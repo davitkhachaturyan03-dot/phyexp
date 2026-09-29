@@ -328,6 +328,12 @@ def train_run(subset_ref: str, name: str, seed: int = 0, steps: int = 5, batch_s
 
     Refuses to launch (raises ``VersionIntegrityError``, no MLflow run is created) if any file of the
     dataset copy differs from its registered digest.
+
+    Disk note (measured 2026-09-29): LeRobot 0.6.1 loads episodes with
+    ``datasets.Dataset.from_parquet(paths, filters=episode_index.isin(...))``, and HF ``datasets`` writes an
+    Arrow cache of the filtered rows under ``HF_DATASETS_CACHE`` for every distinct episode list (~7 GB
+    for a 960-episode subset of this dataset). Subsets are selections in the lineage store, but each new
+    subset trained on costs a cache copy; point ``HF_DATASETS_CACHE`` at a scratch location and clear it.
     """
     subset = Subset.load(subset_ref, lineage_root)
     v = resolve_version(subset.dataset_version_id, lineage_root)
