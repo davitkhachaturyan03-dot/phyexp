@@ -104,7 +104,7 @@ def mermaid(g: dict) -> str:
     lines = ["flowchart LR"]
     for k, n in g["nodes"].items():
         if n["type"] == "run":
-            label = f"{n['stage']}: {n['name']}" + (" [stand-in]" if n.get("stand_in") else "")
+            label = f"{n['stage']}: {n['name']}" + (" [stand-in]" if n.get("stand_in") and "stand-in" not in n["name"] else "")
             lines.append(f'  {nid(k)}["{label}"]')
         elif n["type"] == "raw_files":
             lines.append(f'  {nid(k)}[("raw LIBERO HDF5 x{n["count"]}")]')
