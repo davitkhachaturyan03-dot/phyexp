@@ -1,0 +1,18 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/lineage.py", line 620, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/lineage.py", line 563, in main
+    print(json.dumps({"split_run_id": split_run(a.version, a.reference_per_task, a.seed)}))
+                                      ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/runs.py", line 268, in split_run
+    r.input_subset(all_s, "population", f"{v['name']}/all")
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/runs.py", line 140, in input_subset
+    subset.keys(self.lineage_root), source=_local_source(rel(path)),
+                                           ~~~~~~~~~~~~~^^^^^^^^^^^
+  File "/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/runs.py", line 184, in _local_source
+    from mlflow.data.artifact_dataset_sources import LocalArtifactDatasetSource
+ImportError: cannot import name 'LocalArtifactDatasetSource' from 'mlflow.data.artifact_dataset_sources' (/Users/davit_khachaturyan/Projects/personal/vlaExp/.venv/lib/python3.14/site-packages/mlflow/data/artifact_dataset_sources.py)

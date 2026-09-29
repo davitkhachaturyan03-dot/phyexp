@@ -33,6 +33,8 @@ How lineage is encoded in MLflow (all verified against mlflow 3.16.1 source/beha
 - ``mlflow.source.git.commit`` is set to ``git rev-parse HEAD``. A run refuses to start while tracked or
   untracked files under ``vlapoc/`` or ``scripts/`` differ from that commit, so the recorded SHA is the
   code that ran (``allow_dirty=True`` overrides and is recorded as ``vlapoc.git_dirty=true``).
+- Only FINISHED runs count as producers or consumers; a run that fails part-way is kept (status
+  FAILED) but never becomes a lineage edge.
 - Stand-in stages (no real screening, rollouts or attribution yet) carry ``vlapoc.stand_in=true``
   and write only lineage keys plus clearly named placeholder payloads; no outcome numbers.
 """
@@ -45,6 +47,7 @@ import os
 import subprocess
 import sys
 import time
+import warnings
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -53,6 +56,7 @@ import numpy as np
 import pandas as pd
 
 os.environ.setdefault("MLFLOW_DISABLE_AGENT_HINT", "1")
+warnings.filterwarnings("ignore", message="The specified dataset source can be interpreted in multiple ways")
 
 import mlflow  # noqa: E402
 from mlflow.tracking import MlflowClient  # noqa: E402
@@ -180,10 +184,11 @@ class StageRun:
         mlflow.set_tags({k: str(v) for k, v in d.items()})
 
 
-def _local_source(uri: str):
-    from mlflow.data.artifact_dataset_sources import LocalArtifactDatasetSource
-
-    return LocalArtifactDatasetSource(uri)
+def _local_source(uri: str) -> str:
+    """Repo-relative manifest path; MLflow resolves it to a LocalArtifactDatasetSource with the relative
+    URI kept (measured). That class is generated dynamically in mlflow.data.artifact_dataset_sources and
+    cannot be imported by name, so the string is passed; the resolver's ambiguity warning is silenced."""
+    return uri
 
 
 @contextmanager
@@ -545,7 +550,8 @@ def _inputs(run) -> list[dict]:
 def producers(entity_id: str, lineage_root: Path | None = None) -> list:
     c = client(lineage_root)
     runs = c.search_runs([experiment_id(lineage_root)], filter_string=f"tags.`produced.{entity_id[:DIGEST_LEN]}` LIKE '%'")
-    return [r for r in runs if r.data.tags[f"produced.{entity_id[:DIGEST_LEN]}"].split(":", 1)[1] == entity_id]
+    return [r for r in runs if r.info.status == "FINISHED"
+            and r.data.tags[f"produced.{entity_id[:DIGEST_LEN]}"].split(":", 1)[1] == entity_id]
 
 
 def _short(run) -> dict:
@@ -607,6 +613,8 @@ def consumers(episode_id: str, content_hash: str, lineage_root: Path | None = No
     runs = c.search_runs([experiment_id(lineage_root)], filter_string=f"datasets.digest IN ({quoted})")
     out = []
     for run in runs:
+        if run.info.status != "FINISHED":
+            continue
         via = [i for i in _inputs(run) if i["id"] in ids]
         if via:
             out.append({**_short(run), "via": [f"{i['kind']}:{i['id'][:12]} ({i['role']})" for i in via]})
