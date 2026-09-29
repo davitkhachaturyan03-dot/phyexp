@@ -1,0 +1,16 @@
+AC3.1 registered dataset_version_id = 3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7
+AC3.1 recomputed from dataset      = 3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7  match=True  (19s)
+AC3.1 version dir contents: ['episodes.parquet', 'files.json', 'raw_files.parquet', 'version.json']; files.json entries=77 (data parquet=73); lerobot_root=data/lerobot/libero_spatial_10
+AC3.2 reference=40 candidate=960 overlap=0 union==version: True; reference per task: [2] over 20 tasks; derivation seed=0
+AC3.3 v0/reference: subset_id=b6a72d5e7f31 resolve()=40 indices; served episodes == subset: True; frames served=7915 sum(length_steps)=7915 (every frame via __getitem__) -> OK
+AC3.3 v0/candidate: subset_id=8ee096b72b5a resolve()=960 indices; served episodes == subset: True; frames served=192425 sum(length_steps)=192425 -> OK
+AC3.4 drop_top_k: child c68eacb518e1 n=940 (parent 960 - 20); dropped == 20 highest scores: True; derivation keys=['direction', 'dropped', 'k', 'metric', 'op', 'parent_subset_id', 'score_source', 'score_table_digest', 'tie_break']; parent=8ee096b72b5a score_table_digest=5be220d8a374
+AC3.4 drop_random_k(seed=0) twice -> same subset_id: True (4a06edb41e77); seed=1 differs: True; derivation keys=['dropped', 'k', 'numpy_version', 'op', 'parent_subset_id', 'rng', 'seed']; overlap(top-k dropped, random dropped)=1
+AC3.4 stale content_hash rejected: score table keys != parent subset's episode versions: 1 unknown/stale (e.g. [('libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_p...
+AC3.4 drop-top-k child round-trips through LeRobot: True, frames=190269
+AC3.5 cloned data/lerobot/libero_spatial_10 -> scratch copy in 0.2s
+AC3.5 after flipping 1 bit at byte 50660612 of data/chunk-000/file-017.parquet: VersionIntegrityError: dataset copy at <scratch>/v0_tamper_copy does not match version v0 (3c4dca68d6f1): changed=['data/chunk-000/file-017.parquet'] missing=[] extra=[]
+AC3.5 untouched clone verified first: True (77 files); tamper caught: True; original still verifies: True
+AC3.6 scanned 15 lineage files (json + parquet) under data/lineage/: absolute-path hits=[]
+summary -> tracker/features/2026-09-28-data-lineage-layer/artifacts/s3_summary.json
+       52.73 real       139.29 user        38.47 sys

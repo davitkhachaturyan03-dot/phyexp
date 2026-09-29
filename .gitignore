@@ -1,0 +1,32 @@
+# Local-only repository (owner ruling 2026-09-28, brief.md): source code is versioned so every
+# run can record its git SHA (PoC §2.1 p.3). Data and generated outputs are NOT versioned here;
+# they are identified by content hashes in data/lineage/ instead.
+
+# Data: raw LIBERO HDF5, converted LeRobot datasets, lineage store (versions, subsets, MLflow DB)
+data/
+
+# Python environment and caches
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Generated outputs (training runs, checkpoints, tracking stores)
+outputs/
+checkpoints/
+mlruns/
+mlartifacts/
+mlflow.db
+wandb/
+*.ckpt
+*.safetensors
+
+# Large third-party binaries: the 12 cited papers (~94 MB, re-downloadable from arXiv).
+# The spec itself (docs/VLA_Data_Attribution_PoC.pdf, 131 KB) is versioned.
+docs/papers/
+
+# Personal / machine-local settings
+.idea/
+.claude/settings.local.json
+.DS_Store

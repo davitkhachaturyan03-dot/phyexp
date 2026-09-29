@@ -1,0 +1,10 @@
+{
+  "subsets": {
+    "v0/all": "58b3c415836322d270ffa43038a40a7cfbc6dd38df86d0e84c4ab97db64a6347",
+    "v0/candidate": "8ee096b72b5a4e2b8697cc29f35f1b81aeb270b1f78d593304db9b1845f9410e",
+    "v0/reference": "b6a72d5e7f313bff3690caea2b3b2bef8bffc801d01a6685333546229977e98b"
+  },
+  "versions": {
+    "v0": "3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7"
+  }
+}

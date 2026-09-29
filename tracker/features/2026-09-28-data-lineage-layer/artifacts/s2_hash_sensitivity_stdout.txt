@@ -1,0 +1,6 @@
+catalog hash     3dd60ba676272d8bfcbeef3f2a03235a139ae66b5e231bbc5ea859b01979ec59
+recomputed       3dd60ba676272d8bfcbeef3f2a03235a139ae66b5e231bbc5ea859b01979ec59 True
+1 pixel LSB flip True
+1 action ulp     True
+task string edit True
+drop last frame  True

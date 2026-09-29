@@ -1,0 +1,98 @@
+{
+  "dataset_version_id": "3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7",
+  "episode_hash_scheme": "vlapoc.episode.v1",
+  "files_total_bytes": 7356193961,
+  "lerobot_root": "data/lerobot/libero_spatial_10",
+  "n_episodes": 1000,
+  "n_frames": 200340,
+  "name": "v0",
+  "note": "S1 conversion of raw LIBERO libero_spatial + libero_10, unfiltered",
+  "parent_version_id": null,
+  "registered_utc": "2026-09-29T05:51:59Z",
+  "schema": {
+    "features": {
+      "action": {
+        "dtype": "float32",
+        "names": [
+          "actions"
+        ],
+        "shape": [
+          7
+        ]
+      },
+      "episode_index": {
+        "dtype": "int64",
+        "names": null,
+        "shape": [
+          1
+        ]
+      },
+      "frame_index": {
+        "dtype": "int64",
+        "names": null,
+        "shape": [
+          1
+        ]
+      },
+      "index": {
+        "dtype": "int64",
+        "names": null,
+        "shape": [
+          1
+        ]
+      },
+      "observation.images.image": {
+        "dtype": "image",
+        "names": [
+          "height",
+          "width",
+          "channel"
+        ],
+        "shape": [
+          128,
+          128,
+          3
+        ]
+      },
+      "observation.images.image2": {
+        "dtype": "image",
+        "names": [
+          "height",
+          "width",
+          "channel"
+        ],
+        "shape": [
+          128,
+          128,
+          3
+        ]
+      },
+      "observation.state": {
+        "dtype": "float32",
+        "names": [
+          "state"
+        ],
+        "shape": [
+          8
+        ]
+      },
+      "task_index": {
+        "dtype": "int64",
+        "names": null,
+        "shape": [
+          1
+        ]
+      },
+      "timestamp": {
+        "dtype": "float32",
+        "names": null,
+        "shape": [
+          1
+        ]
+      }
+    },
+    "fps": 20
+  },
+  "scheme": "vlapoc.version.v1"
+}
+.venv/bin/python -m vlapoc.lineage version register --root  --name v0 --note   6.01s user 2.03s system 280% cpu 2.867 total

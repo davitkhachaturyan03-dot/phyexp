@@ -1,0 +1,30 @@
+[
+  {
+    "case": "libero_spatial task 0",
+    "camera": "image",
+    "mad_hub_vs_ours_rot180": 7.44,
+    "mad_hub_vs_raw_unrotated": 71.22,
+    "ours_equals_raw_rot180": true
+  },
+  {
+    "case": "libero_spatial task 0",
+    "camera": "image2",
+    "mad_hub_vs_ours_rot180": 13.96,
+    "mad_hub_vs_raw_unrotated": 75.48,
+    "ours_equals_raw_rot180": true
+  },
+  {
+    "case": "libero_10 task 2 (KITCHEN_SCENE3)",
+    "camera": "image",
+    "mad_hub_vs_ours_rot180": 11.3,
+    "mad_hub_vs_raw_unrotated": 102.49,
+    "ours_equals_raw_rot180": true
+  },
+  {
+    "case": "libero_10 task 2 (KITCHEN_SCENE3)",
+    "camera": "image2",
+    "mad_hub_vs_ours_rot180": 27.58,
+    "mad_hub_vs_raw_unrotated": 74.02,
+    "ours_equals_raw_rot180": true
+  }
+]

@@ -1,0 +1,62 @@
+catalog: 1000 rows x 21 columns -> data/lineage/catalog/libero_spatial_10 (30s)
+unique episode_id: 1000/1000
+1000/1000 hashes match raw
+checks: {"n_episodes": 1000, "unique_episode_ids": 1000, "hash_match_raw": 1000, "task_string_match": 1000, "length_eq_raw_num_samples": 1000, "reward_sum_eq_1": 1000, "first_success_is_last_step": 1000, "dones_last_only": 1000, "init_state_eq_states0": 1000, "control_freq_values": [20]}
+raw files: 20 sha256 recorded; 19.97 GB
+per-suite summary: {
+ "libero_spatial": {
+  "episodes": 500,
+  "tasks": 10,
+  "duration_s": [
+   3.75,
+   6.2,
+   9.85
+  ],
+  "idle_steps_total": 97,
+  "episodes_with_idle": 28,
+  "gripper_toggles": [
+   1,
+   7
+  ],
+  "smoothness": [
+   0.0537,
+   0.0984,
+   0.1611
+  ],
+  "scenes": [
+   "libero_tabletop_manipulation"
+  ]
+ },
+ "libero_10": {
+  "episodes": 500,
+  "tasks": 10,
+  "duration_s": [
+   7.5,
+   13.15,
+   25.85
+  ],
+  "idle_steps_total": 339,
+  "episodes_with_idle": 85,
+  "gripper_toggles": [
+   1,
+   8
+  ],
+  "smoothness": [
+   0.0307,
+   0.0591,
+   0.0979
+  ],
+  "scenes": [
+   "KITCHEN_SCENE3",
+   "KITCHEN_SCENE4",
+   "KITCHEN_SCENE6",
+   "KITCHEN_SCENE8",
+   "LIVING_ROOM_SCENE1",
+   "LIVING_ROOM_SCENE2",
+   "LIVING_ROOM_SCENE5",
+   "LIVING_ROOM_SCENE6",
+   "STUDY_SCENE1"
+  ]
+ }
+}
+       30.33 real       146.60 user        26.49 sys

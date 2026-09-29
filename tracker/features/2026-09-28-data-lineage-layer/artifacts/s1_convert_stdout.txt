@@ -1,0 +1,64 @@
+start 2026-09-28T20:09:34Z
+objc[45286]: Class AVFFrameReceiver is implemented in both /Users/davit_khachaturyan/Projects/personal/vlaExp/.venv/lib/python3.14/site-packages/av/.dylibs/libavdevice.61.3.100.dylib (0x119f003a8) and /opt/homebrew/Cellar/ffmpeg/8.1.1/lib/libavdevice.62.3.101.dylib (0x136378328). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+objc[45286]: Class AVFAudioReceiver is implemented in both /Users/davit_khachaturyan/Projects/personal/vlaExp/.venv/lib/python3.14/site-packages/av/.dylibs/libavdevice.61.3.100.dylib (0x119f003f8) and /opt/homebrew/Cellar/ffmpeg/8.1.1/lib/libavdevice.62.3.101.dylib (0x136378378). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+[convert] 25/1000 episodes, 2400 frames, 8s elapsed, 284 frames/s
+[convert] 50/1000 episodes, 5068 frames, 18s elapsed, 288 frames/s
+[convert] 75/1000 episodes, 8466 frames, 27s elapsed, 308 frames/s
+[convert] 100/1000 episodes, 11775 frames, 38s elapsed, 314 frames/s
+[convert] 125/1000 episodes, 14645 frames, 47s elapsed, 312 frames/s
+[convert] 150/1000 episodes, 17657 frames, 56s elapsed, 313 frames/s
+[convert] 175/1000 episodes, 20259 frames, 66s elapsed, 309 frames/s
+[convert] 200/1000 episodes, 22709 frames, 74s elapsed, 305 frames/s
+[convert] 225/1000 episodes, 26468 frames, 85s elapsed, 312 frames/s
+[convert] 250/1000 episodes, 30188 frames, 95s elapsed, 316 frames/s
+[convert] 275/1000 episodes, 33143 frames, 105s elapsed, 316 frames/s
+[convert] 300/1000 episodes, 35984 frames, 114s elapsed, 315 frames/s
+[convert] 325/1000 episodes, 39065 frames, 124s elapsed, 315 frames/s
+[convert] 350/1000 episodes, 42296 frames, 134s elapsed, 315 frames/s
+[convert] 375/1000 episodes, 45812 frames, 144s elapsed, 318 frames/s
+[convert] 400/1000 episodes, 49407 frames, 155s elapsed, 319 frames/s
+[convert] 425/1000 episodes, 52410 frames, 165s elapsed, 318 frames/s
+[convert] 450/1000 episodes, 55370 frames, 174s elapsed, 317 frames/s
+[convert] 475/1000 episodes, 58922 frames, 185s elapsed, 319 frames/s
+[convert] 500/1000 episodes, 62250 frames, 195s elapsed, 319 frames/s
+[convert] 525/1000 episodes, 69410 frames, 209s elapsed, 333 frames/s
+[convert] 550/1000 episodes, 76950 frames, 223s elapsed, 345 frames/s
+[convert] 575/1000 episodes, 83531 frames, 236s elapsed, 354 frames/s
+[convert] 600/1000 episodes, 89971 frames, 249s elapsed, 361 frames/s
+[convert] 625/1000 episodes, 96663 frames, 263s elapsed, 367 frames/s
+[convert] 650/1000 episodes, 103269 frames, 277s elapsed, 373 frames/s
+[convert] 675/1000 episodes, 109311 frames, 290s elapsed, 378 frames/s
+[convert] 700/1000 episodes, 115703 frames, 303s elapsed, 382 frames/s
+[convert] 725/1000 episodes, 122279 frames, 316s elapsed, 387 frames/s
+[convert] 750/1000 episodes, 128612 frames, 330s elapsed, 390 frames/s
+[convert] 775/1000 episodes, 133372 frames, 341s elapsed, 391 frames/s
+[convert] 800/1000 episodes, 138082 frames, 353s elapsed, 391 frames/s
+[convert] 825/1000 episodes, 144316 frames, 366s elapsed, 394 frames/s
+[convert] 850/1000 episodes, 150838 frames, 379s elapsed, 398 frames/s
+[convert] 875/1000 episodes, 157635 frames, 392s elapsed, 402 frames/s
+[convert] 900/1000 episodes, 164314 frames, 406s elapsed, 405 frames/s
+[convert] 925/1000 episodes, 174315 frames, 423s elapsed, 412 frames/s
+[convert] 950/1000 episodes, 185108 frames, 440s elapsed, 421 frames/s
+[convert] 975/1000 episodes, 192725 frames, 454s elapsed, 424 frames/s
+[convert] 1000/1000 episodes, 200340 frames, 468s elapsed, 428 frames/s
+{"episodes": 1000, "frames": 200340, "wall_time_s": 468.5, "root": "data/lerobot/libero_spatial_10"}
+      471.25 real       652.73 user        80.69 sys
+           731070464  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              814162  page reclaims
+                5193  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+               14482  voluntary context switches
+             1387898  involuntary context switches
+      10887382854786  instructions retired
+       2919774990203  cycles elapsed
+           764970688  peak memory footprint
+exit=0
+end 2026-09-28T20:17:25Z

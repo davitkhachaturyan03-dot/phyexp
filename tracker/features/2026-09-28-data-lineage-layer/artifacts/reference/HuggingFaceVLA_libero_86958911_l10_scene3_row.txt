@@ -1,0 +1,3 @@
+l10_scene3 episode_index 6 frame_index 0 task_index 3
+observation.images.image 256 256 https://datasets-server.huggingface.co/cached-assets/HuggingFaceVLA/libero/--/86958911c0f959db2bbbdb107eb3e17c5f9c798e/--/default/train/1646/observation.images.image/image.jpg
+observation.images.image2 256 256 https://datasets-server.huggingface.co/cached-assets/HuggingFaceVLA/libero/--/86958911c0f959db2bbbdb107eb3e17c5f9c798e/--/default/train/1646/observation.images.image2/image.jpg

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- STORY PAGE TEMPLATE. The vla-summarizer copies this to
+     tracker/features/<feature>/S<n>-<slug>.html and replaces every {{...}}. -->
+<title>S{{n}} {{Story title}} — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← {{Feature title}}</a></p>
+  <h1>S{{n}} · {{Story title}}</h1>
+  <p class="dek">{{One sentence: what this story delivered.}}</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">{{met}}/{{total}}</span></span>
+    <span><b>Depends on</b> {{— / S1}}</span>
+  </div>
+</header>
+
+<h2>Why</h2>
+<p>{{The spec requirement or user ask this serves.}}</p>
+<blockquote>{{PoC quote}} — §{{N.N}}, p. {{N}}</blockquote>
+
+<h2>What was built</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File / function</th><th>What it does</th></tr></thead>
+  <tbody><tr><td><code>{{path::func}}</code></td><td>{{one line}}</td></tr></tbody>
+</table>
+</div>
+
+<h2>Acceptance criteria</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead>
+  <tbody><tr><td>{{AC1.1 text}}</td><td>{{PoC §… p.…}}</td><td>{{✅}}</td><td><code>{{command → output}}</code></td></tr></tbody>
+</table>
+</div>
+
+<h2>Example</h2>
+<p>{{One real input → output walk-through, e.g. a specific episode_id.}}</p>
+<pre><code>{{real command and output}}</code></pre>
+
+<h2>Visual</h2>
+<figure>
+  {{<svg viewBox="0 0 700 280" role="img" aria-label="...">...</svg>}}
+  <figcaption><b>{{Figure title.}}</b> {{What to notice.}}</figcaption>
+</figure>
+
+<h2>Divergences and limitations</h2>
+<p>{{Stated honestly, or "none".}}</p>
+
+</div>
+</body>
+</html>

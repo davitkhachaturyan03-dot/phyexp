@@ -1,0 +1,58 @@
+{
+  "AC3.1": {
+    "registered": "3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7",
+    "recomputed": "3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7",
+    "match": true,
+    "files": 77
+  },
+  "AC3.2": {
+    "reference": 40,
+    "candidate": 960,
+    "overlap": 0,
+    "per_task": [
+      2
+    ],
+    "tasks": 20
+  },
+  "AC3.3": {
+    "v0/reference": {
+      "served_eq_subset": true,
+      "frames": 7915,
+      "expected": 7915,
+      "ok": true
+    },
+    "v0/candidate": {
+      "served_eq_subset": true,
+      "frames": 192425,
+      "expected": 192425,
+      "ok": true
+    }
+  },
+  "AC3.4": {
+    "top_k_child": "c68eacb518e1d48bb67d2b805acb2eb64fb55d566b942d940be261cb6ef5d113",
+    "dropped_eq_expected": true,
+    "random_reproducible": true,
+    "seed_changes": true,
+    "stale_rejected": true,
+    "top_k_roundtrip": true
+  },
+  "AC3.5": {
+    "clean_copy_ok": true,
+    "tamper_caught": true,
+    "original_ok": true
+  },
+  "AC3.6": {
+    "files_scanned": 15,
+    "offenders": []
+  },
+  "names": {
+    "subsets": {
+      "v0/all": "58b3c415836322d270ffa43038a40a7cfbc6dd38df86d0e84c4ab97db64a6347",
+      "v0/candidate": "8ee096b72b5a4e2b8697cc29f35f1b81aeb270b1f78d593304db9b1845f9410e",
+      "v0/reference": "b6a72d5e7f313bff3690caea2b3b2bef8bffc801d01a6685333546229977e98b"
+    },
+    "versions": {
+      "v0": "3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7"
+    }
+  }
+}

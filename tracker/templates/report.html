@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- FEATURE REPORT TEMPLATE. The vla-summarizer copies this to
+     tracker/features/<feature>/report.html and replaces every {{...}}.
+     Delete a section only if there is truly nothing real to say.
+     Never invent numbers: every figure must come from artifacts/ or a command re-run now. -->
+<title>{{Feature title}} — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="../../index.html">← All features</a></p>
+  <h1>{{Feature title}}</h1>
+  <p class="dek">{{One or two sentences: what now exists that did not before, in plain terms.}}</p>
+  <div class="meta">
+    <span><b>Date</b> {{YYYY-MM-DD}}</span>
+    <span><b>Milestone</b> {{e.g. Foundation / Evaluation layer / Ground truth}}</span>
+    <span><b>Stories</b> {{n}} · <b>ACs</b> {{met}}/{{total}}</span>
+    <span><b>Analyzer rounds</b> {{n}}</span>
+    <span><b>Status</b> <span class="pill good">{{verified}}</span></span>
+  </div>
+</header>
+
+<div class="grounding">
+  <h2>Grounding</h2>
+  <dl>
+    <dt>Spec section</dt>
+    <dd>{{PoC §N.N "Title" (p. N) — quote the line(s) that drove this feature.}}</dd>
+    <dt>Papers</dt>
+    <dd>{{docs/papers/<file>.pdf §N — or "none needed"; say which claim you took from it.}}</dd>
+    <dt>Prior art</dt>
+    <dd>{{What already does this off the shelf, how much it covers, and why custom code was or
+        was not justified — from plan.md, as corrected by the analyzer's reinvention audit.}}</dd>
+    <dt>Implements</dt>
+    <dd>{{Which spec requirements this satisfies, and how completely.}}</dd>
+    <dt>Diverges</dt>
+    <dd>{{Where the build departs from the spec and why — or "none". Label owner-approved
+        divergences as such.}}</dd>
+    <dt>Not yet covered</dt>
+    <dd>{{Parts of the cited sections still unbuilt, so the next feature knows the gap.}}</dd>
+  </dl>
+</div>
+
+<h2>How it works</h2>
+<figure>
+  {{<svg viewBox="0 0 700 320" role="img" aria-label="...">dataflow with real module / file names</svg>}}
+  <figcaption><b>{{Figure title.}}</b> {{Where this sits in the PoC architecture (§9).}}</figcaption>
+</figure>
+
+<h2>Stories</h2>
+<a class="entry" href="S1-{{slug}}.html">
+  <div class="top"><span class="title">S1 · {{story title}}</span><span class="date">{{met}}/{{total}} ACs</span></div>
+  <p class="sum">{{One-line outcome, with a real number if there is one.}}</p>
+</a>
+
+<h2>What changed</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File</th><th>Change</th><th class="num">Lines</th></tr></thead>
+  <tbody>
+    <tr><td><code>{{path}}</code></td><td>{{what it does}}</td><td class="num">{{+n}}</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Demo</h2>
+<!-- The centrepiece. Show the feature working on real data. Inline SVG only. -->
+<div class="tiles">
+  <div class="tile"><div class="label">{{metric}}</div><div class="value">{{value}}</div><div class="note">{{how measured}}</div></div>
+</div>
+<figure>
+  {{<svg viewBox="0 0 700 320" role="img" aria-label="...">...</svg>}}
+  <figcaption><b>{{Figure title.}}</b> {{What the reader should notice, and what the axes are.}}</figcaption>
+</figure>
+
+<h3>Reproduce it</h3>
+<pre><code>{{exact command(s), runnable from the repo root}}</code></pre>
+<pre><code>{{real captured output — trimmed, never fabricated}}</code></pre>
+
+<h2>Verification</h2>
+<p>{{What the analyzer reproduced, and how. If something is unverified, say so plainly.}}</p>
+
+<h2>Process trail</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>Round</th><th>Verdict</th><th>Sent back to</th><th>What was caught</th></tr></thead>
+  <tbody>
+    <tr><td>{{1}}</td><td>{{REWORK}}</td><td>{{executor}}</td><td>{{specific finding}}</td></tr>
+  </tbody>
+</table>
+</div>
+<h3>Reinvention audit</h3>
+<div class="scroll">
+<table>
+  <thead><tr><th>Mechanism</th><th>Open-source alternative</th><th>Decision</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td><code>{{file:line}}</code></td><td>{{library.function}}</td><td>{{replaced / kept}}</td><td>{{evidence}}</td></tr>
+  </tbody>
+</table>
+</div>
+<h3>Disputes and owner rulings</h3>
+<p>{{Each dispute, the owner's ruling verbatim, and what changed — or "none".}}</p>
+
+<h2>How to read the code</h2>
+<ol>
+  <li><code>{{path}}</code> — {{why start here}}</li>
+</ol>
+
+<h2>Next</h2>
+<ul>
+  <li>{{The next step this unblocks, per the milestone table on p. 20.}}</li>
+</ul>
+
+<h2>Changes since first release</h2>
+<p class="empty">None yet. Later changes are logged in <a href="changelog.md">changelog.md</a>.</p>
+
+<footer class="doc">
+  Grounded in <a href="../../../docs/VLA_Data_Attribution_PoC.pdf">VLA_Data_Attribution_PoC.pdf</a>
+  · feature record: <a href="plan.md">plan</a> · <a href="execution-log.md">execution log</a>
+  · <a href="refactor.md">refactor</a> · analyzer rounds in <code>analysis-r*.md</code>
+</footer>
+
+</div>
+</body>
+</html>

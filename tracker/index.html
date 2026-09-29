@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VLA PoC — Build Tracker</title>
+<link rel="stylesheet" href="assets/tracker.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow">VLA Training-Data Attribution</p>
+  <h1>Build Tracker</h1>
+  <p class="dek">One folder per feature under <code>features/</code>, each grounded back into
+  <a href="../docs/VLA_Data_Attribution_PoC.pdf">the PoC document</a> or a paper in
+  <a href="../docs/papers/">docs/papers/</a>. Each holds the plan, the execution evidence, the
+  analyzer's verdicts and a stakeholder report. Newest first.</p>
+  <div class="meta">
+    <span><b>Spec</b> docs/VLA_Data_Attribution_PoC.pdf (21 pp)</span>
+    <span><b>Pipeline</b> planner → executor → analyzer → refactorer → summarizer</span>
+  </div>
+</header>
+
+<h2>Features</h2>
+
+<!-- FEATURES:START — newest feature goes directly below this line. Markup:
+<a class="entry" href="features/2026-09-28-<slug>/report.html">
+  <div class="top"><span class="title">Feature title</span><span class="date">2026-09-28</span></div>
+  <p class="sum">What now exists, with one real number.</p>
+  <div class="tags"><span class="pill accent">§2.1 p.3</span><span class="pill">tool used</span>
+  <span class="pill good">verified</span></div>
+</a>
+-->
+<div class="empty">No features built yet.</div>
+<!-- FEATURES:END -->
+
+<h2>Spec coverage</h2>
+<p>Which parts of the PoC are built, where, and where the build departs from the spec.
+One row per PoC section a feature touches.</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>PoC §</th><th>Pages</th><th>What is built</th><th>Feature</th><th>Divergence from spec</th></tr></thead>
+  <tbody>
+<!-- COVERAGE:START — one <tr> per § a feature touches. Label owner-approved divergences. Markup:
+    <tr><td>§2.1</td><td>3</td><td>Episode lineage via …</td>
+        <td><a href="features/2026-09-28-<slug>/report.html">slug</a></td><td>none</td></tr>
+-->
+<!-- COVERAGE:END -->
+  </tbody>
+</table>
+</div>
+
+<footer class="doc">
+  Reports are static, self-contained HTML. Open any of them directly in a browser:
+  no server, no build step, no network access required.
+</footer>
+
+</div>
+</body>
+</html>
