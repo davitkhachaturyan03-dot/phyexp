@@ -1,0 +1,29 @@
+{
+  "AC4.3": {
+    "raised": true,
+    "message": "refusing to edit 1 reference-split episode(s) (PoC \u00a78.7 p.15: corrupt only the training copy): ['libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_14']",
+    "nothing_written": true
+  },
+  "AC4.4": {
+    "episode": "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_0",
+    "len_before": 272,
+    "len_after": 292,
+    "meta_len": 292,
+    "served": 292,
+    "total_frames": 200360,
+    "contiguous": true,
+    "idle_ok": true,
+    "diff": {
+      "changed": 1,
+      "identical": 999
+    },
+    "recomputed_id_match": true,
+    "timing_s": {
+      "delete": 181.3,
+      "write_edits": 0.8,
+      "merge": 74.4,
+      "total": 277.9
+    },
+    "pass": true
+  }
+}

@@ -1,0 +1,10 @@
+AC4.3 editing reference episode libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_14: LineageError raised: True
+AC4.3 message: refusing to edit 1 reference-split episode(s) (PoC §8.7 p.15: corrupt only the training copy): ['libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_14']
+AC4.3 nothing written: True; protected ids for v0: 40
+AC4.4 derive_version(v0, idle_padding x20 on libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_0) -> f4b0ef06952b in 278s, timing {'delete': 181.3, 'write_edits': 0.8, 'merge': 74.4, 'total': 277.9}
+AC4.4 length 272 -> 292 (catalog); meta/episodes length=292; LeRobotDataset(episodes=[999]) frames=292; info total_frames=200360 (v0 200340 + 20); full load frames=200360; from/to contiguous=True; inserted frames idle=True
+AC4.4 diff v0 -> v0pad: changed 1, identical 999; recomputed id matches: True; labels rows: 1
+AC4.4 scratch dataset and scratch lineage root removed: True
+summary -> tracker/features/2026-09-28-data-lineage-layer/artifacts/s4_summary.json
+      301.91 real       913.21 user       195.14 sys
+exit=0

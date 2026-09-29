@@ -1,0 +1,169 @@
+"""Verify S5 (every stage as an MLflow run; trace / consumers / diff; check_scores) against AC5.1-AC5.6.
+
+Runs in an isolated scratch lineage root (``data/lineage_scratch/s5``: copies of the version, subset and
+split manifests, its own ``mlflow.db``), so these tiny test runs never mix with the real chain (S6).
+
+Grounding: PoC §2.1 p.3 (tie-in list; "what changed between the good run and the bad run?"), §2.3 p.4
+(seeds), §9.1-9.2 pp.18-19 (eval tied to checkpoint; screening vs attribution keys).
+
+    .venv/bin/python scripts/verify_runs_s5.py
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+import pandas as pd
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
+os.environ.setdefault("MLFLOW_DISABLE_AGENT_HINT", "1")
+
+from vlapoc.catalog import sha256_file  # noqa: E402
+from vlapoc.derive import load_labels  # noqa: E402
+from vlapoc.lineage import LINEAGE_ROOT, LineageError, Subset, resolve_version, version_episodes  # noqa: E402
+from vlapoc import runs  # noqa: E402
+
+FEATURE_DIR = REPO_ROOT / "tracker" / "features" / "2026-09-28-data-lineage-layer"
+LR = REPO_ROOT / "data" / "lineage_scratch" / "s5"
+RUNS = LR / "runs"
+
+
+def setup() -> None:
+    if LR.exists():
+        shutil.rmtree(LR)
+    LR.mkdir(parents=True)
+    for d in ("versions", "subsets", "splits"):
+        shutil.copytree(LINEAGE_ROOT / d, LR / d)
+    shutil.copy(LINEAGE_ROOT / "names.json", LR / "names.json")
+
+
+def main() -> int:
+    setup()
+    s: dict = {}
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, capture_output=True, text=True).stdout.strip()
+    print(f"scratch lineage root: {LR.relative_to(REPO_ROOT)}; tracking uri scheme: {runs.tracking_uri(LR).split(':')[0]}; HEAD {head[:12]}")
+
+    # upstream runs so trace() can reach raw files
+    b = runs.build_run("v0", lineage_root=LR, verify_raw=False)
+    sp = runs.split_run("v0", 2, 0, lineage_root=LR)
+    ref = Subset.load("v0/reference", LR)
+    # run A: train on v0/reference; select: drop 5 random; run B: train on the child
+    a = runs.train_run("v0/reference", "s5-train-A", seed=0, steps=2, batch_size=2, runs_root=RUNS, lineage_root=LR)
+    sel, child = runs.select_run("v0/reference", "s5-select-random5", "drop_random_k", k=5, seed=0, lineage_root=LR)
+    bb = runs.train_run(child.subset_id, "s5-train-B", seed=0, steps=2, batch_size=2, runs_root=RUNS, lineage_root=LR)
+    a1 = runs.train_run("v0/reference", "s5-train-A-seed1", seed=1, steps=2, batch_size=2, runs_root=RUNS, lineage_root=LR)
+    ev, plan = runs.eval_standin(a["run_id"], "s5-eval-A", RUNS / "s5-eval-A", rollouts_per_task=50, lineage_root=LR)
+    c = runs.client(LR)
+    exp = runs.experiment_id(LR)
+
+    # ---- AC5.1 ------------------------------------------------------------------------------------
+    allr = c.search_runs([exp])
+    stages = sorted({r.data.tags["stage"] for r in allr})
+    found = c.search_runs([exp], filter_string=f"datasets.digest = '{ref.subset_id[:32]}'")
+    names_found = sorted(r.info.run_name for r in found)
+    ra = c.get_run(a["run_id"])
+    di = [d for d in ra.inputs.dataset_inputs][0]
+    print(f"AC5.1 runs: {len(allr)}, stages {stages} (all in {runs.STAGES}: {set(stages) <= set(runs.STAGES)})")
+    print(f"AC5.1 train-A input: name={di.dataset.name} digest={di.dataset.digest} source={di.dataset.source} "
+          f"tags={ {t.key: t.value[:16] for t in di.tags} }")
+    print(f"AC5.1 search_runs(datasets.digest = '{ref.subset_id[:32]}') -> {names_found}")
+    print(f"AC5.1 eval output tags: output.rollouts.sha256={c.get_run(ev).data.tags['output.rollouts.sha256'][:16]}... "
+          f"== sha256(file): {c.get_run(ev).data.tags['output.rollouts.sha256'] == sha256_file(plan)}")
+    s["AC5.1"] = {"runs": len(allr), "stages": stages, "digest_search": names_found}
+
+    # ---- AC5.2 ------------------------------------------------------------------------------------
+    p, t = ra.data.params, ra.data.tags
+    arts = [x.path for x in c.list_artifacts(a["run_id"])] + [x.path for x in c.list_artifacts(a["run_id"], "checkpoint")] \
+        + [x.path for x in c.list_artifacts(a["run_id"], "subset")]
+    ck = REPO_ROOT / t["checkpoint.path"]
+    norm = sorted(ck.glob("policy_preprocessor_step_*_normalizer_processor.safetensors"))[0]
+    fields = {
+        "dataset_version_id": p["dataset_version_id"][:12], "subset_id": p["subset_id"][:12],
+        "episode_id_list_artifact": [x for x in arts if x.startswith("subset/")],
+        "mixture_weights": p["mixture_weights"], "augmentation": p["augmentation"],
+        "train_config_artifacts": [x for x in arts if x.endswith(".json") and "subset/" not in x],
+        "git_sha": t["mlflow.source.git.commit"][:12], "git_sha_is_HEAD": t["mlflow.source.git.commit"] == head,
+        "git_dirty": t["vlapoc.git_dirty"], "seed": p["seed"], "checkpoint.path": t["checkpoint.path"],
+        "weights_sha256_matches_disk": t["checkpoint.weights.sha256"] == sha256_file(ck / "model.safetensors"),
+        "normalizer_sha256_matches_disk": t["checkpoint.normalizer_stats.sha256"] == sha256_file(norm),
+        "stats_json_sha256": t["dataset.stats_json.sha256"][:12], "episodes_match": t["checkpoint.train_config.episodes_match_subset"],
+        "normalization_stats": p["normalization_stats"][:60] + "...",
+    }
+    for k, v in fields.items():
+        print(f"AC5.2 {k}: {v}")
+    s["AC5.2"] = fields
+
+    # ---- AC5.3 ------------------------------------------------------------------------------------
+    re_ = c.get_run(ev)
+    ep = re_.data.params
+    print(f"AC5.3 eval run: checkpoint_sha256 == train-A weights: {ep['checkpoint_sha256'] == a['weights_sha256']}; "
+          f"train_run_id == A: {ep['train_run_id'] == a['run_id']}; suites={ep['suites']}; libero_task_ids={ep['libero_task_ids']}; "
+          f"init_state_indices={ep['init_state_indices']}; seeds={ep['seeds']}; loaded={re_.data.tags['eval.checkpoint.loaded']} "
+          f"({re_.data.tags['eval.checkpoint.n_params']} params); stand_in={re_.data.tags['vlapoc.stand_in']}")
+    pl = pd.read_parquet(plan)
+    print(f"AC5.3 rollout plan rows={len(pl)} outcomes={pl['outcome'].unique().tolist()} columns={list(pl.columns)}")
+    s["AC5.3"] = {"ckpt_match": ep["checkpoint_sha256"] == a["weights_sha256"], "train_run": ep["train_run_id"] == a["run_id"],
+                  "plan_rows": len(pl), "outcomes": pl["outcome"].unique().tolist()}
+
+    # ---- AC5.4 ------------------------------------------------------------------------------------
+    tr = runs.trace(bb["run_id"], LR)
+    chain = [f"{v['stage']}:{v['name']}" for v in tr["runs"].values()]
+    print(f"AC5.4 trace(s5-train-B) runs: {chain}; raw files reached: {len(tr['raw_files'] or [])}")
+    dropped = child.derivation["dropped"][0]
+    h = version_episodes("v0", LR).set_index("episode_id").loc[dropped, "content_hash"]
+    cons = runs.consumers(dropped, h, LR)
+    cnames = [x["name"] for x in cons]
+    print(f"AC5.4 consumers({dropped.split('/')[-2][:30]}.../{dropped.split('/')[-1]}@{h[:12]}): {cnames}; "
+          f"lists train-A: {'s5-train-A' in cnames}; lists train-B (dropped it): {'s5-train-B' in cnames}")
+    d_ab = runs.diff(a["run_id"], bb["run_id"], LR)
+    d_seed = runs.diff(a["run_id"], a1["run_id"], LR)
+    print(f"AC5.4 diff(A, B): removed {d_ab['data']['n_removed']}, added {d_ab['data']['n_added']}, changed_version "
+          f"{d_ab['data']['n_changed_version']}; params {list(d_ab['params'])}; config {list(d_ab['config'])}; git same {d_ab['git']['same']}")
+    print(f"AC5.4 diff(A, A-seed1): data removed/added/changed {d_seed['data']['n_removed']}/{d_seed['data']['n_added']}/"
+          f"{d_seed['data']['n_changed_version']}; params {d_seed['params']}; config {d_seed['config']}")
+    s["AC5.4"] = {"trace": chain, "raw_files": len(tr["raw_files"] or []), "consumers": cnames,
+                  "diff_ab": {k: d_ab["data"][k] for k in ("n_removed", "n_added", "n_changed_version")},
+                  "diff_seed_params": d_seed["params"], "diff_seed_config": d_seed["config"]}
+
+    # ---- AC5.5 check_scores ---------------------------------------------------------------------
+    labels = load_labels("v1", LR)
+    corrupted = labels["episode_id"].tolist()[:6]
+    ref_ids = list(Subset.load("v1/reference", LR).episode_ids[:4])
+    mix = Subset(resolve_version("v1", LR)["dataset_version_id"], tuple(corrupted + ref_ids), {"op": "manual", "note": "AC5.5 test"})
+    mix.save(LR)
+    rv1 = runs.train_run(mix.subset_id, "s5-train-v1-mix", seed=0, steps=2, batch_size=2, runs_root=RUNS, lineage_root=LR)
+    good = mix.keys(LR)
+    ok = runs.check_scores(good.assign(score=0.0), rv1["run_id"], LR)
+    e0 = version_episodes("v0", LR).set_index("episode_id")
+    stale = good.copy()
+    stale["content_hash"] = e0.loc[stale["episode_id"], "content_hash"].to_numpy()  # clean v0 hashes
+    try:
+        runs.check_scores(stale, rv1["run_id"], LR)
+        rejected = None
+    except LineageError as e:
+        rejected = str(e)
+    print(f"AC5.5 run trained on v1 subset (6 corrupted + 4 reference episodes): v1-keyed table accepted {ok}")
+    print(f"AC5.5 same episodes keyed by clean v0 hashes -> rejected: {rejected}")
+    s["AC5.5"] = {"accepted": ok, "rejected": rejected}
+
+    # ---- AC5.6 ------------------------------------------------------------------------------------
+    s["AC5.6"] = {"tracking_uri_scheme": runs.tracking_uri(LR).split(":")[0],
+                  "hf_hub_offline": os.environ.get("HF_HUB_OFFLINE"), "wandb_installed": shutil.which("wandb") is not None}
+    print(f"AC5.6 tracking uri scheme={s['AC5.6']['tracking_uri_scheme']}; HF_HUB_OFFLINE={s['AC5.6']['hf_hub_offline']}; "
+          f"wandb CLI installed={s['AC5.6']['wandb_installed']}")
+    s["run_ids"] = {"build": b, "split": sp, "A": a["run_id"], "select": sel, "B": bb["run_id"], "A_seed1": a1["run_id"],
+                    "eval": ev, "v1mix": rv1["run_id"]}
+    (FEATURE_DIR / "artifacts" / "s5_summary.json").write_text(json.dumps(s, indent=2, default=str))
+    (FEATURE_DIR / "artifacts" / "s5_diff_A_B.json").write_text(json.dumps(d_ab, indent=2, default=str))
+    print("summary -> tracker/features/2026-09-28-data-lineage-layer/artifacts/s5_summary.json")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

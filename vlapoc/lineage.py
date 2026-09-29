@@ -464,6 +464,21 @@ def drop_random_k(parent: Subset, k: int, seed: int, lineage_root: Path | None =
     return child
 
 
+def diff_versions(a: str, b: str, lineage_root: Path | None = None) -> dict:
+    """Episode-version difference between two dataset versions (by episode_id and content_hash)."""
+    ea = version_episodes(a, lineage_root).set_index("episode_id")["content_hash"]
+    eb = version_episodes(b, lineage_root).set_index("episode_id")["content_hash"]
+    common = ea.index.intersection(eb.index)
+    changed = sorted(common[(ea[common] != eb[common]).to_numpy()])
+    return {
+        "a": resolve_version(a, lineage_root)["dataset_version_id"],
+        "b": resolve_version(b, lineage_root)["dataset_version_id"],
+        "changed": len(changed), "identical": int(len(common) - len(changed)),
+        "added": sorted(set(eb.index) - set(ea.index)), "removed": sorted(set(ea.index) - set(eb.index)),
+        "changed_ids": changed,
+    }
+
+
 # ---------------------------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------------------------
@@ -495,11 +510,37 @@ def main(argv: list[str] | None = None) -> int:
     m.add_argument("--version", required=True)
     m.add_argument("--reference-per-task", type=int, default=2)
     m.add_argument("--seed", type=int, default=0)
+    m.add_argument("--track", action="store_true", help="record as an MLflow split run")
     pss = sub.add_parser("subset").add_subparsers(dest="sscmd", required=True)
     ss = pss.add_parser("show")
     ss.add_argument("ref")
     ss.add_argument("--ids", action="store_true", help="print the episode IDs too")
     sub.add_parser("names")
+    vd = pv.add_parser("diff")
+    vd.add_argument("a")
+    vd.add_argument("b")
+    vd.add_argument("--ids", action="store_true")
+    pb = sub.add_parser("build").add_subparsers(dest="bcmd", required=True)
+    bv = pb.add_parser("verify", help="MLflow build run for an existing version (re-verify vs raw)")
+    bv.add_argument("version")
+    d = sub.add_parser("derive", help="S4 demo derivation (RoboDrop action noise), recorded as an MLflow run")
+    d.add_argument("--parent", default="v0")
+    d.add_argument("--name", default="v1")
+    d.add_argument("--demo-action-noise", action="store_true", required=True)
+    d.add_argument("--per-task", type=int, default=5)
+    d.add_argument("--seed", type=int, default=0)
+    d.add_argument("--no-track", action="store_true", help="derive without an MLflow run")
+    t = sub.add_parser("trace")
+    t.add_argument("run_id")
+    cs = sub.add_parser("consumers")
+    cs.add_argument("episode_version", help="<episode_id>@<content_hash>")
+    df_ = sub.add_parser("diff")
+    df_.add_argument("run_a")
+    df_.add_argument("run_b")
+    df_.add_argument("--ids", action="store_true")
+    ck = sub.add_parser("check-scores")
+    ck.add_argument("table", type=Path)
+    ck.add_argument("train_run_id")
     a = p.parse_args(argv)
 
     if a.cmd == "version" and a.vcmd == "register":
@@ -516,6 +557,10 @@ def main(argv: list[str] | None = None) -> int:
         new = recompute_version_id(a.ref, a.root)
         _print({"registered": v["dataset_version_id"], "recomputed": new, "match": new == v["dataset_version_id"]})
     elif a.cmd == "split":
+        if a.track:
+            from vlapoc.runs import split_run
+
+            print(json.dumps({"split_run_id": split_run(a.version, a.reference_per_task, a.seed)}))
         out = make_splits(a.version, a.reference_per_task, a.seed)
         _print(out["record"])
     elif a.cmd == "subset":
@@ -527,6 +572,47 @@ def main(argv: list[str] | None = None) -> int:
         _print(rec)
     elif a.cmd == "names":
         _print(load_names())
+    elif a.cmd == "version" and a.vcmd == "diff":
+        out = diff_versions(a.a, a.b)
+        if not a.ids:
+            out["changed_ids"] = out["changed_ids"][:3] + ([f"... {len(out['changed_ids']) - 3} more"] if len(out["changed_ids"]) > 3 else [])
+        _print(out)
+        print(f"changed {out['changed']}, identical {out['identical']}, added {len(out['added'])}, removed {len(out['removed'])}")
+    elif a.cmd == "build":
+        from vlapoc.runs import build_run
+
+        print(json.dumps({"build_run_id": build_run(a.version)}))
+    elif a.cmd == "derive":
+        if a.no_track:
+            from vlapoc.derive import derive_demo_action_noise
+
+            _print(derive_demo_action_noise(a.parent, a.name, a.per_task, a.seed))
+        else:
+            from vlapoc.runs import derive_run
+
+            rid, out = derive_run(a.parent, a.name, a.per_task, a.seed)
+            _print({"derive_run_id": rid, **out})
+    elif a.cmd == "trace":
+        from vlapoc.runs import trace
+
+        _print(trace(a.run_id))
+    elif a.cmd == "consumers":
+        from vlapoc.runs import consumers
+
+        eid, _, h = a.episode_version.rpartition("@")
+        _print(consumers(eid, h))
+    elif a.cmd == "diff":
+        from vlapoc.runs import diff
+
+        out = diff(a.run_a, a.run_b)
+        if not a.ids:
+            for k in ("added", "removed", "changed_version"):
+                out["data"][k] = out["data"][k][:5] + ([f"... {len(out['data'][k]) - 5} more"] if len(out["data"][k]) > 5 else [])
+        _print(out)
+    elif a.cmd == "check-scores":
+        from vlapoc.runs import check_scores
+
+        _print(check_scores(pd.read_parquet(a.table), a.train_run_id))
     return 0
 
 
