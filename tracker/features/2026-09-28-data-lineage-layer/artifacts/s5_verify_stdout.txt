@@ -1,0 +1,33 @@
+scratch lineage root: data/lineage_scratch/s5; tracking uri scheme: sqlite; HEAD 9a754f3c8d47
+AC5.1 runs: 7, stages ['build', 'eval', 'select', 'split', 'train'] (all in ('build', 'split', 'derive', 'screen', 'select', 'train', 'eval', 'attribute'): True)
+AC5.1 train-A input: name=v0/reference digest=b6a72d5e7f313bff3690caea2b3b2bef source={"uri": "data/lineage_scratch/s5/subsets/b6a72d5e7f313bff3690caea2b3b2bef8bffc801d01a6685333546229977e98b.json"} tags={'mlflow.data.context': 'training', 'vlapoc.dataset_version_id': '3c4dca68d6f196c1', 'vlapoc.id': 'b6a72d5e7f313bff', 'vlapoc.kind': 'subset'}
+AC5.1 search_runs(datasets.digest = 'b6a72d5e7f313bff3690caea2b3b2bef') -> ['s5-select-random5', 's5-train-A', 's5-train-A-seed1']
+AC5.1 eval output tags: output.rollouts.sha256=7af95d21b0dd9951... == sha256(file): True
+AC5.2 dataset_version_id: 3c4dca68d6f1
+AC5.2 subset_id: b6a72d5e7f31
+AC5.2 episode_id_list_artifact: ['subset/b6a72d5e7f313bff3690caea2b3b2bef8bffc801d01a6685333546229977e98b.json']
+AC5.2 mixture_weights: uniform over the subset's frames (LeRobot default sampler; sample_weighting=None)
+AC5.2 augmentation: none (dataset.image_transforms.enable=false)
+AC5.2 train_config_artifacts: ['vlapoc_train_spec.json', 'checkpoint/config.json', 'checkpoint/train_config.json']
+AC5.2 git_sha: 9a754f3c8d47
+AC5.2 git_sha_is_HEAD: True
+AC5.2 git_dirty: false
+AC5.2 seed: 0
+AC5.2 checkpoint.path: data/lineage_scratch/s5/runs/s5-train-A-20260929T073820Z/lerobot/checkpoints/000002/pretrained_model
+AC5.2 weights_sha256_matches_disk: True
+AC5.2 normalizer_sha256_matches_disk: True
+AC5.2 stats_json_sha256: e7881df78102
+AC5.2 episodes_match: true
+AC5.2 normalization_stats: full dataset meta/stats.json of the version (LeRobot default...
+AC5.3 eval run: checkpoint_sha256 == train-A weights: True; train_run_id == A: True; suites=["libero_10", "libero_spatial"]; libero_task_ids={"libero_10": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], "libero_spatial": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]}; init_state_indices=0..49 (LIBERO fixed init states); seeds=seed_base + init_state_index, seed_base=0; loaded=true (51600263 params); stand_in=true
+AC5.3 rollout plan rows=1000 outcomes=['not_run'] columns=['suite', 'libero_task_id', 'task_name', 'init_state_index', 'seed', 'checkpoint_sha256', 'outcome', 'stand_in']
+AC5.4 trace(s5-train-B) runs: ['train:s5-train-B', 'select:s5-select-random5', 'split:split-v0', 'build:build-v0']; raw files reached: 20
+AC5.4 consumers(LIVING_ROOM_SCENE2_put_both_th.../demo_41@b5442591b156): ['s5-select-random5', 's5-train-A', 's5-train-A-seed1', 'split-v0']; lists train-A: True; lists train-B (dropped it): False
+AC5.4 diff(A, B): removed 5, added 0, changed_version 0; params []; config []; git same True
+AC5.4 diff(A, A-seed1): data removed/added/changed 0/0/0; params {'seed': ('0', '1')}; config {'seed': (0, 1)}
+AC5.5 run trained on v1 subset (6 corrupted + 4 reference episodes): v1-keyed table accepted {'rows': 10, 'training_episodes': 10, 'covered': 10, 'ok': True}
+AC5.5 same episodes keyed by clean v0 hashes -> rejected: 6/10 score rows are not episode versions trained on by run f8fc1a9eae50 (e.g. libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate/demo_12@7707f6ecd8f9)
+AC5.6 tracking uri scheme=sqlite; HF_HUB_OFFLINE=1; wandb CLI installed=False
+summary -> tracker/features/2026-09-28-data-lineage-layer/artifacts/s5_summary.json
+       55.09 real       177.66 user        34.79 sys
+exit=0

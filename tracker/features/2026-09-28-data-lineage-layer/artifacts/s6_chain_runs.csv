@@ -1,0 +1,15 @@
+step,run_id,name,stage,stand_in,status,git,chain
+build,bc8f7d09a7bf47adb59132d874b1236f,build-v0,build,false,FINISHED,5d9d272e88c7,(S4 command)
+split,30411f67f697488791db58d8f3b7198c,split-v0,split,false,FINISHED,398e037c724d,(S4 command)
+derive,30f34cd056ab44e69dcf606f067d8871,derive-v1,derive,false,FINISHED,398e037c724d,(S4 command)
+screen,4996309b2f0149e5be8b73c0196e22e6,screen-v1 [stand-in],screen,true,FINISHED,7effd257e5f1,dry-run-k20-s0-20260929T074215Z
+train_full_s0,ff64512b40974587a9d711cd8e4f8b04,train-full-s0,train,false,FINISHED,7effd257e5f1,dry-run-k20-s0-20260929T074215Z
+train_full_s1,dc6b5f18ed544c6cb535d90754ebbf0a,train-full-s1,train,false,FINISHED,7effd257e5f1,dry-run-k20-s0-20260929T074215Z
+eval_full_s0,4a3544cc4b4b4b5e9ec8f3bbbc1bfa1f,eval-train-full-s0 [stand-in],eval,true,FINISHED,7effd257e5f1,dry-run-k20-s0-20260929T074215Z
+attribute,babbdb329ed648e6a77c32cc54043908,attribute-train-full-s0 [stand-in],attribute,true,FINISHED,7effd257e5f1,dry-run-k20-s0-20260929T074215Z
+select_top,f64a0385917b46a987169f0d384dcaec,select-drop-top-20,select,false,FINISHED,7effd257e5f1,dry-run-k20-s0-20260929T074215Z
+select_rand,cb4093eb7ed74d6cabe3f87a952f4de8,select-drop-random-20-s0,select,false,FINISHED,7effd257e5f1,dry-run-k20-s0-20260929T074215Z
+train_top,9339d4685a8e4d009c191fa4641ccf3a,train-drop-top-20,train,false,FINISHED,7effd257e5f1,dry-run-k20-s0-20260929T074215Z
+train_rand,8b380586faee401288cdd58664242938,train-drop-random-20,train,false,FINISHED,7effd257e5f1,dry-run-k20-s0-20260929T074215Z
+eval_top,19e33c426be04397a5d81164f7b8fd58,eval-train-drop-top-20 [stand-in],eval,true,FINISHED,7effd257e5f1,dry-run-k20-s0-20260929T074215Z
+eval_rand,8d340d9e244146a8968bc0deef434d18,eval-train-drop-random-20 [stand-in],eval,true,FINISHED,7effd257e5f1,dry-run-k20-s0-20260929T074215Z

@@ -1,0 +1,60 @@
+{
+  "runs": [
+    {
+      "run_id": "ff64512b40974587a9d711cd8e4f8b04",
+      "name": "train-full-s0",
+      "stage": "train",
+      "stand_in": false,
+      "git": "7effd257e5f1",
+      "status": "FINISHED"
+    },
+    {
+      "run_id": "dc6b5f18ed544c6cb535d90754ebbf0a",
+      "name": "train-full-s1",
+      "stage": "train",
+      "stand_in": false,
+      "git": "7effd257e5f1",
+      "status": "FINISHED"
+    }
+  ],
+  "data": {
+    "subset_a": "69684e60952903867d9a40f106a4f988ec6979ff3584c747fef586bcd4d47fa1",
+    "subset_b": "69684e60952903867d9a40f106a4f988ec6979ff3584c747fef586bcd4d47fa1",
+    "dataset_version_a": "16076b9c5cb2a0e8c5d291fc0766977dc7286c6b9f87df39bd87fe5c17cd85f8",
+    "dataset_version_b": "16076b9c5cb2a0e8c5d291fc0766977dc7286c6b9f87df39bd87fe5c17cd85f8",
+    "added": [],
+    "removed": [],
+    "changed_version": [],
+    "n_added": 0,
+    "n_removed": 0,
+    "n_changed_version": 0
+  },
+  "params": {
+    "seed": [
+      "0",
+      "1"
+    ]
+  },
+  "config": {
+    "seed": [
+      0,
+      1
+    ]
+  },
+  "git": {
+    "a": "7effd257e5f14a190e6dfc35d6f05059dddca145",
+    "b": "7effd257e5f14a190e6dfc35d6f05059dddca145",
+    "same": true
+  },
+  "ignored_bookkeeping": [
+    "checkpoint_path",
+    "dataset.episodes",
+    "job_name",
+    "n_episodes",
+    "n_frames",
+    "output_dir",
+    "run_name",
+    "subset_id",
+    "wandb.run_id"
+  ]
+}

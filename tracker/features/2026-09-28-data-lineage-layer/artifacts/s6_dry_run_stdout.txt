@@ -1,0 +1,61 @@
+chain dry-run-k20-s0-20260929T074215Z; git HEAD 7effd257e5f1 dirty=False
+[reuse] build(v0): run bc8f7d09a7bf (build-v0) already produced 3c4dca68d6f1
+[reuse] split(v0): run 30411f67f697 (split-v0) already produced 8ee096b72b5a
+[reuse] derive(v1): run 30f34cd056ab (derive-v1) produced 16076b9c5cb2
+[run] screen stand-in: 4996309b2f01
+[run] train-full-s0: ff64512b4097 (16.4s, 960 episodes)
+[run] train-full-s1: dc6b5f18ed54 (7.5s)
+[run] eval + attribute stand-ins: 4a3544cc4b4b, babbdb329ed6
+[run] selects: top-k child c598f5692b40, random-k child 8ccebcb5182c
+[run] train on drop-top-k 9339d4685a8e, drop-random-k 8b380586faee; evals 19e33c426be0, 8d340d9e2441
+AC6.1 chain runs:
+         step                                 name     stage stand_in   status          git                           chain
+        build                             build-v0     build    false FINISHED 5d9d272e88c7                    (S4 command)
+        split                             split-v0     split    false FINISHED 398e037c724d                    (S4 command)
+       derive                            derive-v1    derive    false FINISHED 398e037c724d                    (S4 command)
+       screen                 screen-v1 [stand-in]    screen     true FINISHED 7effd257e5f1 dry-run-k20-s0-20260929T074215Z
+train_full_s0                        train-full-s0     train    false FINISHED 7effd257e5f1 dry-run-k20-s0-20260929T074215Z
+train_full_s1                        train-full-s1     train    false FINISHED 7effd257e5f1 dry-run-k20-s0-20260929T074215Z
+ eval_full_s0        eval-train-full-s0 [stand-in]      eval     true FINISHED 7effd257e5f1 dry-run-k20-s0-20260929T074215Z
+    attribute   attribute-train-full-s0 [stand-in] attribute     true FINISHED 7effd257e5f1 dry-run-k20-s0-20260929T074215Z
+   select_top                   select-drop-top-20    select    false FINISHED 7effd257e5f1 dry-run-k20-s0-20260929T074215Z
+  select_rand             select-drop-random-20-s0    select    false FINISHED 7effd257e5f1 dry-run-k20-s0-20260929T074215Z
+    train_top                    train-drop-top-20     train    false FINISHED 7effd257e5f1 dry-run-k20-s0-20260929T074215Z
+   train_rand                 train-drop-random-20     train    false FINISHED 7effd257e5f1 dry-run-k20-s0-20260929T074215Z
+     eval_top    eval-train-drop-top-20 [stand-in]      eval     true FINISHED 7effd257e5f1 dry-run-k20-s0-20260929T074215Z
+    eval_rand eval-train-drop-random-20 [stand-in]      eval     true FINISHED 7effd257e5f1 dry-run-k20-s0-20260929T074215Z
+AC6.2 train-full-s0: train_config.json episodes=960 == subset.resolve(): True; policy=act steps=5 device=mps seed=0 wandb=False (16.3s)
+AC6.2 train-full-s1: train_config.json episodes=960 == subset.resolve(): True; policy=act steps=5 device=mps seed=1 wandb=False (7.5s)
+AC6.2 train-drop-top-20: train_config.json episodes=940 == subset.resolve(): True; policy=act steps=5 device=mps seed=0 wandb=False (12.2s)
+AC6.2 train-drop-random-20: train_config.json episodes=940 == subset.resolve(): True; policy=act steps=5 device=mps seed=0 wandb=False (25.8s)
+
+
+
+
+
+
+AC6.3 diff(train-full-s0, train-drop-top-20): removed 20, added 0, changed_version 0; params {}; config {}; git same True
+AC6.3 diff(train-full-s0, train-full-s1): removed/added/changed 0/0/0; params {'seed': ('0', '1')}; config {'seed': (0, 1)}; git same True
+AC6.3 diff(train-full-s0, train-drop-random-20): removed 20; params {}
+
+AC6.4 trace(train-drop-top-20) reaches 8 runs: ['train:train-drop-top-20', 'select:select-drop-top-20', 'derive:derive-v1', 'attribute:attribute-train-full-s0 [stand-in]', 'build:build-v0', 'split:split-v0', 'train:train-full-s0', 'eval:eval-train-full-s0 [stand-in]']
+AC6.4 raw files reached: 20; first: KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_... sha256 6b30906a52a5741e
+AC6.4 corrupted episodes among the 20 dropped by top-k: 3; probe libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_17 (dropped: True)
+AC6.4 consumers(demo_17@v1 6cfad44e5243): ['attribute-train-full-s0 [stand-in]', 'screen-v1 [stand-in]', 'select-drop-random-20-s0', 'select-drop-top-20', 'train-drop-random-20', 'train-full-s0', 'train-full-s1']
+AC6.4 lists train-full-s0: True; lists train-drop-top-20: False
+AC6.4 consumers(same episode @ clean v0 3456348a0125): ['derive-v1', 'split-v0']
+AC6.5 flipped byte 5552926 of data/chunk-000/file-080.parquet in a scratch clone of v1; train_run refused: True
+AC6.5 dataset copy at <scratch>/v1_tamper_copy does not match version v1 (16076b9c5cb2): changed=['data/chunk-000/file-080.parquet'] missing=[] extra=[]
+AC6.5 MLflow runs before/after the refused launch: 15/15; no data/runs dir created for it: True
+AC6.6 screening stand-in rows 960; keyed to v1/candidate episode versions: 960/960; left join with labels.parquet on (episode_id, content_hash): 100 labelled corrupt, 860 unlabelled; labels found in screening table: 100/100
+AC6.6 attribution stand-in vs train-full-s0: check_scores {'rows': 960, 'training_episodes': 960, 'covered': 960, 'ok': True}
+
+
+
+
+
+
+AC6.7 lineage graph: 36 nodes (14 runs), 40 edges -> artifacts/s6_lineage_graph.json, .mmd
+done in 83.2s -> tracker/features/2026-09-28-data-lineage-layer/artifacts/s6_summary.json
+       84.84 real        79.27 user        35.80 sys
+exit=0

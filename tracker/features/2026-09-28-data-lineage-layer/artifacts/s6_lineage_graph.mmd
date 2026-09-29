@@ -1,0 +1,77 @@
+flowchart LR
+  n8782c5b711["train: train-drop-top-20"]
+  n95ea9c33d2(["checkpoint  e618aed6"])
+  n2d639a576c["select: select-drop-top-20"]
+  nbda9f43274(["subset  c598f569"])
+  n500c919dfd["derive: derive-v1"]
+  n86b0524bd8(["version v1 16076b9c"])
+  n19b20f4e3a(["labels  0915f276"])
+  n12a085b5bb(["subset v1/all ea806e23"])
+  n6666d07bc4(["subset v1/reference f09b75da"])
+  naeddaa14cb(["subset v1/candidate 69684e60"])
+  n17f5b227c6["attribute: attribute-train-full-s0 [stand-in]"]
+  n8ade355f15(["score_table  405cea2d"])
+  nafbcb21c33["build: build-v0"]
+  n89b8c83f4a(["version v0 3c4dca68"])
+  n8faa492802(["subset v0/all 58b3c415"])
+  nccea1031a6["split: split-v0"]
+  n8b07c18032(["split  6c3c195f"])
+  n60c3d601f8(["subset v0/reference b6a72d5e"])
+  nbb9845e113(["subset v0/candidate 8ee096b7"])
+  n8ef75e34cc["train: train-full-s0"]
+  n044ba5f8ac(["checkpoint  6f49bdae"])
+  nfa7177a9e8["eval: eval-train-full-s0 [stand-in]"]
+  nf03577b734(["rollouts  4edc1e0d"])
+  ne0e8fa7397["train: train-drop-random-20"]
+  n41519dfced(["checkpoint  b217876b"])
+  ncd6045ff44["select: select-drop-random-20-s0"]
+  n9c703d3063(["subset  8ccebcb5"])
+  n6a74949720["eval: eval-train-drop-top-20 [stand-in]"]
+  nc7f0ef14c7(["rollouts  8f0abfc6"])
+  nd5b30b05f1["eval: eval-train-drop-random-20 [stand-in]"]
+  nf44f30c4fd(["rollouts  cc2a1618"])
+  n6fa5a44bf0["train: train-full-s1"]
+  n7b4a17d80f(["checkpoint  a14e9c5f"])
+  nf79a7c620e["screen: screen-v1 [stand-in]"]
+  n8f86c299b2(["score_table  950afb8f"])
+  n1c312913cd[("raw LIBERO HDF5 x20")]
+  n6a74949720 -->|produces| nc7f0ef14c7
+  nccea1031a6 -->|produces| n8b07c18032
+  nccea1031a6 -->|produces| nbb9845e113
+  nccea1031a6 -->|produces| n60c3d601f8
+  n500c919dfd -->|produces| n19b20f4e3a
+  n500c919dfd -->|produces| n86b0524bd8
+  n500c919dfd -->|produces| naeddaa14cb
+  n500c919dfd -->|produces| n12a085b5bb
+  n500c919dfd -->|produces| n6666d07bc4
+  n89b8c83f4a -->|parent| n500c919dfd
+  n8ade355f15 -->|scores| n2d639a576c
+  nf79a7c620e -->|produces| n8f86c299b2
+  nfa7177a9e8 -->|produces| nf03577b734
+  nf03577b734 -->|rollouts| n17f5b227c6
+  n8faa492802 -->|population| nccea1031a6
+  naeddaa14cb -->|candidate| nf79a7c620e
+  naeddaa14cb -->|training| n17f5b227c6
+  naeddaa14cb -->|parent| ncd6045ff44
+  naeddaa14cb -->|training| n6fa5a44bf0
+  naeddaa14cb -->|parent| n2d639a576c
+  naeddaa14cb -->|training| n8ef75e34cc
+  n044ba5f8ac -->|checkpoint| nfa7177a9e8
+  n044ba5f8ac -->|checkpoint| n17f5b227c6
+  ne0e8fa7397 -->|produces| n41519dfced
+  n9c703d3063 -->|training| ne0e8fa7397
+  nd5b30b05f1 -->|produces| nf44f30c4fd
+  nbb9845e113 -->|selection_pool| n500c919dfd
+  n8782c5b711 -->|produces| n95ea9c33d2
+  n41519dfced -->|checkpoint| nd5b30b05f1
+  n17f5b227c6 -->|produces| n8ade355f15
+  nafbcb21c33 -->|produces| n89b8c83f4a
+  nafbcb21c33 -->|produces| n8faa492802
+  nbda9f43274 -->|training| n8782c5b711
+  ncd6045ff44 -->|produces| n9c703d3063
+  n6fa5a44bf0 -->|produces| n7b4a17d80f
+  n95ea9c33d2 -->|checkpoint| n6a74949720
+  n6666d07bc4 -->|reference| nf79a7c620e
+  n2d639a576c -->|produces| nbda9f43274
+  n8ef75e34cc -->|produces| n044ba5f8ac
+  n1c312913cd -->|source| nafbcb21c33

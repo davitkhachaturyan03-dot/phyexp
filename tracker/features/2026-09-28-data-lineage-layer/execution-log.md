@@ -342,3 +342,338 @@ Lineage store: `data/lineage/` (944 KB, gitignored). `names.json` = `{"versions"
 7. **Git decisions the owner may want to review:** `docs/papers/` (94 MB) and `.idea/` are gitignored.
    The commit author is set per-commit (`-c user.name/-c user.email`); no global or repo git config
    was changed.
+
+---
+
+### Batch 2 (S4, S5, S6): 2026-09-29
+
+Re-read before starting: `brief.md`, including the new owner answer (perturbation scope: the §2.5/§8.10
+corruption suite is a separate later feature; S4 ships the mechanism plus the one RoboDrop
+action-noise demo). PoC pages re-read from the PDF: p.5 (§2.5, §2.6), p.15 (§8.7), p.17–18 (§8.10),
+p.18–19 (§9.1 Steps 1–4, §9.2).
+
+**Commits (local, no remote; nothing under `data/` or `.venv/`).** Every recorded run's
+`mlflow.source.git.commit` is a commit whose `vlapoc/` and `scripts/` match the tree that ran:
+`stage_run` refuses to start while those paths differ from HEAD.
+- `5d9d272`: S4–S6 code. The build-v0 run and the FAILED split attempt were recorded at this commit.
+- `398e037`: fix, dataset source passed as a string; only FINISHED runs form lineage edges. The
+  split-v0 and derive-v1 runs were recorded here.
+- `9a754f3`: fix, LeRobot needs a fresh `output_dir`. S5 scratch runs were recorded here.
+- `7effd25`: docstring note on the HF cache. All 11 S6 chain runs were recorded here.
+- `67bbd41`: Mermaid label fix. No runs were recorded at this commit; the graph was regenerated from recorded runs.
+
+**Dependencies added (both named with reasons):**
+- `mlflow==3.16.1` (owner answer Q1). Measured:
+  - `pip install --dry-run mlflow` resolved with wheels on Python 3.14, so the plan's
+    mlflow-skinny fallback was not needed.
+  - The install took `38.79 real`. Packages went from 69 to 128; none were removed or upgraded (a
+    diff of `pip list` before and after showed only additions). It pulls SQLAlchemy 2.1.1 and
+    alembic 1.20.0.
+  - The full package was chosen because the S6 verify step uses `mlflow ui`.
+  - On import, mlflow prints an "agent hint" suggesting that a bundled tracing skill be loaded. That
+    is tool output, not an instruction. This feature does not use tracing, so the hint was ignored
+    and silenced with its documented env var `MLFLOW_DISABLE_AGENT_HINT=1`.
+- `accelerate==1.15.0` (+ `psutil==7.2.2`). **Not in the plan: a premise gap.** LeRobot's `train()`
+  calls `require_package("accelerate", extra="training")` and raised
+  `ImportError: 'accelerate' is required but not installed`. The `lerobot[training]` extra would also
+  add wandb and sentry-sdk. Only accelerate is needed with wandb off, so only accelerate was
+  installed, within lerobot's pin `accelerate<2.0.0,>=1.14.0`.
+
+**Housekeeping requested by the orchestrator:** the three unnamed S3 demo subsets (`c68eacb5…`
+drop-top-k by `smoothness`, `4a06edb4…` / `3ab14b12…` random-k seeds 0/1) were moved from
+`data/lineage/subsets/` to `data/lineage/quarantine/s3_verify_demo_subsets/`, with a `README.json`
+saying what they are, why they were moved, and that `scripts/verify_lineage_s3.py` re-creates them.
+No run ever consumed them.
+
+### S4: Derive new dataset versions with ground-truth labels (the injection hook)
+**Files:**
+- `vlapoc/derive.py` (+429). Functions:
+  - `derive_version()`: the mechanism, then content re-verification, catalog, registration, labels,
+    `derivation.json` and split inheritance.
+  - `protected_episode_ids()`, which walks the ancestor chain of reference splits, and `ancestry()`.
+  - `inherit_splits()`, `read_stored_episode()` and `select_per_task()`.
+  - `robodrop_action_noise()`, `idle_padding_edit()` (the AC4.4 test edit) and `derive_demo_action_noise()`.
+- `vlapoc/lineage.py` (+`diff_versions`, CLI `derive`, `version diff`).
+- `scripts/verify_derive_s4.py` (+195).
+
+**Premises checked:**
+- LeRobot 0.6.1 v3 edit tools (plan risk: upstream issue #2283 crash). Tested on the 20-episode
+  smoke dataset with `delete_episodes([3, 7])`, then the writer for 2 edited episodes (one padded by
+  20 frames), then `merge_datasets`. Output: `delete ok`, `merge ok 20 4210`; `kept hashes unchanged
+  in order: True`; `edited appended: ep18 len 119 orig 99`; `meta lengths == stored lengths: True
+  from/to contiguous: True`. **Holds: no crash on 0.6.1.** The plan's first-choice route (tools)
+  was used, and the full-rewrite fallback was not needed.
+- `delete_episodes` copies parquet rows without re-encoding PNGs (`dataset_tools.py:513-608`
+  `_copy_and_reindex_data`). **Holds.**
+- σ_a: v0 `meta/stats.json` `action.std` equals a recomputation over all 200,340 frames (max abs diff
+  6.8e-9). **Holds.** σ_a = [0.3334, 0.3531, 0.4134, 0.0393, 0.0612, 0.0811, 0.9990].
+
+**Acceptance criteria:**
+- ✅ AC4.1: the v1 derivation, run as the plan's verify-by command:
+  `python -m vlapoc.lineage derive --parent v0 --demo-action-noise --per-task 5 --seed 0`.
+  - It produced `"dataset_version_id": "16076b9c5cb2a0e8c5d291fc0766977dc7286c6b9f87df39bd87fe5c17cd85f8"`,
+    `"derive_run_id": "30f34cd056ab44e69dcf606f067d8871"`, `"n_edits": 100` and `"n_frames": 200340`.
+    Timing: `delete 166.0, write_edits 55.4, merge 74.6, total 316.8` s.
+  - `python -m vlapoc.lineage version diff v0 v1` → **`changed 100, identical 900, added 0, removed 0`**.
+  - `scripts/verify_derive_s4.py --v1` gives `v1 record parent_version_id == v0: True; changed ids == label ids: True`,
+    and `parent_content_hash == v0 content_hash for all 1000 rows: True`.
+  - It also gives `v1 loads: episodes=1000 frames=200340; info total_episodes=1000 total_frames=200340 total_tasks=20 fps=20;
+    recomputed id matches registered: True; verify_version files ok: True (85)`.
+  - Kept-episode identity is re-proven inside `derive_version`: every kept episode must hash to its
+    parent hash and every edited one to its in-memory transformed hash, or the derivation raises.
+- ✅ AC4.2: `labels.parquet: 100 rows, columns ['episode_id', 'parent_content_hash', 'content_hash',
+  'corruption_type', 'params', 'seed']`. The join with v1 episodes on (episode_id, content_hash) gives
+  `100/100 matched, 1:1 (unique ids True)`, and `label parent hash == v0 hash: True`.
+  Labels sha256 is `0915f276…`, also recorded as the derive run's `output.labels.sha256` and in `derivation.json`.
+- ✅ AC4.3: `scripts/verify_derive_s4.py --guard` gives
+  `LineageError raised: True`: `refusing to edit 1 reference-split episode(s) (PoC §8.7 p.15: corrupt only the training copy): ['libero_10/KITCHEN_SCENE3_…/demo_14']`,
+  and `nothing written: True; protected ids for v0: 40`. The guard runs before `verify_version` or any write.
+- ✅ AC4.4: `scripts/verify_derive_s4.py --padding`, run in an isolated scratch lineage root. Output:
+  `derive_version(v0, idle_padding x20 on libero_10/KITCHEN_SCENE3_…/demo_0) -> f4b0ef06952b in 278s`, then
+  `length 272 -> 292 (catalog); meta/episodes length=292; LeRobotDataset(episodes=[999]) frames=292; info total_frames=200360 (v0 200340 + 20); full load frames=200360; from/to contiguous=True; inserted frames idle=True`,
+  then `diff v0 -> v0pad: changed 1, identical 999; recomputed id matches: True; labels rows: 1`.
+  The scratch dataset (7.4 GB) and scratch lineage root were removed afterwards (`True`); the test
+  re-creates them.
+- ✅ AC4.5: `corrupted per task: [5] over 20 tasks; in reference split: 0; corruption_type ['action_gaussian_noise']; seed [0]`.
+  - `params` record std_scale 0.25, σ_a (7 values), source "v0 meta/stats.json action.std (1000
+    episodes)", `dims` "all 7 action dims, including the gripper (literal reading …)", `clip: null`,
+    the per-episode RNG rule, the selection rule and "lineage demo" labelling.
+  - Measured on 10 corrupted episodes (2,014 frames), frame by frame against v0: `same length 10/10,
+    observations bit-identical 10/10`. Per dim, (a_v1 − a_v0)/σ_a has mean `[-0.004 … -0.001]` and
+    std `[0.253, 0.246, 0.254, 0.255, 0.247, 0.251, 0.251]`; expected 0 and 0.25.
+- ✅ AC4.6: the `vlapoc/derive.py` docstring cites §2.1 item 4 p.3, §2.5 p.5, §10 p.20, §8.7 p.15,
+  §8.3 p.14, §8.10 p.17 and RoboDrop App. A.1 p.13 (quoted). It records the gripper ambiguity (all 7
+  dims, stored in `params`) and the owner-approved scope of the corruption suite.
+
+**Demo artifacts produced:** `artifacts/s4_guard_padding_stdout.txt`, `s4_derive_v1_stdout.txt`,
+`s4_version_diff_v0_v1_stdout.txt`, `s4_verify_v1_stdout.txt`, `s4_summary.json`, `s4_labels_head10.csv`,
+`s4_build_verify_v0_stdout.txt`, `s4_split_track_stdout.txt`. The v1 dataset is at
+`data/lerobot/libero_spatial_10__v1/` (6.8 GB); v1's version dir holds `labels.parquet` and `derivation.json`.
+
+**Notes / divergences:**
+- **Derived episodes move position.** Edited episodes are appended after the kept ones, so v1's
+  `episode_index` for the 100 edited episodes is 900–999. Identity is carried by `episode_id` in
+  v1's episodes table, and subsets resolve through it.
+- `derive_version` also carries the parent's reference/candidate split over to the child
+  (`v1/reference`, `v1/candidate`, same episode_ids, derivation `inherit_split`). S6 needs these; the
+  plan did not list the step.
+- The v1 files differ from v0's in number (85 vs 77) because `merge_datasets` repacks the parquet files.
+- A derivation costs about 5 min and a full 7 GB copy. `delete_episodes`' per-episode metadata loop
+  alone takes 166–181 s.
+
+### S5: Record every stage as an MLflow run and answer trace / consumers / diff
+**Files:**
+- `vlapoc/runs.py` (+694, of which the module docstring is about 40 lines). Contents:
+  - Backend helpers: `tracking_uri`, `client`, `experiment_id` (experiment `vlapoc-lineage`, artifacts
+    in `data/lineage/mlartifacts`), and `git_state`.
+  - The `StageRun` handle (`input_subset`, `input_version`, `input_entity`, `produced`,
+    `output_file`) and the `stage_run` context manager.
+  - Stages: `build_run`, `split_run`, `derive_run`, `train_run`, `screen_standin`, `eval_standin`,
+    `attribute_standin` and `select_run`.
+  - Queries and helpers: `load_checkpoint`, `producers`, `trace`, `consumers`, `diff` and `check_scores`.
+- `vlapoc/lerobot_train_entry.py` (+60).
+- `vlapoc/lineage.py` CLI: `build verify`, `split make --track`, `trace`, `consumers`, `diff`, `check-scores`.
+- `scripts/verify_runs_s5.py` (+169).
+
+**Premises checked:**
+- **`lerobot-train` works on Py 3.14: FALSE.** Every invocation, including `lerobot-train --help`,
+  fails while building the parser: `TypeError: str | None is not callable`. The failing field is
+  `dataset.root`, with `type(type) = <class 'typing.Union'>`.
+  - Cause: on 3.14, `str | None` is a `typing.Union`, which draccus 0.11.6 does not recognise as Optional.
+  - draccus 0.11.6 is the newest release (`pip index versions draccus`), and lerobot 0.6.1 pins
+    `draccus<0.12.0,>=0.11.6`.
+  - Fallback used: build `TrainPipelineConfig` in Python and call
+    `lerobot.scripts.lerobot_train.train(cfg)`. LeRobot's own `parser.wrap` skips parsing when given a
+    config object (`if len(args) > 0 and type(args[0]) is argtype: cfg = args[0]`).
+  - Measured: 2 ACT steps on MPS in 10.2 s; the checkpoint was saved with `train_config.json`.
+  - The planner had verified only that the module imports.
+- **`PreTrainedConfig.from_pretrained` on Py 3.14: FALSE** (same bug: `typing.Dict[str, …PolicyFeature] | None is not callable`).
+  Fallback in `load_checkpoint`: `draccus.load(PreTrainedConfig, f)` (a decoder with no argparse),
+  then `get_policy_class(cfg.type)(cfg)` and `safetensors.torch.load_model(strict=True)`. Measured:
+  `weights loaded strict=True; params 51600263`.
+- **Missing dependency `accelerate`: FALSE premise.** See dependencies above.
+- **MLflow honours a caller digest: holds, but the length is capped.** `mlflow/utils/validation.py:790`
+  raises if `len(dataset.digest) > MAX_DATASET_DIGEST_SIZE` (36), and the DB column is `String(36)`.
+  Our ids are 64 hex. Adaptation: `digest = id[:32]` (128 bits), with the full id stored as the input
+  tag `vlapoc.id`; every query confirms the full id.
+- `search_runs(filter_string="datasets.digest IN (...)")` and tag searches work on 3.16.1, tested in
+  a scratch DB. The comparators are in `search_utils.py:183` `VALID_DATASET_COMPARATORS = {"!=", "=", LIKE, ILIKE, "IN", "NOT IN"}`.
+- **Normalization-stats leak (plan risk): confirmed.** A checkpoint trained on the 40-episode
+  `v0/reference` subset saved normalizer stats equal to v0's full `meta/stats.json`: `action.mean ==
+  v0 stats.json action mean: True | state.std equal: True`. Camera stats are ImageNet's
+  (`[0.485 0.456 0.406]`). The source is `lerobot_train.py:314 dataset_stats=dataset.meta.stats`.
+  `train_run` records `dataset.stats_json.sha256`, the normalizer file's sha256 and a
+  `normalization_stats` param saying so.
+- LeRobot refuses an existing `output_dir` (`FileExistsError … resume is False`). `train_run` first
+  created the dir to hold its spec, so the first S5 attempt failed there (recorded as FAILED in the
+  scratch DB). Fixed in `9a754f3`: LeRobot now writes to `<run dir>/lerobot/`.
+
+**Acceptance criteria.** Evidence is from `scripts/verify_runs_s5.py`, run in the isolated scratch
+lineage root `data/lineage_scratch/s5` (its own `mlflow.db`) at HEAD `9a754f3c8d47`, **under
+`sandbox-exec` with outbound network denied** (see AC5.6).
+- ✅ AC5.1:
+  - `runs: 7, stages ['build', 'eval', 'select', 'split', 'train'] (all in STAGES: True)`.
+  - The train-A input: `name=v0/reference digest=b6a72d5e7f313bff3690caea2b3b2bef
+    source={"uri": "data/lineage_scratch/s5/subsets/b6a72d5e….json"}`, with tags `mlflow.data.context:
+    training, vlapoc.id, vlapoc.kind: subset, vlapoc.dataset_version_id`.
+  - `search_runs(datasets.digest = 'b6a72d5e…') -> ['s5-select-random5', 's5-train-A', 's5-train-A-seed1']`.
+  - Eval output tag: `output.rollouts.sha256 == sha256(file): True`.
+- ✅ AC5.2: every field of the train-A record:
+  - `dataset_version_id 3c4dca68d6f1` and `subset_id b6a72d5e7f31`.
+  - Episode-ID list artifact: `subset/b6a72d5e….json`.
+  - Mixture weights: "uniform over the subset's frames (LeRobot default sampler; sample_weighting=None)".
+  - Augmentation: "none (dataset.image_transforms.enable=false)".
+  - Config artifacts: `vlapoc_train_spec.json`, `checkpoint/config.json`, `checkpoint/train_config.json`.
+  - Git: `git_sha 9a754f3c8d47`, `git_sha_is_HEAD: True`, `git_dirty: false`. Seed `0`.
+  - Checkpoint: `checkpoint.path data/lineage_scratch/s5/runs/…/lerobot/checkpoints/000002/pretrained_model`;
+    `weights_sha256_matches_disk: True`; `normalizer_sha256_matches_disk: True`;
+    `stats_json_sha256 e7881df78102`; `episodes_match: true`.
+- ✅ AC5.3: the eval run shows `checkpoint_sha256 == train-A weights: True; train_run_id == A: True`,
+  `suites=["libero_10", "libero_spatial"]`, `libero_task_ids={"libero_10": [0..9], "libero_spatial": [0..9]}`,
+  `init_state_indices=0..49 (LIBERO fixed init states)`, `seeds=seed_base + init_state_index, seed_base=0`,
+  `loaded=true (51600263 params)` and `stand_in=true`. The rollout plan has
+  `rows=1000 outcomes=['not_run']`. The checkpoint is actually loaded (strict), not only hashed.
+- ✅ AC5.4 (CLI functions `trace`, `consumers`, `diff`):
+  - `trace(s5-train-B) runs: ['train:s5-train-B', 'select:s5-select-random5', 'split:split-v0', 'build:build-v0']; raw files reached: 20`.
+  - `consumers(LIVING_ROOM_SCENE2_…/demo_41@b5442591b156): ['s5-select-random5', 's5-train-A', 's5-train-A-seed1', 'split-v0']; lists train-A: True; lists train-B (dropped it): False`.
+  - `diff(A, B): removed 5, added 0, changed_version 0; params []; config []; git same True`.
+  - `diff(A, A-seed1): data removed/added/changed 0/0/0; params {'seed': ('0', '1')}; config {'seed': (0, 1)}`.
+  - Full JSON in `artifacts/s5_diff_A_B.json`.
+- ✅ AC5.5: a tiny run trained on a v1 subset (6 corrupted + 4 reference episodes). The v1-keyed
+  table is accepted (`{'rows': 10, 'training_episodes': 10, 'covered': 10, 'ok': True}`). The same
+  episodes keyed by clean v0 hashes are rejected: `6/10 score rows are not episode versions trained on
+  by run f8fc1a9eae50 (e.g. libero_spatial/…/demo_12@7707f6ecd8f9)`. Exactly the 6 corrupted rows are
+  rejected; the 4 reference episodes have identical hashes in v0 and v1, so they are correctly accepted.
+- ✅ AC5.6: the whole S5 script (MLflow, 4 real LeRobot trainings, checkpoint loading, queries) ran
+  under `sandbox-exec -p '(version 1)(allow default)(deny network-outbound (remote ip))'` and exited 0
+  in `55.09 real`.
+  - Control, measured: under the same sandbox `curl https://huggingface.co` returns `000`, exit 7;
+    without it, `200`.
+  - Tracking URI scheme is `sqlite`; `HF_HUB_OFFLINE=1`; no wandb installed; no account anywhere.
+- ✅ AC5.7: the `vlapoc/runs.py` docstring cites §2.1 p.3, §2.3 p.4 and §9.1–9.2 pp.18–19 (quoted),
+  and documents the MLflow encoding and the 36-character digest limit. `lerobot_train_entry.py`
+  documents the draccus/3.14 fallback.
+
+**Demo artifacts produced:** `artifacts/s5_verify_stdout.txt`, `s5_summary.json`, `s5_diff_A_B.json`.
+The scratch lineage root `data/lineage_scratch/s5/` (2.3 GB, mostly 4 tiny-run checkpoints) was left
+for inspection; the script deletes and re-creates it.
+
+**Notes / divergences:**
+- AC6.2's wording ("real `lerobot-train` runs") is met by LeRobot's `train()` function rather than
+  the `lerobot-train` CLI binary, which cannot parse arguments on Python 3.14 (above). The training
+  loop, checkpointing and `train_config.json` are LeRobot's own.
+- MLflow stores some absolute paths in its own records: the experiment `artifact_location` and the
+  auto tag `mlflow.source.name`. Our manifests and the MLflow artifact copies were rescanned after
+  S6, and none holds an absolute path: `lineage manifests scanned: 31 absolute-path hits: []`,
+  `mlflow artifact copies scanned: 27 hits: []`. Moving `data/lineage` to another machine would need
+  the artifact location remapped (inferred; not tested).
+- The first `split make --track` attempt failed (`ImportError: cannot import name
+  'LocalArtifactDatasetSource'`, a class MLflow generates dynamically). It is left in the main DB as a
+  FAILED `split-v0` run with no inputs or products. Queries ignore non-FINISHED runs (`398e037`).
+
+### S6: Run every downstream stage type end to end on the real data (lineage dry run)
+**Files:** `scripts/lineage_dry_run.py` (+297: the chain, the AC checks, `graph()`, `mermaid()`).
+
+**Command:** `HF_DATASETS_CACHE=<repo>/data/hf_datasets_cache .venv/bin/python scripts/lineage_dry_run.py --k 20 --seed 0`
+→ `done in 83.2s`, exit 0, chain `dry-run-k20-s0-20260929T074215Z`, HEAD `7effd257e5f1`, `dirty=False`.
+
+**Acceptance criteria:**
+- ✅ AC6.1: 14 runs, all FINISHED (`artifacts/s6_chain_runs.csv`):
+  - build-v0 (`5d9d272`) and split-v0 (`398e037`) were recorded by the S4 commands and reused via
+    their `produced.*` tags (`[reuse] build(v0): run bc8f7d09a7bf`, `[reuse] split(v0): run 30411f67f697`).
+  - derive-v1 (`398e037`) was likewise recorded by S4 and reused (`[reuse] derive(v1): run 30f34cd056ab`).
+  - Recorded at `7effd25`:
+    - screen-v1 [stand-in]
+    - train-full-s0 and train-full-s1
+    - eval-train-full-s0 [stand-in] and attribute-train-full-s0 [stand-in]
+    - select-drop-top-20 and select-drop-random-20-s0
+    - train-drop-top-20 and train-drop-random-20
+    - eval-train-drop-top-20 [stand-in] and eval-train-drop-random-20 [stand-in]
+  - Stand-ins have `stand_in=true`. Their payloads are placeholders, and no outcome numbers were invented:
+    - screening: `suspicion_score` = NaN;
+    - eval: a rollout plan with `outcome = not_run`;
+    - attribution: `placeholder_score` = sha256 of the key mapped to [0,1), labelled "not an influence estimate".
+  - Order: attribute precedes select (select consumes its score table), matching AC6.4's trace path.
+- ✅ AC6.2: `train_config.json episodes=960 == subset.resolve(): True` for train-full-s0 and s1, and
+  `940 … True` for drop-top-20 and drop-random-20. All use `policy=act steps=5 device=mps wandb=False`.
+  Seeds are 0/1/0/0; training took 16.3 / 7.5 / 12.2 / 25.8 s.
+- ✅ AC6.3: `diff(train-full-s0, train-drop-top-20): removed 20, added 0, changed_version 0; params {}; config {}; git same True`
+  and `diff(train-full-s0, train-full-s1): removed/added/changed 0/0/0; params {'seed': ('0', '1')}; config {'seed': (0, 1)}; git same True`.
+  The diff lists its excluded bookkeeping keys explicitly: `checkpoint_path, dataset.episodes (reported
+  as data), job_name, n_episodes, n_frames, output_dir, run_name, subset_id, wandb.run_id`.
+- ✅ AC6.4: `trace(train-drop-top-20)` reaches 8 runs: `train-drop-top-20, select-drop-top-20,
+  derive-v1, attribute-train-full-s0 [stand-in], build-v0, split-v0, train-full-s0, eval-train-full-s0
+  [stand-in]`. All 11 consumed-entity edges resolve to exactly 1 producer, and `raw files reached: 20`
+  (e.g. `KITCHEN_SCENE3_…` sha256 `6b30906a52a5741e`). JSON is in `artifacts/s6_trace_train_drop_top.json`.
+  - `corrupted episodes among the 20 dropped by top-k: 3`. The placeholder scores are a key hash,
+    so this is chance, not attribution.
+  - Probe `libero_10/KITCHEN_SCENE3_…/demo_17` (dropped: True):
+    `consumers(demo_17@v1 6cfad44e5243): ['attribute-train-full-s0 [stand-in]', 'screen-v1 [stand-in]',
+    'select-drop-random-20-s0', 'select-drop-top-20', 'train-drop-random-20', 'train-full-s0',
+    'train-full-s1']`, so it `lists train-full-s0: True; lists train-drop-top-20: False`.
+  - The same episode at its clean v0 hash `3456348a0125` gives `['derive-v1', 'split-v0']`.
+- ✅ AC6.5: `flipped byte 5552926 of data/chunk-000/file-080.parquet in a scratch clone of v1; train_run refused: True`:
+  `dataset copy at <scratch>/v1_tamper_copy does not match version v1 (16076b9c5cb2): changed=['data/chunk-000/file-080.parquet'] missing=[] extra=[]`.
+  `MLflow runs before/after the refused launch: 15/15`, and no run dir was created for it.
+- ✅ AC6.6: `screening stand-in rows 960; keyed to v1/candidate episode versions: 960/960; left join
+  with labels.parquet on (episode_id, content_hash): 100 labelled corrupt, 860 unlabelled; labels found
+  in screening table: 100/100`. The attribution stand-in against train-full-s0 passes `check_scores`:
+  `{'rows': 960, 'training_episodes': 960, 'covered': 960, 'ok': True}`.
+- ✅ AC6.7: the lineage graph has `36 nodes (14 runs), 40 edges`, written to
+  `artifacts/s6_lineage_graph.json` and `artifacts/s6_lineage_graph.mmd` (Mermaid flowchart: runs,
+  entities, and the 20 raw files as the source node). It was regenerated from the recorded run ids
+  after a label-only fix (`67bbd41`), with the same 36/14/40.
+- Plan's visual check (`mlflow ui`): the server was started on 127.0.0.1:5055 against
+  `data/lineage/mlflow.db` and queried over HTTP (`artifacts/s6_mlflow_ui_rest_stdout.txt`):
+  `search_runs over HTTP, datasets.digest = v1/candidate[:32] (69684e609529...): 6 runs` (attribute,
+  screen, both selects, train-full-s0/s1), `all runs in experiment: 15`, `UI root HTTP 200`. Then
+  stopped. No screenshot was taken.
+
+**Demo artifacts produced:** `artifacts/s6_dry_run_stdout.txt`, `s6_summary.json`, `s6_chain_runs.csv`,
+`s6_diff_full_s0_vs_top.json`, `s6_diff_full_s0_vs_seed.json`, `s6_diff_full_s0_vs_rand.json`,
+`s6_trace_train_drop_top.json`, `s6_consumers_probe.json`, `s6_lineage_graph.json`,
+`s6_lineage_graph.mmd`, `s6_mlflow_ui_rest_stdout.txt`. Checkpoints for the 4 train runs are under
+`data/runs/` (2.3 GB).
+
+**Notes / divergences:** the train runs are 5-step ACT smoke runs. They prove the data → trainer →
+checkpoint path, not training quality (as AC6.2 says). The chain's build, split and derive runs were
+recorded by the S4 commands, not by this script; the script found and reused them through their
+`produced.*` tags because the entities are content-addressed.
+
+### Findings for the analyzer (batch 2)
+1. **`lerobot-train` CLI and `from_pretrained` are unusable on Python 3.14 (FALSE premise; routes to
+   planner/owner).** draccus 0.11.6 (the latest, and pinned by lerobot) cannot build a parser for
+   `X | None` fields on 3.14. The workarounds are in place: programmatic `train(cfg)` and
+   `draccus.load`, then a strict safetensors load. They depend on LeRobot internals (`parser.wrap`'s
+   bypass). The SmolVLA / GPU training feature should either run on Python ≤ 3.13, where the CLI
+   presumably works (inferred, untested), or keep this entry point.
+2. **Missing training dependency.** `accelerate` was installed; it was not in the plan's
+   environment table.
+3. **MLflow's 36-character digest cap.** Handled with 32-hex prefixes plus the full id in tags.
+   The plan's AC5.1 wording `digest=<version_id | subset_id>` is therefore satisfied only by prefix.
+4. **HF `datasets` Arrow cache per subset (FALSE premise "training subsets never copy data", in
+   practice; routes to planner and the training feature).**
+   - Mechanism: `LeRobotDataset(episodes=…)` → `Dataset.from_parquet(filters=…)` writes a filtered
+     Arrow copy per distinct episode list, about 7 GB for a 960-episode subset of this dataset.
+   - Measured: this session created about 50 GB of such caches in
+     `~/.cache/huggingface/datasets/parquet/` (7 entries of 6.5–7.2 GB, all dated 2026-09-29; the
+     whole dir is 62 GB). S6's three distinct subsets used 20 GB of the project-local
+     `data/hf_datasets_cache/`.
+   - Free disk went from 162 GiB (planning) to 53 GiB. The biggest users are the v1 copy (6.8 GB),
+     checkpoints (2.3 + 2.3 GB) and these caches.
+   - **I did not delete anything in `~/.cache`.** The owner may want to clear the 2026-09-29
+     `parquet/default-*` entries. They are regenerable, and an unrelated `sentence-transformers___gooaq`
+     entry sits in the same directory.
+   - Counterfactual experiments with many subsets need `HF_DATASETS_CACHE` on scratch plus cleanup,
+     or a loader that avoids the materialisation.
+5. **Normalization-stats leak confirmed (measured).** A subset-trained checkpoint normalizes with
+   the whole version's `meta/stats.json`, including dropped and reference episodes. It is recorded per
+   run (stats sha256 plus normalizer sha256), not solved. The training/verification feature owns the choice (§1 p.1 "data is the only variable").
+6. **Derivation cost.** Each derived version is a full dataset copy (6.8 GB) and takes about 5 min,
+   mostly LeRobot's `delete_episodes` metadata loop. That is acceptable for the planned handful of
+   injection versions.
+7. **Main lineage DB contents:** 15 runs. They are the 14 S6 chain runs (build/split/derive from the
+   S4 commands, 11 from the dry run) plus 1 FAILED split attempt from the `LocalArtifactDatasetSource`
+   bug. The failed run is inert (no inputs or products; queries use FINISHED runs only).
+8. **Plan wording to revisit (not changed by me):** AC6.2 says "real `lerobot-train` runs". See
+   finding 1: it is LeRobot's `train()` without the CLI.

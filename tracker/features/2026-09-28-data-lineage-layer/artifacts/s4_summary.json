@@ -25,5 +25,51 @@
       "total": 277.9
     },
     "pass": true
+  },
+  "AC4.1": {
+    "changed": 100,
+    "identical": 900,
+    "parent_ok": true,
+    "recomputed_id_match": true,
+    "frames": 200340
+  },
+  "AC4.2": {
+    "rows": 100,
+    "joined": 100,
+    "columns": [
+      "episode_id",
+      "parent_content_hash",
+      "content_hash",
+      "corruption_type",
+      "params",
+      "seed"
+    ]
+  },
+  "AC4.5": {
+    "per_task": [
+      5
+    ],
+    "tasks": 20,
+    "in_reference": 0,
+    "z_mean": [
+      -0.0035,
+      -0.0049,
+      -0.0045,
+      0.0023,
+      -0.0057,
+      -0.0018,
+      -0.0006
+    ],
+    "z_std": [
+      0.253,
+      0.2458,
+      0.2543,
+      0.2546,
+      0.2474,
+      0.2514,
+      0.2514
+    ],
+    "obs_identical": 10,
+    "v1_version_id": "16076b9c5cb2a0e8c5d291fc0766977dc7286c6b9f87df39bd87fe5c17cd85f8"
   }
 }

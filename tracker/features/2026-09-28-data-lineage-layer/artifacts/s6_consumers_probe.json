@@ -1,0 +1,114 @@
+{
+  "probe": "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_17",
+  "v1_hash": "6cfad44e524360005fc747954450b6b4f3e6f438fad4cb6585ec51ed31b88bce",
+  "v0_hash": "3456348a01251f652d20e1b030c1821c22da6e04c5a51b6013231187e4d477fc",
+  "consumers_v1": [
+    {
+      "run_id": "babbdb329ed648e6a77c32cc54043908",
+      "name": "attribute-train-full-s0 [stand-in]",
+      "stage": "attribute",
+      "stand_in": true,
+      "git": "7effd257e5f1",
+      "status": "FINISHED",
+      "via": [
+        "subset:69684e609529 (training)"
+      ]
+    },
+    {
+      "run_id": "4996309b2f0149e5be8b73c0196e22e6",
+      "name": "screen-v1 [stand-in]",
+      "stage": "screen",
+      "stand_in": true,
+      "git": "7effd257e5f1",
+      "status": "FINISHED",
+      "via": [
+        "subset:69684e609529 (candidate)"
+      ]
+    },
+    {
+      "run_id": "cb4093eb7ed74d6cabe3f87a952f4de8",
+      "name": "select-drop-random-20-s0",
+      "stage": "select",
+      "stand_in": false,
+      "git": "7effd257e5f1",
+      "status": "FINISHED",
+      "via": [
+        "subset:69684e609529 (parent)"
+      ]
+    },
+    {
+      "run_id": "f64a0385917b46a987169f0d384dcaec",
+      "name": "select-drop-top-20",
+      "stage": "select",
+      "stand_in": false,
+      "git": "7effd257e5f1",
+      "status": "FINISHED",
+      "via": [
+        "subset:69684e609529 (parent)"
+      ]
+    },
+    {
+      "run_id": "8b380586faee401288cdd58664242938",
+      "name": "train-drop-random-20",
+      "stage": "train",
+      "stand_in": false,
+      "git": "7effd257e5f1",
+      "status": "FINISHED",
+      "via": [
+        "subset:8ccebcb5182c (training)"
+      ]
+    },
+    {
+      "run_id": "ff64512b40974587a9d711cd8e4f8b04",
+      "name": "train-full-s0",
+      "stage": "train",
+      "stand_in": false,
+      "git": "7effd257e5f1",
+      "status": "FINISHED",
+      "via": [
+        "subset:69684e609529 (training)"
+      ]
+    },
+    {
+      "run_id": "dc6b5f18ed544c6cb535d90754ebbf0a",
+      "name": "train-full-s1",
+      "stage": "train",
+      "stand_in": false,
+      "git": "7effd257e5f1",
+      "status": "FINISHED",
+      "via": [
+        "subset:69684e609529 (training)"
+      ]
+    }
+  ],
+  "consumers_v0": [
+    {
+      "run_id": "30f34cd056ab44e69dcf606f067d8871",
+      "name": "derive-v1",
+      "stage": "derive",
+      "stand_in": false,
+      "git": "398e037c724d",
+      "status": "FINISHED",
+      "via": [
+        "version:3c4dca68d6f1 (parent)",
+        "subset:8ee096b72b5a (selection_pool)"
+      ]
+    },
+    {
+      "run_id": "30411f67f697488791db58d8f3b7198c",
+      "name": "split-v0",
+      "stage": "split",
+      "stand_in": false,
+      "git": "398e037c724d",
+      "status": "FINISHED",
+      "via": [
+        "subset:58b3c4158363 (population)"
+      ]
+    }
+  ],
+  "corrupted_dropped": [
+    "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_17",
+    "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_31",
+    "libero_spatial/pick_up_the_black_bowl_next_to_the_cookie_box_and_place_it_on_the_plate/demo_17"
+  ]
+}

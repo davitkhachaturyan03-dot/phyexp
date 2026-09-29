@@ -1,18 +1,19 @@
-Traceback (most recent call last):
-  File "<frozen runpy>", line 198, in _run_module_as_main
-  File "<frozen runpy>", line 88, in _run_code
-  File "/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/lineage.py", line 620, in <module>
-    sys.exit(main())
-             ~~~~^^
-  File "/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/lineage.py", line 563, in main
-    print(json.dumps({"split_run_id": split_run(a.version, a.reference_per_task, a.seed)}))
-                                      ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/runs.py", line 268, in split_run
-    r.input_subset(all_s, "population", f"{v['name']}/all")
-    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/runs.py", line 140, in input_subset
-    subset.keys(self.lineage_root), source=_local_source(rel(path)),
-                                           ~~~~~~~~~~~~~^^^^^^^^^^^
-  File "/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/runs.py", line 184, in _local_source
-    from mlflow.data.artifact_dataset_sources import LocalArtifactDatasetSource
-ImportError: cannot import name 'LocalArtifactDatasetSource' from 'mlflow.data.artifact_dataset_sources' (/Users/davit_khachaturyan/Projects/personal/vlaExp/.venv/lib/python3.14/site-packages/mlflow/data/artifact_dataset_sources.py)
+{"split_run_id": "30411f67f697488791db58d8f3b7198c"}
+{
+  "dataset_version_id": "3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7",
+  "grounding": "PoC \u00a78.3 p.14, \u00a78.7 p.15; RoboDrop App. A.1 p.13 (two uncorrupted episodes per task)",
+  "numpy_version": "2.2.6",
+  "reference_per_task": 2,
+  "rule": "stratified by (suite, libero_task_id); per task, episodes sorted by demo number; numpy.random.default_rng(seed).choice(n, reference_per_task, replace=False), one generator consumed in (suite, libero_task_id) order",
+  "seed": 0,
+  "sizes": {
+    "candidate": 960,
+    "reference": 40
+  },
+  "split_id": "6c3c195f6e6bed8c0b93ff088287579e5757473abd77c667e617e4c6972c1bfd",
+  "subsets": {
+    "candidate": "8ee096b72b5a4e2b8697cc29f35f1b81aeb270b1f78d593304db9b1845f9410e",
+    "reference": "b6a72d5e7f313bff3690caea2b3b2bef8bffc801d01a6685333546229977e98b"
+  },
+  "version_name": "v0"
+}

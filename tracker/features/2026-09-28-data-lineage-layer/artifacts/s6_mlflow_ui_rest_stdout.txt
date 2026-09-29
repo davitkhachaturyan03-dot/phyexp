@@ -1,0 +1,10 @@
+mlflow ui server (http://127.0.0.1:5055, backend sqlite data/lineage/mlflow.db): experiment vlapoc-lineage id 1
+search_runs over HTTP, datasets.digest = v1/candidate[:32] (69684e609529...): 6 runs
+   attribute-train-full-s0 [stand-in] FINISHED stage=attribute stand_in=true
+   screen-v1 [stand-in] FINISHED stage=screen stand_in=true
+   select-drop-random-20-s0 FINISHED stage=select stand_in=false
+   select-drop-top-20 FINISHED stage=select stand_in=false
+   train-full-s0 FINISHED stage=train stand_in=false
+   train-full-s1 FINISHED stage=train stand_in=false
+all runs in experiment: 15
+UI root HTTP 200

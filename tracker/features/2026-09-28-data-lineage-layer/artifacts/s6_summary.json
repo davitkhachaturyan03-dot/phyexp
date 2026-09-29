@@ -1,0 +1,281 @@
+{
+  "chain": "dry-run-k20-s0-20260929T074215Z",
+  "run_ids": {
+    "build": "bc8f7d09a7bf47adb59132d874b1236f",
+    "split": "30411f67f697488791db58d8f3b7198c",
+    "derive": "30f34cd056ab44e69dcf606f067d8871",
+    "screen": "4996309b2f0149e5be8b73c0196e22e6",
+    "train_full_s0": "ff64512b40974587a9d711cd8e4f8b04",
+    "train_full_s1": "dc6b5f18ed544c6cb535d90754ebbf0a",
+    "eval_full_s0": "4a3544cc4b4b4b5e9ec8f3bbbc1bfa1f",
+    "attribute": "babbdb329ed648e6a77c32cc54043908",
+    "select_top": "f64a0385917b46a987169f0d384dcaec",
+    "select_rand": "cb4093eb7ed74d6cabe3f87a952f4de8",
+    "train_top": "9339d4685a8e4d009c191fa4641ccf3a",
+    "train_rand": "8b380586faee401288cdd58664242938",
+    "eval_top": "19e33c426be04397a5d81164f7b8fd58",
+    "eval_rand": "8d340d9e244146a8968bc0deef434d18"
+  },
+  "k": 20,
+  "seed": 0,
+  "steps": 5,
+  "AC6.1": [
+    {
+      "step": "build",
+      "run_id": "bc8f7d09a7bf47adb59132d874b1236f",
+      "name": "build-v0",
+      "stage": "build",
+      "stand_in": "false",
+      "status": "FINISHED",
+      "git": "5d9d272e88c7",
+      "chain": "(S4 command)"
+    },
+    {
+      "step": "split",
+      "run_id": "30411f67f697488791db58d8f3b7198c",
+      "name": "split-v0",
+      "stage": "split",
+      "stand_in": "false",
+      "status": "FINISHED",
+      "git": "398e037c724d",
+      "chain": "(S4 command)"
+    },
+    {
+      "step": "derive",
+      "run_id": "30f34cd056ab44e69dcf606f067d8871",
+      "name": "derive-v1",
+      "stage": "derive",
+      "stand_in": "false",
+      "status": "FINISHED",
+      "git": "398e037c724d",
+      "chain": "(S4 command)"
+    },
+    {
+      "step": "screen",
+      "run_id": "4996309b2f0149e5be8b73c0196e22e6",
+      "name": "screen-v1 [stand-in]",
+      "stage": "screen",
+      "stand_in": "true",
+      "status": "FINISHED",
+      "git": "7effd257e5f1",
+      "chain": "dry-run-k20-s0-20260929T074215Z"
+    },
+    {
+      "step": "train_full_s0",
+      "run_id": "ff64512b40974587a9d711cd8e4f8b04",
+      "name": "train-full-s0",
+      "stage": "train",
+      "stand_in": "false",
+      "status": "FINISHED",
+      "git": "7effd257e5f1",
+      "chain": "dry-run-k20-s0-20260929T074215Z"
+    },
+    {
+      "step": "train_full_s1",
+      "run_id": "dc6b5f18ed544c6cb535d90754ebbf0a",
+      "name": "train-full-s1",
+      "stage": "train",
+      "stand_in": "false",
+      "status": "FINISHED",
+      "git": "7effd257e5f1",
+      "chain": "dry-run-k20-s0-20260929T074215Z"
+    },
+    {
+      "step": "eval_full_s0",
+      "run_id": "4a3544cc4b4b4b5e9ec8f3bbbc1bfa1f",
+      "name": "eval-train-full-s0 [stand-in]",
+      "stage": "eval",
+      "stand_in": "true",
+      "status": "FINISHED",
+      "git": "7effd257e5f1",
+      "chain": "dry-run-k20-s0-20260929T074215Z"
+    },
+    {
+      "step": "attribute",
+      "run_id": "babbdb329ed648e6a77c32cc54043908",
+      "name": "attribute-train-full-s0 [stand-in]",
+      "stage": "attribute",
+      "stand_in": "true",
+      "status": "FINISHED",
+      "git": "7effd257e5f1",
+      "chain": "dry-run-k20-s0-20260929T074215Z"
+    },
+    {
+      "step": "select_top",
+      "run_id": "f64a0385917b46a987169f0d384dcaec",
+      "name": "select-drop-top-20",
+      "stage": "select",
+      "stand_in": "false",
+      "status": "FINISHED",
+      "git": "7effd257e5f1",
+      "chain": "dry-run-k20-s0-20260929T074215Z"
+    },
+    {
+      "step": "select_rand",
+      "run_id": "cb4093eb7ed74d6cabe3f87a952f4de8",
+      "name": "select-drop-random-20-s0",
+      "stage": "select",
+      "stand_in": "false",
+      "status": "FINISHED",
+      "git": "7effd257e5f1",
+      "chain": "dry-run-k20-s0-20260929T074215Z"
+    },
+    {
+      "step": "train_top",
+      "run_id": "9339d4685a8e4d009c191fa4641ccf3a",
+      "name": "train-drop-top-20",
+      "stage": "train",
+      "stand_in": "false",
+      "status": "FINISHED",
+      "git": "7effd257e5f1",
+      "chain": "dry-run-k20-s0-20260929T074215Z"
+    },
+    {
+      "step": "train_rand",
+      "run_id": "8b380586faee401288cdd58664242938",
+      "name": "train-drop-random-20",
+      "stage": "train",
+      "stand_in": "false",
+      "status": "FINISHED",
+      "git": "7effd257e5f1",
+      "chain": "dry-run-k20-s0-20260929T074215Z"
+    },
+    {
+      "step": "eval_top",
+      "run_id": "19e33c426be04397a5d81164f7b8fd58",
+      "name": "eval-train-drop-top-20 [stand-in]",
+      "stage": "eval",
+      "stand_in": "true",
+      "status": "FINISHED",
+      "git": "7effd257e5f1",
+      "chain": "dry-run-k20-s0-20260929T074215Z"
+    },
+    {
+      "step": "eval_rand",
+      "run_id": "8d340d9e244146a8968bc0deef434d18",
+      "name": "eval-train-drop-random-20 [stand-in]",
+      "stage": "eval",
+      "stand_in": "true",
+      "status": "FINISHED",
+      "git": "7effd257e5f1",
+      "chain": "dry-run-k20-s0-20260929T074215Z"
+    }
+  ],
+  "AC6.2": {
+    "train_full_s0": {
+      "episodes_in_train_config": 960,
+      "equal_to_subset": true,
+      "policy": "act",
+      "steps": 5,
+      "device": "mps",
+      "seed": 0,
+      "wandb": false,
+      "seconds": "16.3"
+    },
+    "train_full_s1": {
+      "episodes_in_train_config": 960,
+      "equal_to_subset": true,
+      "policy": "act",
+      "steps": 5,
+      "device": "mps",
+      "seed": 1,
+      "wandb": false,
+      "seconds": "7.5"
+    },
+    "train_top": {
+      "episodes_in_train_config": 940,
+      "equal_to_subset": true,
+      "policy": "act",
+      "steps": 5,
+      "device": "mps",
+      "seed": 0,
+      "wandb": false,
+      "seconds": "12.2"
+    },
+    "train_rand": {
+      "episodes_in_train_config": 940,
+      "equal_to_subset": true,
+      "policy": "act",
+      "steps": 5,
+      "device": "mps",
+      "seed": 0,
+      "wandb": false,
+      "seconds": "25.8"
+    }
+  },
+  "AC6.3": {
+    "top": {
+      "n_removed": 20,
+      "n_added": 0,
+      "n_changed_version": 0,
+      "params": {},
+      "config": {}
+    },
+    "seed": {
+      "n_removed": 0,
+      "n_added": 0,
+      "n_changed_version": 0,
+      "params": {
+        "seed": [
+          "0",
+          "1"
+        ]
+      },
+      "config": {
+        "seed": [
+          0,
+          1
+        ]
+      }
+    }
+  },
+  "AC6.4": {
+    "trace_runs": [
+      "train:train-drop-top-20",
+      "select:select-drop-top-20",
+      "derive:derive-v1",
+      "attribute:attribute-train-full-s0 [stand-in]",
+      "build:build-v0",
+      "split:split-v0",
+      "train:train-full-s0",
+      "eval:eval-train-full-s0 [stand-in]"
+    ],
+    "raw_files": 20,
+    "probe": "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_17",
+    "probe_dropped": true,
+    "corrupted_dropped": 3,
+    "consumers": [
+      "attribute-train-full-s0 [stand-in]",
+      "screen-v1 [stand-in]",
+      "select-drop-random-20-s0",
+      "select-drop-top-20",
+      "train-drop-random-20",
+      "train-full-s0",
+      "train-full-s1"
+    ]
+  },
+  "AC6.5": {
+    "refused": true,
+    "message": "dataset copy at <scratch>/v1_tamper_copy does not match version v1 (16076b9c5cb2): changed=['data/chunk-000/file-080.parquet'] missing=[] extra=[]",
+    "runs_before": 15,
+    "runs_after": 15
+  },
+  "AC6.6": {
+    "screen_rows": 960,
+    "screen_in_candidate": 960,
+    "labelled": 100,
+    "labels_found": 100,
+    "check_scores": {
+      "rows": 960,
+      "training_episodes": 960,
+      "covered": 960,
+      "ok": true
+    }
+  },
+  "AC6.7": {
+    "nodes": 36,
+    "runs": 14,
+    "edges": 40
+  },
+  "seconds": 83.2
+}

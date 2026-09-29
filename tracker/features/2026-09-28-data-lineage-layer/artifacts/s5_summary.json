@@ -1,0 +1,105 @@
+{
+  "AC5.1": {
+    "runs": 7,
+    "stages": [
+      "build",
+      "eval",
+      "select",
+      "split",
+      "train"
+    ],
+    "digest_search": [
+      "s5-select-random5",
+      "s5-train-A",
+      "s5-train-A-seed1"
+    ]
+  },
+  "AC5.2": {
+    "dataset_version_id": "3c4dca68d6f1",
+    "subset_id": "b6a72d5e7f31",
+    "episode_id_list_artifact": [
+      "subset/b6a72d5e7f313bff3690caea2b3b2bef8bffc801d01a6685333546229977e98b.json"
+    ],
+    "mixture_weights": "uniform over the subset's frames (LeRobot default sampler; sample_weighting=None)",
+    "augmentation": "none (dataset.image_transforms.enable=false)",
+    "train_config_artifacts": [
+      "vlapoc_train_spec.json",
+      "checkpoint/config.json",
+      "checkpoint/train_config.json"
+    ],
+    "git_sha": "9a754f3c8d47",
+    "git_sha_is_HEAD": true,
+    "git_dirty": "false",
+    "seed": "0",
+    "checkpoint.path": "data/lineage_scratch/s5/runs/s5-train-A-20260929T073820Z/lerobot/checkpoints/000002/pretrained_model",
+    "weights_sha256_matches_disk": true,
+    "normalizer_sha256_matches_disk": true,
+    "stats_json_sha256": "e7881df78102",
+    "episodes_match": "true",
+    "normalization_stats": "full dataset meta/stats.json of the version (LeRobot default..."
+  },
+  "AC5.3": {
+    "ckpt_match": true,
+    "train_run": true,
+    "plan_rows": 1000,
+    "outcomes": [
+      "not_run"
+    ]
+  },
+  "AC5.4": {
+    "trace": [
+      "train:s5-train-B",
+      "select:s5-select-random5",
+      "split:split-v0",
+      "build:build-v0"
+    ],
+    "raw_files": 20,
+    "consumers": [
+      "s5-select-random5",
+      "s5-train-A",
+      "s5-train-A-seed1",
+      "split-v0"
+    ],
+    "diff_ab": {
+      "n_removed": 5,
+      "n_added": 0,
+      "n_changed_version": 0
+    },
+    "diff_seed_params": {
+      "seed": [
+        "0",
+        "1"
+      ]
+    },
+    "diff_seed_config": {
+      "seed": [
+        0,
+        1
+      ]
+    }
+  },
+  "AC5.5": {
+    "accepted": {
+      "rows": 10,
+      "training_episodes": 10,
+      "covered": 10,
+      "ok": true
+    },
+    "rejected": "6/10 score rows are not episode versions trained on by run f8fc1a9eae50 (e.g. libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate/demo_12@7707f6ecd8f9)"
+  },
+  "AC5.6": {
+    "tracking_uri_scheme": "sqlite",
+    "hf_hub_offline": "1",
+    "wandb_installed": false
+  },
+  "run_ids": {
+    "build": "73f6e74fb0bb4064a256227d01b3ebb1",
+    "split": "d8cc8658653045fcbccb08f1d1af29b5",
+    "A": "20b968fa99ab436fb1cb2e517f70ac1a",
+    "select": "923fccf32bf749d3a77ab9ac92a02e41",
+    "B": "dfe8801a5e08483193ae373ad5f52271",
+    "A_seed1": "3321308777fa4a1ca4566d5c1b290cc9",
+    "eval": "a41a69ebdb704ed68add5f7b61593d18",
+    "v1mix": "f8fc1a9eae504575b24f72c51a92b91c"
+  }
+}

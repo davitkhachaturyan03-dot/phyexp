@@ -1,0 +1,15 @@
+{
+  "a": "3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7",
+  "added": [],
+  "b": "16076b9c5cb2a0e8c5d291fc0766977dc7286c6b9f87df39bd87fe5c17cd85f8",
+  "changed": 100,
+  "changed_ids": [
+    "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_17",
+    "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_28",
+    "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_31",
+    "... 97 more"
+  ],
+  "identical": 900,
+  "removed": []
+}
+changed 100, identical 900, added 0, removed 0

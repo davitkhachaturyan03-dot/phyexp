@@ -1,0 +1,56 @@
+{
+  "runs": [
+    {
+      "run_id": "20b968fa99ab436fb1cb2e517f70ac1a",
+      "name": "s5-train-A",
+      "stage": "train",
+      "stand_in": false,
+      "git": "9a754f3c8d47",
+      "status": "FINISHED"
+    },
+    {
+      "run_id": "dfe8801a5e08483193ae373ad5f52271",
+      "name": "s5-train-B",
+      "stage": "train",
+      "stand_in": false,
+      "git": "9a754f3c8d47",
+      "status": "FINISHED"
+    }
+  ],
+  "data": {
+    "subset_a": "b6a72d5e7f313bff3690caea2b3b2bef8bffc801d01a6685333546229977e98b",
+    "subset_b": "e470d6712d63e19414cb5b9ac3cfa107f70e9ee7ed21b9e3c8266023df108ab5",
+    "dataset_version_a": "3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7",
+    "dataset_version_b": "3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7",
+    "added": [],
+    "removed": [
+      "libero_10/LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket/demo_41",
+      "libero_10/LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket/demo_1",
+      "libero_10/STUDY_SCENE1_pick_up_the_book_and_place_it_in_the_back_compartment_of_the_caddy/demo_32",
+      "libero_spatial/pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate/demo_3",
+      "libero_spatial/pick_up_the_black_bowl_next_to_the_ramekin_and_place_it_on_the_plate/demo_13"
+    ],
+    "changed_version": [],
+    "n_added": 0,
+    "n_removed": 5,
+    "n_changed_version": 0
+  },
+  "params": {},
+  "config": {},
+  "git": {
+    "a": "9a754f3c8d479e4ce46bef963f7088119731abd2",
+    "b": "9a754f3c8d479e4ce46bef963f7088119731abd2",
+    "same": true
+  },
+  "ignored_bookkeeping": [
+    "checkpoint_path",
+    "dataset.episodes",
+    "job_name",
+    "n_episodes",
+    "n_frames",
+    "output_dir",
+    "run_name",
+    "subset_id",
+    "wandb.run_id"
+  ]
+}

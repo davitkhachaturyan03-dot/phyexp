@@ -1,0 +1,71 @@
+{
+  "runs": [
+    {
+      "run_id": "ff64512b40974587a9d711cd8e4f8b04",
+      "name": "train-full-s0",
+      "stage": "train",
+      "stand_in": false,
+      "git": "7effd257e5f1",
+      "status": "FINISHED"
+    },
+    {
+      "run_id": "9339d4685a8e4d009c191fa4641ccf3a",
+      "name": "train-drop-top-20",
+      "stage": "train",
+      "stand_in": false,
+      "git": "7effd257e5f1",
+      "status": "FINISHED"
+    }
+  ],
+  "data": {
+    "subset_a": "69684e60952903867d9a40f106a4f988ec6979ff3584c747fef586bcd4d47fa1",
+    "subset_b": "c598f5692b40da775c91a8e8fcab31c8563647a62a3170371f1d08f977aca6e7",
+    "dataset_version_a": "16076b9c5cb2a0e8c5d291fc0766977dc7286c6b9f87df39bd87fe5c17cd85f8",
+    "dataset_version_b": "16076b9c5cb2a0e8c5d291fc0766977dc7286c6b9f87df39bd87fe5c17cd85f8",
+    "added": [],
+    "removed": [
+      "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_17",
+      "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_31",
+      "libero_10/KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer_of_the_cabinet_and_close_it/demo_11",
+      "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_10",
+      "libero_10/KITCHEN_SCENE8_put_both_moka_pots_on_the_stove/demo_2",
+      "libero_10/KITCHEN_SCENE8_put_both_moka_pots_on_the_stove/demo_48",
+      "libero_10/LIVING_ROOM_SCENE1_put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket/demo_14",
+      "libero_10/LIVING_ROOM_SCENE1_put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket/demo_16",
+      "libero_10/LIVING_ROOM_SCENE1_put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket/demo_34",
+      "libero_10/LIVING_ROOM_SCENE1_put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket/demo_9",
+      "libero_10/LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket/demo_28",
+      "libero_10/STUDY_SCENE1_pick_up_the_book_and_place_it_in_the_back_compartment_of_the_caddy/demo_14",
+      "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate/demo_1",
+      "libero_spatial/pick_up_the_black_bowl_next_to_the_cookie_box_and_place_it_on_the_plate/demo_17",
+      "libero_spatial/pick_up_the_black_bowl_next_to_the_cookie_box_and_place_it_on_the_plate/demo_6",
+      "libero_spatial/pick_up_the_black_bowl_next_to_the_ramekin_and_place_it_on_the_plate/demo_11",
+      "libero_spatial/pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate/demo_13",
+      "libero_spatial/pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate/demo_27",
+      "libero_spatial/pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate/demo_49",
+      "libero_spatial/pick_up_the_black_bowl_on_the_wooden_cabinet_and_place_it_on_the_plate/demo_24"
+    ],
+    "changed_version": [],
+    "n_added": 0,
+    "n_removed": 20,
+    "n_changed_version": 0
+  },
+  "params": {},
+  "config": {},
+  "git": {
+    "a": "7effd257e5f14a190e6dfc35d6f05059dddca145",
+    "b": "7effd257e5f14a190e6dfc35d6f05059dddca145",
+    "same": true
+  },
+  "ignored_bookkeeping": [
+    "checkpoint_path",
+    "dataset.episodes",
+    "job_name",
+    "n_episodes",
+    "n_frames",
+    "output_dir",
+    "run_name",
+    "subset_id",
+    "wandb.run_id"
+  ]
+}
