@@ -342,7 +342,7 @@ def train_run(subset_ref: str, name: str, seed: int = 0, steps: int = 5, batch_s
                  **(policy_overrides or {})}
     spec = {"dataset_repo_id": f"local/{Path(v['lerobot_root']).name}", "dataset_root": v["lerobot_root"],
             "episodes": episodes, "policy_type": policy_type, "policy_overrides": overrides, "steps": steps,
-            "batch_size": batch_size, "num_workers": 0, "seed": seed, "output_dir": rel(out_dir), "job_name": name,
+            "batch_size": batch_size, "num_workers": 0, "seed": seed, "output_dir": rel(out_dir / "lerobot"), "job_name": name,
             "image_transforms_enable": False, "use_imagenet_stats": True}
     stats_path = root / "meta" / "stats.json"
     with stage_run("train", name, lineage_root, chain=chain, allow_dirty=allow_dirty) as r:
@@ -357,7 +357,7 @@ def train_run(subset_ref: str, name: str, seed: int = 0, steps: int = 5, batch_s
                                          "camera stats replaced by ImageNet stats (use_imagenet_stats=true)"})
         r.tags({"dataset_version_id": vid, "subset_id": subset.subset_id, "seed": seed,
                 "dataset.stats_json.sha256": sha256_file(stats_path)})
-        out_dir.mkdir(parents=True, exist_ok=True)
+        out_dir.mkdir(parents=True, exist_ok=True)  # LeRobot writes into out_dir/lerobot, which must not exist yet
         spec_path = out_dir / "vlapoc_train_spec.json"
         spec_path.write_text(json.dumps(spec, indent=2))
         mlflow.log_artifact(str(spec_path))
@@ -370,7 +370,7 @@ def train_run(subset_ref: str, name: str, seed: int = 0, steps: int = 5, batch_s
         mlflow.log_artifact(str(log))
         if proc.returncode != 0:
             raise LineageError(f"LeRobot training failed (exit {proc.returncode}); see {rel(log)}")
-        pretrained = (out_dir / "checkpoints" / "last").resolve() / "pretrained_model"
+        pretrained = (out_dir / "lerobot" / "checkpoints" / "last").resolve() / "pretrained_model"
         files = _ckpt_files(pretrained)
         hashes = {k: sha256_file(p) for k, p in files.items()}
         cfg = json.loads(files["train_config"].read_text())
