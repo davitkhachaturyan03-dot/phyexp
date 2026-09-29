@@ -6,7 +6,8 @@ split manifests, its own ``mlflow.db``), so these tiny test runs never mix with 
 Grounding: PoC §2.1 p.3 (tie-in list; "what changed between the good run and the bad run?"), §2.3 p.4
 (seeds), §9.1-9.2 pp.18-19 (eval tied to checkpoint; screening vs attribution keys).
 
-    .venv/bin/python scripts/verify_runs_s5.py
+    .venv/bin/python scripts/verify_runs_s5.py          # AC5.1-AC5.6 (round 1; 4 tiny training runs)
+    .venv/bin/python scripts/verify_runs_s5.py --r2     # AC5.8-AC5.10 (round 2; selections only, no training)
 """
 
 from __future__ import annotations
@@ -165,5 +166,123 @@ def main() -> int:
     return 0
 
 
+def r2() -> int:
+    """Round-2 checks AC5.8-AC5.10: selections only, no training, in a scratch lineage root.
+
+    The scratch root holds copies of the real manifests and of the real ``mlflow.db`` (so ``trace`` can
+    reach v0 through the recorded build/split/derive runs); on the copy only, the experiment's
+    ``artifact_location`` is repointed to the scratch dir so nothing can be written into the real
+    ``data/lineage/mlartifacts``. The real DB's sha256 and the real artifact tree are compared before/after.
+    """
+    import hashlib
+    import sqlite3
+    import tempfile
+
+    import numpy as np
+
+    from vlapoc.lineage import drop_random_k
+
+    real_db = LINEAGE_ROOT / "mlflow.db"
+    db_sha_before = hashlib.sha256(real_db.read_bytes()).hexdigest()
+    art_before = sorted(str(p.relative_to(LINEAGE_ROOT)) for p in (LINEAGE_ROOT / "mlartifacts").rglob("*"))
+    scratch_root = REPO_ROOT / "data" / "scratch"
+    scratch_root.mkdir(parents=True, exist_ok=True)
+    base = Path(tempfile.mkdtemp(prefix="verify_s5_r2_", dir=scratch_root))
+    lr = base / "lineage"
+    lr.mkdir()
+    for d in ("versions", "subsets", "splits"):
+        shutil.copytree(LINEAGE_ROOT / d, lr / d)
+    shutil.copy(LINEAGE_ROOT / "names.json", lr / "names.json")
+    shutil.copy(real_db, lr / "mlflow.db")
+    (lr / "mlartifacts").mkdir()
+    con = sqlite3.connect(lr / "mlflow.db")
+    con.execute("UPDATE experiments SET artifact_location = ? WHERE name = ?", ((lr / "mlartifacts").resolve().as_uri(), runs.EXPERIMENT))
+    con.commit()
+    con.close()
+    print(f"scratch lineage root {lr.relative_to(REPO_ROOT)} (copy of real manifests + mlflow.db; artifact location repointed)")
+    s: dict = {}
+    try:
+        c = runs.client(lr)
+        exp = runs.experiment_id(lr)
+        n0 = len(c.search_runs([exp]))
+        attr = [r for r in c.search_runs([exp], filter_string="tags.stage = 'attribute'") if r.info.status == "FINISHED"][0]
+        score_path = REPO_ROOT / "data" / "runs" / attr.data.tags["vlapoc.chain"] / "attribute" / attr.data.tags["output.attribution_scores.artifact"]
+        table = pd.read_parquet(score_path)
+        v1c = Subset.load("v1/candidate", lr)
+
+        # ---- AC5.8 direction ---------------------------------------------------------------
+        rid_low, low = runs.select_run("v1/candidate", "r2-select-drop-lowest-20", "drop_top_k", 20, score_path=score_path,
+                                       metric="placeholder_score", score_run_id=attr.info.run_id, direction="lowest", lineage_root=lr)
+        rid_high, high = runs.select_run("v1/candidate", "r2-select-drop-highest-20", "drop_top_k", 20, score_path=score_path,
+                                         metric="placeholder_score", score_run_id=attr.info.run_id, lineage_root=lr)
+        exp_low = sorted(table.sort_values(["placeholder_score", "episode_id"], ascending=[True, True]).head(20)["episode_id"])
+        exp_high = sorted(table.sort_values(["placeholder_score", "episode_id"], ascending=[False, True]).head(20)["episode_id"])
+        pl, ph = c.get_run(rid_low).data.params, c.get_run(rid_high).data.params
+        s6_child = [r for r in c.search_runs([exp], filter_string="attributes.run_name = 'select-drop-top-20'")][0].data.tags["output.subset"].split(":")[1]
+        print(f"AC5.8 lowest: dropped == 20 lowest placeholder scores (tie-break episode_id asc): {low.derivation['dropped'] == exp_low}; "
+              f"derivation direction={low.derivation['direction']!r}; run params direction={pl['direction']!r} metric={pl['metric']!r} k={pl['k']}")
+        print(f"AC5.8 default (highest): dropped == 20 highest: {high.derivation['dropped'] == exp_high}; params direction={ph['direction']!r}; "
+              f"child id == S6 select-drop-top-20 child ({s6_child[:12]}): {high.subset_id == s6_child}; low/high overlap: "
+              f"{len(set(low.derivation['dropped']) & set(high.derivation['dropped']))}")
+        try:
+            runs.select_run("v1/candidate", "bad", "drop_top_k", 20, score_path=score_path, metric="placeholder_score", direction="up", lineage_root=lr)
+            bad = "NOT RAISED"
+        except ValueError as e:
+            bad = str(e)
+        print(f"AC5.8 invalid direction rejected before any run starts: {bad!r}; runs added so far: {len(c.search_runs([exp])) - n0}")
+        s["AC5.8"] = {"lowest_ok": low.derivation["dropped"] == exp_low, "derivation_direction": low.derivation["direction"],
+                      "param_direction": pl["direction"], "highest_ok": high.derivation["dropped"] == exp_high,
+                      "highest_equals_s6_child": high.subset_id == s6_child, "run_low": rid_low, "run_high": rid_high}
+
+        # ---- AC5.9 drop_group as a recorded selection ---------------------------------------------
+        e1 = version_episodes("v1", lr)
+        task = sorted(e1.loc[e1["suite"] == "libero_10", "task_name"].unique())[0]
+        rid_g, g = runs.select_run("v1/candidate", "r2-select-leave-one-task-out", "drop_group", column="task_name", value=task, lineage_root=lr)
+        rg = c.get_run(rid_g)
+        tr = runs.trace(rid_g, lr)
+        chain = [f"{v['stage']}:{v['name']}" for v in tr["runs"].values()]
+        print(f"AC5.9 drop_group(task_name={task[:40]}...): child n={len(g.episode_ids)} (960 - 48); params op={rg.data.params['op']!r} "
+              f"column={rg.data.params['column']!r} value={rg.data.params['value'][:40]!r}... n_dropped={rg.data.params['n_dropped']}; "
+              f"select.dropped tag present: {'select.dropped' in rg.data.tags}; produced subset tag: "
+              f"{rg.data.tags['output.subset'][:20]}...; == child: {rg.data.tags['output.subset'] == 'subset:' + g.subset_id}")
+        print(f"AC5.9 trace(leave-one-task-out select) runs: {chain}; raw files reached: {len(tr['raw_files'] or [])}; "
+              f"every edge has one producer: {all(len(e['produced_by']) == 1 for e in tr['edges'])}")
+        s["AC5.9"] = {"n": len(g.episode_ids), "params": {k: rg.data.params[k] for k in ("op", "column", "value", "n_dropped")},
+                      "trace": chain, "raw_files": len(tr["raw_files"] or []), "run": rid_g}
+
+        # ---- AC5.10 random subsets for datamodels ------------------------------------------------
+        N, n = len(v1c.episode_ids), 480
+        rand = []
+        for seed in (0, 1, 2):
+            rid, child = runs.select_run("v1/candidate", f"r2-select-random-subset-n{n}-s{seed}", "drop_random_k", N - n, seed=seed, lineage_root=lr)
+            again = drop_random_k(v1c, N - n, seed, lineage_root=lr)  # reproduce from the seed alone
+            rp = c.get_run(rid).data.params
+            rand.append((rid, child, again.subset_id == child.subset_id, rp))
+            print(f"AC5.10 seed {seed}: select run {rid[:12]} k={rp['k']} subset_size={rp['subset_size']} -> subset {child.subset_id[:12]} "
+                  f"n={len(child.episode_ids)}; reproduced from seed: {again.subset_id == child.subset_id}")
+        ids = [ch.subset_id for _, ch, _, _ in rand]
+        cols = list(v1c.episode_ids)
+        records = [json.loads((lr / "subsets" / f"{i}.json").read_text()) for i in ids]  # subset records alone
+        M = np.array([[1 if e in set(r["episode_ids"]) else 0 for e in cols] for r in records], dtype=np.int8)
+        print(f"AC5.10 distinct subset ids: {len(set(ids))}/3; membership matrix from subset records: shape {M.shape}, "
+              f"row sums {M.sum(1).tolist()}, episodes in 0/1/2/3 subsets: {np.bincount(M.sum(0), minlength=4).tolist()}")
+        pd.DataFrame(M.T, index=cols, columns=[f"seed{sd}:{i[:12]}" for sd, i in zip((0, 1, 2), ids)]).rename_axis("episode_id") \
+            .to_csv(FEATURE_DIR / "artifacts" / "s5_r2_membership_matrix.csv")
+        s["AC5.10"] = {"subset_ids": ids, "distinct": len(set(ids)), "sizes": [len(ch.episode_ids) for _, ch, _, _ in rand],
+                       "reproducible": [r for _, _, r, _ in rand], "matrix_shape": list(M.shape), "row_sums": M.sum(1).tolist()}
+        s["runs_added_to_scratch_db"] = len(c.search_runs([exp])) - n0
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+    db_sha_after = hashlib.sha256(real_db.read_bytes()).hexdigest()
+    art_after = sorted(str(p.relative_to(LINEAGE_ROOT)) for p in (LINEAGE_ROOT / "mlartifacts").rglob("*"))
+    print(f"runs added to the scratch DB: {s['runs_added_to_scratch_db']}; real mlflow.db sha256 unchanged: {db_sha_before == db_sha_after} "
+          f"({db_sha_after[:12]}); real mlartifacts tree unchanged: {art_before == art_after} ({len(art_after)} paths); scratch removed: {not base.exists()}")
+    s["real_db_unchanged"] = db_sha_before == db_sha_after
+    s["real_artifacts_unchanged"] = art_before == art_after
+    (FEATURE_DIR / "artifacts" / "s5_r2_summary.json").write_text(json.dumps(s, indent=2, default=str))
+    print("summary -> tracker/features/2026-09-28-data-lineage-layer/artifacts/s5_r2_summary.json")
+    return 0
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(r2() if "--r2" in sys.argv[1:] else main())

@@ -12,6 +12,7 @@ Grounding
 - RoboDrop App. A.1 (p. 13, docs/papers/RoboDrop_Gradient_Compatibility_arXiv-2609.10021.pdf): "For
   validation, we reserve two uncorrupted episodes per task, giving 20 clean validation episodes for
   each suite." Hence the default ``reference_per_task = 2`` (40 for our two suites).
+- PoC §2.1 item 5 (p. 3) and §10 (p. 20) group leave-one-out: ``drop_group`` (causal baseline).
 - PoC §2.6 (p. 5): "Remove the top-k “harmful” episodes and retrain: the policy should improve more than
   after removing k random episodes." PoC §9.1 Step 4 (p. 19): "Remove the top-k most harmful episodes
   and retrain. As a control, remove k random episodes and retrain." ``drop_top_k`` / ``drop_random_k``
@@ -45,8 +46,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
 import sys
+import tempfile
 from concurrent.futures import ProcessPoolExecutor
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -280,7 +284,16 @@ def verify_version(ref: str, root: Path | None = None, lineage_root: Path | None
 
 @dataclass(frozen=True)
 class Subset:
-    """A selection of episode versions from one dataset version. Never a data copy."""
+    """A selection of episode versions from one dataset version.
+
+    The record is a selection: no dataset file is rewritten or reindexed; ``resolve()`` maps its
+    ``episode_id``s to the version's ``episode_index`` values. Loading it is not free on disk, though:
+    LeRobot 0.6.1 loads ``episodes=`` through ``datasets.Dataset.from_parquet(..., filters=...)``
+    (``lerobot/datasets/io_utils.py:79-82``), and HF ``datasets`` materialises an Arrow cache of the
+    filtered rows under ``HF_DATASETS_CACHE`` for every distinct episode list (measured: 6.4-6.6 GB for
+    a 940-960 episode subset of this dataset; plan risk R1). Wrap throwaway loads in
+    ``isolated_hf_datasets_cache()``.
+    """
 
     dataset_version_id: str
     episode_ids: tuple[str, ...]
@@ -451,7 +464,13 @@ def drop_top_k(
 def drop_random_k(parent: Subset, k: int, seed: int, lineage_root: Path | None = None) -> Subset:
     """Random-k control (PoC §9.1 Step 4 p.19): ``default_rng(seed).choice(n, k, replace=False)`` over
     the parent's sorted episode_ids. The dropped IDs are recorded too, so the child is reproducible
-    even if a future numpy changes ``Generator.choice``'s stream."""
+    even if a future numpy changes ``Generator.choice``'s stream.
+
+    Random subsets for datamodels-style regression (PoC §2.1 item 5 p.4 "Train many runs on random data
+    subsets, then fit the effect of each group on success"; DataMIL p.4 "we first sample m random
+    subsets of the prior dataset") use this same op: a random subset of size ``n`` from a parent of
+    ``N`` episodes is ``drop_random_k(parent, k=N - n, seed=s)``.
+    """
     if not 0 < k < len(parent.episode_ids):
         raise ValueError(f"k={k} out of range for a parent of {len(parent.episode_ids)} episodes")
     idx = np.random.default_rng(seed).choice(len(parent.episode_ids), size=k, replace=False)
@@ -462,6 +481,71 @@ def drop_random_k(parent: Subset, k: int, seed: int, lineage_root: Path | None =
     child = Subset(parent.dataset_version_id, tuple(sorted(set(parent.episode_ids) - set(dropped))), deriv)
     child.save(lineage_root)
     return child
+
+
+GROUP_COLUMNS_EXCLUDED = {"episode_id", "episode_index", "content_hash", "parent_content_hash", "init_state_sha256",
+                          "source_file", "source_demo"}
+
+
+def drop_group(parent: Subset, column: str, value, lineage_root: Path | None = None) -> Subset:
+    """Group leave-one-out: child subset without every parent episode whose catalog ``column == value``.
+
+    Grounding: PoC §2.1 item 5 (p. 3) "Leave-one-group-out ablations. Drop one data source or task group,
+    retrain, and measure the change"; PoC §10 (p. 20) "Causal baseline | Group-level leave-one-out
+    ablations, judged with the macro-KS gate".
+
+    ``column`` must be a scalar §2.2 catalog column (``vlapoc.catalog.CATALOG_COLUMNS``, e.g. ``suite``,
+    ``task_name``, ``scene``, ``libero_task_id``); per-episode identity/hash columns and list columns
+    (``objects``) are rejected, and so is anything outside the catalog, so ground truth (which lives only
+    in a derived version's ``labels.parquet``) cannot be grouped on. Raises when ``value`` matches no
+    parent episode or every one.
+    """
+    from vlapoc.catalog import CATALOG_COLUMNS
+
+    if column not in CATALOG_COLUMNS or column in GROUP_COLUMNS_EXCLUDED:
+        allowed = sorted(set(CATALOG_COLUMNS) - GROUP_COLUMNS_EXCLUDED - {"objects"})
+        raise LineageError(f"drop_group: {column!r} is not a groupable catalog column; allowed: {allowed}")
+    eps = parent.episodes(lineage_root)
+    if eps[column].map(lambda x: isinstance(x, (list, tuple, np.ndarray))).any():
+        raise LineageError(f"drop_group: {column!r} is list-valued; group on a scalar column")
+    mask = eps[column] == value
+    n = int(mask.sum())
+    if n == 0 or n == len(eps):
+        raise LineageError(f"drop_group: {column} == {value!r} matches {n} of {len(eps)} parent episodes; "
+                           "it must match some but not all")
+    dropped = sorted(eps.loc[mask, "episode_id"])
+    val = value.item() if hasattr(value, "item") else value
+    deriv = {"op": "drop_group", "parent_subset_id": parent.subset_id, "column": column, "value": val,
+             "dropped": dropped}
+    child = Subset(parent.dataset_version_id, tuple(sorted(set(parent.episode_ids) - set(dropped))), deriv)
+    child.save(lineage_root)
+    return child
+
+
+@contextmanager
+def isolated_hf_datasets_cache(parent_dir: Path | None = None):
+    """Route every HF ``datasets`` Arrow cache written inside the block to a fresh temp dir, deleted on exit.
+
+    Why: ``LeRobotDataset(...)`` loads through ``datasets.Dataset.from_parquet`` and leaves a cache per
+    distinct episode list (plan risk R1; analysis-r1 E3: 13 entries from one 20-episode derivation).
+    How: ``datasets/builder.py:365`` resolves the cache root when each builder is constructed
+    (``self._cache_dir_root = str(cache_dir or config.HF_DATASETS_CACHE)``) and no module imports the
+    value by name (grep, datasets 4.8.5), so swapping ``datasets.config.HF_DATASETS_CACHE`` for the
+    duration of the block routes every builder created in it. The temp dir sits under the gitignored
+    ``data/scratch/`` (repo-relative), never under a session-bound path.
+    """
+    import datasets
+
+    base = Path(parent_dir) if parent_dir is not None else REPO_ROOT / "data" / "scratch"
+    base.mkdir(parents=True, exist_ok=True)
+    tmp = Path(tempfile.mkdtemp(prefix="hf_datasets_cache_", dir=base))
+    old = datasets.config.HF_DATASETS_CACHE
+    datasets.config.HF_DATASETS_CACHE = tmp
+    try:
+        yield tmp
+    finally:
+        datasets.config.HF_DATASETS_CACHE = old
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def diff_versions(a: str, b: str, lineage_root: Path | None = None) -> dict:

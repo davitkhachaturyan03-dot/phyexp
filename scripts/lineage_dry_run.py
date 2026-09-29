@@ -24,6 +24,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -47,8 +48,48 @@ from vlapoc.lineage import (  # noqa: E402
 
 FEATURE_DIR = REPO_ROOT / "tracker" / "features" / "2026-09-28-data-lineage-layer"
 ART = FEATURE_DIR / "artifacts"
-SCRATCH = Path("/private/tmp/claude-501/-Users-davit-khachaturyan-Projects-personal-vlaExp/"
-               "ac005395-c032-4c99-b0c0-0f3ce43bc236/scratchpad")
+SCRATCH_ROOT = REPO_ROOT / "data" / "scratch"  # gitignored (data/); never a session-bound path (AC3.9)
+
+
+def tamper_check(v1: dict, steps: int = 5, chain: str | None = None) -> dict:
+    """AC6.5: flip one byte in a clone of v1 and show that ``train_run`` refuses to launch.
+
+    The clone lives in a fresh ``tempfile.mkdtemp`` dir under ``data/scratch/`` and is deleted afterwards.
+    A refused launch creates no MLflow run, so the main DB only gets read.
+    """
+    c = runs.client()
+    SCRATCH_ROOT.mkdir(parents=True, exist_ok=True)
+    scratch = Path(tempfile.mkdtemp(prefix="tamper_", dir=SCRATCH_ROOT))
+    copy = scratch / "v1_tamper_copy"
+    try:
+        subprocess.run(["cp", "-c", "-R", str(REPO_ROOT / v1["lerobot_root"]), str(copy)], check=True)
+        target = sorted((copy / "data").rglob("*.parquet"))[-1]
+        size = target.stat().st_size
+        with open(target, "r+b") as f:
+            f.seek(size // 3)
+            byte = f.read(1)
+            f.seek(size // 3)
+            f.write(bytes([byte[0] ^ 0xFF]))
+        n_before = len(c.search_runs([runs.experiment_id()]))
+        runs_dir = REPO_ROOT / "data" / "runs"
+        dirs_before = set(p.name for p in runs_dir.iterdir()) if runs_dir.is_dir() else set()
+        try:
+            runs.train_run("v1/candidate", "train-on-tampered-copy", seed=0, steps=steps, dataset_root=copy, chain=chain)
+            refused = None
+        except VersionIntegrityError as e:
+            refused = str(e).replace(str(REPO_ROOT) + "/", "")
+        n_after = len(c.search_runs([runs.experiment_id()]))
+        dirs_after = set(p.name for p in runs_dir.iterdir()) if runs_dir.is_dir() else set()
+        log(f"AC6.5 flipped byte {size // 3} of {target.relative_to(copy)} in a clone of v1 at "
+            f"{copy.relative_to(REPO_ROOT)}; train_run refused: {refused is not None}")
+        log(f"AC6.5 {refused}")
+        log(f"AC6.5 MLflow runs before/after the refused launch: {n_before}/{n_after}; new data/runs dirs: "
+            f"{sorted(dirs_after - dirs_before)}")
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+    log(f"AC6.5 scratch clone removed: {not scratch.exists()}")
+    return {"refused": refused is not None, "message": refused, "runs_before": n_before, "runs_after": n_after,
+            "new_run_dirs": sorted(dirs_after - dirs_before)}
 
 
 def log(msg: str) -> None:
@@ -122,7 +163,14 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--steps", type=int, default=5)
     ap.add_argument("--batch-size", type=int, default=4)
+    ap.add_argument("--tamper-only", action="store_true",
+                    help="run only the AC6.5 tamper refusal against the existing v1 (records no run)")
     a = ap.parse_args()
+    if a.tamper_only:
+        res = tamper_check(resolve_version("v1"), steps=a.steps)
+        (ART / "s6_tamper_only.json").write_text(json.dumps(res, indent=2))
+        log("summary -> tracker/features/2026-09-28-data-lineage-layer/artifacts/s6_tamper_only.json")
+        return 0 if res["refused"] and res["runs_before"] == res["runs_after"] else 1
     chain = f"dry-run-k{a.k}-s{a.seed}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
     out = REPO_ROOT / "data" / "runs" / chain
     t_start = time.time()
@@ -240,30 +288,7 @@ def main() -> int:
                         "corrupted_dropped": len(corrupted_dropped), "consumers": cn}
 
     # ---- AC6.5 tamper -----------------------------------------------------------------------------
-    copy = SCRATCH / "v1_tamper_copy"
-    if copy.exists():
-        shutil.rmtree(copy)
-    subprocess.run(["cp", "-c", "-R", str(REPO_ROOT / v1["lerobot_root"]), str(copy)], check=True)
-    target = sorted((copy / "data").rglob("*.parquet"))[-1]
-    size = target.stat().st_size
-    with open(target, "r+b") as f:
-        f.seek(size // 3)
-        byte = f.read(1)
-        f.seek(size // 3)
-        f.write(bytes([byte[0] ^ 0xFF]))
-    n_before = len(c.search_runs([runs.experiment_id()]))
-    try:
-        runs.train_run("v1/candidate", "train-on-tampered-copy", seed=0, steps=a.steps, dataset_root=copy, chain=chain)
-        refused = None
-    except VersionIntegrityError as e:
-        refused = str(e).replace(str(SCRATCH), "<scratch>")
-    n_after = len(c.search_runs([runs.experiment_id()]))
-    log(f"AC6.5 flipped byte {size // 3} of {target.relative_to(copy)} in a scratch clone of v1; train_run refused: {refused is not None}")
-    log(f"AC6.5 {refused}")
-    log(f"AC6.5 MLflow runs before/after the refused launch: {n_before}/{n_after}; no data/runs dir created for it: "
-        f"{not any(p.name.startswith('train-on-tampered-copy') for p in (REPO_ROOT / 'data' / 'runs').iterdir())}")
-    shutil.rmtree(copy)
-    summary["AC6.5"] = {"refused": refused is not None, "message": refused, "runs_before": n_before, "runs_after": n_after}
+    summary["AC6.5"] = tamper_check(v1, steps=a.steps, chain=chain)
 
     # ---- AC6.6 ------------------------------------------------------------------------------------
     scr = pd.read_parquet(screen_path)

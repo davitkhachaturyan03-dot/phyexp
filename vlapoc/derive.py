@@ -38,6 +38,7 @@ episodes move to the end of the derived dataset, and the version's episodes tabl
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import io
 import json
@@ -66,6 +67,7 @@ from vlapoc.lineage import (
     _demo_number,
     _root,
     _write_json,
+    isolated_hf_datasets_cache,
     load_names,
     register_version,
     rel,
@@ -166,11 +168,21 @@ def derive_version(
     derivation: dict | None = None,
     lineage_root: Path | None = None,
     image_writer_threads: int = 4,
+    isolate_hf_cache: bool = True,
 ) -> dict:
     """Write a new dataset version = parent with ``edits`` applied; register it with labels.
 
     Returns a summary with the new ``dataset_version_id``, counts and paths. Raises ``LineageError``
     before writing anything if an edit targets a protected (reference) or unknown episode.
+
+    The derived version's episode table holds the parent's catalog columns plus ``parent_content_hash``
+    and nothing about the edits: ground truth lives only in ``labels.parquet`` (PoC §2.1 item 4 p.3, the
+    method under test must not read the answer; AC4.7).
+
+    ``isolate_hf_cache=True`` (default) routes the HF ``datasets`` caches written by the derivation's
+    ``LeRobotDataset`` loads (parent, kept, edit, merged) to a temp dir that is deleted afterwards, so a
+    derivation leaves the shared cache unchanged (AC4.8). ``False`` reproduces the round-1 behaviour
+    (orphaned caches) and exists only to measure it.
     """
     from lerobot.datasets.dataset_tools import delete_episodes, merge_datasets
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
@@ -211,36 +223,40 @@ def derive_version(
 
     idx_of = dict(zip(eps["episode_id"], eps["episode_index"]))
     edits = sorted(edits, key=lambda e: idx_of[e.episode_id])  # deterministic write order
-    parent_ds = LeRobotDataset(f"local/{parent_root.name}", root=parent_root)
-    delete_episodes(parent_ds, [int(idx_of[e.episode_id]) for e in edits], output_dir=tmp_kept,
-                    repo_id=f"{repo_id}_kept")
-    t_delete = time.time() - t0
+    # Every LeRobotDataset load below writes an HF datasets Arrow cache (plan R1); route them all to a
+    # temp dir that is deleted with the temporary datasets (AC4.8, analysis-r1 E3).
+    cache_ctx = isolated_hf_datasets_cache() if isolate_hf_cache else contextlib.nullcontext()
+    with cache_ctx:
+        parent_ds = LeRobotDataset(f"local/{parent_root.name}", root=parent_root)
+        delete_episodes(parent_ds, [int(idx_of[e.episode_id]) for e in edits], output_dir=tmp_kept,
+                        repo_id=f"{repo_id}_kept")
+        t_delete = time.time() - t0
 
-    ed = LeRobotDataset.create(repo_id=f"{repo_id}_edit", fps=info["fps"], features=user_features, root=tmp_edit,
-                               robot_type=info.get("robot_type"), use_videos=False,
-                               image_writer_threads=image_writer_threads)
-    expected: dict[str, str] = {}
-    for e in edits:
-        src = read_stored_episode(parent_root, int(idx_of[e.episode_id]))
-        new = e.transform(dict(src))
-        _check_canonical(new, src)
-        if new["task"] != src["task"]:
-            raise LineageError("task edits must go through LeRobot modify_tasks (not supported here)")
-        expected[e.episode_id] = episode_content_hash(new["task"], new["action"], new["state"], new["image"], new["image2"])
-        for i in range(len(new["action"])):
-            ed.add_frame({IMAGE_KEYS[0]: new["image"][i], IMAGE_KEYS[1]: new["image2"][i],
-                          "observation.state": new["state"][i], "action": new["action"][i], "task": new["task"]})
-        ed.save_episode()
-    ed.finalize()
-    staging = tmp_edit / "images"
-    if staging.is_dir() and not any(p.is_file() for p in staging.rglob("*")):
-        shutil.rmtree(staging)
-    t_edit = time.time() - t0 - t_delete
+        ed = LeRobotDataset.create(repo_id=f"{repo_id}_edit", fps=info["fps"], features=user_features, root=tmp_edit,
+                                   robot_type=info.get("robot_type"), use_videos=False,
+                                   image_writer_threads=image_writer_threads)
+        expected: dict[str, str] = {}
+        for e in edits:
+            src = read_stored_episode(parent_root, int(idx_of[e.episode_id]))
+            new = e.transform(dict(src))
+            _check_canonical(new, src)
+            if new["task"] != src["task"]:
+                raise LineageError("task edits must go through LeRobot modify_tasks (not supported here)")
+            expected[e.episode_id] = episode_content_hash(new["task"], new["action"], new["state"], new["image"], new["image2"])
+            for i in range(len(new["action"])):
+                ed.add_frame({IMAGE_KEYS[0]: new["image"][i], IMAGE_KEYS[1]: new["image2"][i],
+                              "observation.state": new["state"][i], "action": new["action"][i], "task": new["task"]})
+            ed.save_episode()
+        ed.finalize()
+        staging = tmp_edit / "images"
+        if staging.is_dir() and not any(p.is_file() for p in staging.rglob("*")):
+            shutil.rmtree(staging)
+        t_edit = time.time() - t0 - t_delete
 
-    merge_datasets([LeRobotDataset(f"{repo_id}_kept", root=tmp_kept), LeRobotDataset(f"{repo_id}_edit", root=tmp_edit)],
-                   output_repo_id=repo_id, output_dir=out_root)
-    shutil.rmtree(tmp_kept)
-    shutil.rmtree(tmp_edit)
+        merge_datasets([LeRobotDataset(f"{repo_id}_kept", root=tmp_kept), LeRobotDataset(f"{repo_id}_edit", root=tmp_edit)],
+                       output_repo_id=repo_id, output_dir=out_root)
+        shutil.rmtree(tmp_kept)
+        shutil.rmtree(tmp_edit)
     t_merge = time.time() - t0 - t_delete - t_edit
 
     # --- re-establish identity by content -----------------------------------------------------
@@ -262,8 +278,7 @@ def derive_version(
     for c in ("length_steps", "smoothness", "idle_fraction", "idle_steps", "gripper_toggles"):
         child[c] = stored[c].to_numpy()
     child["duration_s"] = child["length_steps"] / info["fps"]
-    ctype = {e.episode_id: e.corruption_type for e in edits}
-    child["corruption_type"] = child["episode_id"].map(ctype)
+    # Ground truth stays out of the episode table (AC4.7): it lives only in labels.parquet.
 
     # --- catalog + registration + labels -------------------------------------------------------
     cat_dir = DEFAULT_CATALOG_ROOT / out_root.name if lineage_root is None else _root(lineage_root) / "catalog" / out_root.name
@@ -290,6 +305,8 @@ def derive_version(
     deriv = {
         "parent_version_id": pvid, "parent_name": pv["name"], "dataset_version_id": vid, "name": name,
         "n_edits": len(edits), "mechanism": "lerobot delete_episodes + LeRobotDataset writer + merge_datasets",
+        "hf_datasets_cache": ("isolated temp dir under data/scratch, deleted after the derivation" if isolate_hf_cache
+                              else "shared HF_DATASETS_CACHE (derivation-time caches left behind)"),
         "labels_sha256": hashlib.sha256((vdir / "labels.parquet").read_bytes()).hexdigest(),
         "labels_rows_digest": sha256_json(labels.sort_values("episode_id").to_dict("records")),
         **(derivation or {}),

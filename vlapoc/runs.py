@@ -67,6 +67,7 @@ from vlapoc.lineage import (  # noqa: E402
     LineageError,
     Subset,
     _root,
+    drop_group,
     drop_random_k,
     drop_top_k,
     rel,
@@ -507,24 +508,47 @@ def attribute_standin(train_run_id: str, eval_run_id: str, name: str, out_dir: P
         return r.run_id, path, digest
 
 
-def select_run(parent: str, name: str, op: str, k: int, seed: int | None = None, score_path: Path | None = None,
-               metric: str | None = None, score_run_id: str | None = None, lineage_root: Path | None = None,
-               chain: str | None = None) -> tuple[str, Subset]:
-    """Stage ``select``: drop-top-k by a score table, or drop-random-k (PoC §2.6 p.5, §9.1 Step 4)."""
+SELECT_OPS = ("drop_top_k", "drop_random_k", "drop_group")
+
+
+def select_run(parent: str, name: str, op: str, k: int | None = None, seed: int | None = None,
+               score_path: Path | None = None, metric: str | None = None, score_run_id: str | None = None,
+               direction: str = "highest", column: str | None = None, value=None,
+               lineage_root: Path | None = None, chain: str | None = None) -> tuple[str, Subset]:
+    """Stage ``select``: derive a child subset from ``parent`` and record how, as one MLflow run.
+
+    Ops (all children are selections recorded in the lineage store, never data rewrites):
+    - ``drop_top_k`` (PoC §2.6 p.5; §9.1 Step 4 p.19): drop the k top-ranked episodes of a score table by
+      ``metric`` in ``direction`` (``"highest"`` = k largest, ``"lowest"`` = k smallest; ties by
+      ``episode_id``). Whether that removes the "harmful" or the "helpful" episodes ("Remove the top-k
+      “helpful” episodes and retrain", §2.6 p.5; "Repeat for the top-k most helpful episodes", §9.1 Step 4
+      item 5 p.19) depends on the score's sign convention, so the record always carries both ``metric``
+      and ``direction``.
+    - ``drop_random_k`` (§9.1 Step 4 p.19 control): drop k random episodes, seeded. A random subset of
+      size n for datamodels-style regression (§2.1 item 5 p.4) is ``k = N - n``.
+    - ``drop_group`` (§2.1 item 5 p.3; §10 p.20 "Group-level leave-one-out ablations"): drop every
+      episode whose catalog ``column == value``.
+    """
+    if op not in SELECT_OPS:
+        raise ValueError(f"op must be one of {SELECT_OPS}")
+    if op == "drop_top_k" and direction not in ("highest", "lowest"):
+        raise ValueError("direction must be 'highest' or 'lowest'")
     ps = Subset.load(parent, lineage_root)
     with stage_run("select", name, lineage_root, chain=chain) as r:
         r.input_subset(ps, "parent", parent if "/" in parent else None)
         if op == "drop_top_k":
             table = pd.read_parquet(score_path)
-            child = drop_top_k(ps, table, metric, k, "highest", score_source=f"mlflow run {score_run_id}",
+            child = drop_top_k(ps, table, metric, k, direction, score_source=f"mlflow run {score_run_id}",
                                lineage_root=lineage_root)
             r.input_entity("score_table", child.derivation["score_table_digest"], "scores")
-            r.params({"op": op, "k": k, "metric": metric, "direction": "highest", "score_run_id": score_run_id})
+            r.params({"op": op, "k": k, "metric": metric, "direction": direction, "score_run_id": score_run_id})
         elif op == "drop_random_k":
             child = drop_random_k(ps, k, seed, lineage_root=lineage_root)
-            r.params({"op": op, "k": k, "seed": seed})
+            r.params({"op": op, "k": k, "seed": seed, "subset_size": len(ps.episode_ids) - k})
         else:
-            raise ValueError(op)
+            child = drop_group(ps, column, value, lineage_root=lineage_root)
+            r.params({"op": op, "column": column, "value": child.derivation["value"],
+                      "n_dropped": len(child.derivation["dropped"])})
         r.params({"parent_subset_id": ps.subset_id, "child_n_episodes": len(child.episode_ids)})
         r.tags({"select.dropped": json.dumps(child.derivation["dropped"])[:7900]})
         r.produced("subset", child.subset_id, "subset")

@@ -172,11 +172,116 @@ def v1(summary: dict) -> None:
     labels.head(10).to_csv(FEATURE_DIR / "artifacts" / "s4_labels_head10.csv", index=False)
 
 
+def columns(summary: dict) -> None:
+    """AC4.7: a derived version's episode tables carry the parent's catalog columns + parent_content_hash only."""
+    from vlapoc.catalog import CATALOG_COLUMNS
+
+    v1_ = resolve_version("v1")
+    tables = {
+        "v0 version table": LINEAGE_ROOT / "versions" / resolve_version("v0")["dataset_version_id"] / "episodes.parquet",
+        "v1 version table": LINEAGE_ROOT / "versions" / v1_["dataset_version_id"] / "episodes.parquet",
+        "v1 catalog copy": REPO_ROOT / "data" / "lineage" / "catalog" / Path(v1_["lerobot_root"]).name / "episodes.parquet",
+    }
+    res = {}
+    for label, path in tables.items():
+        cols = list(pd.read_parquet(path).columns)
+        label_cols = sorted(set(cols) & {"corruption_type", "params", "seed", "label", "corrupted"})
+        res[label] = {"n_columns": len(cols), "label_columns": label_cols, "columns": cols}
+        print(f"AC4.7 {label} ({path.relative_to(REPO_ROOT)}): {len(cols)} columns; label columns present: {label_cols}")
+    v1cols = res["v1 version table"]["columns"]
+    print(f"AC4.7 v1 columns == v0 catalog columns + ['parent_content_hash']: {v1cols == list(CATALOG_COLUMNS) + ['parent_content_hash']}; "
+          f"v1 version table == catalog copy columns: {v1cols == res['v1 catalog copy']['columns']}; "
+          f"v0 columns == CATALOG_COLUMNS: {res['v0 version table']['columns'] == list(CATALOG_COLUMNS)}")
+    summary["AC4.7_columns"] = res
+
+
+def small_parent(base: Path, lr: Path) -> str:
+    """Convert and register a 20-episode parent (1 demo per task) in a scratch lineage root."""
+    from vlapoc.catalog import hash_stored_dataset
+    from vlapoc.libero_convert import convert, iter_raw_episodes
+    from vlapoc.lineage import register_version
+
+    root = base / "lerobot" / "small20"
+    convert(out_root=root, limit_per_task=1, log_every=100)
+    stored = hash_stored_dataset(root, workers=4)
+    refs = list(iter_raw_episodes(limit_per_task=1))
+    cat = pd.DataFrame([{"episode_id": f"{r.suite}/{r.task_name}/{r.source_demo}", "suite": r.suite, "task_name": r.task_name,
+                         "libero_task_id": r.libero_task_id, "source_file": r.source_file, "source_demo": r.source_demo} for r in refs])
+    for c in ("episode_index", "content_hash", "length_steps", "smoothness", "idle_fraction", "idle_steps", "gripper_toggles"):
+        cat[c] = stored[c].to_numpy()
+    cat["duration_s"] = cat["length_steps"] / 20
+    cdir = lr / "catalog" / "small20"
+    cdir.mkdir(parents=True)
+    cat.to_parquet(cdir / "episodes.parquet", index=False)
+    (cdir / "catalog.json").write_text(json.dumps({"lerobot_root": root.resolve().relative_to(REPO_ROOT).as_posix(),
+                                                   "n_episodes": len(cat)}))
+    return register_version(root, "small20", cdir, note="AC4.8 small parent", lineage_root=lr)["dataset_version_id"]
+
+
+def cache_listing(d: Path) -> tuple[list[str], int]:
+    files = sorted(p for p in d.rglob("*") if p.is_file()) if d.exists() else []
+    return [str(p.relative_to(d)) for p in files], sum(p.stat().st_size for p in files)
+
+
+def cache(summary: dict) -> None:
+    """AC4.8: a derivation leaves the shared HF datasets cache unchanged (isolated temp cache, deleted)."""
+    import tempfile
+
+    import datasets
+
+    scratch_root = REPO_ROOT / "data" / "scratch"
+    scratch_root.mkdir(parents=True, exist_ok=True)
+    base = Path(tempfile.mkdtemp(prefix="verify_s4_cache_", dir=scratch_root))
+    lr = base / "lineage"
+    lr.mkdir()
+    shared = Path(datasets.config.HF_DATASETS_CACHE)
+    try:
+        pvid = small_parent(base, lr)
+        first = version_episodes(pvid, lr).sort_values("episode_index")["episode_id"].iloc[0]
+        print(f"AC4.8 scratch parent small20 {pvid[:12]} (20 episodes) registered in {lr.relative_to(REPO_ROOT)}")
+        before = cache_listing(shared)
+        out = derive_version(pvid, [idle_padding_edit(first, 20)], "small20_pad_isolated", out_root=base / "lerobot" / "pad_isolated",
+                             lineage_root=lr)
+        after = cache_listing(shared)
+        print(f"AC4.8 shared HF_DATASETS_CACHE = {shared.relative_to(REPO_ROOT) if shared.is_relative_to(REPO_ROOT) else shared}: "
+              f"before {len(before[0])} files / {before[1]} bytes; after isolated derive_version {len(after[0])} files / {after[1]} bytes; "
+              f"identical listing and bytes: {before == after}")
+        print(f"AC4.8 derivation {out['dataset_version_id'][:12]}: 1 edit, timing {out['timing_s']}; derivation.json hf_datasets_cache: "
+              f"{json.loads((lr / 'versions' / out['dataset_version_id'] / 'derivation.json').read_text())['hf_datasets_cache']!r}")
+        leftovers = sorted(p.name for p in scratch_root.glob("hf_datasets_cache_*"))
+        print(f"AC4.8 isolated temp caches left under data/scratch/: {leftovers}")
+        # contrast: the round-1 behaviour, measured against a throwaway cache dir so the shared cache is untouched
+        demo = base / "unisolated_cache_demo"
+        demo.mkdir()
+        old = datasets.config.HF_DATASETS_CACHE
+        datasets.config.HF_DATASETS_CACHE = demo
+        try:
+            derive_version(pvid, [idle_padding_edit(first, 21)], "small20_pad_unisolated", out_root=base / "lerobot" / "pad_unisolated",
+                           lineage_root=lr, isolate_hf_cache=False)
+        finally:
+            datasets.config.HF_DATASETS_CACHE = old
+        files, nbytes = cache_listing(demo)
+        arrow = [f for f in files if f.endswith(".arrow")]
+        entries = sorted({f.split("/")[1] for f in files if f.startswith("parquet/") and f.count("/") >= 2})
+        print(f"AC4.8 contrast, isolate_hf_cache=False: {len(files)} cache files ({len(arrow)} .arrow, {len(entries)} parquet builder "
+              f"entries), {nbytes} bytes left behind by one 20-episode derivation")
+        summary["AC4.8"] = {"shared_cache": str(shared.relative_to(REPO_ROOT)) if shared.is_relative_to(REPO_ROOT) else "outside repo",
+                            "before_files": len(before[0]), "before_bytes": before[1], "after_files": len(after[0]),
+                            "after_bytes": after[1], "unchanged": before == after, "leftover_temp_caches": leftovers,
+                            "contrast_unisolated_files": len(files), "contrast_unisolated_arrow": len(arrow),
+                            "contrast_unisolated_entries": len(entries), "contrast_unisolated_bytes": nbytes}
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+        print(f"AC4.8 scratch removed: {not base.exists()}")
+
+
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--guard", action="store_true")
     p.add_argument("--padding", action="store_true")
     p.add_argument("--v1", action="store_true")
+    p.add_argument("--columns", action="store_true", help="AC4.7 column listing")
+    p.add_argument("--cache", action="store_true", help="AC4.8 small-scale derivation cache check")
     a = p.parse_args()
     out = FEATURE_DIR / "artifacts" / "s4_summary.json"
     summary = json.loads(out.read_text()) if out.is_file() else {}
@@ -186,6 +291,10 @@ def main() -> int:
         padding(summary)
     if a.v1:
         v1(summary)
+    if a.columns:
+        columns(summary)
+    if a.cache:
+        cache(summary)
     out.write_text(json.dumps(summary, indent=2, default=str))
     print(f"summary -> {out.relative_to(REPO_ROOT)}")
     return 0
