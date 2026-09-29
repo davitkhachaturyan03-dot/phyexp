@@ -130,7 +130,10 @@ def v1(summary: dict) -> None:
     ver = verify_version("v1")
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
-    ds = LeRobotDataset(DEFAULT_REPO_ID, root=REPO_ROOT / v1_["lerobot_root"])
+    from vlapoc.lineage import isolated_hf_datasets_cache
+
+    with isolated_hf_datasets_cache():  # a full-v1 load would otherwise leave a ~7 GB cache (plan R1)
+        ds = LeRobotDataset(DEFAULT_REPO_ID, root=REPO_ROOT / v1_["lerobot_root"])
     info = json.loads((REPO_ROOT / v1_["lerobot_root"] / "meta" / "info.json").read_text())
     print(f"AC4.1 v1 loads: episodes={ds.num_episodes} frames={ds.num_frames}; info total_episodes={info['total_episodes']} "
           f"total_frames={info['total_frames']} total_tasks={info['total_tasks']} fps={info['fps']}; recomputed id matches "
