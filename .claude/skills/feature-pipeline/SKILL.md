@@ -117,6 +117,11 @@ links resolve, and no `{{` placeholders remain. Send it back with specifics if n
 - Don't do an agent's job to save time. If an agent's output is weak, route it back with
   specific feedback.
 - Relay honestly. If a story ended ❌ or was descoped, the final message says so.
+- **Refused writes.** The harness sometimes refuses a subagent's write of a report-like file
+  ("Subagents should return findings as text, not write report files"). Tell every agent in its
+  dispatch prompt to return the full file content if its write is refused. Then save that
+  content verbatim yourself, with an HTML/Markdown comment noting the orchestrator saved it.
+  Don't edit or summarise the agent's content when saving it.
 - Run agents in the foreground (`run_in_background: false`) when the next step depends on them.
   That is every stage here, because the pipeline is sequential.
 - A feature isn't finished until its folder holds `report.html` and the story pages, and
