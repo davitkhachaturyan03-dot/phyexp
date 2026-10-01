@@ -100,8 +100,9 @@ def main() -> int:
     finally:
         shutil.rmtree(base, ignore_errors=True)
         print(f"scratch removed: {not base.exists()}")
-    a.summary.write_text(json.dumps(out, indent=2, default=str))
-    print(f"summary -> {a.summary.relative_to(REPO_ROOT)}")
+    summary = a.summary.resolve()
+    summary.write_text(json.dumps(out, indent=2, default=str))
+    print(f"summary -> {summary.relative_to(REPO_ROOT) if summary.is_relative_to(REPO_ROOT) else summary}")
     return 0
 
 
