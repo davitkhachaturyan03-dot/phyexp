@@ -1,0 +1,8 @@
+AC4.3 editing reference episode libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_14: LineageError raised: True
+AC4.3 message: refusing to edit 1 reference-split episode(s) (PoC §8.7 p.15: corrupt only the training copy): ['libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_14']
+AC4.3 nothing written: True; protected ids for v0: 40
+AC4.7 v0 version table (data/lineage/versions/3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7/episodes.parquet): 21 columns; label columns present: []
+AC4.7 v1 version table (data/lineage/versions/16076b9c5cb2a0e8c5d291fc0766977dc7286c6b9f87df39bd87fe5c17cd85f8/episodes.parquet): 22 columns; label columns present: []
+AC4.7 v1 catalog copy (data/lineage/catalog/libero_spatial_10__v1/episodes.parquet): 22 columns; label columns present: []
+AC4.7 v1 columns == v0 catalog columns + ['parent_content_hash']: True; v1 version table == catalog copy columns: True; v0 columns == CATALOG_COLUMNS: True
+summary -> tracker/features/2026-09-28-data-lineage-layer/artifacts/s4_summary.json

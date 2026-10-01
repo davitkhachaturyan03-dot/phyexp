@@ -1,0 +1,11 @@
+class Subset:
+    """A selection of episode versions from one dataset version.
+
+    The record is a selection: no dataset file is rewritten or reindexed; ``resolve()`` maps its
+    ``episode_id``s to the version's ``episode_index`` values. Loading it is not free on disk, though:
+    LeRobot 0.6.1 loads ``episodes=`` through ``datasets.Dataset.from_parquet(..., filters=...)``
+    (``lerobot/datasets/io_utils.py:79-82``), and HF ``datasets`` materialises an Arrow cache of the
+    filtered rows under ``HF_DATASETS_CACHE`` for every distinct episode list (measured: 6.4-6.6 GB for
+    a 940-960 episode subset of this dataset; plan risk R1). Wrap throwaway loads in
+    ``isolated_hf_datasets_cache()``.
+    """

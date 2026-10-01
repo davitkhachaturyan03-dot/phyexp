@@ -1,0 +1,27 @@
+scratch lineage root: data/scratch/verify_s3_kvk5nxsv/lineage (deleted at exit)
+AC3.1 registered dataset_version_id = 3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7
+AC3.1 recomputed from dataset      = 3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7  match=True  (19s)
+AC3.1 version dir contents: ['episodes.parquet', 'files.json', 'raw_files.parquet', 'version.json']; files.json entries=77 (data parquet=73); lerobot_root=data/lerobot/libero_spatial_10
+AC3.2 reference=40 candidate=960 overlap=0 union==version: True; reference per task: [2] over 20 tasks; derivation seed=0
+AC3.3 v0/reference: subset_id=b6a72d5e7f31 resolve()=40 indices; served episodes == subset: True; frames served=7915 sum(length_steps)=7915 (every frame via __getitem__) -> OK
+AC3.3 v0/candidate: subset_id=8ee096b72b5a resolve()=960 indices; served episodes == subset: True; frames served=192425 sum(length_steps)=192425 -> OK
+AC3.4 drop_top_k(highest): child c68eacb518e1 n=940; dropped == 20 highest: True; drop_top_k(lowest): dropped == 20 lowest: True; derivation keys=['direction', 'dropped', 'k', 'metric', 'op', 'parent_subset_id', 'score_source', 'score_table_digest', 'tie_break']
+AC3.4 drop_random_k(seed=0) twice -> same subset_id: True (4a06edb41e77); seed=1 differs: True
+AC3.4 stale content_hash rejected: score table keys != parent subset's episode versions: 1 unknown/stale (e.g. [('libero_10/KITCHEN_SCENE3_turn_on_the_stov...
+AC3.4 drop-top-k child round-trips through LeRobot: True, frames=190269
+(isolated HF cache used by these loads: 14.35 GB, deleted with the block)
+AC3.5 cloned data/lerobot/libero_spatial_10 -> data/scratch/verify_s3_kvk5nxsv/v0_tamper_copy in 0.1s
+AC3.5 after flipping 1 bit at byte 50660612 of data/chunk-000/file-017.parquet: VersionIntegrityError: dataset copy at data/scratch/verify_s3_kvk5nxsv/v0_tamper_copy does not match version v0 (3c4dca68d6f1): changed=['data/chunk-000/file-017.parquet'] missing=[] extra=[]
+AC3.5 untouched clone verified first: True (77 files); tamper caught: True; original still verifies: True
+AC3.6 scanned 58 lineage files (json + parquet, incl. mlartifacts copies) under data/lineage/: absolute-path hits=[]
+AC3.8 drop_group(v1/candidate, task_name='KITCHEN_SCENE3_turn_on_the_stove_and_put_the_mok'): child d003e8f75e37 n=912 dropped=48; resolve() == episode_index set of remaining episodes (from v1's episode table): True; derivation keys=['column', 'dropped', 'op', 'parent_subset_id', 'value']
+AC3.8 drop_group(v1/candidate, suite='libero_10'): child 2f101b58b02f n=480 dropped=480; resolve() == episode_index set of remaining episodes (from v1's episode table): True; derivation keys=['column', 'dropped', 'op', 'parent_subset_id', 'value']
+AC3.8 raises on non-catalog column: drop_group: 'corruption_type' is not a groupable catalog column; allowed: ['collection_date', 'duration_s', 'g
+AC3.8 raises on list column: drop_group: 'objects' is list-valued; group on a scalar column
+AC3.8 raises on identity column: drop_group: 'content_hash' is not a groupable catalog column; allowed: ['collection_date', 'duration_s', 'grip
+AC3.8 raises on no match: drop_group: task_name == 'no_such_task' matches 0 of 960 parent episodes; it must match some but not all
+AC3.8 raises on matches all: drop_group: suite == 'libero_spatial' matches 480 of 480 parent episodes; it must match some but not all
+scratch removed: True
+summary -> tracker/features/2026-09-28-data-lineage-layer/artifacts/s3_summary_r2.json
+       48.79 real       144.91 user        30.17 sys
+exit=0

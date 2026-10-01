@@ -1,0 +1,7 @@
+{
+  "refused": true,
+  "message": "dataset copy at data/scratch/tamper_qx1xt7y8/v1_tamper_copy does not match version v1 (16076b9c5cb2): changed=['data/chunk-000/file-080.parquet'] missing=[] extra=[]",
+  "runs_before": 15,
+  "runs_after": 15,
+  "new_run_dirs": []
+}

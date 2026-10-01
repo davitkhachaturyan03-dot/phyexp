@@ -1,0 +1,8 @@
+AC4.8 scratch parent small20 bafb211603dd (20 episodes) registered in data/scratch/verify_s4_cache_txyzlc_y/lineage
+AC4.8 shared HF_DATASETS_CACHE = data/hf_datasets_cache: before 124 files / 28643158514 bytes; after isolated derive_version 124 files / 28643158514 bytes; identical listing and bytes: True
+AC4.8 derivation 6cbeb214cd4c: 1 edit, timing {'delete': 2.5, 'write_edits': 0.5, 'merge': 2.3, 'total': 7.9}; derivation.json hf_datasets_cache: 'isolated temp dir under data/scratch, deleted after the derivation'
+AC4.8 isolated temp caches left under data/scratch/: []
+AC4.8 contrast, isolate_hf_cache=False: 60 cache files (12 .arrow, 12 parquet builder entries), 662758780 bytes left behind by one 20-episode derivation
+AC4.8 scratch removed: True
+summary -> tracker/features/2026-09-28-data-lineage-layer/artifacts/s4_summary.json
+       31.53 real        42.01 user         8.70 sys

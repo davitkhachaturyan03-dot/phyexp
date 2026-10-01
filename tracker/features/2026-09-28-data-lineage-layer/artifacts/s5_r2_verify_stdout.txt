@@ -1,0 +1,13 @@
+scratch lineage root data/scratch/verify_s5_r2_0_wbivg0/lineage (copy of real manifests + mlflow.db; artifact location repointed)
+AC5.8 lowest: dropped == 20 lowest placeholder scores (tie-break episode_id asc): True; derivation direction='lowest'; run params direction='lowest' metric='placeholder_score' k=20
+AC5.8 default (highest): dropped == 20 highest: True; params direction='highest'; child id == S6 select-drop-top-20 child (c598f5692b40): True; low/high overlap: 0
+AC5.8 invalid direction rejected before any run starts: "direction must be 'highest' or 'lowest'"; runs added so far: 2
+AC5.9 drop_group(task_name=KITCHEN_SCENE3_turn_on_the_stove_and_put...): child n=912 (960 - 48); params op='drop_group' column='task_name' value='KITCHEN_SCENE3_turn_on_the_stove_and_put'... n_dropped=48; select.dropped tag present: True; produced subset tag: subset:d003e8f75e371...; == child: True
+AC5.9 trace(leave-one-task-out select) runs: ['select:r2-select-leave-one-task-out', 'derive:derive-v1', 'build:build-v0', 'split:split-v0']; raw files reached: 20; every edge has one producer: True
+AC5.10 seed 0: select run b319bfc8b22d k=480 subset_size=480 -> subset ab03e001e13b n=480; reproduced from seed: True
+AC5.10 seed 1: select run 28a6dff37812 k=480 subset_size=480 -> subset 5eafbb8e378d n=480; reproduced from seed: True
+AC5.10 seed 2: select run 7a174c189d94 k=480 subset_size=480 -> subset d03a5cf5757b n=480; reproduced from seed: True
+AC5.10 distinct subset ids: 3/3; membership matrix from subset records: shape (3, 960), row sums [480, 480, 480], episodes in 0/1/2/3 subsets: [120, 355, 370, 115]
+runs added to the scratch DB: 6; real mlflow.db sha256 unchanged: True (c5faec81f235); real mlartifacts tree unchanged: True (63 paths); scratch removed: True
+summary -> tracker/features/2026-09-28-data-lineage-layer/artifacts/s5_r2_summary.json
+        2.71 real         1.53 user         0.47 sys

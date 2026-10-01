@@ -1,0 +1,10 @@
+AC4.1 version diff v0 v1: changed 100, identical 900, added 0, removed 0
+AC4.1 v1 record parent_version_id == v0: True; changed ids == label ids: True
+AC4.1 parent_content_hash == v0 content_hash for all 1000 rows: True
+AC4.1 v1 loads: episodes=1000 frames=200340; info total_episodes=1000 total_frames=200340 total_tasks=20 fps=20; recomputed id matches registered: True; verify_version files ok: True (85) (25s)
+AC4.2 labels.parquet: 100 rows, columns ['episode_id', 'parent_content_hash', 'content_hash', 'corruption_type', 'params', 'seed']; join with v1 episodes on (episode_id, content_hash): 100/100 matched, 1:1 (unique ids True); label parent hash == v0 hash: True
+AC4.5 corrupted per task: [5] over 20 tasks; in reference split: 0; corruption_type ['action_gaussian_noise']; seed [0]
+AC4.5 params[0]: std_scale=0.25 sigma_a=[0.3334, 0.3531, 0.4134, 0.0393, 0.0612, 0.0811, 0.999] dims='all 7 action dims, including the gripper...' source='v0 meta/stats.json action.std (1000 episodes)'
+AC4.5 10 corrupted episodes checked frame by frame (2014 frames): same length 10/10, observations bit-identical 10/10; (a_v1 - a_v0)/sigma_a per dim: mean [-0.004, -0.005, -0.004, 0.002, -0.006, -0.002, -0.001] std [0.253, 0.246, 0.254, 0.255, 0.247, 0.251, 0.251] (expected 0 and 0.25)
+summary -> tracker/features/2026-09-28-data-lineage-layer/artifacts/s4_summary.json
+       28.72 real       121.46 user        16.24 sys

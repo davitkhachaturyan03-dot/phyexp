@@ -1,0 +1,74 @@
+{
+  "AC3.1": {
+    "registered": "3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7",
+    "recomputed": "3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7",
+    "match": true,
+    "files": 77
+  },
+  "AC3.2": {
+    "reference": 40,
+    "candidate": 960,
+    "overlap": 0,
+    "per_task": [
+      2
+    ],
+    "tasks": 20
+  },
+  "AC3.3": {
+    "v0/reference": {
+      "served_eq_subset": true,
+      "frames": 7915,
+      "expected": 7915,
+      "ok": true
+    },
+    "v0/candidate": {
+      "served_eq_subset": true,
+      "frames": 192425,
+      "expected": 192425,
+      "ok": true
+    }
+  },
+  "AC3.4": {
+    "top_k_child": "c68eacb518e1d48bb67d2b805acb2eb64fb55d566b942d940be261cb6ef5d113",
+    "dropped_eq_expected": true,
+    "lowest_eq_expected": true,
+    "random_reproducible": true,
+    "seed_changes": true,
+    "stale_rejected": true,
+    "top_k_roundtrip": true,
+    "isolated_cache_gb": 14.35
+  },
+  "AC3.5": {
+    "clean_copy_ok": true,
+    "tamper_caught": true,
+    "original_ok": true
+  },
+  "AC3.6": {
+    "files_scanned": 58,
+    "offenders": []
+  },
+  "AC3.8": {
+    "task": "KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it",
+    "children": {
+      "task_name": {
+        "n": 912,
+        "dropped": 48,
+        "resolve_ok": true,
+        "subset_id": "d003e8f75e37182865d8e3a73a10d03bcf0738442ee6d28c19bbeb12ecc56a24"
+      },
+      "suite": {
+        "n": 480,
+        "dropped": 480,
+        "resolve_ok": true,
+        "subset_id": "2f101b58b02ffeffe5fdfd65120356964fa098033054d299dfddffdea3954295"
+      }
+    },
+    "errors": {
+      "non-catalog column": "drop_group: 'corruption_type' is not a groupable catalog column; allowed: ['collection_date', 'duration_s', 'g",
+      "list column": "drop_group: 'objects' is list-valued; group on a scalar column",
+      "identity column": "drop_group: 'content_hash' is not a groupable catalog column; allowed: ['collection_date', 'duration_s', 'grip",
+      "no match": "drop_group: task_name == 'no_such_task' matches 0 of 960 parent episodes; it must match some but not all",
+      "matches all": "drop_group: suite == 'libero_spatial' matches 480 of 480 parent episodes; it must match some but not all"
+    }
+  }
+}

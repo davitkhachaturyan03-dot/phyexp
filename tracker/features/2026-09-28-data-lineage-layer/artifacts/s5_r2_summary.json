@@ -1,0 +1,58 @@
+{
+  "AC5.8": {
+    "lowest_ok": true,
+    "derivation_direction": "lowest",
+    "param_direction": "lowest",
+    "highest_ok": true,
+    "highest_equals_s6_child": true,
+    "run_low": "da62ef4567ef4b0c9f10d514f1245262",
+    "run_high": "74a9f24a6522455796e6f4d43d13e368"
+  },
+  "AC5.9": {
+    "n": 912,
+    "params": {
+      "op": "drop_group",
+      "column": "task_name",
+      "value": "KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it",
+      "n_dropped": "48"
+    },
+    "trace": [
+      "select:r2-select-leave-one-task-out",
+      "derive:derive-v1",
+      "build:build-v0",
+      "split:split-v0"
+    ],
+    "raw_files": 20,
+    "run": "1725b14e2a8a4b7e95f7db91e90e5d61"
+  },
+  "AC5.10": {
+    "subset_ids": [
+      "ab03e001e13bb869e7d04d9583d109a6ad33af02adfcb50fa00b66a319250ab4",
+      "5eafbb8e378d6c102a51759d45802054a1e6437d33d21e91ea09ea079fe07106",
+      "d03a5cf5757bc806a3087a909f7cb3577891b869b8bc38df2d8475789d7f25b2"
+    ],
+    "distinct": 3,
+    "sizes": [
+      480,
+      480,
+      480
+    ],
+    "reproducible": [
+      true,
+      true,
+      true
+    ],
+    "matrix_shape": [
+      3,
+      960
+    ],
+    "row_sums": [
+      480,
+      480,
+      480
+    ]
+  },
+  "runs_added_to_scratch_db": 6,
+  "real_db_unchanged": true,
+  "real_artifacts_unchanged": true
+}

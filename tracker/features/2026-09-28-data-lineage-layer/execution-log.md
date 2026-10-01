@@ -677,3 +677,199 @@ recorded by the S4 commands, not by this script; the script found and reused the
    bug. The failed run is inert (no inputs or products; queries use FINISHED runs only).
 8. **Plan wording to revisit (not changed by me):** AC6.2 says "real `lerobot-train` runs". See
    finding 1: it is LeRobot's `train()` without the CLI.
+
+---
+
+## Round 2: 2026-09-29/10-01
+
+Rework after `analysis-r1.md` (REWORK, planner+executor), implemented against the planner's revised
+`plan.md` (r2). Scope, per the orchestrator: exactly AC3.3 (docstring addendum), AC3.8, AC3.9,
+AC4.7, AC4.8 and AC5.8–5.10, plus the E2 re-checks. Work started 2026-09-29 and was interrupted
+twice by session stops; it resumed on 2026-10-01. Code verified before the stops (AC4.7 rewrite,
+AC4.8) was confirmed from its artifacts and not redone. All other checks ran on 2026-10-01.
+
+Constraints followed:
+- `HF_DATASETS_CACHE=<repo>/data/hf_datasets_cache` for every LeRobot load.
+- Every test scratch dir (lineage roots, clones, temp caches) is a `tempfile.mkdtemp` under the
+  gitignored `data/scratch/`, and is deleted at the end of the run.
+- No new full-scale version and no training run.
+- **The main `data/lineage/mlflow.db` was never written.** Its sha256 is `c5faec81f235…` before and
+  after every round-2 check, the same value the analyzer recorded.
+- The project HF cache is unchanged: 27G, and an exact `124 files / 28,643,158,514 bytes` around AC4.8.
+
+**Commits (local only; no remote; nothing under `data/` or `.venv/`):**
+- `99f7263`: round-2 code (lineage/derive/runs + 4 scripts).
+- `c048c68`: `verify_derive_s4 --v1` full-v1 load in an isolated cache.
+- `1f921c4`: `verify_lineage_s3` accepts a relative `--summary` path. This fixes a crash on the
+  script's last print line, after all checks had passed.
+- Record commit with this log, the artifacts, `plan.md` r2 and `analysis-r1.md`: the commit after `1f921c4`.
+
+Diff for round 2 (`git diff --stat 41f7c11..HEAD -- vlapoc scripts`): 7 files, +598/−142 lines.
+- `vlapoc/lineage.py`: +88. The `Subset` docstring, `drop_random_k` docstring, `GROUP_COLUMNS_EXCLUDED`,
+  `drop_group` (`:490`) and `isolated_hf_datasets_cache` (`:526`).
+- `vlapoc/derive.py`: +81/−. The label column is removed, the derivation-time loads run inside the
+  isolated cache (`:228`), and there is a new `isolate_hf_cache` flag (`:171`).
+- `vlapoc/runs.py`: +40. `SELECT_OPS` and `select_run` with `direction`, `drop_group` and
+  pre-run validation.
+- `scripts/verify_lineage_s3.py`: rewritten for a scratch lineage root, isolated caches, AC3.8 and
+  generic absolute-path detection.
+- `scripts/lineage_dry_run.py`: `tamper_check()` and `--tamper-only`.
+- `scripts/verify_derive_s4.py`: `--columns`, `--cache`, and the isolated `--v1` load.
+- `scripts/verify_runs_s5.py`: `--r2`.
+
+### S3 (round 2)
+- ✅ **AC3.3 addendum.**
+  - The `Subset` docstring (`artifacts/s3_r2_subset_docstring.txt`) now says: "The record is a
+    selection: no dataset file is rewritten or reindexed …".
+  - It also says LeRobot 0.6.1 loads `episodes=` through `datasets.Dataset.from_parquet(..., filters=...)`
+    (`lerobot/datasets/io_utils.py:79-82`), and that HF `datasets` "materialises an Arrow cache of the
+    filtered rows … for every distinct episode list (measured: 6.4-6.6 GB …; plan risk R1)". It
+    points to `isolated_hf_datasets_cache()`.
+  - The old phrase "Never a data copy" is gone.
+  - The AC3.3 behaviour is re-verified in the fresh-shell run below: `v0/reference … frames
+    served=7915 … (every frame via __getitem__) -> OK`, and `v0/candidate … frames served=192425
+    sum(length_steps)=192425 -> OK`.
+- ✅ **AC3.8 `drop_group`.** Evidence is from `env -i … .venv/bin/python scripts/verify_lineage_s3.py`
+  (`artifacts/s3_verify_r2_stdout.txt`, `s3_summary_r2.json`), run in a scratch lineage root:
+  - `drop_group(v1/candidate, task_name='KITCHEN_SCENE3_turn_on_the_stove_and_put_the_mok…')`: child
+    `d003e8f75e37` with `n=912 dropped=48`. `resolve() == episode_index set of remaining episodes
+    (from v1's episode table): True`. Derivation keys are `['column', 'dropped', 'op',
+    'parent_subset_id', 'value']`.
+  - `drop_group(v1/candidate, suite='libero_10')`: child `2f101b58b02f` with `n=480 dropped=480`, and
+    `resolve() … True`.
+  - Children are checked against the episode table, without a LeRobot load, as the AC asks (R1).
+  - It raises in each refusal case:
+    - non-catalog column: `'corruption_type' is not a groupable catalog column; allowed: [...]`;
+    - list column: `'objects' is list-valued`;
+    - identity column: `'content_hash' is not a groupable catalog column`;
+    - no match: `task_name == 'no_such_task' matches 0 of 960`;
+    - matches all: `suite == 'libero_spatial' matches 480 of 480` (on the 480-episode libero_spatial-only child).
+- ✅ **AC3.9 no absolute or session-bound paths.**
+  - `grep -rnE '/private/tmp|/tmp/claude|/Users/' vlapoc scripts` prints nothing (exit 1); re-checked 2026-10-01.
+  - The literal `"/Users/"` detection string in the old AC3.6 scan was replaced with run-time markers
+    (`REPO_ROOT`, `Path.home()`, `tempfile.gettempdir()`) plus a check for JSON or CSV values that
+    start with `/`.
+  - Scratch comes from `tempfile.mkdtemp(dir=<repo>/data/scratch)`.
+  - **Fresh shell:** both scripts were run under `env -i HOME=$HOME PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    HF_DATASETS_CACHE=… MLFLOW_DISABLE_AGENT_HINT=1`. The code no longer references the round-1 session
+    scratchpad at all, which is what makes them session-independent.
+    - `scripts/verify_lineage_s3.py` → `exit=0` in `48.79 real`. AC3.1 `match=True`, AC3.2 40/960
+      disjoint, AC3.3 as above, and AC3.4 highest and lowest correct, random-k reproducible
+      (`4a06edb41e77`, the same id as round 1), stale key rejected.
+    - The same run: AC3.5 tamper caught in `data/scratch/verify_s3_*/v0_tamper_copy`; AC3.6
+      `scanned 58 lineage files … absolute-path hits=[]`; AC3.8 as above. `scratch removed: True`.
+      LeRobot loads used `14.35 GB` of isolated cache, deleted with the block.
+    - `scripts/lineage_dry_run.py --tamper-only` (AC6.5 step) → `exit=0` in `5.12 real`. Output:
+      `flipped byte 5552926 of data/chunk-000/file-080.parquet in a clone of v1 at data/scratch/tamper_*/v1_tamper_copy; train_run refused: True`;
+      `changed=['data/chunk-000/file-080.parquet']`; `MLflow runs before/after the refused launch: 15/15; new data/runs dirs: []`;
+      `scratch clone removed: True`. Main DB sha256 `c5faec81f235ebf8` before and after
+      (`artifacts/s6_r2_tamper_only_stdout.txt`, `s6_tamper_only.json`).
+  - The first fresh-shell S3 run passed every check but exited 1 on its final `print`, because a
+    relative `--summary` path hit `relative_to(REPO_ROOT)`. That was fixed in `1f921c4` and re-run
+    to `exit=0`; the output above is from the re-run.
+
+### S4 (round 2)
+- ✅ **AC4.7 no ground truth in a derived version's episode tables.**
+  - Code: the two lines that added `corruption_type` (round-1 `derive.py:265-266`) are removed. The
+    remaining `corruption_type` uses in `derive.py` are the `EpisodeEdit` field, the `labels.parquet`
+    row and the version-level `derivation.json` record.
+  - Data, rewritten in place by `data/scratch/r2_strip_label_column.py` (code and output in
+    `artifacts/s4_r2_strip_label_column_stdout.txt`). Before:
+    - `[before] …versions/16076b9c…/episodes.parquet: 1000 rows x 23 cols; corruption_type present: True; sha256 135c06557bc96ab6`, and the same for `catalog/libero_spatial_10__v1/episodes.parquet`;
+    - `[before] recompute v1: 16076b9c5cb2a0e8... match registered: True; labels join: 100/100; version diff v0 v1: changed 100, identical 900`.
+  - The rewrite: `[rewrite] … dropped corruption_type (100 non-null values); remaining columns identical to before: True; dtypes identical: True`, for both files.
+  - After:
+    - `[after] … 1000 rows x 22 cols; corruption_type present: False; sha256 3fcca3a4da973315`, both files;
+    - `[after] recompute v1: 16076b9c5cb2a0e8... match registered: True; labels join: 100/100; version diff v0 v1: changed 100, identical 900`.
+  - Column listing (`scripts/verify_derive_s4.py --columns`, `artifacts/s4_r2_columns_guard_stdout.txt`):
+    - v0 version table: 21 columns; v1 version table: 22; v1 catalog copy: 22. Label columns present: `[]` in all three.
+    - `v1 columns == v0 catalog columns + ['parent_content_hash']: True`; `v1 version table == catalog copy columns: True`.
+  - Re-run of the S4 checks (`--v1`, `artifacts/s4_r2_verify_v1_stdout.txt`):
+    - `changed 100, identical 900`;
+    - `recomputed id matches registered: True; verify_version files ok: True (85)`;
+    - `labels … 100/100 matched, 1:1`;
+    - AC4.5 noise statistics unchanged (std 0.246–0.255 σ_a).
+  - `--guard` re-run: `LineageError raised: True … nothing written: True`.
+  - Remaining stale copy (disclosed, not modified): the round-1 S5 scratch root
+    `data/lineage_scratch/s5/versions/16076b9c…/episodes.parquet` still has the column. Nothing in the
+    real store reads it, and `scripts/verify_runs_s5.py` (round-1 mode) deletes and re-copies that
+    root from the real store. A scan of every other parquet under `data/lineage*` found label columns
+    only in `labels.parquet` files (the real one and its MLflow artifact copy).
+- ✅ **AC4.8 a derivation leaves the HF cache unchanged.** The planner's lead was verified first:
+  - `datasets/builder.py:365` reads `self._cache_dir_root = str(cache_dir or config.HF_DATASETS_CACHE)`
+    at builder construction.
+  - `grep` finds no module that imports `HF_DATASETS_CACHE` by name (datasets 4.8.5).
+  - Fix: `isolated_hf_datasets_cache()` swaps `datasets.config.HF_DATASETS_CACHE` for a `mkdtemp`
+    under `data/scratch/` and deletes it afterwards. `derive_version` runs its parent, kept, edit and
+    merged loads inside it. `derivation.json` records the policy.
+  - Check: `scripts/verify_derive_s4.py --cache` (`artifacts/s4_r2_cache_stdout.txt`) converted and
+    registered a 20-episode parent (`small20 bafb211603dd`) in a scratch lineage root.
+    - `shared HF_DATASETS_CACHE = data/hf_datasets_cache: before 124 files / 28643158514 bytes; after isolated derive_version 124 files / 28643158514 bytes; identical listing and bytes: True`.
+    - `isolated temp caches left under data/scratch/: []`.
+  - **Contrast**, the round-1 behaviour (`isolate_hf_cache=False`, against a throwaway cache dir):
+    `60 cache files (12 .arrow, 12 parquet builder entries), 662758780 bytes left behind by one
+    20-episode derivation`. That matches the analyzer's 13-entry observation in order of magnitude.
+  - Correction to round-1 finding 6: the round-1 v1 derivation ran without isolation and without
+    `HF_DATASETS_CACHE` set. Its derivation-time caches therefore went to `~/.cache/huggingface/datasets`
+    and are among the ~50 GB of 2026-09-29 entries flagged there; they were not measured separately.
+    From now on a derivation costs the dataset copy (~6.8 GB) plus a transient temp cache.
+
+### S5 (round 2)
+Evidence is from `scripts/verify_runs_s5.py --r2` (`artifacts/s5_r2_verify_stdout.txt`,
+`s5_r2_summary.json`, `s5_r2_membership_matrix.csv`). It ran in a scratch lineage root under
+`data/scratch/` holding copies of the real manifests and of the real `mlflow.db`.
+- The DB copy is needed so `trace` can reach v0 through the recorded build, split and derive runs.
+- On the copy only, the experiment's `artifact_location` was repointed to the scratch dir (one
+  `UPDATE experiments …` via sqlite3), so no artifact can land in the real `mlartifacts`.
+- 6 runs were added to the scratch DB. `real mlflow.db sha256 unchanged: True (c5faec81f235)`,
+  `real mlartifacts tree unchanged: True (63 paths)`, `scratch removed: True`. No training happened.
+- ✅ **AC5.8 `select_run(direction=…)`.**
+  - `lowest: dropped == 20 lowest placeholder scores (tie-break episode_id asc): True; derivation direction='lowest'; run params direction='lowest' metric='placeholder_score' k=20`.
+  - The default: `dropped == 20 highest: True; params direction='highest'; child id == S6 select-drop-top-20 child (c598f5692b40): True; low/high overlap: 0`.
+    The default reproduces the round-1 child exactly.
+  - `invalid direction rejected before any run starts: "direction must be 'highest' or 'lowest'"`
+    (runs added at that point: 2, i.e. no run for the bad call).
+  - The docstring explains that "harmful" vs "helpful" depends on the score's sign convention, so
+    the record carries `metric` and `direction`, citing §2.6 p.5 and §9.1 Step 4 item 5 p.19.
+- ✅ **AC5.9 `select_run(op="drop_group")`.**
+  - `child n=912 (960 - 48); params op='drop_group' column='task_name' value='KITCHEN_SCENE3_turn_on_the_stove_and_put'... n_dropped=48; select.dropped tag present: True; produced subset tag … == child: True`.
+  - `trace(leave-one-task-out select) runs: ['select:r2-select-leave-one-task-out', 'derive:derive-v1', 'build:build-v0', 'split:split-v0']; raw files reached: 20; every edge has one producer: True`.
+- ✅ **AC5.10 random subsets via `drop_random_k`, with k = N − n.**
+  - Seeds 0/1/2, each with `k=480 subset_size=480`, gave subsets `ab03e001e13b`, `5eafbb8e378d` and
+    `d03a5cf5757b`, each `n=480; reproduced from seed: True`.
+  - `distinct subset ids: 3/3`.
+  - `membership matrix from subset records: shape (3, 960), row sums [480, 480, 480], episodes in 0/1/2/3 subsets: [120, 355, 370, 115]`.
+  - The `drop_random_k` docstring states "a random subset of size n from a parent of N episodes is
+    `drop_random_k(parent, k=N - n, seed=s)`", citing PoC §2.1 item 5 p.4 and DataMIL p.4. The
+    `select_run` docstring repeats the mapping, and the run records `subset_size`.
+
+### Notes / divergences (round 2)
+- The `select.dropped` MLflow tag is truncated at 7,900 characters, so for large drops it holds a
+  prefix. Examples are k = 480, where the full id list is ~43 KB, and a suite drop. The full list is
+  always in the child subset's `derivation["dropped"]` (repo-relative JSON). Unchanged from round 1;
+  the record of truth is the subset file.
+- AC4.4 (`--padding`) was not re-run. It builds a temporary full-scale copy of v0 (~7 GB), which
+  this round's constraints rule out, and AC4.4 is unchanged and was reproduced by the analyzer at small scale.
+- Not done, deliberately (outside the coordinator's "exactly those ACs"):
+  - **Clip note in v1's `params`.** Editing `labels.parquet` would also change the `labels_sha256`
+    recorded in `derivation.json` and as the derive run's `output.labels.sha256` tag. The effect of
+    `clip: null` stays documented here: actions leave `Box(-1, 1)`, and `gripper_toggles` on
+    corrupted episodes is 84–428 (analysis-r1).
+  - **Episode-table digest in `version.json`** (optional in plan r2).
+  - **Refactor nits** (for the refactorer).
+- The coordinator's resume message said free disk was 124 GiB. `df` measured 107 GiB on 2026-10-01
+  before the runs; the isolated caches add up to ~14 GB transiently during a run and are freed afterwards.
+
+### Rebuttals to analyzer
+None. E1–E4 were implemented as specified. The "Precision" note in plan r2 (function-level
+`direction` already existed at `drop_top_k`; only the tracked stage hard-coded it) is consistent with
+what I changed.
+
+### Findings for the analyzer (round 2)
+1. The planner's AC4.8 lead was correct and sufficient. One process-wide swap of
+   `datasets.config.HF_DATASETS_CACHE` routes all derivation-time builders (measured: shared cache
+   byte-identical; 0 temp leftovers). The same context manager also stops verification loads from
+   growing the project cache: `verify_lineage_s3.py` used 14.35 GB transiently.
+2. Copying the main `mlflow.db` into a scratch root, with its artifact location repointed, is how
+   AC5.9's trace reaches v0 without writing to the main DB. This is a test-harness technique and not
+   part of the library.

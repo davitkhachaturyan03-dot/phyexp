@@ -71,5 +71,103 @@
     ],
     "obs_identical": 10,
     "v1_version_id": "16076b9c5cb2a0e8c5d291fc0766977dc7286c6b9f87df39bd87fe5c17cd85f8"
+  },
+  "AC4.8": {
+    "shared_cache": "data/hf_datasets_cache",
+    "before_files": 124,
+    "before_bytes": 28643158514,
+    "after_files": 124,
+    "after_bytes": 28643158514,
+    "unchanged": true,
+    "leftover_temp_caches": [],
+    "contrast_unisolated_files": 60,
+    "contrast_unisolated_arrow": 12,
+    "contrast_unisolated_entries": 12,
+    "contrast_unisolated_bytes": 662758780
+  },
+  "AC4.7_columns": {
+    "v0 version table": {
+      "n_columns": 21,
+      "label_columns": [],
+      "columns": [
+        "episode_id",
+        "episode_index",
+        "content_hash",
+        "suite",
+        "task_name",
+        "libero_task_id",
+        "language_instruction",
+        "scene",
+        "objects",
+        "source",
+        "operator",
+        "collection_date",
+        "length_steps",
+        "duration_s",
+        "init_state_sha256",
+        "smoothness",
+        "idle_fraction",
+        "idle_steps",
+        "gripper_toggles",
+        "source_file",
+        "source_demo"
+      ]
+    },
+    "v1 version table": {
+      "n_columns": 22,
+      "label_columns": [],
+      "columns": [
+        "episode_id",
+        "episode_index",
+        "content_hash",
+        "suite",
+        "task_name",
+        "libero_task_id",
+        "language_instruction",
+        "scene",
+        "objects",
+        "source",
+        "operator",
+        "collection_date",
+        "length_steps",
+        "duration_s",
+        "init_state_sha256",
+        "smoothness",
+        "idle_fraction",
+        "idle_steps",
+        "gripper_toggles",
+        "source_file",
+        "source_demo",
+        "parent_content_hash"
+      ]
+    },
+    "v1 catalog copy": {
+      "n_columns": 22,
+      "label_columns": [],
+      "columns": [
+        "episode_id",
+        "episode_index",
+        "content_hash",
+        "suite",
+        "task_name",
+        "libero_task_id",
+        "language_instruction",
+        "scene",
+        "objects",
+        "source",
+        "operator",
+        "collection_date",
+        "length_steps",
+        "duration_s",
+        "init_state_sha256",
+        "smoothness",
+        "idle_fraction",
+        "idle_steps",
+        "gripper_toggles",
+        "source_file",
+        "source_demo",
+        "parent_content_hash"
+      ]
+    }
   }
 }

@@ -1,0 +1,8 @@
+AC6.5 flipped byte 5552926 of data/chunk-000/file-080.parquet in a clone of v1 at data/scratch/tamper_qx1xt7y8/v1_tamper_copy; train_run refused: True
+AC6.5 dataset copy at data/scratch/tamper_qx1xt7y8/v1_tamper_copy does not match version v1 (16076b9c5cb2): changed=['data/chunk-000/file-080.parquet'] missing=[] extra=[]
+AC6.5 MLflow runs before/after the refused launch: 15/15; new data/runs dirs: []
+AC6.5 scratch clone removed: True
+summary -> tracker/features/2026-09-28-data-lineage-layer/artifacts/s6_tamper_only.json
+        5.12 real        11.67 user         3.08 sys
+exit=0
+main mlflow.db sha256 before c5faec81f235ebf8 after c5faec81f235ebf8

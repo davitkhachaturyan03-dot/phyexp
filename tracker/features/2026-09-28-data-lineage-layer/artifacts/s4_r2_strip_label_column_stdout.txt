@@ -1,0 +1,45 @@
+[before] data/lineage/versions/16076b9c5cb2a0e8c5d291fc0766977dc7286c6b9f87df39bd87fe5c17cd85f8/episodes.parquet: 1000 rows x 23 cols; corruption_type present: True; sha256 135c06557bc96ab6
+[before] data/lineage/catalog/libero_spatial_10__v1/episodes.parquet: 1000 rows x 23 cols; corruption_type present: True; sha256 135c06557bc96ab6
+[before] recompute v1: 16076b9c5cb2a0e8... match registered: True; labels join: 100/100; version diff v0 v1: changed 100, identical 900
+[rewrite] data/lineage/versions/16076b9c5cb2a0e8c5d291fc0766977dc7286c6b9f87df39bd87fe5c17cd85f8/episodes.parquet: dropped corruption_type (100 non-null values); remaining columns identical to before: True; dtypes identical: True
+[rewrite] data/lineage/catalog/libero_spatial_10__v1/episodes.parquet: dropped corruption_type (100 non-null values); remaining columns identical to before: True; dtypes identical: True
+[after] data/lineage/versions/16076b9c5cb2a0e8c5d291fc0766977dc7286c6b9f87df39bd87fe5c17cd85f8/episodes.parquet: 1000 rows x 22 cols; corruption_type present: False; sha256 3fcca3a4da973315
+[after] data/lineage/catalog/libero_spatial_10__v1/episodes.parquet: 1000 rows x 22 cols; corruption_type present: False; sha256 3fcca3a4da973315
+[after] recompute v1: 16076b9c5cb2a0e8... match registered: True; labels join: 100/100; version diff v0 v1: changed 100, identical 900
+--- code (data/scratch/r2_strip_label_column.py, run from the repo root) ---
+"""AC4.7 one-off migration: drop the ground-truth column from v1's two episode tables, in place."""
+import hashlib, sys
+from pathlib import Path
+import pandas as pd
+sys.path.insert(0, ".")
+from vlapoc.lineage import resolve_version, recompute_version_id, diff_versions, version_episodes, LINEAGE_ROOT
+from vlapoc.derive import load_labels
+
+
+def checks(tag, v1, paths):
+    for p in paths:
+        df = pd.read_parquet(p)
+        print(f"[{tag}] {p.relative_to(Path.cwd())}: {len(df)} rows x {len(df.columns)} cols; corruption_type present: "
+              f"{'corruption_type' in df.columns}; sha256 {hashlib.sha256(p.read_bytes()).hexdigest()[:16]}", flush=True)
+    rec = recompute_version_id("v1")
+    lab = load_labels("v1")
+    j = lab.merge(version_episodes("v1"), on=["episode_id", "content_hash"], how="inner")
+    d = diff_versions("v0", "v1")
+    print(f"[{tag}] recompute v1: {rec[:16]}... match registered: {rec == v1['dataset_version_id']}; labels join: {len(j)}/{len(lab)}; "
+          f"version diff v0 v1: changed {d['changed']}, identical {d['identical']}", flush=True)
+
+
+if __name__ == "__main__":
+    v1 = resolve_version("v1")
+    paths = [LINEAGE_ROOT / "versions" / v1["dataset_version_id"] / "episodes.parquet",
+             Path.cwd() / "data" / "lineage" / "catalog" / Path(v1["lerobot_root"]).name / "episodes.parquet"]
+    checks("before", v1, paths)
+    for p in paths:
+        df = pd.read_parquet(p)
+        fixed = df.drop(columns=["corruption_type"])
+        fixed.to_parquet(p, index=False)
+        back = pd.read_parquet(p)
+        print(f"[rewrite] {p.relative_to(Path.cwd())}: dropped corruption_type ({int(df['corruption_type'].notna().sum())} non-null "
+              f"values); remaining columns identical to before: {back.equals(fixed)}; dtypes identical: "
+              f"{dict(back.dtypes) == dict(fixed.dtypes)}", flush=True)
+    checks("after", v1, paths)
