@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S5 Stage runs and lineage queries — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+  figure.fig svg { max-width: 680px; margin: 0 auto; }
+  .ax-label { fill: var(--muted); font: 10px var(--mono); }
+  .val-label { fill: var(--text); font: 600 11px var(--sans); }
+  .lg-label { fill: var(--muted); font: 10.5px var(--sans); }
+  .bar { fill: var(--accent); }
+  .expect { stroke: var(--text); stroke-width: 1.5; }
+  td.ok { white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Data layer + lineage layer</a></p>
+  <h1>S5 · Every stage as an MLflow run, and the <code>trace</code> / <code>consumers</code> / <code>diff</code> queries</h1>
+  <p class="dek">Each PoC stage now records itself as an MLflow run in a local SQLite store. The run names the
+  exact episode versions it consumed and the entities it produced, plus the git SHA. Three queries read them
+  back: where did this run's data come from, which runs used this episode version, and what changed between
+  two runs.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">10/10 met</span></span>
+    <span><b>Depends on</b> S3, S4</span>
+    <span><b>Backend</b> MLflow 3.16.1, <code>data/lineage/mlflow.db</code> (owner: local)</span>
+  </div>
+</header>
+
+<h2>Why</h2>
+<blockquote>"Every training run should be tied to exact dataset versions (content hashes), episode IDs, mixture
+weights, augmentation settings, the config, the git SHA, and the resulting checkpoints. Every eval rollout
+should be tied back to that checkpoint. W&amp;B Artifacts, MLflow, or DVC handle this well. … it lets you answer
+"what changed between the good run and the bad run?"" — §2.1, p. 3</blockquote>
+<blockquote>"The most compelling output is where screening and outcome attribution disagree" — §9.2, p. 19. Both score
+tables must therefore share episode-version keys.</blockquote>
+<blockquote>"Remove the top-k "helpful" episodes and retrain" — §2.6, p. 5 · "Randomized subset training with
+regression (datamodels-style)" — §2.1 item 5, p. 4</blockquote>
+<p>The backend is the owner's choice (Q1, <a href="brief.md">brief.md</a>): "MLflow, local", meaning SQLite,
+no account and offline.</p>
+
+<h2>What was built</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File / function</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>vlapoc/runs.py::stage_run</code>, <code>StageRun</code></td><td>One MLflow run per stage, tagged <code>stage</code>. Consumed episode sets are logged with <code>mlflow.log_input</code>: <code>digest</code> = the first 32 hex characters of our id, the full id in the input tag <code>vlapoc.id</code>. Produced entities become <code>produced.&lt;id&gt;</code> tags. The run refuses to start while <code>vlapoc/</code> or <code>scripts/</code> differ from HEAD.</td></tr>
+    <tr><td><code>vlapoc/runs.py::train_run</code></td><td>Verifies the version's bytes, then calls LeRobot's own <code>train()</code> on <code>dataset.episodes = subset.resolve()</code>. Logs the config, seed, git SHA, checkpoint path, and sha256 of the weights and of the normalizer stats.</td></tr>
+    <tr><td><code>vlapoc/lerobot_train_entry.py::build_config</code></td><td>Builds LeRobot's <code>TrainPipelineConfig</code> in Python, because the <code>lerobot-train</code> CLI cannot build its parser on Python 3.14.</td></tr>
+    <tr><td><code>vlapoc/runs.py::select_run</code></td><td>Records a selection as a <code>select</code> stage: <code>drop_top_k</code> with <code>direction</code> ∈ {highest, lowest} (r2), <code>drop_random_k</code> (also the random subsets), and <code>drop_group</code> (r2).</td></tr>
+    <tr><td><code>vlapoc/runs.py::screen_standin</code>, <code>eval_standin</code>, <code>attribute_standin</code></td><td>Lineage contracts for the stages not built yet: real keys, placeholder payloads, <code>stand_in=true</code>, no outcome numbers.</td></tr>
+    <tr><td><code>vlapoc/runs.py::trace</code>, <code>consumers</code>, <code>diff</code>, <code>check_scores</code></td><td>Walk producers upstream to the raw files; list the runs whose input contained an episode version; separate data, param, config and git differences; reject score rows for episode versions a run never trained on.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Acceptance criteria</h2>
+<p>AC5.1–5.7 come from <code>scripts/verify_runs_s5.py</code> in a scratch lineage root, run under a sandbox
+that denies outbound network. AC5.8–5.10 come from <code>verify_runs_s5.py --r2</code> in a scratch copy of
+the real store. The real <code>mlflow.db</code> was unchanged (<code>c5faec81…</code>).</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence (real output)</th></tr></thead>
+  <tbody>
+    <tr><td>AC5.1 One MLflow run per stage; inputs as dataset inputs (32-hex digest, full id in a tag); <code>search_runs</code> by digest finds consumers</td><td>§2.1 p.3; MLflow docs</td><td class="ok"><span class="pill good">met</span></td><td><code>search_runs(datasets.digest = 'b6a72d5e7f313bff3690caea2b3b2bef') -&gt; ['s5-select-random5', 's5-train-A', 's5-train-A-seed1']</code></td></tr>
+    <tr><td>AC5.2 A train run records every §2.1 field</td><td>§2.1 p.3</td><td class="ok"><span class="pill good">met</span></td><td><code>git_sha_is_HEAD: True · git_dirty: false · seed: 0 · weights_sha256_matches_disk: True · normalizer_sha256_matches_disk: True · episodes_match: true</code></td></tr>
+    <tr><td>AC5.3 An eval run records the checkpoint hash it loaded, the train run, suites, task ids, init states, seeds</td><td>§2.1 p.3</td><td class="ok"><span class="pill good">met</span></td><td><code>checkpoint_sha256 == train-A weights: True; train_run_id == A: True; … loaded=true (51600263 params); stand_in=true</code></td></tr>
+    <tr><td>AC5.4 <code>trace</code>, <code>consumers</code>, <code>diff</code> work</td><td>§2.1 p.3</td><td class="ok"><span class="pill good">met</span></td><td><code>trace(s5-train-B): … raw files reached: 20</code> · <code>consumers(…demo_41@b5442591b156): lists train-A: True; lists train-B (dropped it): False</code> · <code>diff(A, A-seed1): data 0/0/0; params {'seed': ('0', '1')}</code></td></tr>
+    <tr><td>AC5.5 <code>check_scores</code> rejects rows for episode versions not trained on</td><td>§9.1 Step 3; §9.2</td><td class="ok"><span class="pill good">met</span></td><td><code>6/10 score rows are not episode versions trained on by run f8fc1a9eae50 (e.g. …/demo_12@7707f6ecd8f9)</code></td></tr>
+    <tr><td>AC5.6 Offline, no account</td><td>owner Q1</td><td class="ok"><span class="pill good">met</span></td><td>Whole script under <code>sandbox-exec … (deny network-outbound)</code>: exit 0 in 55.09 s. The control <code>curl</code> under the same sandbox returns <code>000</code>, exit 7.</td></tr>
+    <tr><td>AC5.7 Grounding docstrings</td><td>vla-build</td><td class="ok"><span class="pill good">met</span></td><td>Module docstring of <code>vlapoc/runs.py</code> (§2.1, §2.3, §9.1–9.2)</td></tr>
+    <tr><td>AC5.8 (r2) <code>select_run</code> records <code>direction</code>: the "helpful" control</td><td>§2.6 p.5; §9.1 Step 4 p.19</td><td class="ok"><span class="pill good">met</span></td><td><code>lowest: dropped == 20 lowest … True; derivation direction='lowest'; run params direction='lowest'</code> · default child <code>== S6 select-drop-top-20 child (c598f5692b40): True</code> · <code>direction="up"</code> rejected before any run starts</td></tr>
+    <tr><td>AC5.9 (r2) <code>select_run(op="drop_group")</code>: group leave-one-out as a recorded stage</td><td>§10 p.20; §2.1 item 5</td><td class="ok"><span class="pill good">met</span></td><td><code>child n=912 (960 - 48)</code> · <code>trace(leave-one-task-out select) … raw files reached: 20; every edge has one producer: True</code></td></tr>
+    <tr><td>AC5.10 (r2) Random subsets for datamodels via <code>drop_random_k(k = N − n)</code>; membership matrix from the records</td><td>§2.1 item 5 p.4; DataMIL p.4</td><td class="ok"><span class="pill good">met</span></td><td><code>distinct subset ids: 3/3; membership matrix from subset records: shape (3, 960), row sums [480, 480, 480], episodes in 0/1/2/3 subsets: [120, 355, 370, 115]</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Example</h2>
+<p><code>diff</code> answers "what changed between the good run and the bad run?" at episode-version resolution.
+Here are two scratch train runs on <code>v0/reference</code> and a random-5 drop of it
+(<code>artifacts/s5_diff_A_B.json</code>, trimmed):</p>
+<pre><code>"runs": ["s5-train-A" (20b968fa…), "s5-train-B" (dfe8801a…)]
+"data": {"dataset_version_a" == "dataset_version_b": "3c4dca68…",
+         "removed": ["libero_10/LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket/demo_41",
+                     "libero_10/LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket/demo_1",
+                     "libero_10/STUDY_SCENE1_pick_up_the_book_and_place_it_in_the_back_compartment_of_the_caddy/demo_32",
+                     "libero_spatial/pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate/demo_3",
+                     "libero_spatial/pick_up_the_black_bowl_next_to_the_ramekin_and_place_it_on_the_plate/demo_13"],
+         "n_added": 0, "n_removed": 5, "n_changed_version": 0}
+"params": {}, "config": {}, "git": {"same": true}
+"ignored_bookkeeping": ["checkpoint_path", "dataset.episodes", "job_name", "n_episodes", "n_frames", "output_dir", …]</code></pre>
+<p>The full-scale version on the real chain (k = 20 removed, seed-only for s0 vs s1) is in
+<a href="S6-end-to-end-dry-run.html">S6</a>.</p>
+
+<h2>Visual</h2>
+<figure class="fig">
+<!--FIG:membership:start-->
+<svg viewBox="0 0 680 270" role="img" aria-label="Number of the 960 candidate episodes that appear in 0, 1, 2 or 3 of the 3 random 480-episode subsets: [120, 355, 370, 115]">
+<line x1="70" y1="210.0" x2="650" y2="210.0" class="svg-grid"/>
+<text x="62" y="213.5" class="ax-label" text-anchor="end">0</text>
+<line x1="70" y1="165.0" x2="650" y2="165.0" class="svg-grid"/>
+<text x="62" y="168.5" class="ax-label" text-anchor="end">100</text>
+<line x1="70" y1="120.0" x2="650" y2="120.0" class="svg-grid"/>
+<text x="62" y="123.5" class="ax-label" text-anchor="end">200</text>
+<line x1="70" y1="75.0" x2="650" y2="75.0" class="svg-grid"/>
+<text x="62" y="78.5" class="ax-label" text-anchor="end">300</text>
+<line x1="70" y1="30.0" x2="650" y2="30.0" class="svg-grid"/>
+<text x="62" y="33.5" class="ax-label" text-anchor="end">400</text>
+<g><title>in 0 of 3 subsets: 120 episodes (binomial expectation 120)</title>
+<path d="M107.5,210 V160.0 Q107.5,156.0 111.5,156.0 H173.5 Q177.5,156.0 177.5,160.0 V210 Z" class="bar"/>
+<line x1="99.5" y1="156.0" x2="185.5" y2="156.0" class="expect"/>
+<text x="142.5" y="148" class="val-label" text-anchor="middle">120</text>
+<text x="142.5" y="226" class="ax-label" text-anchor="middle">in 0 of 3</text>
+</g>
+<g><title>in 1 of 3 subsets: 355 episodes (binomial expectation 360)</title>
+<path d="M252.5,210 V54.2 Q252.5,50.2 256.5,50.2 H318.5 Q322.5,50.2 322.5,54.2 V210 Z" class="bar"/>
+<line x1="244.5" y1="48.0" x2="330.5" y2="48.0" class="expect"/>
+<text x="287.5" y="42.25" class="val-label" text-anchor="middle">355</text>
+<text x="287.5" y="226" class="ax-label" text-anchor="middle">in 1 of 3</text>
+</g>
+<g><title>in 2 of 3 subsets: 370 episodes (binomial expectation 360)</title>
+<path d="M397.5,210 V47.5 Q397.5,43.5 401.5,43.5 H463.5 Q467.5,43.5 467.5,47.5 V210 Z" class="bar"/>
+<line x1="389.5" y1="48.0" x2="475.5" y2="48.0" class="expect"/>
+<text x="432.5" y="35.5" class="val-label" text-anchor="middle">370</text>
+<text x="432.5" y="226" class="ax-label" text-anchor="middle">in 2 of 3</text>
+</g>
+<g><title>in 3 of 3 subsets: 115 episodes (binomial expectation 120)</title>
+<path d="M542.5,210 V162.2 Q542.5,158.2 546.5,158.2 H608.5 Q612.5,158.2 612.5,162.2 V210 Z" class="bar"/>
+<line x1="534.5" y1="156.0" x2="620.5" y2="156.0" class="expect"/>
+<text x="577.5" y="150.25" class="val-label" text-anchor="middle">115</text>
+<text x="577.5" y="226" class="ax-label" text-anchor="middle">in 3 of 3</text>
+</g>
+<line x1="70" y1="210" x2="650" y2="210" class="svg-axis"/>
+<text x="14" y="120" class="ax-label" text-anchor="middle" transform="rotate(-90 14 120)">episodes</text>
+<text x="360" y="246" class="ax-label" text-anchor="middle">how many of the 3 random subsets (seeds 0/1/2, k = 480 dropped each) contain the episode</text>
+<rect x="78" y="12" width="14" height="10" rx="2" class="bar"/>
+<text x="98" y="21" class="lg-label">measured, from the 3 subset records</text>
+<line x1="338" y1="17" x2="366" y2="17" class="expect"/>
+<text x="372" y="21" class="lg-label">Binomial(3, 0.5) × 960 (computed, for reference)</text>
+</svg>
+<!--FIG:membership:end-->
+  <figcaption><b>Three random half-subsets, recorded only as selections: the input a datamodels regression
+  needs.</b> Three <code>select</code> runs with <code>drop_random_k(k = 480)</code> and seeds 0, 1 and 2 each
+  keep 480 of the 960 candidate episodes. The bars count how many candidates sit in 0, 1, 2 or all 3 of
+  those subsets, computed from the 3 × 960 membership matrix that is built from the subset records alone. The short
+  horizontal ticks are what independent halves would give (960 × C(3, k) / 8; computed here, for reference). The
+  counts sit close to them, as expected of seeded random halves. Pairwise overlaps are 247, 235 and 233
+  episodes (against 240 expected). No training was run on these subsets. Source:
+  <code>artifacts/s5_r2_membership_matrix.csv</code>.</figcaption>
+</figure>
+<div class="scroll">
+<table>
+  <thead><tr><th>Seed</th><th>Subset id</th><th class="num">Episodes</th><th class="num">libero_spatial</th><th class="num">libero_10</th><th>Reproduced from seed</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td><code>ab03e001e13b…</code></td><td class="num">480</td><td class="num">239</td><td class="num">241</td><td>True</td></tr>
+    <tr><td>1</td><td><code>5eafbb8e378d…</code></td><td class="num">480</td><td class="num">225</td><td class="num">255</td><td>True</td></tr>
+    <tr><td>2</td><td><code>d03a5cf5757b…</code></td><td class="num">480</td><td class="num">236</td><td class="num">244</td><td>True</td></tr>
+  </tbody>
+</table>
+</div>
+<p>Per-suite counts and overlaps were computed from the membership CSV for this report (measured). Ids and
+"reproduced" come from <code>artifacts/s5_r2_verify_stdout.txt</code>.</p>
+
+<h2>Divergences and limitations</h2>
+<ul>
+  <li><b>Training goes through LeRobot's <code>train()</code>, not the <code>lerobot-train</code> CLI.</b> On
+  Python 3.14 the CLI fails while building its parser (<code>TypeError: str | None is not callable</code>), the
+  bug of draccus issue #69, which is open. lerobot 0.6.1 declares only Python 3.12 and 3.13 (its
+  <code>METADATA</code> classifiers); the venv is 3.14.0. The sampler, training loop, checkpointing and
+  <code>train_config.json</code> are LeRobot's own. <code>from_pretrained</code> fails the same way, so
+  <code>load_checkpoint</code> uses <code>draccus.load</code> plus a strict safetensors load.</li>
+  <li><b>The MLflow dataset digest is capped at 36 characters</b> (<code>MAX_DATASET_DIGEST_SIZE = 36</code>). The
+  digest is a 32-hex prefix (128 bits); every query re-checks the full id from the tag.</li>
+  <li><b>Normalization-stats leak (open decision for the training feature).</b> LeRobot normalizes with the
+  whole version's <code>meta/stats.json</code>, which covers all 1000 episodes: the 40 references, the 100
+  corrupted and any dropped episodes. A checkpoint trained on the 40-episode reference subset saved stats
+  equal to v0's full file (measured). Each run records <code>stats_json.sha256</code>,
+  <code>normalizer.sha256</code> and a <code>normalization_stats</code> param. Fixed-reference or per-subset
+  stats is not decided here.</li>
+  <li><b>A refused <code>drop_group</code> inside <code>select_run</code> leaves a FAILED run.</b> <code>direction</code>
+  is validated before the run starts; <code>column</code> and <code>value</code> are not (analyzer, measured). The
+  run is inert, because only FINISHED runs form lineage edges.</li>
+  <li><b>The <code>select.dropped</code> tag is truncated</b> at 7,900 characters, which leaves an invalid-JSON
+  prefix for large drops (about 47,400 characters at k = 480). The subset file is the record of truth.</li>
+  <li><b>Datamodels scale.</b> Each random-subset record stores <code>episode_ids</code> and <code>dropped</code>
+  (about 95 KB at n = 480) plus one MLflow run. At DataMIL's m = 10⁴ that is roughly 1 GB of JSON and 10⁴
+  runs (analyzer, inferred); a mask-matrix artifact would scale.</li>
+  <li><b>New dependencies:</b> <code>mlflow==3.16.1</code> (owner Q1) and <code>accelerate==1.15.0</code>, which
+  LeRobot's <code>train()</code> requires (<code>require_package("accelerate")</code>). The repo has no dependency
+  manifest; versions are recorded in the execution log only.</li>
+  <li><b>MLflow keeps some absolute paths in its own records</b> (experiment <code>artifact_location</code>,
+  <code>mlflow.source.name</code>). Our manifests hold none. Moving <code>data/lineage</code> to another machine
+  needs the artifact location remapped (inferred; untested).</li>
+</ul>
+
+<footer class="doc">S5 of <a href="report.html">Data layer + lineage layer</a> · evidence in <code>artifacts/s5_*</code>
+· <a href="plan.md">plan</a> · <a href="execution-log.md">execution log</a></footer>
+
+</div>
+</body>
+</html>

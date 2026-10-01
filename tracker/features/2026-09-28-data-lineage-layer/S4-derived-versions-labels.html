@@ -1,0 +1,1185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S4 Derived versions with ground truth — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+  figure.fig svg { max-width: 680px; margin: 0 auto; }
+  .ax-label { fill: var(--muted); font: 10px var(--mono); }
+  .lg-label { fill: var(--muted); font: 10.5px var(--sans); }
+  .cell.same { fill: var(--surface-2); stroke: var(--border); stroke-width: .6; }
+  .cell.ref { fill: none; stroke: var(--text); stroke-width: 1.4; }
+  .cell.cor { fill: var(--accent); }
+  .cell:hover { stroke: var(--text); stroke-width: 1.6; }
+  td.ok { white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Data layer + lineage layer</a></p>
+  <h1>S4 · Derived dataset versions with ground-truth labels: the injection hook</h1>
+  <p class="dek">A corrupted copy of the dataset is now a new version whose parentage is recorded. Only the
+  edited episodes change hash, and what was done to them lives in a separate <code>labels.parquet</code>
+  that the method under test never reads. The demo derivation v1 differs from v0 in exactly 100 episode
+  versions; the other 900 are identical.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">8/8 met</span></span>
+    <span><b>Depends on</b> S3</span>
+    <span><b>v1</b> <code>16076b9c5cb2…</code> · <code>data/lerobot/libero_spatial_10__v1/</code></span>
+  </div>
+</header>
+
+<h2>Why</h2>
+<p>The PoC proves an attribution method by planting bad episodes and checking whether the method finds
+them. That needs a record of exactly which episode versions were corrupted and how, kept away from the
+method, plus references that are never touched.</p>
+<blockquote>"Deliberately corrupt known subsets of training data … Then check whether your attribution method flags
+exactly those." — §2.1 item 4, p. 3</blockquote>
+<blockquote>Ground truth: "Injection experiment with 5–10% corrupted episodes, using LIBERO's original demos as clean
+references" — §10, p. 20</blockquote>
+<blockquote>"Corrupt episodes two ways: pad some with idle or hesitant segments …" — §8.10, p. 17 (so edits may change length)</blockquote>
+<p>The one demo corruption follows RoboDrop App. A.1 (p. 13) literally: "Action corruption adds zero-mean
+Gaussian noise with standard deviation 0.25σa to the demonstrated actions" (quoted). The full §2.5
+corruption suite is a separate later feature: <b>owner-approved scope</b> (<a href="brief.md">brief.md</a>,
+2026-09-29).</p>
+
+<h2>What was built</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File / function</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>vlapoc/derive.py::EpisodeEdit</code></td><td>One ground-truth edit: which episode, corruption type, params, seed and a transform over the canonical arrays. The transform may change the length, but not the task string.</td></tr>
+    <tr><td><code>vlapoc/derive.py::derive_version</code></td><td>Read as four steps. (1) Guards: refuse unknown, duplicated or reference-split episodes before writing anything. (2) <code>_write_derived_dataset</code>: LeRobot's <code>delete_episodes</code> → writer → <code>merge_datasets</code>, inside an isolated HF cache. (3) <code>_derived_episode_table</code>: every kept episode must hash to its parent hash. (4) Register, write <code>labels.parquet</code> and <code>derivation.json</code>, and inherit the splits.</td></tr>
+    <tr><td><code>vlapoc/derive.py::protected_episode_ids</code></td><td>Every episode in a <code>reference</code> split of this version or any ancestor: never editable (§8.7).</td></tr>
+    <tr><td><code>vlapoc/derive.py::robodrop_action_noise</code></td><td><code>a + N(0, (0.25·σ_a)²)</code> per action dim, all 7 dims, per-episode RNG seeded by (seed, <code>episode_id</code>), no clipping.</td></tr>
+    <tr><td><code>vlapoc/derive.py::derive_demo_action_noise</code></td><td>v1: 5 candidate episodes per task (100 = 10%), seed 0, σ_a from v0's <code>meta/stats.json</code>.</td></tr>
+    <tr><td><code>vlapoc/derive.py::idle_padding_edit</code></td><td>Test edit for AC4.4: inserts 20 idle frames (proves that length-changing edits work).</td></tr>
+    <tr><td><code>vlapoc/derive.py::load_labels</code></td><td>Reads a derived version's ground truth. For evaluation code only; the method must not call it (plan Rule 5).</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Acceptance criteria</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence (real output)</th></tr></thead>
+  <tbody>
+    <tr><td>AC4.1 Only the edited episodes change hash; parent links stored; v1 passes the load and hash checks</td><td>§2.1 p.3</td><td class="ok"><span class="pill good">met</span></td><td><code>version diff v0 v1: changed 100, identical 900, added 0, removed 0</code> · <code>recomputed id matches registered: True; verify_version files ok: True (85)</code></td></tr>
+    <tr><td>AC4.2 <code>labels.parquet</code>: one row per edit, joins 1:1 with v1's episodes</td><td>§2.1 item 4; §10</td><td class="ok"><span class="pill good">met</span></td><td><code>100 rows … join … on (episode_id, content_hash): 100/100 matched, 1:1</code></td></tr>
+    <tr><td>AC4.3 Editing a reference episode raises; nothing is written</td><td>§8.7 p.15; RoboDrop A.1</td><td class="ok"><span class="pill good">met</span></td><td><code>refusing to edit 1 reference-split episode(s) (PoC §8.7 p.15: corrupt only the training copy)</code> · <code>nothing written: True</code></td></tr>
+    <tr><td>AC4.4 A length-changing edit (+20 idle frames) keeps metadata consistent and loads</td><td>§8.10 p.17</td><td class="ok"><span class="pill good">met</span></td><td><code>length 272 -&gt; 292; meta/episodes length=292; … total_frames=200360 (v0 200340 + 20)</code> (full scale, round 1); the analyzer re-ran it at small scale on the round-2 code: <code>len 261 -&gt; 281</code></td></tr>
+    <tr><td>AC4.5 v1 = RoboDrop noise on 5 candidates per task (100), seeded</td><td>RoboDrop A.1; §2.5</td><td class="ok"><span class="pill good">met</span></td><td><code>corrupted per task: [5] over 20 tasks; in reference split: 0</code> · <code>(a_v1 - a_v0)/sigma_a … std [0.253, 0.246, 0.254, 0.255, 0.247, 0.251, 0.251] (expected 0.25)</code></td></tr>
+    <tr><td>AC4.6 Grounding docstring, gripper ambiguity noted</td><td>vla-build</td><td class="ok"><span class="pill good">met</span></td><td><code>params.dims = "all 7 action dims, including the gripper (literal reading; …)"</code></td></tr>
+    <tr><td>AC4.7 (r2) No ground truth in a derived version's episode tables</td><td>§2.1 item 4; §9.1 Step 1</td><td class="ok"><span class="pill good">met</span></td><td><code>v1 version table: 22 columns; label columns present: []</code> · <code>v1 columns == v0 catalog columns + ['parent_content_hash']: True</code></td></tr>
+    <tr><td>AC4.8 (r2) A derivation leaves the shared HF cache unchanged</td><td>analysis-r1 E3</td><td class="ok"><span class="pill good">met</span></td><td><code>before 124 files / 28643158514 bytes; after isolated derive_version 124 files / 28643158514 bytes</code> · old behaviour: <code>60 cache files … 662758780 bytes left behind</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Example</h2>
+<p>One corrupted episode, as its label row records it (<code>artifacts/s4_labels_head10.csv</code>, row 1;
+params trimmed):</p>
+<pre><code>episode_id          libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate/demo_12
+parent_content_hash 7707f6ecd8f9087e74da69234029c47dace500c1f3e6adfefdfcb62d3aaf8e58   (its v0 hash)
+content_hash        a747e23769747937660e27628788c30074d8f587acd783568e5690116aabe336   (its v1 hash)
+corruption_type     action_gaussian_noise          seed 0
+params              {"std_scale": 0.25, "sigma_a": [0.3334, 0.3531, 0.4134, 0.0393, 0.0612, 0.0811, 0.9990],
+                     "dims": "all 7 action dims, including the gripper …", "clip": null,
+                     "source": "RoboDrop App. A.1 p.13: zero-mean Gaussian noise, std 0.25*sigma_a …", …}</code></pre>
+<p>S5 shows why both hashes matter: a score table keyed by this episode's clean v0 hash is rejected
+against a run that trained on v1.</p>
+<p>What the noise did to the actions, measured on disk for this report (pyarrow reads only;
+<code>artifacts/summarizer_v1_checks_stdout.txt</code>):</p>
+<pre><code>frames with any action dim outside [-1, 1]: corrupted 0.5116, clean 0.0000
+corrupted action min per dim: [-1.09, -1.077, -1.332, -0.242, -0.327, -0.385, -2.069]
+corrupted action max per dim: [1.158, 1.215, 1.26, 0.303, 0.284, 0.416, 1.964]
+gripper action exactly +-1: corrupted 0.0000, clean 1.0000
+gripper_toggles on the 100 corrupted episodes: v1 84-428, same episodes in v0 1-5</code></pre>
+
+<h2>Visual</h2>
+<figure class="fig">
+<!--FIG:episodegrid:start-->
+<svg viewBox="0 0 680 378" role="img" aria-label="Grid of all 1000 episodes, 20 tasks by 50 demos: 100 corrupted in v1, 40 reference episodes, 900 with identical content hash in v0 and v1">
+<text x="132.3" y="32" class="ax-label" text-anchor="middle">0</text>
+<text x="238.3" y="32" class="ax-label" text-anchor="middle">10</text>
+<text x="344.3" y="32" class="ax-label" text-anchor="middle">20</text>
+<text x="450.3" y="32" class="ax-label" text-anchor="middle">30</text>
+<text x="556.3" y="32" class="ax-label" text-anchor="middle">40</text>
+<text x="651.7" y="32" class="ax-label" text-anchor="middle">49</text>
+<text x="122" y="32" class="ax-label" text-anchor="end">demo_k →</text>
+<g><title>libero_spatial task 0: pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate</title><text x="122" y="48.1" class="ax-label" text-anchor="end">libero_spatial 0</text></g>
+<rect x="128.0" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_0: candidate, identical in v0 and v1</title></rect>
+<rect x="138.6" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_1: candidate, identical in v0 and v1</title></rect>
+<rect x="149.2" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_2: candidate, identical in v0 and v1</title></rect>
+<rect x="159.8" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_3: candidate, identical in v0 and v1</title></rect>
+<rect x="170.4" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_4: candidate, identical in v0 and v1</title></rect>
+<rect x="181.0" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_5: candidate, identical in v0 and v1</title></rect>
+<rect x="191.6" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_6: candidate, identical in v0 and v1</title></rect>
+<rect x="202.2" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_7: candidate, identical in v0 and v1</title></rect>
+<rect x="212.8" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_8: candidate, identical in v0 and v1</title></rect>
+<rect x="223.4" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_9: candidate, identical in v0 and v1</title></rect>
+<rect x="234.0" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_10: candidate, identical in v0 and v1</title></rect>
+<rect x="244.6" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_11: candidate, identical in v0 and v1</title></rect>
+<rect x="255.2" y="40" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 0 demo_12: corrupted in v1 (content hash changed)</title></rect>
+<rect x="265.8" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_13: candidate, identical in v0 and v1</title></rect>
+<rect x="276.4" y="40" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 0 demo_14: corrupted in v1 (content hash changed)</title></rect>
+<rect x="287.0" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_15: candidate, identical in v0 and v1</title></rect>
+<rect x="297.6" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_16: candidate, identical in v0 and v1</title></rect>
+<rect x="308.2" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_17: candidate, identical in v0 and v1</title></rect>
+<rect x="318.8" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_18: candidate, identical in v0 and v1</title></rect>
+<rect x="329.4" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_19: candidate, identical in v0 and v1</title></rect>
+<rect x="340.0" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_20: candidate, identical in v0 and v1</title></rect>
+<rect x="350.6" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_21: candidate, identical in v0 and v1</title></rect>
+<rect x="361.2" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_22: candidate, identical in v0 and v1</title></rect>
+<rect x="371.8" y="40" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 0 demo_23: corrupted in v1 (content hash changed)</title></rect>
+<rect x="382.4" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_24: candidate, identical in v0 and v1</title></rect>
+<rect x="393.0" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_25: candidate, identical in v0 and v1</title></rect>
+<rect x="403.6" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_26: candidate, identical in v0 and v1</title></rect>
+<rect x="414.2" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_27: candidate, identical in v0 and v1</title></rect>
+<rect x="424.8" y="40" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 0 demo_28: corrupted in v1 (content hash changed)</title></rect>
+<rect x="435.4" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_29: candidate, identical in v0 and v1</title></rect>
+<rect x="446.0" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_30: candidate, identical in v0 and v1</title></rect>
+<rect x="456.6" y="40" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_spatial task 0 demo_31: reference split (never editable; hash identical)</title></rect>
+<rect x="467.2" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_32: candidate, identical in v0 and v1</title></rect>
+<rect x="477.8" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_33: candidate, identical in v0 and v1</title></rect>
+<rect x="488.4" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_34: candidate, identical in v0 and v1</title></rect>
+<rect x="499.0" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_35: candidate, identical in v0 and v1</title></rect>
+<rect x="509.6" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_36: candidate, identical in v0 and v1</title></rect>
+<rect x="520.2" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_37: candidate, identical in v0 and v1</title></rect>
+<rect x="530.8" y="40" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 0 demo_38: corrupted in v1 (content hash changed)</title></rect>
+<rect x="541.4" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_39: candidate, identical in v0 and v1</title></rect>
+<rect x="552.0" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_40: candidate, identical in v0 and v1</title></rect>
+<rect x="562.6" y="40" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_spatial task 0 demo_41: reference split (never editable; hash identical)</title></rect>
+<rect x="573.2" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_42: candidate, identical in v0 and v1</title></rect>
+<rect x="583.8" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_43: candidate, identical in v0 and v1</title></rect>
+<rect x="594.4" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_44: candidate, identical in v0 and v1</title></rect>
+<rect x="605.0" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_45: candidate, identical in v0 and v1</title></rect>
+<rect x="615.6" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_46: candidate, identical in v0 and v1</title></rect>
+<rect x="626.2" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_47: candidate, identical in v0 and v1</title></rect>
+<rect x="636.8" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_48: candidate, identical in v0 and v1</title></rect>
+<rect x="647.4" y="40" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 0 demo_49: candidate, identical in v0 and v1</title></rect>
+<g><title>libero_spatial task 1: pick_up_the_black_bowl_next_to_the_ramekin_and_place_it_on_the_plate</title><text x="122" y="61.1" class="ax-label" text-anchor="end">libero_spatial 1</text></g>
+<rect x="128.0" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_0: candidate, identical in v0 and v1</title></rect>
+<rect x="138.6" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_1: candidate, identical in v0 and v1</title></rect>
+<rect x="149.2" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_2: candidate, identical in v0 and v1</title></rect>
+<rect x="159.8" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_3: candidate, identical in v0 and v1</title></rect>
+<rect x="170.4" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_4: candidate, identical in v0 and v1</title></rect>
+<rect x="181.0" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_5: candidate, identical in v0 and v1</title></rect>
+<rect x="191.6" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_6: candidate, identical in v0 and v1</title></rect>
+<rect x="202.2" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_7: candidate, identical in v0 and v1</title></rect>
+<rect x="212.8" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_8: candidate, identical in v0 and v1</title></rect>
+<rect x="223.4" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_9: candidate, identical in v0 and v1</title></rect>
+<rect x="234.0" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_10: candidate, identical in v0 and v1</title></rect>
+<rect x="244.6" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_11: candidate, identical in v0 and v1</title></rect>
+<rect x="255.2" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_12: candidate, identical in v0 and v1</title></rect>
+<rect x="265.8" y="53" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_spatial task 1 demo_13: reference split (never editable; hash identical)</title></rect>
+<rect x="276.4" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_14: candidate, identical in v0 and v1</title></rect>
+<rect x="287.0" y="53" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_spatial task 1 demo_15: reference split (never editable; hash identical)</title></rect>
+<rect x="297.6" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_16: candidate, identical in v0 and v1</title></rect>
+<rect x="308.2" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_17: candidate, identical in v0 and v1</title></rect>
+<rect x="318.8" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_18: candidate, identical in v0 and v1</title></rect>
+<rect x="329.4" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_19: candidate, identical in v0 and v1</title></rect>
+<rect x="340.0" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_20: candidate, identical in v0 and v1</title></rect>
+<rect x="350.6" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_21: candidate, identical in v0 and v1</title></rect>
+<rect x="361.2" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_22: candidate, identical in v0 and v1</title></rect>
+<rect x="371.8" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_23: candidate, identical in v0 and v1</title></rect>
+<rect x="382.4" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_24: candidate, identical in v0 and v1</title></rect>
+<rect x="393.0" y="53" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 1 demo_25: corrupted in v1 (content hash changed)</title></rect>
+<rect x="403.6" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_26: candidate, identical in v0 and v1</title></rect>
+<rect x="414.2" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_27: candidate, identical in v0 and v1</title></rect>
+<rect x="424.8" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_28: candidate, identical in v0 and v1</title></rect>
+<rect x="435.4" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_29: candidate, identical in v0 and v1</title></rect>
+<rect x="446.0" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_30: candidate, identical in v0 and v1</title></rect>
+<rect x="456.6" y="53" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 1 demo_31: corrupted in v1 (content hash changed)</title></rect>
+<rect x="467.2" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_32: candidate, identical in v0 and v1</title></rect>
+<rect x="477.8" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_33: candidate, identical in v0 and v1</title></rect>
+<rect x="488.4" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_34: candidate, identical in v0 and v1</title></rect>
+<rect x="499.0" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_35: candidate, identical in v0 and v1</title></rect>
+<rect x="509.6" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_36: candidate, identical in v0 and v1</title></rect>
+<rect x="520.2" y="53" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 1 demo_37: corrupted in v1 (content hash changed)</title></rect>
+<rect x="530.8" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_38: candidate, identical in v0 and v1</title></rect>
+<rect x="541.4" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_39: candidate, identical in v0 and v1</title></rect>
+<rect x="552.0" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_40: candidate, identical in v0 and v1</title></rect>
+<rect x="562.6" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_41: candidate, identical in v0 and v1</title></rect>
+<rect x="573.2" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_42: candidate, identical in v0 and v1</title></rect>
+<rect x="583.8" y="53" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 1 demo_43: corrupted in v1 (content hash changed)</title></rect>
+<rect x="594.4" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_44: candidate, identical in v0 and v1</title></rect>
+<rect x="605.0" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_45: candidate, identical in v0 and v1</title></rect>
+<rect x="615.6" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_46: candidate, identical in v0 and v1</title></rect>
+<rect x="626.2" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_47: candidate, identical in v0 and v1</title></rect>
+<rect x="636.8" y="53" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 1 demo_48: candidate, identical in v0 and v1</title></rect>
+<rect x="647.4" y="53" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 1 demo_49: corrupted in v1 (content hash changed)</title></rect>
+<g><title>libero_spatial task 2: pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate</title><text x="122" y="74.1" class="ax-label" text-anchor="end">libero_spatial 2</text></g>
+<rect x="128.0" y="66" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_spatial task 2 demo_0: reference split (never editable; hash identical)</title></rect>
+<rect x="138.6" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_1: candidate, identical in v0 and v1</title></rect>
+<rect x="149.2" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_2: candidate, identical in v0 and v1</title></rect>
+<rect x="159.8" y="66" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_spatial task 2 demo_3: reference split (never editable; hash identical)</title></rect>
+<rect x="170.4" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_4: candidate, identical in v0 and v1</title></rect>
+<rect x="181.0" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_5: candidate, identical in v0 and v1</title></rect>
+<rect x="191.6" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_6: candidate, identical in v0 and v1</title></rect>
+<rect x="202.2" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_7: candidate, identical in v0 and v1</title></rect>
+<rect x="212.8" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_8: candidate, identical in v0 and v1</title></rect>
+<rect x="223.4" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_9: candidate, identical in v0 and v1</title></rect>
+<rect x="234.0" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_10: candidate, identical in v0 and v1</title></rect>
+<rect x="244.6" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_11: candidate, identical in v0 and v1</title></rect>
+<rect x="255.2" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_12: candidate, identical in v0 and v1</title></rect>
+<rect x="265.8" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_13: candidate, identical in v0 and v1</title></rect>
+<rect x="276.4" y="66" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 2 demo_14: corrupted in v1 (content hash changed)</title></rect>
+<rect x="287.0" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_15: candidate, identical in v0 and v1</title></rect>
+<rect x="297.6" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_16: candidate, identical in v0 and v1</title></rect>
+<rect x="308.2" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_17: candidate, identical in v0 and v1</title></rect>
+<rect x="318.8" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_18: candidate, identical in v0 and v1</title></rect>
+<rect x="329.4" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_19: candidate, identical in v0 and v1</title></rect>
+<rect x="340.0" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_20: candidate, identical in v0 and v1</title></rect>
+<rect x="350.6" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_21: candidate, identical in v0 and v1</title></rect>
+<rect x="361.2" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_22: candidate, identical in v0 and v1</title></rect>
+<rect x="371.8" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_23: candidate, identical in v0 and v1</title></rect>
+<rect x="382.4" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_24: candidate, identical in v0 and v1</title></rect>
+<rect x="393.0" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_25: candidate, identical in v0 and v1</title></rect>
+<rect x="403.6" y="66" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 2 demo_26: corrupted in v1 (content hash changed)</title></rect>
+<rect x="414.2" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_27: candidate, identical in v0 and v1</title></rect>
+<rect x="424.8" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_28: candidate, identical in v0 and v1</title></rect>
+<rect x="435.4" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_29: candidate, identical in v0 and v1</title></rect>
+<rect x="446.0" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_30: candidate, identical in v0 and v1</title></rect>
+<rect x="456.6" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_31: candidate, identical in v0 and v1</title></rect>
+<rect x="467.2" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_32: candidate, identical in v0 and v1</title></rect>
+<rect x="477.8" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_33: candidate, identical in v0 and v1</title></rect>
+<rect x="488.4" y="66" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 2 demo_34: corrupted in v1 (content hash changed)</title></rect>
+<rect x="499.0" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_35: candidate, identical in v0 and v1</title></rect>
+<rect x="509.6" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_36: candidate, identical in v0 and v1</title></rect>
+<rect x="520.2" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_37: candidate, identical in v0 and v1</title></rect>
+<rect x="530.8" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_38: candidate, identical in v0 and v1</title></rect>
+<rect x="541.4" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_39: candidate, identical in v0 and v1</title></rect>
+<rect x="552.0" y="66" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 2 demo_40: corrupted in v1 (content hash changed)</title></rect>
+<rect x="562.6" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_41: candidate, identical in v0 and v1</title></rect>
+<rect x="573.2" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_42: candidate, identical in v0 and v1</title></rect>
+<rect x="583.8" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_43: candidate, identical in v0 and v1</title></rect>
+<rect x="594.4" y="66" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 2 demo_44: corrupted in v1 (content hash changed)</title></rect>
+<rect x="605.0" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_45: candidate, identical in v0 and v1</title></rect>
+<rect x="615.6" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_46: candidate, identical in v0 and v1</title></rect>
+<rect x="626.2" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_47: candidate, identical in v0 and v1</title></rect>
+<rect x="636.8" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_48: candidate, identical in v0 and v1</title></rect>
+<rect x="647.4" y="66" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 2 demo_49: candidate, identical in v0 and v1</title></rect>
+<g><title>libero_spatial task 3: pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate</title><text x="122" y="87.1" class="ax-label" text-anchor="end">libero_spatial 3</text></g>
+<rect x="128.0" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_0: candidate, identical in v0 and v1</title></rect>
+<rect x="138.6" y="79" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 3 demo_1: corrupted in v1 (content hash changed)</title></rect>
+<rect x="149.2" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_2: candidate, identical in v0 and v1</title></rect>
+<rect x="159.8" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_3: candidate, identical in v0 and v1</title></rect>
+<rect x="170.4" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_4: candidate, identical in v0 and v1</title></rect>
+<rect x="181.0" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_5: candidate, identical in v0 and v1</title></rect>
+<rect x="191.6" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_6: candidate, identical in v0 and v1</title></rect>
+<rect x="202.2" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_7: candidate, identical in v0 and v1</title></rect>
+<rect x="212.8" y="79" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 3 demo_8: corrupted in v1 (content hash changed)</title></rect>
+<rect x="223.4" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_9: candidate, identical in v0 and v1</title></rect>
+<rect x="234.0" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_10: candidate, identical in v0 and v1</title></rect>
+<rect x="244.6" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_11: candidate, identical in v0 and v1</title></rect>
+<rect x="255.2" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_12: candidate, identical in v0 and v1</title></rect>
+<rect x="265.8" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_13: candidate, identical in v0 and v1</title></rect>
+<rect x="276.4" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_14: candidate, identical in v0 and v1</title></rect>
+<rect x="287.0" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_15: candidate, identical in v0 and v1</title></rect>
+<rect x="297.6" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_16: candidate, identical in v0 and v1</title></rect>
+<rect x="308.2" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_17: candidate, identical in v0 and v1</title></rect>
+<rect x="318.8" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_18: candidate, identical in v0 and v1</title></rect>
+<rect x="329.4" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_19: candidate, identical in v0 and v1</title></rect>
+<rect x="340.0" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_20: candidate, identical in v0 and v1</title></rect>
+<rect x="350.6" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_21: candidate, identical in v0 and v1</title></rect>
+<rect x="361.2" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_22: candidate, identical in v0 and v1</title></rect>
+<rect x="371.8" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_23: candidate, identical in v0 and v1</title></rect>
+<rect x="382.4" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_24: candidate, identical in v0 and v1</title></rect>
+<rect x="393.0" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_25: candidate, identical in v0 and v1</title></rect>
+<rect x="403.6" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_26: candidate, identical in v0 and v1</title></rect>
+<rect x="414.2" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_27: candidate, identical in v0 and v1</title></rect>
+<rect x="424.8" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_28: candidate, identical in v0 and v1</title></rect>
+<rect x="435.4" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_29: candidate, identical in v0 and v1</title></rect>
+<rect x="446.0" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_30: candidate, identical in v0 and v1</title></rect>
+<rect x="456.6" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_31: candidate, identical in v0 and v1</title></rect>
+<rect x="467.2" y="79" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_spatial task 3 demo_32: reference split (never editable; hash identical)</title></rect>
+<rect x="477.8" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_33: candidate, identical in v0 and v1</title></rect>
+<rect x="488.4" y="79" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 3 demo_34: corrupted in v1 (content hash changed)</title></rect>
+<rect x="499.0" y="79" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 3 demo_35: corrupted in v1 (content hash changed)</title></rect>
+<rect x="509.6" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_36: candidate, identical in v0 and v1</title></rect>
+<rect x="520.2" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_37: candidate, identical in v0 and v1</title></rect>
+<rect x="530.8" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_38: candidate, identical in v0 and v1</title></rect>
+<rect x="541.4" y="79" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_spatial task 3 demo_39: reference split (never editable; hash identical)</title></rect>
+<rect x="552.0" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_40: candidate, identical in v0 and v1</title></rect>
+<rect x="562.6" y="79" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 3 demo_41: corrupted in v1 (content hash changed)</title></rect>
+<rect x="573.2" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_42: candidate, identical in v0 and v1</title></rect>
+<rect x="583.8" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_43: candidate, identical in v0 and v1</title></rect>
+<rect x="594.4" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_44: candidate, identical in v0 and v1</title></rect>
+<rect x="605.0" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_45: candidate, identical in v0 and v1</title></rect>
+<rect x="615.6" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_46: candidate, identical in v0 and v1</title></rect>
+<rect x="626.2" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_47: candidate, identical in v0 and v1</title></rect>
+<rect x="636.8" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_48: candidate, identical in v0 and v1</title></rect>
+<rect x="647.4" y="79" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 3 demo_49: candidate, identical in v0 and v1</title></rect>
+<g><title>libero_spatial task 4: pick_up_the_black_bowl_in_the_top_drawer_of_the_wooden_cabinet_and_place_it_on_the_plate</title><text x="122" y="100.1" class="ax-label" text-anchor="end">libero_spatial 4</text></g>
+<rect x="128.0" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_0: candidate, identical in v0 and v1</title></rect>
+<rect x="138.6" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_1: candidate, identical in v0 and v1</title></rect>
+<rect x="149.2" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_2: candidate, identical in v0 and v1</title></rect>
+<rect x="159.8" y="92" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 4 demo_3: corrupted in v1 (content hash changed)</title></rect>
+<rect x="170.4" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_4: candidate, identical in v0 and v1</title></rect>
+<rect x="181.0" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_5: candidate, identical in v0 and v1</title></rect>
+<rect x="191.6" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_6: candidate, identical in v0 and v1</title></rect>
+<rect x="202.2" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_7: candidate, identical in v0 and v1</title></rect>
+<rect x="212.8" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_8: candidate, identical in v0 and v1</title></rect>
+<rect x="223.4" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_9: candidate, identical in v0 and v1</title></rect>
+<rect x="234.0" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_10: candidate, identical in v0 and v1</title></rect>
+<rect x="244.6" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_11: candidate, identical in v0 and v1</title></rect>
+<rect x="255.2" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_12: candidate, identical in v0 and v1</title></rect>
+<rect x="265.8" y="92" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 4 demo_13: corrupted in v1 (content hash changed)</title></rect>
+<rect x="276.4" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_14: candidate, identical in v0 and v1</title></rect>
+<rect x="287.0" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_15: candidate, identical in v0 and v1</title></rect>
+<rect x="297.6" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_16: candidate, identical in v0 and v1</title></rect>
+<rect x="308.2" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_17: candidate, identical in v0 and v1</title></rect>
+<rect x="318.8" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_18: candidate, identical in v0 and v1</title></rect>
+<rect x="329.4" y="92" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 4 demo_19: corrupted in v1 (content hash changed)</title></rect>
+<rect x="340.0" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_20: candidate, identical in v0 and v1</title></rect>
+<rect x="350.6" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_21: candidate, identical in v0 and v1</title></rect>
+<rect x="361.2" y="92" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 4 demo_22: corrupted in v1 (content hash changed)</title></rect>
+<rect x="371.8" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_23: candidate, identical in v0 and v1</title></rect>
+<rect x="382.4" y="92" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_spatial task 4 demo_24: reference split (never editable; hash identical)</title></rect>
+<rect x="393.0" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_25: candidate, identical in v0 and v1</title></rect>
+<rect x="403.6" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_26: candidate, identical in v0 and v1</title></rect>
+<rect x="414.2" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_27: candidate, identical in v0 and v1</title></rect>
+<rect x="424.8" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_28: candidate, identical in v0 and v1</title></rect>
+<rect x="435.4" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_29: candidate, identical in v0 and v1</title></rect>
+<rect x="446.0" y="92" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_spatial task 4 demo_30: reference split (never editable; hash identical)</title></rect>
+<rect x="456.6" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_31: candidate, identical in v0 and v1</title></rect>
+<rect x="467.2" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_32: candidate, identical in v0 and v1</title></rect>
+<rect x="477.8" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_33: candidate, identical in v0 and v1</title></rect>
+<rect x="488.4" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_34: candidate, identical in v0 and v1</title></rect>
+<rect x="499.0" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_35: candidate, identical in v0 and v1</title></rect>
+<rect x="509.6" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_36: candidate, identical in v0 and v1</title></rect>
+<rect x="520.2" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_37: candidate, identical in v0 and v1</title></rect>
+<rect x="530.8" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_38: candidate, identical in v0 and v1</title></rect>
+<rect x="541.4" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_39: candidate, identical in v0 and v1</title></rect>
+<rect x="552.0" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_40: candidate, identical in v0 and v1</title></rect>
+<rect x="562.6" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_41: candidate, identical in v0 and v1</title></rect>
+<rect x="573.2" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_42: candidate, identical in v0 and v1</title></rect>
+<rect x="583.8" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_43: candidate, identical in v0 and v1</title></rect>
+<rect x="594.4" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_44: candidate, identical in v0 and v1</title></rect>
+<rect x="605.0" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_45: candidate, identical in v0 and v1</title></rect>
+<rect x="615.6" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_46: candidate, identical in v0 and v1</title></rect>
+<rect x="626.2" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_47: candidate, identical in v0 and v1</title></rect>
+<rect x="636.8" y="92" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 4 demo_48: candidate, identical in v0 and v1</title></rect>
+<rect x="647.4" y="92" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 4 demo_49: corrupted in v1 (content hash changed)</title></rect>
+<g><title>libero_spatial task 5: pick_up_the_black_bowl_on_the_ramekin_and_place_it_on_the_plate</title><text x="122" y="113.1" class="ax-label" text-anchor="end">libero_spatial 5</text></g>
+<rect x="128.0" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_0: candidate, identical in v0 and v1</title></rect>
+<rect x="138.6" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_1: candidate, identical in v0 and v1</title></rect>
+<rect x="149.2" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_2: candidate, identical in v0 and v1</title></rect>
+<rect x="159.8" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_3: candidate, identical in v0 and v1</title></rect>
+<rect x="170.4" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_4: candidate, identical in v0 and v1</title></rect>
+<rect x="181.0" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_5: candidate, identical in v0 and v1</title></rect>
+<rect x="191.6" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_6: candidate, identical in v0 and v1</title></rect>
+<rect x="202.2" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_7: candidate, identical in v0 and v1</title></rect>
+<rect x="212.8" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_8: candidate, identical in v0 and v1</title></rect>
+<rect x="223.4" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_9: candidate, identical in v0 and v1</title></rect>
+<rect x="234.0" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_10: candidate, identical in v0 and v1</title></rect>
+<rect x="244.6" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_11: candidate, identical in v0 and v1</title></rect>
+<rect x="255.2" y="105" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 5 demo_12: corrupted in v1 (content hash changed)</title></rect>
+<rect x="265.8" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_13: candidate, identical in v0 and v1</title></rect>
+<rect x="276.4" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_14: candidate, identical in v0 and v1</title></rect>
+<rect x="287.0" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_15: candidate, identical in v0 and v1</title></rect>
+<rect x="297.6" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_16: candidate, identical in v0 and v1</title></rect>
+<rect x="308.2" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_17: candidate, identical in v0 and v1</title></rect>
+<rect x="318.8" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_18: candidate, identical in v0 and v1</title></rect>
+<rect x="329.4" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_19: candidate, identical in v0 and v1</title></rect>
+<rect x="340.0" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_20: candidate, identical in v0 and v1</title></rect>
+<rect x="350.6" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_21: candidate, identical in v0 and v1</title></rect>
+<rect x="361.2" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_22: candidate, identical in v0 and v1</title></rect>
+<rect x="371.8" y="105" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 5 demo_23: corrupted in v1 (content hash changed)</title></rect>
+<rect x="382.4" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_24: candidate, identical in v0 and v1</title></rect>
+<rect x="393.0" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_25: candidate, identical in v0 and v1</title></rect>
+<rect x="403.6" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_26: candidate, identical in v0 and v1</title></rect>
+<rect x="414.2" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_27: candidate, identical in v0 and v1</title></rect>
+<rect x="424.8" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_28: candidate, identical in v0 and v1</title></rect>
+<rect x="435.4" y="105" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 5 demo_29: corrupted in v1 (content hash changed)</title></rect>
+<rect x="446.0" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_30: candidate, identical in v0 and v1</title></rect>
+<rect x="456.6" y="105" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_spatial task 5 demo_31: reference split (never editable; hash identical)</title></rect>
+<rect x="467.2" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_32: candidate, identical in v0 and v1</title></rect>
+<rect x="477.8" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_33: candidate, identical in v0 and v1</title></rect>
+<rect x="488.4" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_34: candidate, identical in v0 and v1</title></rect>
+<rect x="499.0" y="105" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_spatial task 5 demo_35: reference split (never editable; hash identical)</title></rect>
+<rect x="509.6" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_36: candidate, identical in v0 and v1</title></rect>
+<rect x="520.2" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_37: candidate, identical in v0 and v1</title></rect>
+<rect x="530.8" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_38: candidate, identical in v0 and v1</title></rect>
+<rect x="541.4" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_39: candidate, identical in v0 and v1</title></rect>
+<rect x="552.0" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_40: candidate, identical in v0 and v1</title></rect>
+<rect x="562.6" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_41: candidate, identical in v0 and v1</title></rect>
+<rect x="573.2" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_42: candidate, identical in v0 and v1</title></rect>
+<rect x="583.8" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_43: candidate, identical in v0 and v1</title></rect>
+<rect x="594.4" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_44: candidate, identical in v0 and v1</title></rect>
+<rect x="605.0" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_45: candidate, identical in v0 and v1</title></rect>
+<rect x="615.6" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_46: candidate, identical in v0 and v1</title></rect>
+<rect x="626.2" y="105" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 5 demo_47: corrupted in v1 (content hash changed)</title></rect>
+<rect x="636.8" y="105" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 5 demo_48: candidate, identical in v0 and v1</title></rect>
+<rect x="647.4" y="105" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 5 demo_49: corrupted in v1 (content hash changed)</title></rect>
+<g><title>libero_spatial task 6: pick_up_the_black_bowl_next_to_the_cookie_box_and_place_it_on_the_plate</title><text x="122" y="126.1" class="ax-label" text-anchor="end">libero_spatial 6</text></g>
+<rect x="128.0" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_0: candidate, identical in v0 and v1</title></rect>
+<rect x="138.6" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_1: candidate, identical in v0 and v1</title></rect>
+<rect x="149.2" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_2: candidate, identical in v0 and v1</title></rect>
+<rect x="159.8" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_3: candidate, identical in v0 and v1</title></rect>
+<rect x="170.4" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_4: candidate, identical in v0 and v1</title></rect>
+<rect x="181.0" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_5: candidate, identical in v0 and v1</title></rect>
+<rect x="191.6" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_6: candidate, identical in v0 and v1</title></rect>
+<rect x="202.2" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_7: candidate, identical in v0 and v1</title></rect>
+<rect x="212.8" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_8: candidate, identical in v0 and v1</title></rect>
+<rect x="223.4" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_9: candidate, identical in v0 and v1</title></rect>
+<rect x="234.0" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_10: candidate, identical in v0 and v1</title></rect>
+<rect x="244.6" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_11: candidate, identical in v0 and v1</title></rect>
+<rect x="255.2" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_12: candidate, identical in v0 and v1</title></rect>
+<rect x="265.8" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_13: candidate, identical in v0 and v1</title></rect>
+<rect x="276.4" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_14: candidate, identical in v0 and v1</title></rect>
+<rect x="287.0" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_15: candidate, identical in v0 and v1</title></rect>
+<rect x="297.6" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_16: candidate, identical in v0 and v1</title></rect>
+<rect x="308.2" y="118" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 6 demo_17: corrupted in v1 (content hash changed)</title></rect>
+<rect x="318.8" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_18: candidate, identical in v0 and v1</title></rect>
+<rect x="329.4" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_19: candidate, identical in v0 and v1</title></rect>
+<rect x="340.0" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_20: candidate, identical in v0 and v1</title></rect>
+<rect x="350.6" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_21: candidate, identical in v0 and v1</title></rect>
+<rect x="361.2" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_22: candidate, identical in v0 and v1</title></rect>
+<rect x="371.8" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_23: candidate, identical in v0 and v1</title></rect>
+<rect x="382.4" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_24: candidate, identical in v0 and v1</title></rect>
+<rect x="393.0" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_25: candidate, identical in v0 and v1</title></rect>
+<rect x="403.6" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_26: candidate, identical in v0 and v1</title></rect>
+<rect x="414.2" y="118" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_spatial task 6 demo_27: reference split (never editable; hash identical)</title></rect>
+<rect x="424.8" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_28: candidate, identical in v0 and v1</title></rect>
+<rect x="435.4" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_29: candidate, identical in v0 and v1</title></rect>
+<rect x="446.0" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_30: candidate, identical in v0 and v1</title></rect>
+<rect x="456.6" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_31: candidate, identical in v0 and v1</title></rect>
+<rect x="467.2" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_32: candidate, identical in v0 and v1</title></rect>
+<rect x="477.8" y="118" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 6 demo_33: corrupted in v1 (content hash changed)</title></rect>
+<rect x="488.4" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_34: candidate, identical in v0 and v1</title></rect>
+<rect x="499.0" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_35: candidate, identical in v0 and v1</title></rect>
+<rect x="509.6" y="118" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 6 demo_36: corrupted in v1 (content hash changed)</title></rect>
+<rect x="520.2" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_37: candidate, identical in v0 and v1</title></rect>
+<rect x="530.8" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_38: candidate, identical in v0 and v1</title></rect>
+<rect x="541.4" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_39: candidate, identical in v0 and v1</title></rect>
+<rect x="552.0" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_40: candidate, identical in v0 and v1</title></rect>
+<rect x="562.6" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_41: candidate, identical in v0 and v1</title></rect>
+<rect x="573.2" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_42: candidate, identical in v0 and v1</title></rect>
+<rect x="583.8" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_43: candidate, identical in v0 and v1</title></rect>
+<rect x="594.4" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_44: candidate, identical in v0 and v1</title></rect>
+<rect x="605.0" y="118" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 6 demo_45: corrupted in v1 (content hash changed)</title></rect>
+<rect x="615.6" y="118" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_spatial task 6 demo_46: reference split (never editable; hash identical)</title></rect>
+<rect x="626.2" y="118" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 6 demo_47: corrupted in v1 (content hash changed)</title></rect>
+<rect x="636.8" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_48: candidate, identical in v0 and v1</title></rect>
+<rect x="647.4" y="118" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 6 demo_49: candidate, identical in v0 and v1</title></rect>
+<g><title>libero_spatial task 7: pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate</title><text x="122" y="139.1" class="ax-label" text-anchor="end">libero_spatial 7</text></g>
+<rect x="128.0" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_0: candidate, identical in v0 and v1</title></rect>
+<rect x="138.6" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_1: candidate, identical in v0 and v1</title></rect>
+<rect x="149.2" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_2: candidate, identical in v0 and v1</title></rect>
+<rect x="159.8" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_3: candidate, identical in v0 and v1</title></rect>
+<rect x="170.4" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_4: candidate, identical in v0 and v1</title></rect>
+<rect x="181.0" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_5: candidate, identical in v0 and v1</title></rect>
+<rect x="191.6" y="131" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 7 demo_6: corrupted in v1 (content hash changed)</title></rect>
+<rect x="202.2" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_7: candidate, identical in v0 and v1</title></rect>
+<rect x="212.8" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_8: candidate, identical in v0 and v1</title></rect>
+<rect x="223.4" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_9: candidate, identical in v0 and v1</title></rect>
+<rect x="234.0" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_10: candidate, identical in v0 and v1</title></rect>
+<rect x="244.6" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_11: candidate, identical in v0 and v1</title></rect>
+<rect x="255.2" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_12: candidate, identical in v0 and v1</title></rect>
+<rect x="265.8" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_13: candidate, identical in v0 and v1</title></rect>
+<rect x="276.4" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_14: candidate, identical in v0 and v1</title></rect>
+<rect x="287.0" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_15: candidate, identical in v0 and v1</title></rect>
+<rect x="297.6" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_16: candidate, identical in v0 and v1</title></rect>
+<rect x="308.2" y="131" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 7 demo_17: corrupted in v1 (content hash changed)</title></rect>
+<rect x="318.8" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_18: candidate, identical in v0 and v1</title></rect>
+<rect x="329.4" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_19: candidate, identical in v0 and v1</title></rect>
+<rect x="340.0" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_20: candidate, identical in v0 and v1</title></rect>
+<rect x="350.6" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_21: candidate, identical in v0 and v1</title></rect>
+<rect x="361.2" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_22: candidate, identical in v0 and v1</title></rect>
+<rect x="371.8" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_23: candidate, identical in v0 and v1</title></rect>
+<rect x="382.4" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_24: candidate, identical in v0 and v1</title></rect>
+<rect x="393.0" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_25: candidate, identical in v0 and v1</title></rect>
+<rect x="403.6" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_26: candidate, identical in v0 and v1</title></rect>
+<rect x="414.2" y="131" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 7 demo_27: corrupted in v1 (content hash changed)</title></rect>
+<rect x="424.8" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_28: candidate, identical in v0 and v1</title></rect>
+<rect x="435.4" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_29: candidate, identical in v0 and v1</title></rect>
+<rect x="446.0" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_30: candidate, identical in v0 and v1</title></rect>
+<rect x="456.6" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_31: candidate, identical in v0 and v1</title></rect>
+<rect x="467.2" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_32: candidate, identical in v0 and v1</title></rect>
+<rect x="477.8" y="131" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_spatial task 7 demo_33: reference split (never editable; hash identical)</title></rect>
+<rect x="488.4" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_34: candidate, identical in v0 and v1</title></rect>
+<rect x="499.0" y="131" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 7 demo_35: corrupted in v1 (content hash changed)</title></rect>
+<rect x="509.6" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_36: candidate, identical in v0 and v1</title></rect>
+<rect x="520.2" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_37: candidate, identical in v0 and v1</title></rect>
+<rect x="530.8" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_38: candidate, identical in v0 and v1</title></rect>
+<rect x="541.4" y="131" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_spatial task 7 demo_39: reference split (never editable; hash identical)</title></rect>
+<rect x="552.0" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_40: candidate, identical in v0 and v1</title></rect>
+<rect x="562.6" y="131" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 7 demo_41: corrupted in v1 (content hash changed)</title></rect>
+<rect x="573.2" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_42: candidate, identical in v0 and v1</title></rect>
+<rect x="583.8" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_43: candidate, identical in v0 and v1</title></rect>
+<rect x="594.4" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_44: candidate, identical in v0 and v1</title></rect>
+<rect x="605.0" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_45: candidate, identical in v0 and v1</title></rect>
+<rect x="615.6" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_46: candidate, identical in v0 and v1</title></rect>
+<rect x="626.2" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_47: candidate, identical in v0 and v1</title></rect>
+<rect x="636.8" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_48: candidate, identical in v0 and v1</title></rect>
+<rect x="647.4" y="131" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 7 demo_49: candidate, identical in v0 and v1</title></rect>
+<g><title>libero_spatial task 8: pick_up_the_black_bowl_next_to_the_plate_and_place_it_on_the_plate</title><text x="122" y="152.1" class="ax-label" text-anchor="end">libero_spatial 8</text></g>
+<rect x="128.0" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_0: candidate, identical in v0 and v1</title></rect>
+<rect x="138.6" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_1: candidate, identical in v0 and v1</title></rect>
+<rect x="149.2" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_2: candidate, identical in v0 and v1</title></rect>
+<rect x="159.8" y="144" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 8 demo_3: corrupted in v1 (content hash changed)</title></rect>
+<rect x="170.4" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_4: candidate, identical in v0 and v1</title></rect>
+<rect x="181.0" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_5: candidate, identical in v0 and v1</title></rect>
+<rect x="191.6" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_6: candidate, identical in v0 and v1</title></rect>
+<rect x="202.2" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_7: candidate, identical in v0 and v1</title></rect>
+<rect x="212.8" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_8: candidate, identical in v0 and v1</title></rect>
+<rect x="223.4" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_9: candidate, identical in v0 and v1</title></rect>
+<rect x="234.0" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_10: candidate, identical in v0 and v1</title></rect>
+<rect x="244.6" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_11: candidate, identical in v0 and v1</title></rect>
+<rect x="255.2" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_12: candidate, identical in v0 and v1</title></rect>
+<rect x="265.8" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_13: candidate, identical in v0 and v1</title></rect>
+<rect x="276.4" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_14: candidate, identical in v0 and v1</title></rect>
+<rect x="287.0" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_15: candidate, identical in v0 and v1</title></rect>
+<rect x="297.6" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_16: candidate, identical in v0 and v1</title></rect>
+<rect x="308.2" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_17: candidate, identical in v0 and v1</title></rect>
+<rect x="318.8" y="144" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 8 demo_18: corrupted in v1 (content hash changed)</title></rect>
+<rect x="329.4" y="144" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_spatial task 8 demo_19: reference split (never editable; hash identical)</title></rect>
+<rect x="340.0" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_20: candidate, identical in v0 and v1</title></rect>
+<rect x="350.6" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_21: candidate, identical in v0 and v1</title></rect>
+<rect x="361.2" y="144" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 8 demo_22: corrupted in v1 (content hash changed)</title></rect>
+<rect x="371.8" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_23: candidate, identical in v0 and v1</title></rect>
+<rect x="382.4" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_24: candidate, identical in v0 and v1</title></rect>
+<rect x="393.0" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_25: candidate, identical in v0 and v1</title></rect>
+<rect x="403.6" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_26: candidate, identical in v0 and v1</title></rect>
+<rect x="414.2" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_27: candidate, identical in v0 and v1</title></rect>
+<rect x="424.8" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_28: candidate, identical in v0 and v1</title></rect>
+<rect x="435.4" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_29: candidate, identical in v0 and v1</title></rect>
+<rect x="446.0" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_30: candidate, identical in v0 and v1</title></rect>
+<rect x="456.6" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_31: candidate, identical in v0 and v1</title></rect>
+<rect x="467.2" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_32: candidate, identical in v0 and v1</title></rect>
+<rect x="477.8" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_33: candidate, identical in v0 and v1</title></rect>
+<rect x="488.4" y="144" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 8 demo_34: corrupted in v1 (content hash changed)</title></rect>
+<rect x="499.0" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_35: candidate, identical in v0 and v1</title></rect>
+<rect x="509.6" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_36: candidate, identical in v0 and v1</title></rect>
+<rect x="520.2" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_37: candidate, identical in v0 and v1</title></rect>
+<rect x="530.8" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_38: candidate, identical in v0 and v1</title></rect>
+<rect x="541.4" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_39: candidate, identical in v0 and v1</title></rect>
+<rect x="552.0" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_40: candidate, identical in v0 and v1</title></rect>
+<rect x="562.6" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_41: candidate, identical in v0 and v1</title></rect>
+<rect x="573.2" y="144" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_spatial task 8 demo_42: reference split (never editable; hash identical)</title></rect>
+<rect x="583.8" y="144" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 8 demo_43: corrupted in v1 (content hash changed)</title></rect>
+<rect x="594.4" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_44: candidate, identical in v0 and v1</title></rect>
+<rect x="605.0" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_45: candidate, identical in v0 and v1</title></rect>
+<rect x="615.6" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_46: candidate, identical in v0 and v1</title></rect>
+<rect x="626.2" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_47: candidate, identical in v0 and v1</title></rect>
+<rect x="636.8" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_48: candidate, identical in v0 and v1</title></rect>
+<rect x="647.4" y="144" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 8 demo_49: candidate, identical in v0 and v1</title></rect>
+<g><title>libero_spatial task 9: pick_up_the_black_bowl_on_the_wooden_cabinet_and_place_it_on_the_plate</title><text x="122" y="165.1" class="ax-label" text-anchor="end">libero_spatial 9</text></g>
+<rect x="128.0" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_0: candidate, identical in v0 and v1</title></rect>
+<rect x="138.6" y="157" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_spatial task 9 demo_1: reference split (never editable; hash identical)</title></rect>
+<rect x="149.2" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_2: candidate, identical in v0 and v1</title></rect>
+<rect x="159.8" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_3: candidate, identical in v0 and v1</title></rect>
+<rect x="170.4" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_4: candidate, identical in v0 and v1</title></rect>
+<rect x="181.0" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_5: candidate, identical in v0 and v1</title></rect>
+<rect x="191.6" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_6: candidate, identical in v0 and v1</title></rect>
+<rect x="202.2" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_7: candidate, identical in v0 and v1</title></rect>
+<rect x="212.8" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_8: candidate, identical in v0 and v1</title></rect>
+<rect x="223.4" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_9: candidate, identical in v0 and v1</title></rect>
+<rect x="234.0" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_10: candidate, identical in v0 and v1</title></rect>
+<rect x="244.6" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_11: candidate, identical in v0 and v1</title></rect>
+<rect x="255.2" y="157" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 9 demo_12: corrupted in v1 (content hash changed)</title></rect>
+<rect x="265.8" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_13: candidate, identical in v0 and v1</title></rect>
+<rect x="276.4" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_14: candidate, identical in v0 and v1</title></rect>
+<rect x="287.0" y="157" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 9 demo_15: corrupted in v1 (content hash changed)</title></rect>
+<rect x="297.6" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_16: candidate, identical in v0 and v1</title></rect>
+<rect x="308.2" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_17: candidate, identical in v0 and v1</title></rect>
+<rect x="318.8" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_18: candidate, identical in v0 and v1</title></rect>
+<rect x="329.4" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_19: candidate, identical in v0 and v1</title></rect>
+<rect x="340.0" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_20: candidate, identical in v0 and v1</title></rect>
+<rect x="350.6" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_21: candidate, identical in v0 and v1</title></rect>
+<rect x="361.2" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_22: candidate, identical in v0 and v1</title></rect>
+<rect x="371.8" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_23: candidate, identical in v0 and v1</title></rect>
+<rect x="382.4" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_24: candidate, identical in v0 and v1</title></rect>
+<rect x="393.0" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_25: candidate, identical in v0 and v1</title></rect>
+<rect x="403.6" y="157" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 9 demo_26: corrupted in v1 (content hash changed)</title></rect>
+<rect x="414.2" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_27: candidate, identical in v0 and v1</title></rect>
+<rect x="424.8" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_28: candidate, identical in v0 and v1</title></rect>
+<rect x="435.4" y="157" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 9 demo_29: corrupted in v1 (content hash changed)</title></rect>
+<rect x="446.0" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_30: candidate, identical in v0 and v1</title></rect>
+<rect x="456.6" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_31: candidate, identical in v0 and v1</title></rect>
+<rect x="467.2" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_32: candidate, identical in v0 and v1</title></rect>
+<rect x="477.8" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_33: candidate, identical in v0 and v1</title></rect>
+<rect x="488.4" y="157" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_spatial task 9 demo_34: corrupted in v1 (content hash changed)</title></rect>
+<rect x="499.0" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_35: candidate, identical in v0 and v1</title></rect>
+<rect x="509.6" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_36: candidate, identical in v0 and v1</title></rect>
+<rect x="520.2" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_37: candidate, identical in v0 and v1</title></rect>
+<rect x="530.8" y="157" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_spatial task 9 demo_38: reference split (never editable; hash identical)</title></rect>
+<rect x="541.4" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_39: candidate, identical in v0 and v1</title></rect>
+<rect x="552.0" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_40: candidate, identical in v0 and v1</title></rect>
+<rect x="562.6" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_41: candidate, identical in v0 and v1</title></rect>
+<rect x="573.2" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_42: candidate, identical in v0 and v1</title></rect>
+<rect x="583.8" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_43: candidate, identical in v0 and v1</title></rect>
+<rect x="594.4" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_44: candidate, identical in v0 and v1</title></rect>
+<rect x="605.0" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_45: candidate, identical in v0 and v1</title></rect>
+<rect x="615.6" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_46: candidate, identical in v0 and v1</title></rect>
+<rect x="626.2" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_47: candidate, identical in v0 and v1</title></rect>
+<rect x="636.8" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_48: candidate, identical in v0 and v1</title></rect>
+<rect x="647.4" y="157" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_spatial task 9 demo_49: candidate, identical in v0 and v1</title></rect>
+<g><title>libero_10 task 0: LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket</title><text x="122" y="190.1" class="ax-label" text-anchor="end">libero_10 0</text></g>
+<rect x="128.0" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_0: candidate, identical in v0 and v1</title></rect>
+<rect x="138.6" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_1: candidate, identical in v0 and v1</title></rect>
+<rect x="149.2" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_2: candidate, identical in v0 and v1</title></rect>
+<rect x="159.8" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_3: candidate, identical in v0 and v1</title></rect>
+<rect x="170.4" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_4: candidate, identical in v0 and v1</title></rect>
+<rect x="181.0" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_5: candidate, identical in v0 and v1</title></rect>
+<rect x="191.6" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_6: candidate, identical in v0 and v1</title></rect>
+<rect x="202.2" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_7: candidate, identical in v0 and v1</title></rect>
+<rect x="212.8" y="182" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_10 task 0 demo_8: reference split (never editable; hash identical)</title></rect>
+<rect x="223.4" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_9: candidate, identical in v0 and v1</title></rect>
+<rect x="234.0" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_10: candidate, identical in v0 and v1</title></rect>
+<rect x="244.6" y="182" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 0 demo_11: corrupted in v1 (content hash changed)</title></rect>
+<rect x="255.2" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_12: candidate, identical in v0 and v1</title></rect>
+<rect x="265.8" y="182" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 0 demo_13: corrupted in v1 (content hash changed)</title></rect>
+<rect x="276.4" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_14: candidate, identical in v0 and v1</title></rect>
+<rect x="287.0" y="182" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 0 demo_15: corrupted in v1 (content hash changed)</title></rect>
+<rect x="297.6" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_16: candidate, identical in v0 and v1</title></rect>
+<rect x="308.2" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_17: candidate, identical in v0 and v1</title></rect>
+<rect x="318.8" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_18: candidate, identical in v0 and v1</title></rect>
+<rect x="329.4" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_19: candidate, identical in v0 and v1</title></rect>
+<rect x="340.0" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_20: candidate, identical in v0 and v1</title></rect>
+<rect x="350.6" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_21: candidate, identical in v0 and v1</title></rect>
+<rect x="361.2" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_22: candidate, identical in v0 and v1</title></rect>
+<rect x="371.8" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_23: candidate, identical in v0 and v1</title></rect>
+<rect x="382.4" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_24: candidate, identical in v0 and v1</title></rect>
+<rect x="393.0" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_25: candidate, identical in v0 and v1</title></rect>
+<rect x="403.6" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_26: candidate, identical in v0 and v1</title></rect>
+<rect x="414.2" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_27: candidate, identical in v0 and v1</title></rect>
+<rect x="424.8" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_28: candidate, identical in v0 and v1</title></rect>
+<rect x="435.4" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_29: candidate, identical in v0 and v1</title></rect>
+<rect x="446.0" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_30: candidate, identical in v0 and v1</title></rect>
+<rect x="456.6" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_31: candidate, identical in v0 and v1</title></rect>
+<rect x="467.2" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_32: candidate, identical in v0 and v1</title></rect>
+<rect x="477.8" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_33: candidate, identical in v0 and v1</title></rect>
+<rect x="488.4" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_34: candidate, identical in v0 and v1</title></rect>
+<rect x="499.0" y="182" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 0 demo_35: corrupted in v1 (content hash changed)</title></rect>
+<rect x="509.6" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_36: candidate, identical in v0 and v1</title></rect>
+<rect x="520.2" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_37: candidate, identical in v0 and v1</title></rect>
+<rect x="530.8" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_38: candidate, identical in v0 and v1</title></rect>
+<rect x="541.4" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_39: candidate, identical in v0 and v1</title></rect>
+<rect x="552.0" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_40: candidate, identical in v0 and v1</title></rect>
+<rect x="562.6" y="182" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_10 task 0 demo_41: reference split (never editable; hash identical)</title></rect>
+<rect x="573.2" y="182" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 0 demo_42: corrupted in v1 (content hash changed)</title></rect>
+<rect x="583.8" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_43: candidate, identical in v0 and v1</title></rect>
+<rect x="594.4" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_44: candidate, identical in v0 and v1</title></rect>
+<rect x="605.0" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_45: candidate, identical in v0 and v1</title></rect>
+<rect x="615.6" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_46: candidate, identical in v0 and v1</title></rect>
+<rect x="626.2" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_47: candidate, identical in v0 and v1</title></rect>
+<rect x="636.8" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_48: candidate, identical in v0 and v1</title></rect>
+<rect x="647.4" y="182" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 0 demo_49: candidate, identical in v0 and v1</title></rect>
+<g><title>libero_10 task 1: LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket</title><text x="122" y="203.1" class="ax-label" text-anchor="end">libero_10 1</text></g>
+<rect x="128.0" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_0: candidate, identical in v0 and v1</title></rect>
+<rect x="138.6" y="195" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_10 task 1 demo_1: reference split (never editable; hash identical)</title></rect>
+<rect x="149.2" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_2: candidate, identical in v0 and v1</title></rect>
+<rect x="159.8" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_3: candidate, identical in v0 and v1</title></rect>
+<rect x="170.4" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_4: candidate, identical in v0 and v1</title></rect>
+<rect x="181.0" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_5: candidate, identical in v0 and v1</title></rect>
+<rect x="191.6" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_6: candidate, identical in v0 and v1</title></rect>
+<rect x="202.2" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_7: candidate, identical in v0 and v1</title></rect>
+<rect x="212.8" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_8: candidate, identical in v0 and v1</title></rect>
+<rect x="223.4" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_9: candidate, identical in v0 and v1</title></rect>
+<rect x="234.0" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_10: candidate, identical in v0 and v1</title></rect>
+<rect x="244.6" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_11: candidate, identical in v0 and v1</title></rect>
+<rect x="255.2" y="195" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 1 demo_12: corrupted in v1 (content hash changed)</title></rect>
+<rect x="265.8" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_13: candidate, identical in v0 and v1</title></rect>
+<rect x="276.4" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_14: candidate, identical in v0 and v1</title></rect>
+<rect x="287.0" y="195" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 1 demo_15: corrupted in v1 (content hash changed)</title></rect>
+<rect x="297.6" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_16: candidate, identical in v0 and v1</title></rect>
+<rect x="308.2" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_17: candidate, identical in v0 and v1</title></rect>
+<rect x="318.8" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_18: candidate, identical in v0 and v1</title></rect>
+<rect x="329.4" y="195" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 1 demo_19: corrupted in v1 (content hash changed)</title></rect>
+<rect x="340.0" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_20: candidate, identical in v0 and v1</title></rect>
+<rect x="350.6" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_21: candidate, identical in v0 and v1</title></rect>
+<rect x="361.2" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_22: candidate, identical in v0 and v1</title></rect>
+<rect x="371.8" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_23: candidate, identical in v0 and v1</title></rect>
+<rect x="382.4" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_24: candidate, identical in v0 and v1</title></rect>
+<rect x="393.0" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_25: candidate, identical in v0 and v1</title></rect>
+<rect x="403.6" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_26: candidate, identical in v0 and v1</title></rect>
+<rect x="414.2" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_27: candidate, identical in v0 and v1</title></rect>
+<rect x="424.8" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_28: candidate, identical in v0 and v1</title></rect>
+<rect x="435.4" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_29: candidate, identical in v0 and v1</title></rect>
+<rect x="446.0" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_30: candidate, identical in v0 and v1</title></rect>
+<rect x="456.6" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_31: candidate, identical in v0 and v1</title></rect>
+<rect x="467.2" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_32: candidate, identical in v0 and v1</title></rect>
+<rect x="477.8" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_33: candidate, identical in v0 and v1</title></rect>
+<rect x="488.4" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_34: candidate, identical in v0 and v1</title></rect>
+<rect x="499.0" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_35: candidate, identical in v0 and v1</title></rect>
+<rect x="509.6" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_36: candidate, identical in v0 and v1</title></rect>
+<rect x="520.2" y="195" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 1 demo_37: corrupted in v1 (content hash changed)</title></rect>
+<rect x="530.8" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_38: candidate, identical in v0 and v1</title></rect>
+<rect x="541.4" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_39: candidate, identical in v0 and v1</title></rect>
+<rect x="552.0" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_40: candidate, identical in v0 and v1</title></rect>
+<rect x="562.6" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_41: candidate, identical in v0 and v1</title></rect>
+<rect x="573.2" y="195" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_10 task 1 demo_42: reference split (never editable; hash identical)</title></rect>
+<rect x="583.8" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_43: candidate, identical in v0 and v1</title></rect>
+<rect x="594.4" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_44: candidate, identical in v0 and v1</title></rect>
+<rect x="605.0" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_45: candidate, identical in v0 and v1</title></rect>
+<rect x="615.6" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_46: candidate, identical in v0 and v1</title></rect>
+<rect x="626.2" y="195" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 1 demo_47: corrupted in v1 (content hash changed)</title></rect>
+<rect x="636.8" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_48: candidate, identical in v0 and v1</title></rect>
+<rect x="647.4" y="195" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 1 demo_49: candidate, identical in v0 and v1</title></rect>
+<g><title>libero_10 task 2: KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it</title><text x="122" y="216.1" class="ax-label" text-anchor="end">libero_10 2</text></g>
+<rect x="128.0" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_0: candidate, identical in v0 and v1</title></rect>
+<rect x="138.6" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_1: candidate, identical in v0 and v1</title></rect>
+<rect x="149.2" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_2: candidate, identical in v0 and v1</title></rect>
+<rect x="159.8" y="208" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_10 task 2 demo_3: reference split (never editable; hash identical)</title></rect>
+<rect x="170.4" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_4: candidate, identical in v0 and v1</title></rect>
+<rect x="181.0" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_5: candidate, identical in v0 and v1</title></rect>
+<rect x="191.6" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_6: candidate, identical in v0 and v1</title></rect>
+<rect x="202.2" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_7: candidate, identical in v0 and v1</title></rect>
+<rect x="212.8" y="208" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 2 demo_8: corrupted in v1 (content hash changed)</title></rect>
+<rect x="223.4" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_9: candidate, identical in v0 and v1</title></rect>
+<rect x="234.0" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_10: candidate, identical in v0 and v1</title></rect>
+<rect x="244.6" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_11: candidate, identical in v0 and v1</title></rect>
+<rect x="255.2" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_12: candidate, identical in v0 and v1</title></rect>
+<rect x="265.8" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_13: candidate, identical in v0 and v1</title></rect>
+<rect x="276.4" y="208" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_10 task 2 demo_14: reference split (never editable; hash identical)</title></rect>
+<rect x="287.0" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_15: candidate, identical in v0 and v1</title></rect>
+<rect x="297.6" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_16: candidate, identical in v0 and v1</title></rect>
+<rect x="308.2" y="208" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 2 demo_17: corrupted in v1 (content hash changed)</title></rect>
+<rect x="318.8" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_18: candidate, identical in v0 and v1</title></rect>
+<rect x="329.4" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_19: candidate, identical in v0 and v1</title></rect>
+<rect x="340.0" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_20: candidate, identical in v0 and v1</title></rect>
+<rect x="350.6" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_21: candidate, identical in v0 and v1</title></rect>
+<rect x="361.2" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_22: candidate, identical in v0 and v1</title></rect>
+<rect x="371.8" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_23: candidate, identical in v0 and v1</title></rect>
+<rect x="382.4" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_24: candidate, identical in v0 and v1</title></rect>
+<rect x="393.0" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_25: candidate, identical in v0 and v1</title></rect>
+<rect x="403.6" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_26: candidate, identical in v0 and v1</title></rect>
+<rect x="414.2" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_27: candidate, identical in v0 and v1</title></rect>
+<rect x="424.8" y="208" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 2 demo_28: corrupted in v1 (content hash changed)</title></rect>
+<rect x="435.4" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_29: candidate, identical in v0 and v1</title></rect>
+<rect x="446.0" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_30: candidate, identical in v0 and v1</title></rect>
+<rect x="456.6" y="208" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 2 demo_31: corrupted in v1 (content hash changed)</title></rect>
+<rect x="467.2" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_32: candidate, identical in v0 and v1</title></rect>
+<rect x="477.8" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_33: candidate, identical in v0 and v1</title></rect>
+<rect x="488.4" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_34: candidate, identical in v0 and v1</title></rect>
+<rect x="499.0" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_35: candidate, identical in v0 and v1</title></rect>
+<rect x="509.6" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_36: candidate, identical in v0 and v1</title></rect>
+<rect x="520.2" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_37: candidate, identical in v0 and v1</title></rect>
+<rect x="530.8" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_38: candidate, identical in v0 and v1</title></rect>
+<rect x="541.4" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_39: candidate, identical in v0 and v1</title></rect>
+<rect x="552.0" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_40: candidate, identical in v0 and v1</title></rect>
+<rect x="562.6" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_41: candidate, identical in v0 and v1</title></rect>
+<rect x="573.2" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_42: candidate, identical in v0 and v1</title></rect>
+<rect x="583.8" y="208" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 2 demo_43: corrupted in v1 (content hash changed)</title></rect>
+<rect x="594.4" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_44: candidate, identical in v0 and v1</title></rect>
+<rect x="605.0" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_45: candidate, identical in v0 and v1</title></rect>
+<rect x="615.6" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_46: candidate, identical in v0 and v1</title></rect>
+<rect x="626.2" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_47: candidate, identical in v0 and v1</title></rect>
+<rect x="636.8" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_48: candidate, identical in v0 and v1</title></rect>
+<rect x="647.4" y="208" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 2 demo_49: candidate, identical in v0 and v1</title></rect>
+<g><title>libero_10 task 3: KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer_of_the_cabinet_and_close_it</title><text x="122" y="229.1" class="ax-label" text-anchor="end">libero_10 3</text></g>
+<rect x="128.0" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_0: candidate, identical in v0 and v1</title></rect>
+<rect x="138.6" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_1: candidate, identical in v0 and v1</title></rect>
+<rect x="149.2" y="221" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 3 demo_2: corrupted in v1 (content hash changed)</title></rect>
+<rect x="159.8" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_3: candidate, identical in v0 and v1</title></rect>
+<rect x="170.4" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_4: candidate, identical in v0 and v1</title></rect>
+<rect x="181.0" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_5: candidate, identical in v0 and v1</title></rect>
+<rect x="191.6" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_6: candidate, identical in v0 and v1</title></rect>
+<rect x="202.2" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_7: candidate, identical in v0 and v1</title></rect>
+<rect x="212.8" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_8: candidate, identical in v0 and v1</title></rect>
+<rect x="223.4" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_9: candidate, identical in v0 and v1</title></rect>
+<rect x="234.0" y="221" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 3 demo_10: corrupted in v1 (content hash changed)</title></rect>
+<rect x="244.6" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_11: candidate, identical in v0 and v1</title></rect>
+<rect x="255.2" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_12: candidate, identical in v0 and v1</title></rect>
+<rect x="265.8" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_13: candidate, identical in v0 and v1</title></rect>
+<rect x="276.4" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_14: candidate, identical in v0 and v1</title></rect>
+<rect x="287.0" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_15: candidate, identical in v0 and v1</title></rect>
+<rect x="297.6" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_16: candidate, identical in v0 and v1</title></rect>
+<rect x="308.2" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_17: candidate, identical in v0 and v1</title></rect>
+<rect x="318.8" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_18: candidate, identical in v0 and v1</title></rect>
+<rect x="329.4" y="221" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 3 demo_19: corrupted in v1 (content hash changed)</title></rect>
+<rect x="340.0" y="221" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_10 task 3 demo_20: reference split (never editable; hash identical)</title></rect>
+<rect x="350.6" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_21: candidate, identical in v0 and v1</title></rect>
+<rect x="361.2" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_22: candidate, identical in v0 and v1</title></rect>
+<rect x="371.8" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_23: candidate, identical in v0 and v1</title></rect>
+<rect x="382.4" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_24: candidate, identical in v0 and v1</title></rect>
+<rect x="393.0" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_25: candidate, identical in v0 and v1</title></rect>
+<rect x="403.6" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_26: candidate, identical in v0 and v1</title></rect>
+<rect x="414.2" y="221" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 3 demo_27: corrupted in v1 (content hash changed)</title></rect>
+<rect x="424.8" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_28: candidate, identical in v0 and v1</title></rect>
+<rect x="435.4" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_29: candidate, identical in v0 and v1</title></rect>
+<rect x="446.0" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_30: candidate, identical in v0 and v1</title></rect>
+<rect x="456.6" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_31: candidate, identical in v0 and v1</title></rect>
+<rect x="467.2" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_32: candidate, identical in v0 and v1</title></rect>
+<rect x="477.8" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_33: candidate, identical in v0 and v1</title></rect>
+<rect x="488.4" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_34: candidate, identical in v0 and v1</title></rect>
+<rect x="499.0" y="221" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 3 demo_35: corrupted in v1 (content hash changed)</title></rect>
+<rect x="509.6" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_36: candidate, identical in v0 and v1</title></rect>
+<rect x="520.2" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_37: candidate, identical in v0 and v1</title></rect>
+<rect x="530.8" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_38: candidate, identical in v0 and v1</title></rect>
+<rect x="541.4" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_39: candidate, identical in v0 and v1</title></rect>
+<rect x="552.0" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_40: candidate, identical in v0 and v1</title></rect>
+<rect x="562.6" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_41: candidate, identical in v0 and v1</title></rect>
+<rect x="573.2" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_42: candidate, identical in v0 and v1</title></rect>
+<rect x="583.8" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_43: candidate, identical in v0 and v1</title></rect>
+<rect x="594.4" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_44: candidate, identical in v0 and v1</title></rect>
+<rect x="605.0" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_45: candidate, identical in v0 and v1</title></rect>
+<rect x="615.6" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_46: candidate, identical in v0 and v1</title></rect>
+<rect x="626.2" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_47: candidate, identical in v0 and v1</title></rect>
+<rect x="636.8" y="221" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 3 demo_48: candidate, identical in v0 and v1</title></rect>
+<rect x="647.4" y="221" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_10 task 3 demo_49: reference split (never editable; hash identical)</title></rect>
+<g><title>libero_10 task 4: LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate</title><text x="122" y="242.1" class="ax-label" text-anchor="end">libero_10 4</text></g>
+<rect x="128.0" y="234" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_10 task 4 demo_0: reference split (never editable; hash identical)</title></rect>
+<rect x="138.6" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_1: candidate, identical in v0 and v1</title></rect>
+<rect x="149.2" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_2: candidate, identical in v0 and v1</title></rect>
+<rect x="159.8" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_3: candidate, identical in v0 and v1</title></rect>
+<rect x="170.4" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_4: candidate, identical in v0 and v1</title></rect>
+<rect x="181.0" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_5: candidate, identical in v0 and v1</title></rect>
+<rect x="191.6" y="234" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_10 task 4 demo_6: reference split (never editable; hash identical)</title></rect>
+<rect x="202.2" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_7: candidate, identical in v0 and v1</title></rect>
+<rect x="212.8" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_8: candidate, identical in v0 and v1</title></rect>
+<rect x="223.4" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_9: candidate, identical in v0 and v1</title></rect>
+<rect x="234.0" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_10: candidate, identical in v0 and v1</title></rect>
+<rect x="244.6" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_11: candidate, identical in v0 and v1</title></rect>
+<rect x="255.2" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_12: candidate, identical in v0 and v1</title></rect>
+<rect x="265.8" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_13: candidate, identical in v0 and v1</title></rect>
+<rect x="276.4" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_14: candidate, identical in v0 and v1</title></rect>
+<rect x="287.0" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_15: candidate, identical in v0 and v1</title></rect>
+<rect x="297.6" y="234" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 4 demo_16: corrupted in v1 (content hash changed)</title></rect>
+<rect x="308.2" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_17: candidate, identical in v0 and v1</title></rect>
+<rect x="318.8" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_18: candidate, identical in v0 and v1</title></rect>
+<rect x="329.4" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_19: candidate, identical in v0 and v1</title></rect>
+<rect x="340.0" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_20: candidate, identical in v0 and v1</title></rect>
+<rect x="350.6" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_21: candidate, identical in v0 and v1</title></rect>
+<rect x="361.2" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_22: candidate, identical in v0 and v1</title></rect>
+<rect x="371.8" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_23: candidate, identical in v0 and v1</title></rect>
+<rect x="382.4" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_24: candidate, identical in v0 and v1</title></rect>
+<rect x="393.0" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_25: candidate, identical in v0 and v1</title></rect>
+<rect x="403.6" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_26: candidate, identical in v0 and v1</title></rect>
+<rect x="414.2" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_27: candidate, identical in v0 and v1</title></rect>
+<rect x="424.8" y="234" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 4 demo_28: corrupted in v1 (content hash changed)</title></rect>
+<rect x="435.4" y="234" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 4 demo_29: corrupted in v1 (content hash changed)</title></rect>
+<rect x="446.0" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_30: candidate, identical in v0 and v1</title></rect>
+<rect x="456.6" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_31: candidate, identical in v0 and v1</title></rect>
+<rect x="467.2" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_32: candidate, identical in v0 and v1</title></rect>
+<rect x="477.8" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_33: candidate, identical in v0 and v1</title></rect>
+<rect x="488.4" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_34: candidate, identical in v0 and v1</title></rect>
+<rect x="499.0" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_35: candidate, identical in v0 and v1</title></rect>
+<rect x="509.6" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_36: candidate, identical in v0 and v1</title></rect>
+<rect x="520.2" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_37: candidate, identical in v0 and v1</title></rect>
+<rect x="530.8" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_38: candidate, identical in v0 and v1</title></rect>
+<rect x="541.4" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_39: candidate, identical in v0 and v1</title></rect>
+<rect x="552.0" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_40: candidate, identical in v0 and v1</title></rect>
+<rect x="562.6" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_41: candidate, identical in v0 and v1</title></rect>
+<rect x="573.2" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_42: candidate, identical in v0 and v1</title></rect>
+<rect x="583.8" y="234" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 4 demo_43: corrupted in v1 (content hash changed)</title></rect>
+<rect x="594.4" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_44: candidate, identical in v0 and v1</title></rect>
+<rect x="605.0" y="234" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 4 demo_45: corrupted in v1 (content hash changed)</title></rect>
+<rect x="615.6" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_46: candidate, identical in v0 and v1</title></rect>
+<rect x="626.2" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_47: candidate, identical in v0 and v1</title></rect>
+<rect x="636.8" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_48: candidate, identical in v0 and v1</title></rect>
+<rect x="647.4" y="234" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 4 demo_49: candidate, identical in v0 and v1</title></rect>
+<g><title>libero_10 task 5: STUDY_SCENE1_pick_up_the_book_and_place_it_in_the_back_compartment_of_the_caddy</title><text x="122" y="255.1" class="ax-label" text-anchor="end">libero_10 5</text></g>
+<rect x="128.0" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_0: candidate, identical in v0 and v1</title></rect>
+<rect x="138.6" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_1: candidate, identical in v0 and v1</title></rect>
+<rect x="149.2" y="247" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 5 demo_2: corrupted in v1 (content hash changed)</title></rect>
+<rect x="159.8" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_3: candidate, identical in v0 and v1</title></rect>
+<rect x="170.4" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_4: candidate, identical in v0 and v1</title></rect>
+<rect x="181.0" y="247" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 5 demo_5: corrupted in v1 (content hash changed)</title></rect>
+<rect x="191.6" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_6: candidate, identical in v0 and v1</title></rect>
+<rect x="202.2" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_7: candidate, identical in v0 and v1</title></rect>
+<rect x="212.8" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_8: candidate, identical in v0 and v1</title></rect>
+<rect x="223.4" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_9: candidate, identical in v0 and v1</title></rect>
+<rect x="234.0" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_10: candidate, identical in v0 and v1</title></rect>
+<rect x="244.6" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_11: candidate, identical in v0 and v1</title></rect>
+<rect x="255.2" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_12: candidate, identical in v0 and v1</title></rect>
+<rect x="265.8" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_13: candidate, identical in v0 and v1</title></rect>
+<rect x="276.4" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_14: candidate, identical in v0 and v1</title></rect>
+<rect x="287.0" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_15: candidate, identical in v0 and v1</title></rect>
+<rect x="297.6" y="247" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 5 demo_16: corrupted in v1 (content hash changed)</title></rect>
+<rect x="308.2" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_17: candidate, identical in v0 and v1</title></rect>
+<rect x="318.8" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_18: candidate, identical in v0 and v1</title></rect>
+<rect x="329.4" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_19: candidate, identical in v0 and v1</title></rect>
+<rect x="340.0" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_20: candidate, identical in v0 and v1</title></rect>
+<rect x="350.6" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_21: candidate, identical in v0 and v1</title></rect>
+<rect x="361.2" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_22: candidate, identical in v0 and v1</title></rect>
+<rect x="371.8" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_23: candidate, identical in v0 and v1</title></rect>
+<rect x="382.4" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_24: candidate, identical in v0 and v1</title></rect>
+<rect x="393.0" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_25: candidate, identical in v0 and v1</title></rect>
+<rect x="403.6" y="247" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_10 task 5 demo_26: reference split (never editable; hash identical)</title></rect>
+<rect x="414.2" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_27: candidate, identical in v0 and v1</title></rect>
+<rect x="424.8" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_28: candidate, identical in v0 and v1</title></rect>
+<rect x="435.4" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_29: candidate, identical in v0 and v1</title></rect>
+<rect x="446.0" y="247" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 5 demo_30: corrupted in v1 (content hash changed)</title></rect>
+<rect x="456.6" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_31: candidate, identical in v0 and v1</title></rect>
+<rect x="467.2" y="247" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_10 task 5 demo_32: reference split (never editable; hash identical)</title></rect>
+<rect x="477.8" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_33: candidate, identical in v0 and v1</title></rect>
+<rect x="488.4" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_34: candidate, identical in v0 and v1</title></rect>
+<rect x="499.0" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_35: candidate, identical in v0 and v1</title></rect>
+<rect x="509.6" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_36: candidate, identical in v0 and v1</title></rect>
+<rect x="520.2" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_37: candidate, identical in v0 and v1</title></rect>
+<rect x="530.8" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_38: candidate, identical in v0 and v1</title></rect>
+<rect x="541.4" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_39: candidate, identical in v0 and v1</title></rect>
+<rect x="552.0" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_40: candidate, identical in v0 and v1</title></rect>
+<rect x="562.6" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_41: candidate, identical in v0 and v1</title></rect>
+<rect x="573.2" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_42: candidate, identical in v0 and v1</title></rect>
+<rect x="583.8" y="247" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 5 demo_43: corrupted in v1 (content hash changed)</title></rect>
+<rect x="594.4" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_44: candidate, identical in v0 and v1</title></rect>
+<rect x="605.0" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_45: candidate, identical in v0 and v1</title></rect>
+<rect x="615.6" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_46: candidate, identical in v0 and v1</title></rect>
+<rect x="626.2" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_47: candidate, identical in v0 and v1</title></rect>
+<rect x="636.8" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_48: candidate, identical in v0 and v1</title></rect>
+<rect x="647.4" y="247" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 5 demo_49: candidate, identical in v0 and v1</title></rect>
+<g><title>libero_10 task 6: LIVING_ROOM_SCENE6_put_the_white_mug_on_the_plate_and_put_the_chocolate_pudding_to_the_right_of_the_plate</title><text x="122" y="268.1" class="ax-label" text-anchor="end">libero_10 6</text></g>
+<rect x="128.0" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_0: candidate, identical in v0 and v1</title></rect>
+<rect x="138.6" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_1: candidate, identical in v0 and v1</title></rect>
+<rect x="149.2" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_2: candidate, identical in v0 and v1</title></rect>
+<rect x="159.8" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_3: candidate, identical in v0 and v1</title></rect>
+<rect x="170.4" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_4: candidate, identical in v0 and v1</title></rect>
+<rect x="181.0" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_5: candidate, identical in v0 and v1</title></rect>
+<rect x="191.6" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_6: candidate, identical in v0 and v1</title></rect>
+<rect x="202.2" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_7: candidate, identical in v0 and v1</title></rect>
+<rect x="212.8" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_8: candidate, identical in v0 and v1</title></rect>
+<rect x="223.4" y="260" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 6 demo_9: corrupted in v1 (content hash changed)</title></rect>
+<rect x="234.0" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_10: candidate, identical in v0 and v1</title></rect>
+<rect x="244.6" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_11: candidate, identical in v0 and v1</title></rect>
+<rect x="255.2" y="260" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_10 task 6 demo_12: reference split (never editable; hash identical)</title></rect>
+<rect x="265.8" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_13: candidate, identical in v0 and v1</title></rect>
+<rect x="276.4" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_14: candidate, identical in v0 and v1</title></rect>
+<rect x="287.0" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_15: candidate, identical in v0 and v1</title></rect>
+<rect x="297.6" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_16: candidate, identical in v0 and v1</title></rect>
+<rect x="308.2" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_17: candidate, identical in v0 and v1</title></rect>
+<rect x="318.8" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_18: candidate, identical in v0 and v1</title></rect>
+<rect x="329.4" y="260" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 6 demo_19: corrupted in v1 (content hash changed)</title></rect>
+<rect x="340.0" y="260" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 6 demo_20: corrupted in v1 (content hash changed)</title></rect>
+<rect x="350.6" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_21: candidate, identical in v0 and v1</title></rect>
+<rect x="361.2" y="260" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 6 demo_22: corrupted in v1 (content hash changed)</title></rect>
+<rect x="371.8" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_23: candidate, identical in v0 and v1</title></rect>
+<rect x="382.4" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_24: candidate, identical in v0 and v1</title></rect>
+<rect x="393.0" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_25: candidate, identical in v0 and v1</title></rect>
+<rect x="403.6" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_26: candidate, identical in v0 and v1</title></rect>
+<rect x="414.2" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_27: candidate, identical in v0 and v1</title></rect>
+<rect x="424.8" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_28: candidate, identical in v0 and v1</title></rect>
+<rect x="435.4" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_29: candidate, identical in v0 and v1</title></rect>
+<rect x="446.0" y="260" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_10 task 6 demo_30: reference split (never editable; hash identical)</title></rect>
+<rect x="456.6" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_31: candidate, identical in v0 and v1</title></rect>
+<rect x="467.2" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_32: candidate, identical in v0 and v1</title></rect>
+<rect x="477.8" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_33: candidate, identical in v0 and v1</title></rect>
+<rect x="488.4" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_34: candidate, identical in v0 and v1</title></rect>
+<rect x="499.0" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_35: candidate, identical in v0 and v1</title></rect>
+<rect x="509.6" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_36: candidate, identical in v0 and v1</title></rect>
+<rect x="520.2" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_37: candidate, identical in v0 and v1</title></rect>
+<rect x="530.8" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_38: candidate, identical in v0 and v1</title></rect>
+<rect x="541.4" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_39: candidate, identical in v0 and v1</title></rect>
+<rect x="552.0" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_40: candidate, identical in v0 and v1</title></rect>
+<rect x="562.6" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_41: candidate, identical in v0 and v1</title></rect>
+<rect x="573.2" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_42: candidate, identical in v0 and v1</title></rect>
+<rect x="583.8" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_43: candidate, identical in v0 and v1</title></rect>
+<rect x="594.4" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_44: candidate, identical in v0 and v1</title></rect>
+<rect x="605.0" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_45: candidate, identical in v0 and v1</title></rect>
+<rect x="615.6" y="260" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 6 demo_46: corrupted in v1 (content hash changed)</title></rect>
+<rect x="626.2" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_47: candidate, identical in v0 and v1</title></rect>
+<rect x="636.8" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_48: candidate, identical in v0 and v1</title></rect>
+<rect x="647.4" y="260" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 6 demo_49: candidate, identical in v0 and v1</title></rect>
+<g><title>libero_10 task 7: LIVING_ROOM_SCENE1_put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket</title><text x="122" y="281.1" class="ax-label" text-anchor="end">libero_10 7</text></g>
+<rect x="128.0" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_0: candidate, identical in v0 and v1</title></rect>
+<rect x="138.6" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_1: candidate, identical in v0 and v1</title></rect>
+<rect x="149.2" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_2: candidate, identical in v0 and v1</title></rect>
+<rect x="159.8" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_3: candidate, identical in v0 and v1</title></rect>
+<rect x="170.4" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_4: candidate, identical in v0 and v1</title></rect>
+<rect x="181.0" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_5: candidate, identical in v0 and v1</title></rect>
+<rect x="191.6" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_6: candidate, identical in v0 and v1</title></rect>
+<rect x="202.2" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_7: candidate, identical in v0 and v1</title></rect>
+<rect x="212.8" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_8: candidate, identical in v0 and v1</title></rect>
+<rect x="223.4" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_9: candidate, identical in v0 and v1</title></rect>
+<rect x="234.0" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_10: candidate, identical in v0 and v1</title></rect>
+<rect x="244.6" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_11: candidate, identical in v0 and v1</title></rect>
+<rect x="255.2" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_12: candidate, identical in v0 and v1</title></rect>
+<rect x="265.8" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_13: candidate, identical in v0 and v1</title></rect>
+<rect x="276.4" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_14: candidate, identical in v0 and v1</title></rect>
+<rect x="287.0" y="273" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 7 demo_15: corrupted in v1 (content hash changed)</title></rect>
+<rect x="297.6" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_16: candidate, identical in v0 and v1</title></rect>
+<rect x="308.2" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_17: candidate, identical in v0 and v1</title></rect>
+<rect x="318.8" y="273" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_10 task 7 demo_18: reference split (never editable; hash identical)</title></rect>
+<rect x="329.4" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_19: candidate, identical in v0 and v1</title></rect>
+<rect x="340.0" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_20: candidate, identical in v0 and v1</title></rect>
+<rect x="350.6" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_21: candidate, identical in v0 and v1</title></rect>
+<rect x="361.2" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_22: candidate, identical in v0 and v1</title></rect>
+<rect x="371.8" y="273" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_10 task 7 demo_23: reference split (never editable; hash identical)</title></rect>
+<rect x="382.4" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_24: candidate, identical in v0 and v1</title></rect>
+<rect x="393.0" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_25: candidate, identical in v0 and v1</title></rect>
+<rect x="403.6" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_26: candidate, identical in v0 and v1</title></rect>
+<rect x="414.2" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_27: candidate, identical in v0 and v1</title></rect>
+<rect x="424.8" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_28: candidate, identical in v0 and v1</title></rect>
+<rect x="435.4" y="273" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 7 demo_29: corrupted in v1 (content hash changed)</title></rect>
+<rect x="446.0" y="273" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 7 demo_30: corrupted in v1 (content hash changed)</title></rect>
+<rect x="456.6" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_31: candidate, identical in v0 and v1</title></rect>
+<rect x="467.2" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_32: candidate, identical in v0 and v1</title></rect>
+<rect x="477.8" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_33: candidate, identical in v0 and v1</title></rect>
+<rect x="488.4" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_34: candidate, identical in v0 and v1</title></rect>
+<rect x="499.0" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_35: candidate, identical in v0 and v1</title></rect>
+<rect x="509.6" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_36: candidate, identical in v0 and v1</title></rect>
+<rect x="520.2" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_37: candidate, identical in v0 and v1</title></rect>
+<rect x="530.8" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_38: candidate, identical in v0 and v1</title></rect>
+<rect x="541.4" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_39: candidate, identical in v0 and v1</title></rect>
+<rect x="552.0" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_40: candidate, identical in v0 and v1</title></rect>
+<rect x="562.6" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_41: candidate, identical in v0 and v1</title></rect>
+<rect x="573.2" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_42: candidate, identical in v0 and v1</title></rect>
+<rect x="583.8" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_43: candidate, identical in v0 and v1</title></rect>
+<rect x="594.4" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_44: candidate, identical in v0 and v1</title></rect>
+<rect x="605.0" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_45: candidate, identical in v0 and v1</title></rect>
+<rect x="615.6" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_46: candidate, identical in v0 and v1</title></rect>
+<rect x="626.2" y="273" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 7 demo_47: corrupted in v1 (content hash changed)</title></rect>
+<rect x="636.8" y="273" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 7 demo_48: candidate, identical in v0 and v1</title></rect>
+<rect x="647.4" y="273" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 7 demo_49: corrupted in v1 (content hash changed)</title></rect>
+<g><title>libero_10 task 8: KITCHEN_SCENE8_put_both_moka_pots_on_the_stove</title><text x="122" y="294.1" class="ax-label" text-anchor="end">libero_10 8</text></g>
+<rect x="128.0" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_0: candidate, identical in v0 and v1</title></rect>
+<rect x="138.6" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_1: candidate, identical in v0 and v1</title></rect>
+<rect x="149.2" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_2: candidate, identical in v0 and v1</title></rect>
+<rect x="159.8" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_3: candidate, identical in v0 and v1</title></rect>
+<rect x="170.4" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_4: candidate, identical in v0 and v1</title></rect>
+<rect x="181.0" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_5: candidate, identical in v0 and v1</title></rect>
+<rect x="191.6" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_6: candidate, identical in v0 and v1</title></rect>
+<rect x="202.2" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_7: candidate, identical in v0 and v1</title></rect>
+<rect x="212.8" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_8: candidate, identical in v0 and v1</title></rect>
+<rect x="223.4" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_9: candidate, identical in v0 and v1</title></rect>
+<rect x="234.0" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_10: candidate, identical in v0 and v1</title></rect>
+<rect x="244.6" y="286" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 8 demo_11: corrupted in v1 (content hash changed)</title></rect>
+<rect x="255.2" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_12: candidate, identical in v0 and v1</title></rect>
+<rect x="265.8" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_13: candidate, identical in v0 and v1</title></rect>
+<rect x="276.4" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_14: candidate, identical in v0 and v1</title></rect>
+<rect x="287.0" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_15: candidate, identical in v0 and v1</title></rect>
+<rect x="297.6" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_16: candidate, identical in v0 and v1</title></rect>
+<rect x="308.2" y="286" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 8 demo_17: corrupted in v1 (content hash changed)</title></rect>
+<rect x="318.8" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_18: candidate, identical in v0 and v1</title></rect>
+<rect x="329.4" y="286" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 8 demo_19: corrupted in v1 (content hash changed)</title></rect>
+<rect x="340.0" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_20: candidate, identical in v0 and v1</title></rect>
+<rect x="350.6" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_21: candidate, identical in v0 and v1</title></rect>
+<rect x="361.2" y="286" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 8 demo_22: corrupted in v1 (content hash changed)</title></rect>
+<rect x="371.8" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_23: candidate, identical in v0 and v1</title></rect>
+<rect x="382.4" y="286" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 8 demo_24: corrupted in v1 (content hash changed)</title></rect>
+<rect x="393.0" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_25: candidate, identical in v0 and v1</title></rect>
+<rect x="403.6" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_26: candidate, identical in v0 and v1</title></rect>
+<rect x="414.2" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_27: candidate, identical in v0 and v1</title></rect>
+<rect x="424.8" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_28: candidate, identical in v0 and v1</title></rect>
+<rect x="435.4" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_29: candidate, identical in v0 and v1</title></rect>
+<rect x="446.0" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_30: candidate, identical in v0 and v1</title></rect>
+<rect x="456.6" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_31: candidate, identical in v0 and v1</title></rect>
+<rect x="467.2" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_32: candidate, identical in v0 and v1</title></rect>
+<rect x="477.8" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_33: candidate, identical in v0 and v1</title></rect>
+<rect x="488.4" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_34: candidate, identical in v0 and v1</title></rect>
+<rect x="499.0" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_35: candidate, identical in v0 and v1</title></rect>
+<rect x="509.6" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_36: candidate, identical in v0 and v1</title></rect>
+<rect x="520.2" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_37: candidate, identical in v0 and v1</title></rect>
+<rect x="530.8" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_38: candidate, identical in v0 and v1</title></rect>
+<rect x="541.4" y="286" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_10 task 8 demo_39: reference split (never editable; hash identical)</title></rect>
+<rect x="552.0" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_40: candidate, identical in v0 and v1</title></rect>
+<rect x="562.6" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_41: candidate, identical in v0 and v1</title></rect>
+<rect x="573.2" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_42: candidate, identical in v0 and v1</title></rect>
+<rect x="583.8" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_43: candidate, identical in v0 and v1</title></rect>
+<rect x="594.4" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_44: candidate, identical in v0 and v1</title></rect>
+<rect x="605.0" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_45: candidate, identical in v0 and v1</title></rect>
+<rect x="615.6" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_46: candidate, identical in v0 and v1</title></rect>
+<rect x="626.2" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_47: candidate, identical in v0 and v1</title></rect>
+<rect x="636.8" y="286" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 8 demo_48: candidate, identical in v0 and v1</title></rect>
+<rect x="647.4" y="286" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_10 task 8 demo_49: reference split (never editable; hash identical)</title></rect>
+<g><title>libero_10 task 9: KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it</title><text x="122" y="307.1" class="ax-label" text-anchor="end">libero_10 9</text></g>
+<rect x="128.0" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_0: candidate, identical in v0 and v1</title></rect>
+<rect x="138.6" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_1: candidate, identical in v0 and v1</title></rect>
+<rect x="149.2" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_2: candidate, identical in v0 and v1</title></rect>
+<rect x="159.8" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_3: candidate, identical in v0 and v1</title></rect>
+<rect x="170.4" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_4: candidate, identical in v0 and v1</title></rect>
+<rect x="181.0" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_5: candidate, identical in v0 and v1</title></rect>
+<rect x="191.6" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_6: candidate, identical in v0 and v1</title></rect>
+<rect x="202.2" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_7: candidate, identical in v0 and v1</title></rect>
+<rect x="212.8" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_8: candidate, identical in v0 and v1</title></rect>
+<rect x="223.4" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_9: candidate, identical in v0 and v1</title></rect>
+<rect x="234.0" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_10: candidate, identical in v0 and v1</title></rect>
+<rect x="244.6" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_11: candidate, identical in v0 and v1</title></rect>
+<rect x="255.2" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_12: candidate, identical in v0 and v1</title></rect>
+<rect x="265.8" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_13: candidate, identical in v0 and v1</title></rect>
+<rect x="276.4" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_14: candidate, identical in v0 and v1</title></rect>
+<rect x="287.0" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_15: candidate, identical in v0 and v1</title></rect>
+<rect x="297.6" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_16: candidate, identical in v0 and v1</title></rect>
+<rect x="308.2" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_17: candidate, identical in v0 and v1</title></rect>
+<rect x="318.8" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_18: candidate, identical in v0 and v1</title></rect>
+<rect x="329.4" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_19: candidate, identical in v0 and v1</title></rect>
+<rect x="340.0" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_20: candidate, identical in v0 and v1</title></rect>
+<rect x="350.6" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_21: candidate, identical in v0 and v1</title></rect>
+<rect x="361.2" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_22: candidate, identical in v0 and v1</title></rect>
+<rect x="371.8" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_23: candidate, identical in v0 and v1</title></rect>
+<rect x="382.4" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_24: candidate, identical in v0 and v1</title></rect>
+<rect x="393.0" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_25: candidate, identical in v0 and v1</title></rect>
+<rect x="403.6" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_26: candidate, identical in v0 and v1</title></rect>
+<rect x="414.2" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_27: candidate, identical in v0 and v1</title></rect>
+<rect x="424.8" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_28: candidate, identical in v0 and v1</title></rect>
+<rect x="435.4" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_29: candidate, identical in v0 and v1</title></rect>
+<rect x="446.0" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_30: candidate, identical in v0 and v1</title></rect>
+<rect x="456.6" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_31: candidate, identical in v0 and v1</title></rect>
+<rect x="467.2" y="299" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 9 demo_32: corrupted in v1 (content hash changed)</title></rect>
+<rect x="477.8" y="299" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_10 task 9 demo_33: reference split (never editable; hash identical)</title></rect>
+<rect x="488.4" y="299" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 9 demo_34: corrupted in v1 (content hash changed)</title></rect>
+<rect x="499.0" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_35: candidate, identical in v0 and v1</title></rect>
+<rect x="509.6" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_36: candidate, identical in v0 and v1</title></rect>
+<rect x="520.2" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_37: candidate, identical in v0 and v1</title></rect>
+<rect x="530.8" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_38: candidate, identical in v0 and v1</title></rect>
+<rect x="541.4" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_39: candidate, identical in v0 and v1</title></rect>
+<rect x="552.0" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_40: candidate, identical in v0 and v1</title></rect>
+<rect x="562.6" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_41: candidate, identical in v0 and v1</title></rect>
+<rect x="573.2" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_42: candidate, identical in v0 and v1</title></rect>
+<rect x="583.8" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_43: candidate, identical in v0 and v1</title></rect>
+<rect x="594.4" y="299" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 9 demo_44: corrupted in v1 (content hash changed)</title></rect>
+<rect x="605.0" y="299" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 9 demo_45: corrupted in v1 (content hash changed)</title></rect>
+<rect x="615.6" y="299" width="8.6" height="8.6" rx="1.5" class="cell cor"><title>libero_10 task 9 demo_46: corrupted in v1 (content hash changed)</title></rect>
+<rect x="626.2" y="299" width="8.6" height="8.6" rx="1.5" class="cell ref"><title>libero_10 task 9 demo_47: reference split (never editable; hash identical)</title></rect>
+<rect x="636.8" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_48: candidate, identical in v0 and v1</title></rect>
+<rect x="647.4" y="299" width="8.6" height="8.6" rx="1.5" class="cell same"><title>libero_10 task 9 demo_49: candidate, identical in v0 and v1</title></rect>
+<rect x="128" y="325" width="8.6" height="8.6" rx="1.5" class="cell cor"/>
+<text x="142" y="334" class="lg-label">corrupted in v1: 100 (5 per task) · content hash changed</text>
+<rect x="128" y="343" width="8.6" height="8.6" rx="1.5" class="cell ref"/>
+<text x="142" y="352" class="lg-label">reference split: 40 (2 per task) · guard refuses to edit them</text>
+<rect x="128" y="361" width="8.6" height="8.6" rx="1.5" class="cell same"/>
+<text x="142" y="370" class="lg-label">identical content hash in v0 and v1: 900 (860 candidates + 40 references)</text>
+</svg>
+<!--FIG:episodegrid:end-->
+  <figcaption><b>All 1000 episodes, v0 → v1: which changed and which could not.</b> One square per demo: rows
+  are the 20 tasks, columns <code>demo_0</code> to <code>demo_49</code>. Filled squares are the 100 episodes
+  the demo derivation corrupted, 5 per task. The 40 outlined squares are the reference split, which the
+  guard refuses to edit; they keep their hash. No corrupted square is outlined. The picture is the ground
+  truth an injection test scores against, and it lives only in <code>labels.parquet</code>. Hover a square for
+  its status. Source: <code>artifacts/summarizer_v1_episode_status.csv</code>, exported for this report from
+  the v0 and v1 episode tables and v1's labels.</figcaption>
+</figure>
+
+<h2>Divergences and limitations</h2>
+<ul>
+  <li><b>Round 1 leaked the ground truth into the method-facing table.</b> The executor's first
+  <code>derive_version</code> also wrote <code>corruption_type</code> into v1's episode table, which every
+  downstream stage reads. The analyzer caught it (analysis-r1 E2), and round 2 removed it. Both v1 tables
+  were rewritten in place (sha256 <code>135c0655…</code> → <code>3fcca3a4…</code>); the v1 id, the 100/100
+  labels join and the 100/900 diff are unchanged.</li>
+  <li><b>The rewrite left no trace in the lineage store.</b> No episode-table digest exists to record it (see
+  S3). A stale copy with the column remains in the round-1 scratch root <code>data/lineage_scratch/s5/</code>;
+  no library path reads it.</li>
+  <li><b>Noised actions leave LIBERO's <code>Box(−1, 1)</code></b> (<code>clip: null</code>): 51% of corrupted
+  frames have a dimension outside [−1, 1], and the gripper ranges −2.07 to +1.96. The gripper stops being
+  ±1, so <code>gripper_toggles</code> is meaningless on corrupted episodes (84–428 vs 1–5). Whether to clip
+  is for the injection feature.</li>
+  <li><b>All 7 dims are noised, the gripper included.</b> RoboDrop doesn't say; this is the literal reading,
+  recorded in <code>params.dims</code>.</li>
+  <li><b>Edited episodes move position.</b> They are appended, so in v1 they are <code>episode_index</code>
+  900–999. Identity travels with <code>episode_id</code>.</li>
+  <li><b>LeRobot's <code>task_index</code> order in a derived dataset depends on <code>PYTHONHASHSEED</code></b>
+  (<code>dataset_tools.py:549</code>, <code>list(set(tasks))</code>; refactorer, measured). Content hashes and
+  version ids are unaffected. <code>files.json</code> digests and the <code>task_index</code> stats of a
+  re-derivation will differ.</li>
+  <li><b>Cost:</b> a derivation takes about 5 min and writes a full 6.8 GB copy (<code>delete_episodes</code>' metadata
+  loop alone is 166–181 s), plus a temporary cache that is now deleted.</li>
+  <li><b>Ground truth can be reconstructed from <code>derivation.json</code></b> (selection rule plus seed). That
+  file sits beside <code>labels.parquet</code>, not in the catalog. The method should read episodes only through
+  <code>version_episodes</code> / <code>Subset</code>.</li>
+</ul>
+
+<footer class="doc">S4 of <a href="report.html">Data layer + lineage layer</a> · evidence in <code>artifacts/s4_*</code>
+· <a href="plan.md">plan</a> · <a href="execution-log.md">execution log</a></footer>
+
+</div>
+</body>
+</html>

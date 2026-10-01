@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S3 Versions, splits and subsets — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+  figure.fig svg { max-width: 680px; margin: 0 auto; }
+  .n-run { fill: var(--surface); stroke: var(--border); stroke-width: 1.2; }
+  .n-title { fill: var(--text); font: 600 12px var(--sans); }
+  .n-title-s { fill: var(--text); font: 600 11px var(--sans); }
+  .n-meta { fill: var(--muted); font: 9px var(--mono); }
+  .n-out { fill: var(--text); font: 10px var(--mono); }
+  .e { stroke: var(--muted); stroke-width: 1.1; fill: none; }
+  .ah { fill: var(--muted); }
+  .ah.trace { fill: var(--accent); }
+  .e-label { fill: var(--muted); font: 9.5px var(--mono); }
+  td.ok { white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Data layer + lineage layer</a></p>
+  <h1>S3 · Dataset versions, named splits and subsets that resolve to LeRobot <code>episodes=</code></h1>
+  <p class="dek">A dataset version is now identified by its content (<code>dataset_version_id</code>). A held-out
+  clean reference split (40) and a candidate split (960) are persisted. Every selection a later stage makes
+  (drop top-k, drop k random, drop a group, a random subset) is a recorded child subset that LeRobot can
+  load exactly.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">9/9 met</span></span>
+    <span><b>Depends on</b> S2</span>
+    <span><b>Store</b> <code>data/lineage/{versions,subsets,splits,names.json}</code></span>
+  </div>
+</header>
+
+<h2>Why</h2>
+<p>Runs must be tied to exact dataset versions, and the screening and injection stages need a clean
+reference set that is never corrupted. The counterfactual and causal-baseline stages each train on a
+subset: drop top-k, drop k random, drop one group, or many random subsets. The record has to say how
+each subset was derived.</p>
+<blockquote>References "are a small, held-out set of clean demonstrations for the target task, separate from the
+candidate data being audited." — §8.3, p. 14</blockquote>
+<blockquote>"Treat LIBERO's original demos as clean; corrupt only the training copy" — §8.7, p. 15 (row "Benchmark demos (PoC)")</blockquote>
+<blockquote>"Remove the top-k most harmful episodes and retrain. As a control, remove k random episodes and retrain."
+— §9.1 Step 4, p. 19 · "Leave-one-group-out ablations. Drop one data source or task group, retrain, and measure
+the change." — §2.1 item 5, p. 3</blockquote>
+<p>The reference size comes from RoboDrop App. A.1 (p. 13): "we reserve two uncorrupted episodes per task"
+(quoted; <code>docs/papers/RoboDrop_Gradient_Compatibility_arXiv-2609.10021.pdf</code>).</p>
+
+<h2>What was built</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File / function</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>vlapoc/lineage.py::version_id</code>, <code>register_version</code></td><td>A version is identified by sha256 over the feature schema plus the sorted (<code>episode_id</code>, <code>content_hash</code>) pairs. Registering writes <code>versions/&lt;id&gt;/</code> and binds a name (<code>v0</code>).</td></tr>
+    <tr><td><code>vlapoc/lineage.py::recompute_version_id</code>, <code>verify_version</code></td><td>Re-hash every episode and recompute the id (about 19 s), or check the sha256 of every file of the physical copy (about 3 s). Any changed byte raises <code>VersionIntegrityError</code>.</td></tr>
+    <tr><td><code>vlapoc/lineage.py::Subset</code> (+ <code>resolve()</code>)</td><td>A selection of episode versions from one version. <code>subset_id</code> hashes (version, sorted ids, derivation), and <code>resolve()</code> returns LeRobot's <code>episode_index</code> list.</td></tr>
+    <tr><td><code>vlapoc/lineage.py::make_splits</code></td><td>The held-out <code>reference</code> split (2 per task, stratified, seeded) and the <code>candidate</code> rest, disjoint and persisted with their rule and seed.</td></tr>
+    <tr><td><code>vlapoc/lineage.py::drop_top_k</code>, <code>drop_random_k</code>, <code>drop_group</code></td><td>The selection ops. Each derivation records op, parent, metric and direction, or seed, or column and value, plus the dropped ids. A random subset of size n is <code>drop_random_k(k = N − n)</code>.</td></tr>
+    <tr><td><code>vlapoc/lineage.py::isolated_hf_datasets_cache</code></td><td>Routes the HF <code>datasets</code> cache written by throwaway loads to a temporary directory that is deleted afterwards (see R1 below).</td></tr>
+    <tr><td><code>python -m vlapoc.lineage</code></td><td>The CLI: 14 commands (<code>version register|show|verify|recompute|diff</code>, <code>split make</code>, <code>subset show</code>, <code>names</code>, <code>build verify</code>, <code>derive</code>, <code>trace</code>, <code>consumers</code>, <code>diff</code>, <code>check-scores</code>).</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Acceptance criteria</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence (real output)</th></tr></thead>
+  <tbody>
+    <tr><td>AC3.1 <code>dataset_version_id</code> recomputes from the dataset</td><td>§2.1 p.3</td><td class="ok"><span class="pill good">met</span></td><td><code>recomputed from dataset = 3c4dca68…53b7 match=True (19s)</code></td></tr>
+    <tr><td>AC3.2 Reference = 2 per task (40), candidate = the rest (960), disjoint, rule and seed persisted</td><td>RoboDrop A.1; §8.3</td><td class="ok"><span class="pill good">met</span></td><td><code>reference=40 candidate=960 overlap=0 union==version: True; reference per task: [2] over 20 tasks</code></td></tr>
+    <tr><td>AC3.3 LeRobot serves exactly the subset; plus (r2) the docstring says the loader writes a cache</td><td>LeRobot <code>episodes=</code>; analysis-r1 P1</td><td class="ok"><span class="pill good">met</span></td><td><code>v0/reference: served == subset: True; frames served=7915 sum(length_steps)=7915 (every frame via __getitem__)</code> · <code>v0/candidate: … 192425 → OK</code></td></tr>
+    <tr><td>AC3.4 <code>drop_top_k</code> (either direction) and <code>drop_random_k</code> record their derivation; random is reproducible</td><td>§2.6 p.5; §9.1 p.19</td><td class="ok"><span class="pill good">met</span></td><td><code>dropped == 20 highest: True; dropped == 20 lowest: True</code> · <code>drop_random_k(seed=0) twice -&gt; same subset_id: True (4a06edb41e77)</code> · stale hash rejected</td></tr>
+    <tr><td>AC3.5 <code>verify_version</code> catches one changed byte in a scratch copy</td><td>§2.1 p.3</td><td class="ok"><span class="pill good">met</span></td><td><code>VersionIntegrityError: … changed=['data/chunk-000/file-017.parquet']</code>; original still verifies</td></tr>
+    <tr><td>AC3.6 No manifest holds an absolute path</td><td>inferred (Linux GPU box)</td><td class="ok"><span class="pill good">met</span></td><td><code>scanned 58 lineage files … absolute-path hits=[]</code></td></tr>
+    <tr><td>AC3.7 Grounding docstrings</td><td>vla-build</td><td class="ok"><span class="pill good">met</span></td><td>Module docstring of <code>vlapoc/lineage.py</code></td></tr>
+    <tr><td>AC3.8 (r2) <code>drop_group</code>: one task → 912, one suite → 480; refuses non-catalog, list and identity columns, no-match and all-match</td><td>§2.1 item 5 p.3; §10 p.20</td><td class="ok"><span class="pill good">met</span></td><td><code>task_name=KITCHEN_SCENE3…: child d003e8f75e37 n=912 dropped=48; resolve() == … True</code> · <code>suite='libero_10': child 2f101b58b02f n=480</code> · <code>'corruption_type' is not a groupable catalog column</code></td></tr>
+    <tr><td>AC3.9 (r2) No absolute or session-bound path in code; scripts run in a fresh shell</td><td>analysis-r1 E4</td><td class="ok"><span class="pill good">met</span></td><td><code>grep -rnE '/private/tmp|/tmp/claude|/Users/' vlapoc scripts</code> → no output · <code>env -i … verify_lineage_s3.py</code> → <code>exit=0</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Example</h2>
+<p>The v0 version and its split, as the CLI prints them (<code>artifacts/s3_version_show_v0_stdout.txt</code>,
+<code>s3_split_make_stdout.txt</code>):</p>
+<pre><code>$ .venv/bin/python -m vlapoc.lineage version show v0
+  "dataset_version_id": "3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7",
+  "episodes_by_suite": {"libero_10": 500, "libero_spatial": 500},
+  "files_total_bytes": 7356193961,  "n_episodes": 1000,  "n_frames": 200340,  "parent_version_id": null, …
+
+$ .venv/bin/python -m vlapoc.lineage split make --version v0 --reference-per-task 2 --seed 0
+  "rule": "stratified by (suite, libero_task_id); per task, episodes sorted by demo number;
+           numpy.random.default_rng(seed).choice(n, reference_per_task, replace=False), …",
+  "sizes": {"candidate": 960, "reference": 40},
+  "subsets": {"candidate": "8ee096b72b5a…", "reference": "b6a72d5e7f31…"}</code></pre>
+<p>A tampered copy is refused before anything reads it. One bit flipped in an APFS clone of v0
+(<code>artifacts/s3_verify_r2_stdout.txt</code>):</p>
+<pre><code>AC3.5 after flipping 1 bit at byte 50660612 of data/chunk-000/file-017.parquet: VersionIntegrityError: dataset copy at
+      data/scratch/verify_s3_kvk5nxsv/v0_tamper_copy does not match version v0 (3c4dca68d6f1):
+      changed=['data/chunk-000/file-017.parquet'] missing=[] extra=[]
+AC3.5 untouched clone verified first: True (77 files); tamper caught: True; original still verifies: True</code></pre>
+
+<h2>Visual</h2>
+<figure class="fig">
+<!--FIG:subsets:start-->
+<svg viewBox="0 0 680 400" role="img" aria-label="How subsets derive from one another: the split of v0 and the selections made from v1/candidate, with their real subset ids and sizes">
+<defs><marker id="st-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker><marker id="st-aht" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah trace"/></marker></defs>
+<rect x="20" y="20" width="190" height="44" rx="7" class="n-run"/>
+<text x="28" y="37" class="n-title">v0/all</text>
+<text x="28" y="51" class="n-out">58b3c415 · 1000 episodes</text>
+<rect x="250" y="10" width="200" height="56" rx="7" class="n-run"/>
+<text x="258" y="27" class="n-title">v0/reference</text>
+<text x="258" y="41" class="n-out">b6a72d5e · 40 eps</text>
+<text x="258" y="55" class="n-meta">held out, clean (2 per task)</text>
+<rect x="250" y="74" width="200" height="56" rx="7" class="n-run"/>
+<text x="258" y="91" class="n-title">v0/candidate</text>
+<text x="258" y="105" class="n-out">8ee096b7 · 960 eps</text>
+<text x="258" y="119" class="n-meta">the training pool</text>
+<path d="M210,42 L230,42 L230,38 L250,38" class="e" marker-end="url(#st-ah)"/>
+<path d="M230,42 L230,102 L250,102" class="e" marker-end="url(#st-ah)"/>
+<text x="232" y="152" class="e-label">split: seed 0, 2 per task, stratified</text>
+<text x="470" y="40" class="e-label">derive-v1 copies the split:</text>
+<text x="470" y="52" class="e-label">v1/reference, v1/candidate</text>
+<text x="470" y="64" class="e-label">(same episode_ids, v1 hashes)</text>
+<line x1="20" y1="172" x2="660" y2="172" class="svg-grid"/>
+<rect x="20" y="250" width="190" height="56" rx="7" class="n-run"/>
+<text x="28" y="267" class="n-title">v1/candidate</text>
+<text x="28" y="281" class="n-out">69684e60 · 960 episodes</text>
+<text x="28" y="295" class="n-meta">parent of every selection</text>
+<rect x="300" y="186" width="360" height="36" rx="7" class="n-run"/>
+<text x="308" y="201" class="n-title-s">drop_top_k  k=20, highest placeholder_score</text>
+<text x="308" y="215" class="n-meta">c598f569 · 940 eps   S6 · main store · trained</text>
+<path d="M210,272 L250,272 L250,204 L300,204" class="e" marker-end="url(#st-ah)"/>
+<rect x="300" y="228" width="360" height="36" rx="7" class="n-run"/>
+<text x="308" y="243" class="n-title-s">drop_random_k  k=20, seed 0</text>
+<text x="308" y="257" class="n-meta">8ccebcb5 · 940 eps   S6 · main store · trained</text>
+<path d="M210,272 L250,272 L250,246 L300,246" class="e" marker-end="url(#st-ah)"/>
+<rect x="300" y="270" width="360" height="36" rx="7" class="n-run"/>
+<text x="308" y="285" class="n-title-s">drop_group  task_name=KITCHEN_SCENE3…</text>
+<text x="308" y="299" class="n-meta">d003e8f7 · 912 eps   r2 · scratch root · leave-one-task-out</text>
+<path d="M210,272 L250,272 L250,288 L300,288" class="e" marker-end="url(#st-ah)"/>
+<rect x="300" y="312" width="360" height="36" rx="7" class="n-run"/>
+<text x="308" y="327" class="n-title-s">drop_group  suite=libero_10</text>
+<text x="308" y="341" class="n-meta">2f101b58 · 480 eps   r2 · scratch root · leave-one-suite-out</text>
+<path d="M210,272 L250,272 L250,330 L300,330" class="e" marker-end="url(#st-ah)"/>
+<rect x="300" y="354" width="360" height="36" rx="7" class="n-run"/>
+<text x="308" y="369" class="n-title-s">drop_random_k  k=480, seeds 0/1/2</text>
+<text x="308" y="383" class="n-meta">ab03e001 · 5eafbb8e · d03a5cf5   r2 · scratch · 480 eps each</text>
+<path d="M210,272 L250,272 L250,372 L300,372" class="e" marker-end="url(#st-ah)"/>
+<text x="20" y="330" class="e-label">Each child records op, parent subset id</text>
+<text x="20" y="342" class="e-label">and the dropped ids; subset_id hashes</text>
+<text x="20" y="354" class="e-label">(version, episode_ids, derivation).</text>
+</svg>
+<!--FIG:subsets:end-->
+  <figcaption><b>How the recorded subsets derive from one another, with their real ids and sizes.</b> Top:
+  the split of v0 into 40 held-out references and 960 candidates. <code>derive-v1</code> (S4) carries the
+  split over to v1. Bottom: every selection is a child of <code>v1/candidate</code>. The two S6 children were
+  trained on (5-step smoke runs). The other three were made in round-2 scratch lineage roots, to prove the
+  leave-one-out and datamodels ops; none was trained. The top-k child's "scores" are a hash-based
+  placeholder from the attribution stand-in, so it shows the mechanism, not a result. Because ids hash
+  content and derivation, the leave-one-task-out child got the same id (<code>d003e8f7</code>) in two
+  separate scratch runs. Sources: <code>s3_split_make_stdout.txt</code>, <code>s3_summary_r2.json</code>,
+  <code>s5_r2_summary.json</code>, <code>s6_lineage_graph.json</code>.</figcaption>
+</figure>
+
+<h2>Divergences and limitations</h2>
+<ul>
+  <li><b>R1: a subset is a selection in the record, but loading it costs disk.</b> LeRobot loads
+  <code>episodes=</code> through <code>Dataset.from_parquet(filters=…)</code> (<code>lerobot/datasets/io_utils.py:79-82</code>,
+  quoted), and HF <code>datasets</code> writes an Arrow cache per distinct episode list: measured 6.6, 6.4 and
+  6.5 GB for the three S6 training subsets. Streaming is no way out, because
+  <code>StreamingLeRobotDataset</code> stores <code>episodes</code> but never filters on it (quoted source,
+  analyzer measured). This is the main blocker for many-subset training (see the report's open decisions).</li>
+  <li><b><code>files.json</code> identifies a physical copy, not content.</b> LeRobot parquet files are not
+  byte-reproducible, so <code>verify_version</code> is a tamper check. <code>dataset_version_id</code> is the
+  content identity.</li>
+  <li><b>No episode-table digest.</b> <code>version.json</code> does not digest the
+  <code>episode_index → episode_id</code> table that <code>resolve()</code> depends on. An edit to it would go
+  unnoticed at training time (analysis-r2, non-blocking).</li>
+  <li><b>Re-registering content under a new name rewrites that version's record name.</b> After registering
+  v0's content as <code>v0copy</code> in a scratch store, <code>resolve_version("v0")</code> returned a record
+  named <code>v0copy</code> (refactorer, measured; now documented in the docstring).</li>
+  <li><b><code>libero_task_id</code> is suite-relative.</b> <code>drop_group(parent, "libero_task_id", 2)</code>
+  drops one task from each suite (96 episodes, analyzer measured). Use <code>task_name</code> for leave-one-task-out.</li>
+  <li>References accept prefix ids of 8 or more hex characters. The refactorer deduplicated the resolver but
+  left prefix matching in place: removing it is the owner's call.</li>
+</ul>
+
+<footer class="doc">S3 of <a href="report.html">Data layer + lineage layer</a> · evidence in <code>artifacts/s3_*</code>
+· <a href="plan.md">plan</a> · <a href="execution-log.md">execution log</a></footer>
+
+</div>
+</body>
+</html>

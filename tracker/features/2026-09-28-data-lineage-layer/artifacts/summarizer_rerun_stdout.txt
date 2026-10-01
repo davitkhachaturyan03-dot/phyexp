@@ -1,0 +1,37 @@
+# summarizer re-run 2026-10-01T12:16:19Z, git HEAD 0dcf589
+mlflow.db sha256 before: c5faec81f235ebf8
+
+$ .venv/bin/python -m vlapoc.lineage version diff v0 v1
+changed 100, identical 900, added 0, removed 0
+
+$ .venv/bin/python -m vlapoc.lineage version verify v0   (then v1)
+{  "files_checked": 77,  "ok": true,  "version": "3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7"}
+{  "files_checked": 85,  "ok": true,  "version": "16076b9c5cb2a0e8c5d291fc0766977dc7286c6b9f87df39bd87fe5c17cd85f8"}
+
+$ .venv/bin/python -m vlapoc.lineage diff ff64512b40974587a9d711cd8e4f8b04 9339d4685a8e4d009c191fa4641ccf3a   # train-full-s0 vs train-drop-top-20
+runs: ['train-full-s0', 'train-drop-top-20']
+data: removed 20 | added 0 | changed_version 0 | same dataset version: True
+params: {} | config: {} | git same: True
+
+$ .venv/bin/python -m vlapoc.lineage diff ff64512b40974587a9d711cd8e4f8b04 dc6b5f18ed544c6cb535d90754ebbf0a   # train-full-s0 vs train-full-s1
+data: removed 0 | added 0 | changed_version 0
+params: {'seed': ['0', '1']} | config: {'seed': [0, 1]} | git same: True
+
+$ .venv/bin/python -m vlapoc.lineage trace 9339d4685a8e4d009c191fa4641ccf3a   # train-drop-top-20
+runs reached: 8 ['attribute:attribute-train-full-s0 [stand-in]', 'build:build-v0', 'derive:derive-v1', 'eval:eval-train-full-s0 [stand-in]', 'select:select-drop-top-20', 'split:split-v0', 'train:train-drop-top-20', 'train:train-full-s0']
+edges: 11 | each with exactly one producer: True
+raw files reached: 20
+identical to artifacts/s6_trace_train_drop_top.json: True
+
+$ .venv/bin/python -m vlapoc.lineage consumers libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_17@6cfad44e5243...   # its v1 (corrupted) version
+['attribute-train-full-s0 [stand-in]', 'screen-v1 [stand-in]', 'select-drop-random-20-s0', 'select-drop-top-20', 'train-drop-random-20', 'train-full-s0', 'train-full-s1']
+$ .venv/bin/python -m vlapoc.lineage consumers libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_17@3456348a0125...   # its clean v0 version
+['derive-v1', 'split-v0']
+
+$ tamper_check(v1) from scripts/lineage_dry_run.py (driver; the committed artifact is not overwritten)
+AC6.5 flipped byte 5552926 of data/chunk-000/file-080.parquet in a clone of v1 at data/scratch/tamper_dcbeiu77/v1_tamper_copy; train_run refused: True
+AC6.5 dataset copy at data/scratch/tamper_dcbeiu77/v1_tamper_copy does not match version v1 (16076b9c5cb2): changed=['data/chunk-000/file-080.parquet'] missing=[] extra=[]
+AC6.5 MLflow runs before/after the refused launch: 15/15; new data/runs dirs: []
+AC6.5 scratch clone removed: True
+
+mlflow.db sha256 after:  c5faec81f235ebf8

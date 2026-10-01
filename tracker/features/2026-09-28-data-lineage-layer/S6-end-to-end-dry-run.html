@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S6 End-to-end lineage dry run — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+  figure.fig svg { max-width: 680px; margin: 0 auto; }
+  .n-run { fill: var(--surface); stroke: var(--border); stroke-width: 1.2; }
+  .n-run.trace { stroke: var(--accent); stroke-width: 2; }
+  .n-run.standin { stroke-dasharray: 5 3; fill: var(--surface-2); }
+  .n-title { fill: var(--text); font: 600 12px var(--sans); }
+  .n-meta { fill: var(--muted); font: 9px var(--mono); }
+  .n-out { fill: var(--text); font: 10px var(--mono); }
+  .n-note { fill: var(--muted); font: italic 9.5px var(--sans); }
+  .gt { fill: var(--accent); font-weight: 600; }
+  .badge { fill: var(--warn); font-weight: 700; }
+  .e { stroke: var(--muted); stroke-width: 1.1; fill: none; }
+  .e.trace { stroke: var(--accent); stroke-width: 2; }
+  .ah { fill: var(--muted); }
+  .ah.trace { fill: var(--accent); }
+  .e-label { fill: var(--muted); font: 9.5px var(--mono); }
+  .callout { fill: var(--surface-2); stroke: var(--border); }
+  .c-title { fill: var(--text); font: 600 9.5px var(--mono); }
+  .c-body { fill: var(--text); font: 9.5px var(--mono); }
+  .lg-label { fill: var(--muted); font: 10.5px var(--sans); }
+  td.ok { white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Data layer + lineage layer</a></p>
+  <h1>S6 · Every downstream stage type, end to end, on the real data</h1>
+  <p class="dek">One script recorded the PoC's whole chain as 14 MLflow runs on the real v0/v1 data:
+  build → split → derive → screen → train ×2 → eval → attribute → select ×2 → train ×2 → eval ×2. The trains
+  are real (if tiny) LeRobot runs; screening, evaluation and attribution are labelled stand-ins. Every run
+  names the episode versions it used.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">7/7 met</span></span>
+    <span><b>Depends on</b> S4, S5</span>
+    <span><b>Chain</b> <code>dry-run-k20-s0-20260929T074215Z</code> · git <code>7effd25</code></span>
+  </div>
+</header>
+
+<h2>Why</h2>
+<p>The owner's requirement is that the layer "will enable all downstream tasks inside the poc"
+(<a href="brief.md">brief.md</a>). The way to show that before those stages exist is to run each stage
+type once, with its real inputs and outputs, and check that lineage names exactly what each one consumed.</p>
+<blockquote>Step 3 input: "The training dataset, the trained policy, and the rollouts from Step 2." · Step 4: "Remove the
+top-k most harmful episodes and retrain. As a control, remove k random episodes and retrain." — §9.1, pp. 18–19</blockquote>
+
+<h2>What was built</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File / function</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>scripts/lineage_dry_run.py::main</code></td><td>Every stage call in order, then the AC6.x checks. build/split/derive are reused through their <code>produced.*</code> tags when a run already produced the same content-addressed entity.</td></tr>
+    <tr><td><code>scripts/lineage_dry_run.py::tamper_check</code></td><td>Flips one byte in an APFS clone of v1 under <code>data/scratch/</code>, calls <code>train_run</code> on it, and checks that it refuses without recording a run. <code>--tamper-only</code> runs just this.</td></tr>
+    <tr><td><code>scripts/lineage_dry_run.py::graph</code>, <code>mermaid</code></td><td>Build the lineage graph (runs, entities, the 20 raw files) from the recorded runs: <code>artifacts/s6_lineage_graph.json</code> and <code>.mmd</code>.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Acceptance criteria</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence (real output)</th></tr></thead>
+  <tbody>
+    <tr><td>AC6.1 One script records the chain on real v0/v1; stand-ins marked; no invented outcomes</td><td>§9 pp.18–19; §2.6</td><td class="ok"><span class="pill good">met</span></td><td>14 runs, all <code>FINISHED</code> (<code>artifacts/s6_chain_runs.csv</code>). Placeholder payloads: screening scores <code>NaN</code>; rollout plan <code>outcome = not_run</code>; attribution = a hash of the key, labelled "not an influence estimate"</td></tr>
+    <tr><td>AC6.2 (reworded r2) Trains are real LeRobot <code>train()</code> runs; <code>train_config.json</code> lists exactly the subset</td><td>§2.1 p.3; R2</td><td class="ok"><span class="pill good">met</span></td><td><code>train-full-s0: train_config.json episodes=960 == subset.resolve(): True; policy=act steps=5 device=mps seed=0 wandb=False</code> · drop-top-20 and drop-random-20: <code>940 … True</code></td></tr>
+    <tr><td>AC6.3 <code>diff</code>: exactly k removed for drop-top-k; seed-only for s0 vs s1</td><td>§2.1 p.3; §2.3 p.4</td><td class="ok"><span class="pill good">met</span></td><td><code>diff(train-full-s0, train-drop-top-20): removed 20, added 0, changed_version 0; params {}; config {}; git same True</code> · <code>diff(train-full-s0, train-full-s1): removed/added/changed 0/0/0; params {'seed': ('0', '1')}</code></td></tr>
+    <tr><td>AC6.4 <code>trace(train-drop-top-k)</code> reaches v0 and the 20 raw files; <code>consumers</code> excludes the drop run for a dropped episode</td><td>§2.1 p.3</td><td class="ok"><span class="pill good">met</span></td><td><code>reaches 8 runs … raw files reached: 20</code> · <code>consumers(demo_17@v1 6cfad44e5243) … lists train-full-s0: True; lists train-drop-top-20: False</code></td></tr>
+    <tr><td>AC6.5 Tamper test: one changed byte in a scratch copy and <code>train_run</code> refuses</td><td>§2.1 p.3</td><td class="ok"><span class="pill good">met</span></td><td><code>train_run refused: True</code> · <code>MLflow runs before/after the refused launch: 15/15</code> (re-run for this report, below)</td></tr>
+    <tr><td>AC6.6 Screening table joins v1 labels on (<code>episode_id</code>, <code>content_hash</code>) for 960/960; attribution table passes <code>check_scores</code></td><td>§9.2 p.19</td><td class="ok"><span class="pill good">met</span></td><td><code>keyed to v1/candidate episode versions: 960/960; … labels found in screening table: 100/100</code> · <code>check_scores {'rows': 960, 'training_episodes': 960, 'covered': 960, 'ok': True}</code></td></tr>
+    <tr><td>AC6.7 Lineage-graph artifact (JSON + rendering)</td><td>§2.1 p.3</td><td class="ok"><span class="pill good">met</span></td><td><code>lineage graph: 36 nodes (14 runs), 40 edges -&gt; artifacts/s6_lineage_graph.json, .mmd</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Example</h2>
+<p>Take one corrupted episode, <code>libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_17</code>.
+The drop-top-20 selection removed it, so only runs that saw its corrupted v1 version are listed. Re-run for
+this report on 2026-10-01 (<code>artifacts/summarizer_rerun_stdout.txt</code>):</p>
+<pre><code>$ .venv/bin/python -m vlapoc.lineage consumers libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_17@6cfad44e5243…
+['attribute-train-full-s0 [stand-in]', 'screen-v1 [stand-in]', 'select-drop-random-20-s0', 'select-drop-top-20',
+ 'train-drop-random-20', 'train-full-s0', 'train-full-s1']          # no train-drop-top-20: it was dropped
+$ .venv/bin/python -m vlapoc.lineage consumers …/demo_17@3456348a0125…   # the same episode, clean v0 version
+['derive-v1', 'split-v0']
+
+$ .venv/bin/python -m vlapoc.lineage trace 9339d4685a8e4d009c191fa4641ccf3a   # train-drop-top-20
+runs reached: 8 ['attribute:attribute-train-full-s0 [stand-in]', 'build:build-v0', 'derive:derive-v1',
+  'eval:eval-train-full-s0 [stand-in]', 'select:select-drop-top-20', 'split:split-v0', 'train:train-drop-top-20', 'train:train-full-s0']
+edges: 11 | each with exactly one producer: True
+raw files reached: 20
+identical to artifacts/s6_trace_train_drop_top.json: True
+
+$ tamper_check(v1)
+AC6.5 flipped byte 5552926 of data/chunk-000/file-080.parquet in a clone of v1 at data/scratch/tamper_dcbeiu77/v1_tamper_copy; train_run refused: True
+AC6.5 dataset copy at data/scratch/tamper_dcbeiu77/v1_tamper_copy does not match version v1 (16076b9c5cb2): changed=['data/chunk-000/file-080.parquet'] …
+AC6.5 MLflow runs before/after the refused launch: 15/15; new data/runs dirs: []</code></pre>
+
+<h2>Visual</h2>
+<figure class="fig">
+<!--FIG:lineage:start-->
+<svg viewBox="0 0 680 968" role="img" aria-label="Lineage graph of the S6 dry run: 14 MLflow runs and the entities they consumed and produced, from the 20 raw LIBERO files to the stand-in evaluations">
+<defs><marker id="lg-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker><marker id="lg-aht" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah trace"/></marker></defs>
+<path d="M340,338 L340,368" class="e trace"/>
+<path d="M12,368 L340,368" class="e trace"/>
+<path d="M340,368 L668,368" class="e"/>
+<path d="M580,113 L622,113 L622,282 L580,282" class="e trace" marker-end="url(#lg-aht)"/>
+<text x="616" y="158" class="e-label" text-anchor="end">version v0 3c4dca68 · parent</text>
+<path d="M300,626 L300,644 L150,644 L150,662" class="e trace" marker-end="url(#lg-aht)"/>
+<text x="306" y="640" class="e-label">score_table 405cea2d · scores</text>
+<path d="M340,536 L340,572" class="e trace" marker-end="url(#lg-aht)"/>
+<text x="334" y="558" class="e-label" text-anchor="end">rollouts 4edc1e0d</text>
+<path d="M340,140 L340,170" class="e trace" marker-end="url(#lg-aht)"/>
+<text x="334" y="159" class="e-label" text-anchor="end">v0/all 58b3c415 · population</text>
+<path d="M150,368 L150,392" class="e" marker-end="url(#lg-ah)"/>
+<text x="154" y="385" class="e-label">candidate</text>
+<path d="M228,368 L228,599 L245,599" class="e trace" marker-end="url(#lg-aht)"/>
+<text x="224" y="590" class="e-label" text-anchor="end">training</text>
+<path d="M668,368 L668,689 L660,689" class="e" marker-end="url(#lg-ah)"/>
+<text x="662" y="654" class="e-label" text-anchor="end">parent</text>
+<path d="M565,368 L565,392" class="e" marker-end="url(#lg-ah)"/>
+<text x="569" y="385" class="e-label">training</text>
+<path d="M12,368 L12,689 L20,689" class="e trace" marker-end="url(#lg-aht)"/>
+<text x="18" y="654" class="e-label">parent</text>
+<path d="M340,368 L340,392" class="e trace" marker-end="url(#lg-aht)"/>
+<text x="344" y="385" class="e-label">training</text>
+<path d="M340,446 L340,482" class="e trace" marker-end="url(#lg-aht)"/>
+<text x="334" y="468" class="e-label" text-anchor="end">checkpoint 6f49bdae</text>
+<path d="M435,419 L452,419 L452,586 L435,586" class="e trace" marker-end="url(#lg-aht)"/>
+<text x="458" y="505" class="e-label">checkpoint</text>
+<text x="458" y="516" class="e-label">6f49bdae</text>
+<path d="M565,716 L565,752" class="e" marker-end="url(#lg-ah)"/>
+<text x="559" y="738" class="e-label" text-anchor="end">subset 8ccebcb5 · training</text>
+<path d="M340,224 L340,254" class="e trace" marker-end="url(#lg-aht)"/>
+<text x="334" y="243" class="e-label" text-anchor="end">v0/candidate 8ee096b7 · selection_pool</text>
+<path d="M565,806 L565,842" class="e" marker-end="url(#lg-ah)"/>
+<text x="571" y="828" class="e-label">checkpoint b217876b</text>
+<path d="M115,716 L115,752" class="e trace" marker-end="url(#lg-aht)"/>
+<text x="121" y="738" class="e-label">subset c598f569 · training</text>
+<path d="M115,806 L115,842" class="e" marker-end="url(#lg-ah)"/>
+<text x="109" y="828" class="e-label" text-anchor="end">checkpoint e618aed6</text>
+<path d="M100,322 L40,322 L40,392" class="e" marker-end="url(#lg-ah)"/>
+<text x="46" y="352" class="e-label">v1/reference f09b75da · reference</text>
+<path d="M340,54 L340,86" class="e trace" marker-end="url(#lg-aht)"/>
+<text x="346" y="74" class="e-label">source: 20 files, sha256 each</text>
+<text x="676" y="348" class="e-label" text-anchor="end">v1/candidate</text>
+<text x="676" y="359" class="e-label" text-anchor="end">69684e60 → 6 runs</text>
+<rect x="170" y="10" width="340" height="44" rx="8" class="n-run trace"/>
+<text x="340" y="28" class="n-title" text-anchor="middle">raw LIBERO HDF5 × 20</text>
+<text x="340" y="44" class="n-meta" text-anchor="middle">libero_spatial + libero_10 · 1000 demos · sha256 per file</text>
+<g><title>build run build-v0 · run_id bc8f7d09a7bf47adb59132d874b1236f · git 5d9d272e88c7 · FINISHED</title><rect x="100" y="86" width="480" height="54" rx="8" class="n-run trace"/>
+<text x="108" y="104" class="n-title">build-v0</text>
+<text x="108" y="118" class="n-meta">build · run bc8f7d09 · git 5d9d272</text>
+<text x="108" y="132" class="n-out">→ version v0 3c4dca68 · v0/all 58b3c415</text>
+</g>
+<g><title>split run split-v0 · run_id 30411f67f697488791db58d8f3b7198c · git 398e037c724d · FINISHED</title><rect x="100" y="170" width="480" height="54" rx="8" class="n-run trace"/>
+<text x="108" y="188" class="n-title">split-v0</text>
+<text x="108" y="202" class="n-meta">split · run 30411f67 · git 398e037</text>
+<text x="108" y="216" class="n-out">→ split 6c3c195f · v0/candidate 8ee096b7 · v0/reference b6a72d5e</text>
+</g>
+<g><title>derive run derive-v1 · run_id 30f34cd056ab44e69dcf606f067d8871 · git 398e037c724d · FINISHED</title><rect x="100" y="254" width="480" height="84" rx="8" class="n-run trace"/>
+<text x="108" y="272" class="n-title">derive-v1</text>
+<text x="108" y="286" class="n-meta">derive · run 30f34cd0 · git 398e037</text>
+<text x="108" y="302" class="n-out">→ version v1 16076b9c · v1/all ea806e23 · v1/reference f09b75da</text>
+<text x="108" y="316" class="n-out">→ v1/candidate 69684e60 (960 episodes; the bus below)</text>
+<text x="108" y="330" class="n-out"><tspan class="gt">→ labels 0915f276</tspan> · ground truth; no run consumes it</text>
+</g>
+<g><title>screen run screen-v1 [stand-in] · run_id 4996309b2f0149e5be8b73c0196e22e6 · git 7effd257e5f1 · FINISHED</title><rect x="20" y="392" width="190" height="54" rx="8" class="n-run standin"/>
+<text x="28" y="410" class="n-title">screen-v1</text>
+<text x="28" y="424" class="n-meta"><tspan class="badge">STAND-IN</tspan> · screen · run 4996309b</text>
+<text x="28" y="438" class="n-out">→ score_table 950afb8f</text>
+</g>
+<g><title>train run train-full-s0 · run_id ff64512b40974587a9d711cd8e4f8b04 · git 7effd257e5f1 · FINISHED</title><rect x="245" y="392" width="190" height="54" rx="8" class="n-run trace"/>
+<text x="253" y="410" class="n-title">train-full-s0</text>
+<text x="253" y="424" class="n-meta">train · run ff64512b</text>
+<text x="253" y="438" class="n-out">→ checkpoint 6f49bdae</text>
+</g>
+<g><title>train run train-full-s1 · run_id dc6b5f18ed544c6cb535d90754ebbf0a · git 7effd257e5f1 · FINISHED</title><rect x="470" y="392" width="190" height="54" rx="8" class="n-run"/>
+<text x="478" y="410" class="n-title">train-full-s1</text>
+<text x="478" y="424" class="n-meta">train · run dc6b5f18</text>
+<text x="478" y="438" class="n-out">→ checkpoint a14e9c5f</text>
+</g>
+<g><title>eval run eval-train-full-s0 [stand-in] · run_id 4a3544cc4b4b4b5e9ec8f3bbbc1bfa1f · git 7effd257e5f1 · FINISHED</title><rect x="245" y="482" width="190" height="54" rx="8" class="n-run trace standin"/>
+<text x="253" y="500" class="n-title">eval-train-full-s0</text>
+<text x="253" y="514" class="n-meta"><tspan class="badge">STAND-IN</tspan> · eval · run 4a3544cc</text>
+<text x="253" y="528" class="n-out">→ rollouts 4edc1e0d</text>
+</g>
+<g><title>attribute run attribute-train-full-s0 [stand-in] · run_id babbdb329ed648e6a77c32cc54043908 · git 7effd257e5f1 · FINISHED</title><rect x="245" y="572" width="190" height="54" rx="8" class="n-run trace standin"/>
+<text x="253" y="590" class="n-title">attribute-train-full-s0</text>
+<text x="253" y="604" class="n-meta"><tspan class="badge">STAND-IN</tspan> · attribute · run babbdb32</text>
+<text x="253" y="618" class="n-out">→ score_table 405cea2d</text>
+</g>
+<g><title>select run select-drop-top-20 · run_id f64a0385917b46a987169f0d384dcaec · git 7effd257e5f1 · FINISHED</title><rect x="20" y="662" width="190" height="54" rx="8" class="n-run trace"/>
+<text x="28" y="680" class="n-title">select-drop-top-20</text>
+<text x="28" y="694" class="n-meta">select · run f64a0385</text>
+<text x="28" y="708" class="n-out">→ subset c598f569 · 940 eps</text>
+</g>
+<g><title>select run select-drop-random-20-s0 · run_id cb4093eb7ed74d6cabe3f87a952f4de8 · git 7effd257e5f1 · FINISHED</title><rect x="470" y="662" width="190" height="54" rx="8" class="n-run"/>
+<text x="478" y="680" class="n-title">select-drop-random-20-s0</text>
+<text x="478" y="694" class="n-meta">select · run cb4093eb</text>
+<text x="478" y="708" class="n-out">→ subset 8ccebcb5 · 940 eps</text>
+</g>
+<g><title>train run train-drop-top-20 · run_id 9339d4685a8e4d009c191fa4641ccf3a · git 7effd257e5f1 · FINISHED</title><rect x="20" y="752" width="190" height="54" rx="8" class="n-run trace"/>
+<text x="28" y="770" class="n-title">train-drop-top-20</text>
+<text x="28" y="784" class="n-meta">train · run 9339d468</text>
+<text x="28" y="798" class="n-out">→ checkpoint e618aed6</text>
+</g>
+<g><title>train run train-drop-random-20 · run_id 8b380586faee401288cdd58664242938 · git 7effd257e5f1 · FINISHED</title><rect x="470" y="752" width="190" height="54" rx="8" class="n-run"/>
+<text x="478" y="770" class="n-title">train-drop-random-20</text>
+<text x="478" y="784" class="n-meta">train · run 8b380586</text>
+<text x="478" y="798" class="n-out">→ checkpoint b217876b</text>
+</g>
+<g><title>eval run eval-train-drop-top-20 [stand-in] · run_id 19e33c426be04397a5d81164f7b8fd58 · git 7effd257e5f1 · FINISHED</title><rect x="20" y="842" width="190" height="54" rx="8" class="n-run standin"/>
+<text x="28" y="860" class="n-title">eval-train-drop-top-20</text>
+<text x="28" y="874" class="n-meta"><tspan class="badge">STAND-IN</tspan> · eval · run 19e33c42</text>
+<text x="28" y="888" class="n-out">→ rollouts 8f0abfc6</text>
+</g>
+<g><title>eval run eval-train-drop-random-20 [stand-in] · run_id 8d340d9e244146a8968bc0deef434d18 · git 7effd257e5f1 · FINISHED</title><rect x="470" y="842" width="190" height="54" rx="8" class="n-run standin"/>
+<text x="478" y="860" class="n-title">eval-train-drop-random-20</text>
+<text x="478" y="874" class="n-meta"><tspan class="badge">STAND-IN</tspan> · eval · run 8d340d9e</text>
+<text x="478" y="888" class="n-out">→ rollouts cc2a1618</text>
+</g>
+<text x="24" y="460" class="n-note">stored, not acted on (§9.1)</text>
+<text x="474" y="460" class="n-note">seed control; not consumed</text>
+<rect x="222" y="752" width="236" height="142" rx="8" class="callout"/>
+<text x="232" y="771" class="c-title">diff(train-full-s0, train-drop-top-20)</text>
+<text x="232" y="787" class="c-body">removed 20 · added 0 · changed 0</text>
+<text x="232" y="801" class="c-body">params {} · config {}</text>
+<text x="232" y="815" class="c-body">git same: true</text>
+<text x="232" y="839" class="c-title">diff(train-full-s0, train-full-s1)</text>
+<text x="232" y="855" class="c-body">removed 0 · added 0 · changed 0</text>
+<text x="232" y="869" class="c-body">params: seed 0 → 1 (only)</text>
+<text x="232" y="883" class="c-body">git same: true</text>
+<rect x="20" y="914" width="22" height="13" rx="3" class="n-run"/>
+<text x="48" y="925" class="lg-label">real stage run</text>
+<rect x="150" y="914" width="22" height="13" rx="3" class="n-run standin"/>
+<text x="178" y="925" class="lg-label">STAND-IN: placeholder payload, no outcome numbers</text>
+<path d="M20,950 L42,950" class="e trace"/>
+<text x="48" y="954" class="lg-label">trace(train-drop-top-20): 8 runs, 11 edges, 20 raw files</text>
+<text x="400" y="954" class="lg-label">arrow label = entity consumed · role</text>
+</svg>
+<!--FIG:lineage:end-->
+  <figcaption><b>The recorded lineage, drawn from <code>s6_lineage_graph.json</code>: 14 runs, 21 entities, the raw
+  files, and 40 edges.</b> Each box is a run; its "→" line lists the entities it produced, with real id
+  prefixes. Arrows are consumption, labelled with the entity consumed and its role. The six arrows hanging
+  off the horizontal bus all consume <code>v1/candidate</code>. The highlighted path is what
+  <code>trace(train-drop-top-20)</code> walks. Note two dead ends: <code>labels</code> (the ground truth) is
+  consumed by no run, and the screening table is stored, not acted on, as §9.1 asks. Dashed boxes are
+  stand-ins and produce no outcome numbers; the selection's "scores" are therefore placeholders, and only
+  the mechanism is real. Lane runs were recorded at git <code>7effd25</code>; build at <code>5d9d272</code>;
+  split and derive at <code>398e037</code>.</figcaption>
+</figure>
+
+<h2>Divergences and limitations</h2>
+<ul>
+  <li><b>Three stages are stand-ins only:</b> screening (scores <code>NaN</code>), evaluation (a rollout plan with
+  <code>outcome = not_run</code>; the checkpoint is really loaded, with 51,600,263 params, strict) and attribution
+  (scores = sha256 of the key mapped to [0, 1)). They prove the lineage contracts and nothing about outcomes.</li>
+  <li><b>The trains are 5-step ACT smoke runs on MPS</b> (16.3 / 7.5 / 12.2 / 25.8 s), not SmolVLA. They prove
+  the path from data to trainer to checkpoint, not training quality.</li>
+  <li>3 of the 20 episodes dropped by top-k were corrupted. The placeholder scores are a key hash, so this is
+  chance, not attribution.</li>
+  <li>The chain's build, split and derive runs were recorded by the S4 commands and reused, which is possible
+  because the entities are content-addressed.</li>
+  <li>The main store holds 15 runs: the 14 chain runs and one inert <code>FAILED</code> split attempt (an MLflow
+  import bug, fixed in <code>398e037</code>). Queries use FINISHED runs only.</li>
+  <li><b>Disk:</b> the 4 checkpoints take 2.3 GB under <code>data/runs/</code>, and the three distinct training subsets
+  made 6.6 / 6.4 / 6.5 GB of HF cache (R1).</li>
+</ul>
+
+<footer class="doc">S6 of <a href="report.html">Data layer + lineage layer</a> · evidence in <code>artifacts/s6_*</code>
+· <a href="plan.md">plan</a> · <a href="execution-log.md">execution log</a></footer>
+
+</div>
+</body>
+</html>

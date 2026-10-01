@@ -32,7 +32,16 @@
   <span class="pill good">verified</span></div>
 </a>
 -->
-<div class="empty">No features built yet.</div>
+<a class="entry" href="features/2026-09-28-data-lineage-layer/report.html">
+  <div class="top"><span class="title">Data layer + lineage layer</span><span class="date">2026-09-28 → 2026-10-01</span></div>
+  <p class="sum">All 1000 LIBERO demos (libero_spatial + libero_10, 200,340 frames, 0 dropped) in one lossless
+  LeRobot v3 dataset, each episode bit-exact to raw (1000/1000) with a stable ID and content hash.
+  Derived versions keep ground truth apart (v1: 100 changed / 900 identical). Every stage is an MLflow run, so
+  <code>diff</code> shows two runs differ by exactly 20 removed episode versions and nothing else.</p>
+  <div class="tags"><span class="pill accent">§2.1 p.3</span><span class="pill accent">§2.2 p.4</span>
+  <span class="pill accent">§10 Foundation p.20</span><span class="pill">LeRobot v3</span><span class="pill">MLflow (local)</span>
+  <span class="pill warn">3 stages stand-in</span><span class="pill good">verified · 48/48 ACs</span></div>
+</a>
 <!-- FEATURES:END -->
 
 <h2>Spec coverage</h2>
@@ -46,6 +55,24 @@ One row per PoC section a feature touches.</p>
     <tr><td>§2.1</td><td>3</td><td>Episode lineage via …</td>
         <td><a href="features/2026-09-28-<slug>/report.html">slug</a></td><td>none</td></tr>
 -->
+    <tr><td>§2.1 item 1</td><td>3</td><td>Lineage: content-addressed dataset versions and subsets; every stage an MLflow run tied to episode versions, config, git SHA, seed and checkpoint hashes; <code>trace</code> / <code>consumers</code> / <code>diff</code> ("what changed between the good run and the bad run?")</td>
+        <td><a href="features/2026-09-28-data-lineage-layer/report.html">data-lineage-layer</a></td><td>MLflow local SQLite as the backend (<b>owner-approved</b>, Q1); git local only (<b>owner-approved</b>, Q2). Training via LeRobot <code>train()</code> through an entry point, because the CLI is broken on Python 3.14 (draccus #69). Normalization stats come from the full version (open decision)</td></tr>
+    <tr><td>§2.1 item 5</td><td>3–4</td><td>Group leave-one-out (<code>drop_group</code>) and random subsets for datamodels (<code>drop_random_k(k = N − n)</code> + membership matrix), recorded as <code>select</code> runs; no training on them yet</td>
+        <td><a href="features/2026-09-28-data-lineage-layer/report.html">data-lineage-layer</a></td><td>Training many subsets is not feasible yet: about 6.5 GB of HF cache per distinct subset</td></tr>
+    <tr><td>§2.2</td><td>4</td><td>Episode catalog: stable <code>episode_id</code>, <code>content_hash</code> (1000/1000 bit-exact to raw), 21 columns incl. smoothness, idle fraction, gripper toggles; LeRobot v3 dataset of all 1000 demos</td>
+        <td><a href="features/2026-09-28-data-lineage-layer/report.html">data-lineage-layer</a></td><td><code>operator</code> and <code>collection_date</code> null (LIBERO publishes neither). All 1000 demos, not the hub's filtered 811; 128² native, fps 20, lossless PNG (hub: 256², fps 10, AV1)</td></tr>
+    <tr><td>§2.5</td><td>5</td><td>Injection mechanism only: derived versions, <code>labels.parquet</code>, reference guard, length-changing edits; one demo corruption (RoboDrop 0.25σ action noise on 10%)</td>
+        <td><a href="features/2026-09-28-data-lineage-layer/report.html">data-lineage-layer</a></td><td>Full corruption suite deferred to a separate feature (<b>owner-approved</b>, 2026-09-29). Noise is unclipped: actions leave [−1, 1]</td></tr>
+    <tr><td>§2.6</td><td>5</td><td>Counterfactual selections recorded: drop top-k (<code>direction</code> highest / lowest, i.e. harmful and helpful) and drop k random, with retraining runs (5-step ACT smoke)</td>
+        <td><a href="features/2026-09-28-data-lineage-layer/report.html">data-lineage-layer</a></td><td>Mechanism only: scores are stand-in placeholders; no outcomes, no PhAIL significance gate yet</td></tr>
+    <tr><td>§3.5 A</td><td>7–8</td><td>Human reference durations: <code>duration_s</code> per episode (= length / 20 Hz; last step is the only success, 1000/1000), per-task summary</td>
+        <td><a href="features/2026-09-28-data-lineage-layer/report.html">data-lineage-layer</a></td><td>Whole-episode T only; per-sub-task T for libero_10 not built</td></tr>
+    <tr><td>§8.3, §8.7</td><td>14–15</td><td>Held-out clean reference split (2 per task = 40, RoboDrop App. A.1) and 960 candidates; derivations refuse to edit any reference episode</td>
+        <td><a href="features/2026-09-28-data-lineage-layer/report.html">data-lineage-layer</a></td><td>none</td></tr>
+    <tr><td>§9.1–9.2</td><td>18–19</td><td>Key contract: every stage names its inputs as (<code>episode_id</code>, <code>content_hash</code>); <code>check_scores</code> rejects scores for episode versions a run never trained on; screening output stored, not acted on</td>
+        <td><a href="features/2026-09-28-data-lineage-layer/report.html">data-lineage-layer</a></td><td>Screening (Step 1), evaluation (Step 2) and attribution (Step 3) are stand-ins with placeholder payloads</td></tr>
+    <tr><td>§10 Foundation</td><td>20</td><td>Lineage tracking, episode catalog, LIBERO (two suites); the path from data to LeRobot trainer to checkpoint proven</td>
+        <td><a href="features/2026-09-28-data-lineage-layer/report.html">data-lineage-layer</a></td><td>SmolVLA not trained yet (ACT smoke runs only); lerobot 0.6.1 declares Python 3.12/3.13, the venv is 3.14</td></tr>
 <!-- COVERAGE:END -->
   </tbody>
 </table>

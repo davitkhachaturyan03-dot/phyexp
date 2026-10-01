@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S1 Convert raw LIBERO to LeRobot v3 — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+  .shot { display: block; width: 100%; max-width: 640px; height: auto; margin: 0 auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  td.ok { white-space: nowrap; }
+  .vs td:nth-child(2) { font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Data layer + lineage layer</a></p>
+  <h1>S1 · Convert raw LIBERO into one LeRobot v3 dataset, unfiltered</h1>
+  <p class="dek">All 1000 human demonstrations of libero_spatial and libero_10 now sit in one LeRobot v3
+  dataset (200,340 frames), stored losslessly. Every stored frame equals the raw frame rotated 180°.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">7/7 met</span></span>
+    <span><b>Depends on</b> none</span>
+    <span><b>Dataset</b> <code>data/lerobot/libero_spatial_10/</code> (v0)</span>
+  </div>
+</header>
+
+<h2>Why</h2>
+<p>The first milestone asks for LIBERO in a form SmolVLA can train on, and the episode catalog builds on
+LeRobot's format. The owner asked for "a dataset … that will enable all downstream tasks inside the poc"
+(<a href="brief.md">brief.md</a>).</p>
+<blockquote>Foundation: "Lineage tracking; episode catalog; LIBERO (one or two suites) + SmolVLA" — §10, p. 20</blockquote>
+<blockquote>"LeRobot's dataset format plus a Parquet metadata table works well." — §2.2, p. 4</blockquote>
+
+<h2>What was built</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File / function</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>vlapoc/libero_convert.py::load_raw_episode</code></td><td>The one raw → canonical mapping: frames flipped in height and width (180°), state = <code>ee_pos ‖ ee_ori ‖ gripper_states</code> as float32 (8 values), actions as float32 (7).</td></tr>
+    <tr><td><code>vlapoc/libero_convert.py::convert</code></td><td>LeRobot's own writer loop: <code>LeRobotDataset.create(fps=20, use_videos=False, robot_type="panda")</code> → <code>add_frame</code> → <code>save_episode</code> → <code>finalize</code>.</td></tr>
+    <tr><td><code>vlapoc/libero_convert.py::FEATURES</code>, <code>LIBERO_TASK_ORDER</code></td><td>The LeRobot LIBERO schema (keys copied from the pinned hub <code>info.json</code> files), and LIBERO's benchmark task order, which is not alphabetical.</td></tr>
+    <tr><td><code>vlapoc/libero_convert.py::iter_raw_episodes</code></td><td>Walks the raw files in suite → task → <code>demo_k</code> order. That order becomes LeRobot's <code>episode_index</code>.</td></tr>
+    <tr><td><code>scripts/verify_libero_convert.py</code></td><td>Evidence for AC1.1–1.6: <code>info.json</code>, schema diffs against both hub datasets, frame-by-frame checks, counts, rewards, size.</td></tr>
+    <tr><td><code>scripts/orientation_figure.py</code></td><td>The raw / ours / hub comparison image and the pixel-difference numbers.</td></tr>
+    <tr><td><code>artifacts/reference/</code></td><td>Pinned copies of both hub <code>info.json</code> files, LIBERO's task map, and the hub reference frames with their row provenance.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Acceptance criteria</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence (real output)</th></tr></thead>
+  <tbody>
+    <tr><td>AC1.1 <code>info.json</code>: v3.0, fps 20, 1000 episodes, 200,340 frames, 20 tasks; the dataset loads</td><td>§10 p.20</td><td class="ok"><span class="pill good">met</span></td><td><code>AC1.1 info.json: {'codebase_version': 'v3.0', 'fps': 20, 'total_episodes': 1000, 'total_frames': 200340, 'total_tasks': 20, 'robot_type': 'panda'}</code><br><code>LeRobotDataset loads: num_episodes=1000 num_frames=200340</code></td></tr>
+    <tr><td>AC1.2 (reworded r2) Schema equals <code>HuggingFaceVLA/libero@86958911</code> except image shape and fps; the dtype difference against <code>lerobot/libero</code> is recorded</td><td>LeRobot LIBERO docs; AC1.6</td><td class="ok"><span class="pill good">met</span></td><td><code>vs HuggingFaceVLA/libero: image.shape ours=[128,128,3] ref=[256,256,3]; image2.shape likewise (fps 20 vs 10)</code><br><code>vs lerobot/libero: also image.dtype ours=image ref=video</code></td></tr>
+    <tr><td>AC1.3 State and action equal the raw HDF5 values, every frame of 3 episodes per suite</td><td>LeRobot docs</td><td class="ok"><span class="pill good">met</span></td><td><code>episode_index 0, 250, 499, 500, 750, 999: 'state_equal': True, 'action_equal': True</code>. Analyzer: 10 more random episodes with its own pyarrow/h5py reader.</td></tr>
+    <tr><td>AC1.4 Frames are the raw frames rotated 180°; orientation figure</td><td><code>env_processor.py</code></td><td class="ok"><span class="pill good">met</span></td><td><code>'image_eq_raw_rot180': True, 'image_eq_raw_unrotated': False, 'image2_eq_raw_rot180': True</code> (all 6 episodes, every frame)</td></tr>
+    <tr><td>AC1.5 No filtering: 20 tasks × 50; every length equals raw; every demo's only reward is at its last step</td><td>CLAUDE.md rule</td><td class="ok"><span class="pill good">met</span></td><td><code>20 tasks, counts=[50]</code> · <code>length == raw num_samples: 1000/1000</code> · <code>exactly one reward==1, at the last step: 1000/1000; dones likewise: 1000/1000</code></td></tr>
+    <tr><td>AC1.6 (reworded r2) Lossless storage; size as file bytes; wall time</td><td>analysis-r1</td><td class="ok"><span class="pill good">met</span></td><td><code>sum(file sizes)=7.356 GB (36719 B/frame), data parquet files=73, videos dir exists=False</code> · <code>"wall_time_s": 468.5</code></td></tr>
+    <tr><td>AC1.7 Grounding docstring cites §2.2, §10 and the schema sources, and states the divergences</td><td>vla-build</td><td class="ok"><span class="pill good">met</span></td><td>Module docstring of <code>vlapoc/libero_convert.py</code>, read by the analyzer.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Example</h2>
+<p>Episode 999 is the last demo of the last libero_10 task. Reading it back through LeRobot and comparing it
+with the raw HDF5, read independently, matches state, action and both cameras on all 295 frames:</p>
+<pre><code>$ .venv/bin/python scripts/verify_libero_convert.py
+AC1.3/1.4 episode_index 999: {'episode': 'libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_49',
+  'frames': 295, 'state_equal': True, 'action_equal': True, 'image_eq_raw_rot180': True,
+  'image_eq_raw_unrotated': False, 'image2_eq_raw_rot180': True}
+AC1.5 raw rewards: exactly one reward==1, at the last step: 1000/1000; dones likewise: 1000/1000
+AC1.6 on-disk: du=7.44 GiB, sum(file sizes)=7.356 GB (36719 B/frame), data parquet files=73, videos dir exists=False</code></pre>
+
+<h3>Ours against the hub dataset for the same two suites</h3>
+<div class="scroll">
+<table class="vs">
+  <thead><tr><th></th><th>Ours (v0)</th><th><code>lerobot/libero</code> @ a1aaacb7, same two suites</th></tr></thead>
+  <tbody>
+    <tr><td>Episodes</td><td>1000 (500 + 500)</td><td>811 (432 + 379)</td></tr>
+    <tr><td>Frames</td><td>200,340</td><td>154,439</td></tr>
+    <tr><td>Episodes shortened against raw</td><td>0</td><td>68 of 811 have a length no raw demo of that task has</td></tr>
+    <tr><td>Declared fps</td><td>20 (the control rate)</td><td>10</td></tr>
+    <tr><td>Image size and storage</td><td>128² native, lossless PNG in parquet</td><td>256² re-render, AV1 video</td></tr>
+    <tr><td>Map back to raw <code>demo_k</code></td><td>yes (S2: <code>source_file</code>, <code>source_demo</code>)</td><td>no column for it in <code>meta/episodes</code></td></tr>
+  </tbody>
+</table>
+</div>
+<p>Ours: measured in S1 (<code>artifacts/s1_summary.json</code>). Hub column: measured by the planner from the
+hub's pinned metadata (<a href="plan.md">plan.md</a>, prior-art table). I did not re-run it for this page.
+The hub set is OpenVLA's "no-noops" corpus. Its premise (that some demos failed) is false here: every raw
+demo ends with its only <code>reward == 1</code> (AC1.5).</p>
+
+<h2>Visual</h2>
+<figure>
+  <img class="shot" src="artifacts/s1_orientation.png" alt="Grid of camera frames: for two tasks and both cameras, the raw HDF5 frame (upside down), our converted frame, and a HuggingFaceVLA/libero frame of the same task">
+  <figcaption><b>Raw frame, our frame and a hub frame, per task and camera.</b> The left column (raw HDF5) is
+  upside down; ours (middle) has the hub's layout (right), robot base at the top. Mean absolute pixel
+  difference to the hub frame, ours against unrotated raw: agentview 7.44 vs 71.22 (libero_spatial task 0)
+  and 11.30 vs 102.49 (KITCHEN_SCENE3); wrist camera 13.96 vs 75.48 and 27.58 vs 74.02
+  (<code>artifacts/s1_orientation_stats.json</code>). The hub frame comes from a different demo, re-rendered at
+  256², so it is not expected to match exactly. The exact check is AC1.4 (bit-equal to raw rotated 180°).</figcaption>
+</figure>
+
+<h2>Divergences and limitations</h2>
+<ul>
+  <li><b>Four deliberate divergences from the hub LIBERO datasets</b> (stated in the module docstring):
+  all 1000 demos at full length, not the hub's 811; native 128×128, not a 256² re-render; fps 20, not 10;
+  lossless PNG, not AV1 video. The content hash in S2 relies on the lossless storage.</li>
+  <li><b>Resolution is a decision for the evaluation feature.</b> Rollouts must render at 128. LeRobot's
+  <code>LiberoEnv</code> config defaults to 360 (quoted in <a href="plan.md">plan.md</a>). Published
+  SmolVLA/π0 LIBERO numbers used the 256² hub data, so absolute success rates may differ (inferred).</li>
+  <li><b>AC1.2 was reworded in round 2.</b> Against <code>lerobot/libero</code> the image dtype is necessarily
+  <code>image</code> rather than <code>video</code>, because the dataset is lossless. The analyzer accepted
+  the rewording as matching what was built.</li>
+  <li>LeRobot's writer leaves an empty <code>images/</code> staging tree behind. <code>convert()</code> now removes
+  it after <code>finalize()</code>, so the committed converter differs from the code that ran by those 4 lines
+  (<a href="execution-log.md">execution log</a>).</li>
+  <li>PyAV's bundled <code>libavdevice</code> clashes with Homebrew ffmpeg and prints an objc warning on import
+  (measured). No crash was observed.</li>
+</ul>
+
+<footer class="doc">S1 of <a href="report.html">Data layer + lineage layer</a> · evidence in <code>artifacts/s1_*</code>
+· <a href="plan.md">plan</a> · <a href="execution-log.md">execution log</a></footer>
+
+</div>
+</body>
+</html>

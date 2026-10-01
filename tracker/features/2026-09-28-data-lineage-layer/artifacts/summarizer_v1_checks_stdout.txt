@@ -1,0 +1,15 @@
+v0 episode table: 1000 rows x 21 cols; v1 episode table: 1000 rows x 22 cols
+label columns in v1 episode table: []
+labels.parquet: 100 rows, columns ['episode_id', 'parent_content_hash', 'content_hash', 'corruption_type', 'params', 'seed']
+labels join v1 on (episode_id, content_hash): 100
+content_hash v0 -> v1: changed 100, identical 900
+labelled episodes per task: [5] over 20 tasks
+v1 episode_index of the 100 edited episodes: 900..999 (appended after the 900 kept ones)
+gripper_toggles on the 100 corrupted episodes: v1 84-428, same episodes in v0 1-5
+v1 data files read: 81; frames 200340 (corrupted 19598, clean 180742)
+frames with any action dim outside [-1, 1]: corrupted 0.5116, clean 0.0000
+corrupted action min per dim: [-1.09, -1.077, -1.332, -0.242, -0.327, -0.385, -2.069]
+corrupted action max per dim: [1.158, 1.215, 1.26, 0.303, 0.284, 0.416, 1.964]
+clean action min per dim:     [-0.938, -0.938, -0.938, -0.23, -0.368, -0.368, -1.0]
+clean action max per dim:     [0.938, 0.938, 0.938, 0.329, 0.37, 0.375, 1.0]
+gripper action exactly +-1: corrupted 0.0000, clean 1.0000
