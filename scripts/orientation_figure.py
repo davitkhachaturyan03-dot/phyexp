@@ -9,6 +9,8 @@ JPEG previews of frame 0 of hub episodes 1272 and 6), saved under artifacts/refe
 The hub frame is a different demo re-rendered at 256x256, so pixels do not match exactly; the figure
 shows orientation. As supporting numbers, it prints the mean absolute difference between the hub frame
 and our frame (upsampled 2x, nearest) and between the hub frame and the unrotated raw frame.
+
+    .venv/bin/python scripts/orientation_figure.py   # writes artifacts/s1_orientation.png and _stats.json
 """
 
 from __future__ import annotations
@@ -58,10 +60,12 @@ def stored_frame(root: Path, episode_index: int, cam: str, frame: int = 0) -> np
 
 
 def up2(a: np.ndarray) -> np.ndarray:
+    """128x128 frame -> 256x256 (nearest neighbour), to sit beside and compare with the 256x256 hub frame."""
     return np.asarray(Image.fromarray(a).resize((256, 256), Image.NEAREST))
 
 
 def main() -> int:
+    """Build the raw | ours | hub figure for both cases and cameras, and print the per-tile stats."""
     root = DEFAULT_OUT
     tiles, stats = [], []
     for label, suite, task, ep_idx, ref in CASES:

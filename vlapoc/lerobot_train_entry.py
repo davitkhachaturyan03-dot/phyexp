@@ -16,7 +16,13 @@ Grounding: PoC §2.1 item 2 p.3 ("SmolVLA via LeRobot"); PoC p.1 "model, config,
 evaluation protocol are held fixed so that data is the only variable": only ``dataset.episodes``
 and ``seed`` vary between runs of one experiment.
 
-    python -m vlapoc.lerobot_train_entry <spec.json>
+Where it sits: the training run between Steps 1 and 2 of docs/dataflow.md. ``vlapoc.runs.train_run``
+writes the spec, launches this module in a subprocess inside its MLflow run, and afterwards hashes the
+checkpoint LeRobot saved under the spec's ``output_dir``.
+
+Usage (from the repo root; normally only ``train_run`` calls it)::
+
+    .venv/bin/python -m vlapoc.lerobot_train_entry data/runs/<name>-<UTC stamp>/vlapoc_train_spec.json
 """
 
 from __future__ import annotations
@@ -30,6 +36,14 @@ os.environ.setdefault("MLFLOW_DISABLE_AGENT_HINT", "1")
 
 
 def build_config(spec: dict):
+    """LeRobot ``TrainPipelineConfig`` from the spec ``train_run`` writes.
+
+    Required keys: ``policy_type``, ``dataset_repo_id``, ``dataset_root`` (repo-relative),
+    ``episodes`` (LeRobot ``episode_index`` list), ``steps``, ``batch_size``, ``seed``, ``output_dir``
+    (must not exist; LeRobot refuses to overwrite) and ``job_name``. Optional: ``policy_overrides``,
+    ``use_imagenet_stats``, ``image_transforms_enable``, ``num_workers``, ``log_freq``. One checkpoint is
+    saved, at the last step (``save_freq = steps``), and wandb is always off.
+    """
     from lerobot.configs.default import DatasetConfig, WandBConfig
     from lerobot.configs.policies import PreTrainedConfig
     from lerobot.configs.train import TrainPipelineConfig
@@ -48,6 +62,7 @@ def build_config(spec: dict):
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Read the spec at ``argv[0]`` and run LeRobot's ``train()`` on it (exceptions exit non-zero)."""
     argv = sys.argv[1:] if argv is None else argv
     spec = json.loads(Path(argv[0]).read_text())
     from lerobot.scripts.lerobot_train import train

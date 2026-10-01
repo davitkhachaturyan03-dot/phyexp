@@ -12,7 +12,13 @@ content-addressed and were recorded by the S4 commands). Train steps are real Le
 keys plus placeholder payloads: screening scores are NaN, the rollout plan has outcome ``not_run``,
 attribution scores are a hash of the key. No outcome numbers are invented.
 
-    .venv/bin/python scripts/lineage_dry_run.py --k 20 --seed 0
+    .venv/bin/python scripts/lineage_dry_run.py --k 20 --seed 0      # full chain: records runs in data/lineage
+    .venv/bin/python scripts/lineage_dry_run.py --tamper-only        # AC6.5 only; records no run
+
+The full chain writes real runs (and ~2.3 GB of checkpoints under ``data/runs/``), refuses to start
+with uncommitted changes under ``vlapoc/`` or ``scripts/``, and overwrites the S6 files in the
+feature's ``artifacts/``. Its order matters: attribute runs before select, because select consumes
+attribute's score table, which is what makes ``trace(train-drop-top-k)`` reach the full training run.
 """
 
 from __future__ import annotations
@@ -49,6 +55,10 @@ from vlapoc.lineage import (  # noqa: E402
 FEATURE_DIR = REPO_ROOT / "tracker" / "features" / "2026-09-28-data-lineage-layer"
 ART = FEATURE_DIR / "artifacts"
 SCRATCH_ROOT = REPO_ROOT / "data" / "scratch"  # gitignored (data/); never a session-bound path (AC3.9)
+
+
+def log(msg: str) -> None:
+    print(msg, flush=True)
 
 
 def tamper_check(v1: dict, steps: int = 5, chain: str | None = None) -> dict:
@@ -92,11 +102,12 @@ def tamper_check(v1: dict, steps: int = 5, chain: str | None = None) -> dict:
             "new_run_dirs": sorted(dirs_after - dirs_before)}
 
 
-def log(msg: str) -> None:
-    print(msg, flush=True)
-
-
 def reuse_or(entity_id: str, fn, label: str) -> str:
+    """Run id of the run that already produced ``entity_id``, or of a new run made by calling ``fn()``.
+
+    Entities are content-addressed, so if v0, its split or v1 already has a producer, re-running that
+    stage would only duplicate the record.
+    """
     prods = runs.producers(entity_id)
     if prods:
         log(f"[reuse] {label}: run {prods[0].info.run_id[:12]} ({prods[0].info.run_name}) already produced {entity_id[:12]}")
@@ -139,6 +150,7 @@ def graph(run_ids: list[str]) -> dict:
 
 
 def mermaid(g: dict) -> str:
+    """Mermaid ``flowchart LR`` text for a ``graph()`` result: runs as boxes, entities as stadiums."""
     def nid(x):
         return "n" + hashlib.sha256(x.encode()).hexdigest()[:10]
 
@@ -158,6 +170,7 @@ def mermaid(g: dict) -> str:
 
 
 def main() -> int:
+    """Record the chain (usage in the module docstring), then check AC6.1-AC6.7 and write the artifacts."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--k", type=int, default=20)
     ap.add_argument("--seed", type=int, default=0)
@@ -179,7 +192,7 @@ def main() -> int:
 
     v0 = resolve_version("v0")
     R["build"] = reuse_or(v0["dataset_version_id"], lambda: runs.build_run("v0", chain=chain), "build(v0)")
-    R["split"] = reuse_or(Subset.load("v0/candidate").subset_id, lambda: runs.split_run("v0", 2, 0, chain=chain), "split(v0)")
+    R["split"] = reuse_or(Subset.load("v0/candidate").subset_id, lambda: runs.split_run("v0", 2, 0, chain=chain)[0], "split(v0)")
     try:
         v1 = resolve_version("v1")
     except LineageError:

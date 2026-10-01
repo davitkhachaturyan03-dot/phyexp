@@ -13,6 +13,9 @@ The drop-top-k demonstration uses a real catalog column (``smoothness``) as the 
 mechanism check, not an attribution result, and no outcome numbers are invented.
 
     .venv/bin/python scripts/verify_lineage_s3.py [--summary <path>]
+
+Takes ~50 s and up to ~14 GB of transient isolated cache (deleted at the end of the block).
+The summary defaults to the feature's ``artifacts/s3_summary.json``.
 """
 
 from __future__ import annotations
@@ -87,6 +90,7 @@ ABS_CSV_FIELD = re.compile(r'(^|[,\n])"?/[^,\n]')  # a CSV field that starts wit
 
 
 def main() -> int:
+    """Run every check in a fresh scratch lineage root, delete the root, write the JSON summary."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--summary", type=Path, default=FEATURE_DIR / "artifacts" / "s3_summary.json")
     a = ap.parse_args()
@@ -107,6 +111,10 @@ def main() -> int:
 
 
 def _run(out: dict, lr: Path, base: Path) -> None:
+    """The checks, one block per AC, against the scratch lineage root ``lr``; results go into ``out``.
+
+    Only AC3.6 reads the real store (``data/lineage/``), and only to scan it for absolute paths.
+    """
     v = resolve_version("v0", lr)
     vid = v["dataset_version_id"]
     root = REPO_ROOT / v["lerobot_root"]

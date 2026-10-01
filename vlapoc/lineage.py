@@ -37,8 +37,45 @@ Layout under ``data/lineage/`` (all paths stored relative to the repo root; neve
 
     names.json                              {"versions": {"v0": id}, "subsets": {"v0/reference": sid, ...}}
     versions/<dataset_version_id>/version.json, episodes.parquet, files.json, raw_files.parquet
+                                            (+ labels.parquet, derivation.json for a derived version)
     subsets/<subset_id>.json
     splits/<split_id>.json
+
+A *reference* to a version or subset (every ``ref`` argument below) is a name from ``names.json``
+(``v0``, ``v0/candidate``), a full 64-hex id, or a unique id prefix of at least 8 hex characters.
+
+Where it sits
+-------------
+Third step (docs/dataflow.md). It takes the catalog (``vlapoc.catalog``) and turns the dataset into
+named, content-addressed objects that every later stage consumes and produces: the clean reference
+set and the training (candidate) set of the "Full flow" diagram, and the Step 4 "drop top-k / drop
+k random" selections. ``vlapoc.derive`` adds derived (corrupted) versions on top, and ``vlapoc.runs``
+records each stage as an MLflow run that names these ids.
+
+Usage (from the repo root; every command prints JSON)::
+
+    # dataset versions
+    .venv/bin/python -m vlapoc.lineage version register --root data/lerobot/libero_spatial_10 --name v0
+    .venv/bin/python -m vlapoc.lineage version show v0
+    .venv/bin/python -m vlapoc.lineage version verify v0        # sha256 of every file vs files.json (~3 s)
+    .venv/bin/python -m vlapoc.lineage version recompute v0     # re-hash every episode, recompute the id (~19 s)
+    .venv/bin/python -m vlapoc.lineage version diff v0 v1 [--ids]
+    # splits and subsets
+    .venv/bin/python -m vlapoc.lineage split make --version v0 --reference-per-task 2 --seed 0 [--track]
+    .venv/bin/python -m vlapoc.lineage subset show v0/reference [--ids]
+    .venv/bin/python -m vlapoc.lineage names
+    # stages recorded as MLflow runs (vlapoc.runs, vlapoc.derive)
+    .venv/bin/python -m vlapoc.lineage build verify v0
+    .venv/bin/python -m vlapoc.lineage derive --parent v0 --name v1 --demo-action-noise --per-task 5 --seed 0
+    # lineage queries over the recorded runs (vlapoc.runs)
+    .venv/bin/python -m vlapoc.lineage trace <run_id>
+    .venv/bin/python -m vlapoc.lineage consumers <episode_id>@<content_hash>
+    .venv/bin/python -m vlapoc.lineage diff <run_a> <run_b> [--ids]
+    .venv/bin/python -m vlapoc.lineage check-scores <scores.parquet> <train_run_id>
+
+``register``, ``split make``, ``build`` and ``derive`` write to ``data/lineage/``. ``--track``,
+``build`` and ``derive`` also add an MLflow run, and refuse to start while ``vlapoc/`` or ``scripts/``
+has uncommitted changes, so the recorded git SHA is the code that ran.
 """
 
 from __future__ import annotations
@@ -58,7 +95,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from vlapoc.catalog import DEFAULT_CATALOG_ROOT, HASH_DOMAIN, hash_stored_dataset, sha256_file
+from vlapoc.catalog import CATALOG_COLUMNS, DEFAULT_CATALOG_ROOT, HASH_DOMAIN, hash_stored_dataset, sha256_file
 from vlapoc.libero_convert import REPO_ROOT, SUITES
 
 LINEAGE_ROOT = REPO_ROOT / "data" / "lineage"
@@ -81,10 +118,12 @@ class VersionIntegrityError(LineageError):
 
 
 def canonical_json(obj) -> bytes:
+    """UTF-8 JSON with sorted keys and no whitespace: the byte form every id in this module hashes."""
     return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
 def sha256_json(obj) -> str:
+    """sha256 (hex) of ``canonical_json(obj)``; the same object always gives the same id."""
     return hashlib.sha256(canonical_json(obj)).hexdigest()
 
 
@@ -98,6 +137,7 @@ def rel(path: Path) -> str:
 
 
 def _root(lineage_root: Path | None) -> Path:
+    """The lineage store to use: ``lineage_root`` if given (tests use scratch copies), else ``data/lineage``."""
     return Path(lineage_root) if lineage_root is not None else LINEAGE_ROOT
 
 
@@ -106,6 +146,10 @@ def _names_path(lineage_root: Path | None) -> Path:
 
 
 def load_names(lineage_root: Path | None = None) -> dict:
+    """``names.json``: ``{"versions": {name: dataset_version_id}, "subsets": {name: subset_id}}``.
+
+    Names are convenience aliases; every record and MLflow run stores the ids themselves.
+    """
     p = _names_path(lineage_root)
     if p.is_file():
         return json.loads(p.read_text())
@@ -113,6 +157,7 @@ def load_names(lineage_root: Path | None = None) -> dict:
 
 
 def _bind_name(kind: str, name: str, value: str, lineage_root: Path | None, force: bool = False) -> None:
+    """Bind ``names.json[kind][name] = value``; rebinding a name to a different id needs ``force``."""
     names = load_names(lineage_root)
     old = names[kind].get(name)
     if old is not None and old != value and not force:
@@ -129,7 +174,24 @@ def _write_json(path: Path, obj) -> None:
 
 
 def _demo_number(episode_id: str) -> int:
+    """``k`` of ``.../demo_<k>``, for numeric (not string) ordering of a task's episodes."""
     return int(episode_id.rsplit("demo_", 1)[1])
+
+
+def _resolve_ref(ref: str, bound_names: dict[str, str], known_ids: list[str], kind: str) -> str:
+    """Full id for a reference: a name bound in ``names.json``, a full id, or a unique id prefix.
+
+    ``known_ids`` are the ids present on disk. An exact match wins; otherwise a prefix of at least 8
+    characters may match, and it must match exactly one id. Raises ``LineageError`` on no match or an
+    ambiguous one.
+    """
+    wanted = bound_names.get(ref, ref)
+    matches = [i for i in known_ids if i == wanted]
+    if not matches and len(wanted) >= 8:
+        matches = [i for i in known_ids if i.startswith(wanted)]
+    if len(matches) != 1:
+        raise LineageError(f"unknown or ambiguous {kind} {ref!r}")
+    return matches[0]
 
 
 # ---------------------------------------------------------------------------------------------
@@ -149,7 +211,11 @@ def schema_of(info: dict) -> dict:
 
 
 def version_id(schema: dict, pairs) -> str:
-    """``dataset_version_id`` from the feature schema and the (episode_id, content_hash) pairs."""
+    """``dataset_version_id`` from the feature schema and the (episode_id, content_hash) pairs.
+
+    The pairs are sorted first, so episode order (LeRobot's positional ``episode_index``) does not
+    affect the id. Raises ``LineageError`` on a duplicate ``episode_id``.
+    """
     eps = sorted([str(e), str(h)] for e, h in pairs)
     if len({e for e, _ in eps}) != len(eps):
         raise LineageError("duplicate episode_id in version")
@@ -165,7 +231,11 @@ def _file_digest(args: tuple[str, str]) -> tuple[str, str, int]:
 
 
 def file_digests(root: Path, workers: int = 8) -> list[dict]:
-    """sha256 + size of every file in a LeRobot dataset root (data parquet files and meta/)."""
+    """``[{"path", "sha256", "size_bytes"}]`` for every file under a LeRobot dataset root, sorted by path.
+
+    These identify one physical copy, not the content: two conversions of the same data differ here
+    (random HF ``datasets`` fingerprint in each parquet file) while their ``dataset_version_id`` agrees.
+    """
     root = Path(root)
     files = sorted(p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file())
     with ProcessPoolExecutor(max_workers=workers) as ex:
@@ -182,7 +252,23 @@ def register_version(
     lineage_root: Path | None = None,
     force_name: bool = False,
 ) -> dict:
-    """Register the LeRobot dataset at ``root`` (with its S2 catalog) as a content-addressed version."""
+    """Register the LeRobot dataset at ``root`` (with its S2 catalog) as a content-addressed version.
+
+    Args:
+        root: dataset root inside the repo.
+        name: name to bind in ``names.json`` (also binds ``<name>/all`` to the full-episode subset).
+        catalog_dir: catalog written by ``vlapoc.catalog``; default ``data/lineage/catalog/<root name>``.
+            Its ``catalog.json`` must name this ``root``.
+        parent_version_id: set by ``vlapoc.derive`` for a derived version.
+        force_name: allow rebinding an existing name to a different id.
+
+    Returns:
+        The ``version.json`` record written to ``versions/<dataset_version_id>/``.
+
+    Re-registering content that is already registered rewrites that version's ``version.json`` (name,
+    note, timestamp) while ``names.json`` keeps the old name bound too, so ``resolve_version`` of the
+    old name then returns a record carrying the new name (measured in a scratch store).
+    """
     root = Path(root).resolve()
     catalog_dir = Path(catalog_dir) if catalog_dir is not None else DEFAULT_CATALOG_ROOT / root.name
     cat_meta = json.loads((catalog_dir / "catalog.json").read_text())
@@ -226,17 +312,16 @@ def register_version(
 
 def resolve_version(ref: str, lineage_root: Path | None = None) -> dict:
     """``version.json`` for a version name (``v0``), full id, or unique id prefix (>= 8 hex chars)."""
-    names = load_names(lineage_root)
-    vid = names["versions"].get(ref, ref)
     vroot = _root(lineage_root) / "versions"
-    cand = [p.name for p in vroot.iterdir()] if vroot.is_dir() else []
-    matches = [c for c in cand if c == vid] or ([c for c in cand if c.startswith(vid)] if len(vid) >= 8 else [])
-    if len(matches) != 1:
-        raise LineageError(f"unknown or ambiguous version {ref!r}")
-    return json.loads((vroot / matches[0] / "version.json").read_text())
+    known = [p.name for p in vroot.iterdir()] if vroot.is_dir() else []
+    vid = _resolve_ref(ref, load_names(lineage_root)["versions"], known, "version")
+    return json.loads((vroot / vid / "version.json").read_text())
 
 
 def version_episodes(ref: str, lineage_root: Path | None = None) -> pd.DataFrame:
+    """The version's episode table: one row per episode, ``CATALOG_COLUMNS`` (plus
+    ``parent_content_hash`` for a derived version). It maps ``episode_id`` to this copy's positional
+    ``episode_index``, and it is what screening and attribution read; it never holds ground truth."""
     vid = resolve_version(ref, lineage_root)["dataset_version_id"]
     return pd.read_parquet(_root(lineage_root) / "versions" / vid / "episodes.parquet")
 
@@ -259,7 +344,9 @@ def recompute_version_id(ref: str, root: Path | None = None, lineage_root: Path 
 def verify_version(ref: str, root: Path | None = None, lineage_root: Path | None = None) -> dict:
     """Recompute every file digest of a dataset copy; raise ``VersionIntegrityError`` on any mismatch.
 
-    ``root`` overrides the registered location (e.g. to check a copy on another machine).
+    ``root`` overrides the registered location (e.g. to check a copy on another machine). Returns
+    ``{"version", "files_checked", "ok": True}``. ``train_run`` and ``derive_version`` call this before
+    reading a copy, so a single changed byte stops the stage before it starts.
     """
     v = resolve_version(ref, lineage_root)
     root = Path(root) if root is not None else REPO_ROOT / v["lerobot_root"]
@@ -307,6 +394,8 @@ class Subset:
 
     @property
     def subset_id(self) -> str:
+        """sha256 over (scheme, ``dataset_version_id``, sorted ``episode_ids``, ``derivation``): the same
+        episodes selected by a different rule get a different id, so the record keeps how it was made."""
         return sha256_json(
             {"scheme": SUBSET_SCHEME, "dataset_version_id": self.dataset_version_id,
              "episode_ids": list(self.episode_ids), "derivation": self.derivation}
@@ -330,11 +419,13 @@ class Subset:
         return sorted(int(i) for i in self.episodes(lineage_root)["episode_index"])
 
     def to_record(self) -> dict:
+        """The JSON record stored as ``subsets/<subset_id>.json``."""
         return {"subset_id": self.subset_id, "scheme": SUBSET_SCHEME, "dataset_version_id": self.dataset_version_id,
                 "n_episodes": len(self.episode_ids), "episode_ids": list(self.episode_ids),
                 "derivation": self.derivation}
 
     def save(self, lineage_root: Path | None = None) -> Path:
+        """Write ``subsets/<subset_id>.json`` (idempotent) after checking every id is in the version."""
         self.episodes(lineage_root)  # validates membership
         p = _root(lineage_root) / "subsets" / f"{self.subset_id}.json"
         _write_json(p, self.to_record())
@@ -342,17 +433,16 @@ class Subset:
 
     @classmethod
     def load(cls, ref: str, lineage_root: Path | None = None) -> "Subset":
-        """Load by subset name (``v0/candidate``), full id, or unique prefix (>= 8 hex chars)."""
-        sid = load_names(lineage_root)["subsets"].get(ref, ref)
+        """Load by subset name (``v0/candidate``), full id, or unique prefix (>= 8 hex chars).
+
+        Raises ``LineageError`` if the file's content no longer hashes to its id (edited by hand).
+        """
         sdir = _root(lineage_root) / "subsets"
-        cand = [p.stem for p in sdir.glob("*.json")]
-        matches = [c for c in cand if c == sid] or ([c for c in cand if c.startswith(sid)] if len(sid) >= 8 else [])
-        if len(matches) != 1:
-            raise LineageError(f"unknown or ambiguous subset {ref!r}")
-        rec = json.loads((sdir / f"{matches[0]}.json").read_text())
+        sid = _resolve_ref(ref, load_names(lineage_root)["subsets"], [p.stem for p in sdir.glob("*.json")], "subset")
+        rec = json.loads((sdir / f"{sid}.json").read_text())
         s = cls(rec["dataset_version_id"], tuple(rec["episode_ids"]), rec["derivation"])
         if s.subset_id != rec["subset_id"]:
-            raise LineageError(f"subset file {matches[0]} does not hash to its id (edited by hand?)")
+            raise LineageError(f"subset file {sid} does not hash to its id (edited by hand?)")
         return s
 
 
@@ -364,6 +454,10 @@ def make_splits(
     Rule: tasks are visited in (suite order, libero_task_id) order; within a task, episodes are sorted
     by demo number and ``numpy.random.default_rng(seed).choice(n, k, replace=False)`` (one generator,
     consumed in that task order) picks the reference episodes.
+
+    Writes both subsets, ``splits/<split_id>.json`` and the names ``<version>/reference`` and
+    ``<version>/candidate``. Deterministic, so re-running rewrites identical records. Returns
+    ``{"record": <split record>, "reference": Subset, "candidate": Subset}``.
     """
     v = resolve_version(version, lineage_root)
     vid = v["dataset_version_id"]
@@ -415,6 +509,8 @@ def score_table_digest(score_table: pd.DataFrame, metric: str) -> str:
 
 
 def _check_score_keys(parent: Subset, score_table: pd.DataFrame, metric: str, lineage_root: Path | None) -> None:
+    """Raise unless the score table keys exactly the parent's (episode_id, content_hash) pairs, once each,
+    with no NaN in ``metric``: no stale hashes, no unscored parent episodes, no extras."""
     for c in ("episode_id", "content_hash", metric):
         if c not in score_table.columns:
             raise LineageError(f"score table lacks column {c!r}")
@@ -483,6 +579,8 @@ def drop_random_k(parent: Subset, k: int, seed: int, lineage_root: Path | None =
     return child
 
 
+# Per-episode identity/hash columns: unique (or nearly) per episode, so "dropping a group" by them is
+# not a group ablation. drop_group refuses them.
 GROUP_COLUMNS_EXCLUDED = {"episode_id", "episode_index", "content_hash", "parent_content_hash", "init_state_sha256",
                           "source_file", "source_demo"}
 
@@ -495,13 +593,18 @@ def drop_group(parent: Subset, column: str, value, lineage_root: Path | None = N
     ablations, judged with the macro-KS gate".
 
     ``column`` must be a scalar §2.2 catalog column (``vlapoc.catalog.CATALOG_COLUMNS``, e.g. ``suite``,
-    ``task_name``, ``scene``, ``libero_task_id``); per-episode identity/hash columns and list columns
-    (``objects``) are rejected, and so is anything outside the catalog, so ground truth (which lives only
-    in a derived version's ``labels.parquet``) cannot be grouped on. Raises when ``value`` matches no
-    parent episode or every one.
-    """
-    from vlapoc.catalog import CATALOG_COLUMNS
+    ``task_name``, ``scene``); per-episode identity/hash columns and list columns (``objects``) are
+    rejected, and so is anything outside the catalog, so ground truth (which lives only in a derived
+    version's ``labels.parquet``) cannot be grouped on. Raises when ``value`` matches no parent episode
+    or every one.
 
+    Use ``task_name`` for leave-one-task-out. ``libero_task_id`` is the task's index *within its suite*
+    (0-9 in each suite), so ``drop_group(parent, "libero_task_id", 2)`` drops one task from each suite
+    (measured by the analyzer: 96 episodes from two tasks, one per suite, on a 960-episode candidate split).
+
+    The derivation records ``op``, ``column``, ``value`` (numpy scalars stored as plain Python values),
+    the parent subset id and the sorted dropped ids.
+    """
     if column not in CATALOG_COLUMNS or column in GROUP_COLUMNS_EXCLUDED:
         allowed = sorted(set(CATALOG_COLUMNS) - GROUP_COLUMNS_EXCLUDED - {"objects"})
         raise LineageError(f"drop_group: {column!r} is not a groupable catalog column; allowed: {allowed}")
@@ -549,7 +652,12 @@ def isolated_hf_datasets_cache(parent_dir: Path | None = None):
 
 
 def diff_versions(a: str, b: str, lineage_root: Path | None = None) -> dict:
-    """Episode-version difference between two dataset versions (by episode_id and content_hash)."""
+    """Episode-version difference between two dataset versions (by episode_id and content_hash).
+
+    Returns both full ids, the counts ``changed`` and ``identical`` (episodes present in both), the
+    sorted ``added``/``removed`` episode ids, and ``changed_ids``. Reads only the episode tables, not
+    the data files.
+    """
     ea = version_episodes(a, lineage_root).set_index("episode_id")["content_hash"]
     eb = version_episodes(b, lineage_root).set_index("episode_id")["content_hash"]
     common = ea.index.intersection(eb.index)
@@ -564,139 +672,204 @@ def diff_versions(a: str, b: str, lineage_root: Path | None = None) -> dict:
 
 
 # ---------------------------------------------------------------------------------------------
-# CLI
+# CLI (usage in the module docstring)
 # ---------------------------------------------------------------------------------------------
+# One handler per leaf command, attached with argparse's ``set_defaults(func=...)``. Handlers for the
+# MLflow-backed commands import ``vlapoc.runs`` / ``vlapoc.derive`` inside the function: both modules
+# import this one, so a top-level import here would be circular. (Under ``python -m vlapoc.lineage``
+# this file runs as ``__main__`` and ``vlapoc.runs`` loads a second copy as ``vlapoc.lineage``, which
+# is why an error raised from runs prints as ``vlapoc.lineage.LineageError``.)
 
 
 def _print(obj) -> None:
     print(json.dumps(obj, indent=2, sort_keys=True, default=str))
 
 
-def main(argv: list[str] | None = None) -> int:
+def _head(items: list, n: int) -> list:
+    """The first ``n`` items, plus a ``"... <k> more"`` marker when there are more."""
+    return items[:n] + ([f"... {len(items) - n} more"] if len(items) > n else [])
+
+
+def _cmd_version_register(a) -> None:
+    _print(register_version(a.root, a.name, a.catalog, note=a.note))
+
+
+def _cmd_version_show(a) -> None:
+    v = resolve_version(a.ref)
+    v["episodes_by_suite"] = version_episodes(a.ref).groupby("suite", sort=False).size().to_dict()
+    _print(v)
+
+
+def _cmd_version_verify(a) -> None:
+    _print(verify_version(a.ref, a.root))
+
+
+def _cmd_version_recompute(a) -> None:
+    registered = resolve_version(a.ref)["dataset_version_id"]
+    recomputed = recompute_version_id(a.ref, a.root)
+    _print({"registered": registered, "recomputed": recomputed, "match": recomputed == registered})
+
+
+def _cmd_version_diff(a) -> None:
+    out = diff_versions(a.a, a.b)
+    if not a.ids:
+        out["changed_ids"] = _head(out["changed_ids"], 3)
+    _print(out)
+    print(f"changed {out['changed']}, identical {out['identical']}, added {len(out['added'])}, removed {len(out['removed'])}")
+
+
+def _cmd_split_make(a) -> None:
+    if a.track:  # split_run calls make_splits inside its MLflow run and returns the same record
+        from vlapoc.runs import split_run
+
+        run_id, record = split_run(a.version, a.reference_per_task, a.seed)
+        print(json.dumps({"split_run_id": run_id}))
+    else:
+        record = make_splits(a.version, a.reference_per_task, a.seed)["record"]
+    _print(record)
+
+
+def _cmd_subset_show(a) -> None:
+    s = Subset.load(a.ref)
+    rec = s.to_record()
+    if not a.ids:
+        rec["episode_ids"] = f"<{len(s.episode_ids)} ids; --ids to print>"
+    rec["resolve_head"] = s.resolve()[:10]
+    _print(rec)
+
+
+def _cmd_names(a) -> None:
+    _print(load_names())
+
+
+def _cmd_build_verify(a) -> None:
+    from vlapoc.runs import build_run
+
+    print(json.dumps({"build_run_id": build_run(a.version)}))
+
+
+def _cmd_derive(a) -> None:
+    if a.no_track:
+        from vlapoc.derive import derive_demo_action_noise
+
+        _print(derive_demo_action_noise(a.parent, a.name, a.per_task, a.seed))
+    else:
+        from vlapoc.runs import derive_run
+
+        run_id, out = derive_run(a.parent, a.name, a.per_task, a.seed)
+        _print({"derive_run_id": run_id, **out})
+
+
+def _cmd_trace(a) -> None:
+    from vlapoc.runs import trace
+
+    _print(trace(a.run_id))
+
+
+def _cmd_consumers(a) -> None:
+    from vlapoc.runs import consumers
+
+    episode_id, _, content_hash = a.episode_version.rpartition("@")
+    _print(consumers(episode_id, content_hash))
+
+
+def _cmd_run_diff(a) -> None:
+    from vlapoc.runs import diff
+
+    out = diff(a.run_a, a.run_b)
+    if not a.ids:
+        for k in ("added", "removed", "changed_version"):
+            out["data"][k] = _head(out["data"][k], 5)
+    _print(out)
+
+
+def _cmd_check_scores(a) -> None:
+    from vlapoc.runs import check_scores
+
+    _print(check_scores(pd.read_parquet(a.table), a.train_run_id))
+
+
+def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="python -m vlapoc.lineage", description="Dataset versions, splits, subsets.")
     sub = p.add_subparsers(dest="cmd", required=True)
-    pv = sub.add_parser("version").add_subparsers(dest="vcmd", required=True)
-    r = pv.add_parser("register")
-    r.add_argument("--root", type=Path, required=True)
-    r.add_argument("--name", required=True)
-    r.add_argument("--catalog", type=Path, default=None)
-    r.add_argument("--note", default=None)
-    s = pv.add_parser("show")
-    s.add_argument("ref")
-    vv = pv.add_parser("verify")
-    vv.add_argument("ref")
-    vv.add_argument("--root", type=Path, default=None)
-    rc = pv.add_parser("recompute")
-    rc.add_argument("ref")
-    rc.add_argument("--root", type=Path, default=None)
-    ps = sub.add_parser("split").add_subparsers(dest="scmd", required=True)
-    m = ps.add_parser("make")
-    m.add_argument("--version", required=True)
-    m.add_argument("--reference-per-task", type=int, default=2)
-    m.add_argument("--seed", type=int, default=0)
-    m.add_argument("--track", action="store_true", help="record as an MLflow split run")
-    pss = sub.add_parser("subset").add_subparsers(dest="sscmd", required=True)
-    ss = pss.add_parser("show")
-    ss.add_argument("ref")
-    ss.add_argument("--ids", action="store_true", help="print the episode IDs too")
-    sub.add_parser("names")
-    vd = pv.add_parser("diff")
-    vd.add_argument("a")
-    vd.add_argument("b")
-    vd.add_argument("--ids", action="store_true")
-    pb = sub.add_parser("build").add_subparsers(dest="bcmd", required=True)
-    bv = pb.add_parser("verify", help="MLflow build run for an existing version (re-verify vs raw)")
-    bv.add_argument("version")
-    d = sub.add_parser("derive", help="S4 demo derivation (RoboDrop action noise), recorded as an MLflow run")
-    d.add_argument("--parent", default="v0")
-    d.add_argument("--name", default="v1")
-    d.add_argument("--demo-action-noise", action="store_true", required=True)
-    d.add_argument("--per-task", type=int, default=5)
-    d.add_argument("--seed", type=int, default=0)
-    d.add_argument("--no-track", action="store_true", help="derive without an MLflow run")
-    t = sub.add_parser("trace")
-    t.add_argument("run_id")
-    cs = sub.add_parser("consumers")
-    cs.add_argument("episode_version", help="<episode_id>@<content_hash>")
-    df_ = sub.add_parser("diff")
-    df_.add_argument("run_a")
-    df_.add_argument("run_b")
-    df_.add_argument("--ids", action="store_true")
-    ck = sub.add_parser("check-scores")
-    ck.add_argument("table", type=Path)
-    ck.add_argument("train_run_id")
-    a = p.parse_args(argv)
 
-    if a.cmd == "version" and a.vcmd == "register":
-        _print(register_version(a.root, a.name, a.catalog, note=a.note))
-    elif a.cmd == "version" and a.vcmd == "show":
-        v = resolve_version(a.ref)
-        eps = version_episodes(a.ref)
-        v["episodes_by_suite"] = eps.groupby("suite", sort=False).size().to_dict()
-        _print(v)
-    elif a.cmd == "version" and a.vcmd == "verify":
-        _print(verify_version(a.ref, a.root))
-    elif a.cmd == "version" and a.vcmd == "recompute":
-        v = resolve_version(a.ref)
-        new = recompute_version_id(a.ref, a.root)
-        _print({"registered": v["dataset_version_id"], "recomputed": new, "match": new == v["dataset_version_id"]})
-    elif a.cmd == "split":
-        if a.track:
-            from vlapoc.runs import split_run
+    version = sub.add_parser("version").add_subparsers(dest="vcmd", required=True)
+    c = version.add_parser("register")
+    c.add_argument("--root", type=Path, required=True)
+    c.add_argument("--name", required=True)
+    c.add_argument("--catalog", type=Path, default=None)
+    c.add_argument("--note", default=None)
+    c.set_defaults(func=_cmd_version_register)
+    c = version.add_parser("show")
+    c.add_argument("ref")
+    c.set_defaults(func=_cmd_version_show)
+    c = version.add_parser("verify")
+    c.add_argument("ref")
+    c.add_argument("--root", type=Path, default=None)
+    c.set_defaults(func=_cmd_version_verify)
+    c = version.add_parser("recompute")
+    c.add_argument("ref")
+    c.add_argument("--root", type=Path, default=None)
+    c.set_defaults(func=_cmd_version_recompute)
+    c = version.add_parser("diff")
+    c.add_argument("a")
+    c.add_argument("b")
+    c.add_argument("--ids", action="store_true")
+    c.set_defaults(func=_cmd_version_diff)
 
-            print(json.dumps({"split_run_id": split_run(a.version, a.reference_per_task, a.seed)}))
-        out = make_splits(a.version, a.reference_per_task, a.seed)
-        _print(out["record"])
-    elif a.cmd == "subset":
-        s = Subset.load(a.ref)
-        rec = s.to_record()
-        if not a.ids:
-            rec["episode_ids"] = f"<{len(s.episode_ids)} ids; --ids to print>"
-        rec["resolve_head"] = s.resolve()[:10]
-        _print(rec)
-    elif a.cmd == "names":
-        _print(load_names())
-    elif a.cmd == "version" and a.vcmd == "diff":
-        out = diff_versions(a.a, a.b)
-        if not a.ids:
-            out["changed_ids"] = out["changed_ids"][:3] + ([f"... {len(out['changed_ids']) - 3} more"] if len(out["changed_ids"]) > 3 else [])
-        _print(out)
-        print(f"changed {out['changed']}, identical {out['identical']}, added {len(out['added'])}, removed {len(out['removed'])}")
-    elif a.cmd == "build":
-        from vlapoc.runs import build_run
+    c = sub.add_parser("split").add_subparsers(dest="scmd", required=True).add_parser("make")
+    c.add_argument("--version", required=True)
+    c.add_argument("--reference-per-task", type=int, default=2)
+    c.add_argument("--seed", type=int, default=0)
+    c.add_argument("--track", action="store_true", help="record as an MLflow split run")
+    c.set_defaults(func=_cmd_split_make)
 
-        print(json.dumps({"build_run_id": build_run(a.version)}))
-    elif a.cmd == "derive":
-        if a.no_track:
-            from vlapoc.derive import derive_demo_action_noise
+    c = sub.add_parser("subset").add_subparsers(dest="sscmd", required=True).add_parser("show")
+    c.add_argument("ref")
+    c.add_argument("--ids", action="store_true", help="print the episode IDs too")
+    c.set_defaults(func=_cmd_subset_show)
 
-            _print(derive_demo_action_noise(a.parent, a.name, a.per_task, a.seed))
-        else:
-            from vlapoc.runs import derive_run
+    sub.add_parser("names").set_defaults(func=_cmd_names)
 
-            rid, out = derive_run(a.parent, a.name, a.per_task, a.seed)
-            _print({"derive_run_id": rid, **out})
-    elif a.cmd == "trace":
-        from vlapoc.runs import trace
+    c = sub.add_parser("build").add_subparsers(dest="bcmd", required=True).add_parser(
+        "verify", help="MLflow build run for an existing version (re-verify vs raw)")
+    c.add_argument("version")
+    c.set_defaults(func=_cmd_build_verify)
 
-        _print(trace(a.run_id))
-    elif a.cmd == "consumers":
-        from vlapoc.runs import consumers
+    c = sub.add_parser("derive", help="S4 demo derivation (RoboDrop action noise), recorded as an MLflow run")
+    c.add_argument("--parent", default="v0")
+    c.add_argument("--name", default="v1")
+    c.add_argument("--demo-action-noise", action="store_true", required=True)
+    c.add_argument("--per-task", type=int, default=5)
+    c.add_argument("--seed", type=int, default=0)
+    c.add_argument("--no-track", action="store_true", help="derive without an MLflow run")
+    c.set_defaults(func=_cmd_derive)
 
-        eid, _, h = a.episode_version.rpartition("@")
-        _print(consumers(eid, h))
-    elif a.cmd == "diff":
-        from vlapoc.runs import diff
+    c = sub.add_parser("trace")
+    c.add_argument("run_id")
+    c.set_defaults(func=_cmd_trace)
+    c = sub.add_parser("consumers")
+    c.add_argument("episode_version", help="<episode_id>@<content_hash>")
+    c.set_defaults(func=_cmd_consumers)
+    c = sub.add_parser("diff")
+    c.add_argument("run_a")
+    c.add_argument("run_b")
+    c.add_argument("--ids", action="store_true")
+    c.set_defaults(func=_cmd_run_diff)
+    c = sub.add_parser("check-scores")
+    c.add_argument("table", type=Path)
+    c.add_argument("train_run_id")
+    c.set_defaults(func=_cmd_check_scores)
+    return p
 
-        out = diff(a.run_a, a.run_b)
-        if not a.ids:
-            for k in ("added", "removed", "changed_version"):
-                out["data"][k] = out["data"][k][:5] + ([f"... {len(out['data'][k]) - 5} more"] if len(out["data"][k]) > 5 else [])
-        _print(out)
-    elif a.cmd == "check-scores":
-        from vlapoc.runs import check_scores
 
-        _print(check_scores(pd.read_parquet(a.table), a.train_run_id))
+def main(argv: list[str] | None = None) -> int:
+    """Parse ``argv`` (default: ``sys.argv[1:]``), run the chosen command, return exit code 0.
+
+    Errors propagate as exceptions (non-zero exit with a traceback); argparse errors exit with 2.
+    """
+    args = _build_parser().parse_args(argv)
+    args.func(args)
     return 0
 
 

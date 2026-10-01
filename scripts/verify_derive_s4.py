@@ -5,6 +5,13 @@ Grounding: PoC §2.1 item 4 p.3, §2.5 p.5, §8.7 p.15 ("corrupt only the traini
 
     .venv/bin/python scripts/verify_derive_s4.py --guard --padding   # AC4.3, AC4.4 (scratch lineage root)
     .venv/bin/python scripts/verify_derive_s4.py --v1                # AC4.1, AC4.2, AC4.5 on the real v1
+    .venv/bin/python scripts/verify_derive_s4.py --columns --cache   # AC4.7 column listing, AC4.8 cache check
+
+Costs: ``--padding`` derives a full-scale copy of v0 (~7 GB, ~5 min) under ``data/lerobot/`` and
+deletes it; ``--v1`` loads all of v1 inside an isolated temp cache (~7 GB transient); ``--cache``
+converts and derives a 20-episode parent under ``data/scratch/`` (under a minute). ``--guard``, ``--columns``
+and ``--v1`` only read the real store. Every run merges its results into
+``artifacts/s4_summary.json`` (``--v1`` also rewrites ``artifacts/s4_labels_head10.csv``).
 """
 
 from __future__ import annotations
@@ -48,6 +55,7 @@ SCRATCH_OUT = REPO_ROOT / "data" / "lerobot" / "_scratch_s4_padding"
 
 
 def guard(summary: dict) -> None:
+    """AC4.3: editing a reference-split episode of v0 raises before anything is written."""
     ref = Subset.load("v0/reference")
     victim = ref.episode_ids[0]
     target = REPO_ROOT / "data" / "lerobot" / "libero_spatial_10__should_not_exist"
@@ -63,6 +71,7 @@ def guard(summary: dict) -> None:
 
 
 def padding(summary: dict) -> None:
+    """AC4.4: a length-changing edit (20 idle frames) at full scale, in a scratch lineage root."""
     for p in (SCRATCH_LINEAGE, SCRATCH_OUT):
         if p.exists():
             shutil.rmtree(p)
@@ -114,6 +123,7 @@ def padding(summary: dict) -> None:
 
 
 def v1(summary: dict) -> None:
+    """AC4.1, AC4.2, AC4.5 on the real v1: diff vs v0, recompute + verify, labels join, noise statistics."""
     v0, v1_ = resolve_version("v0"), resolve_version("v1")
     d = diff_versions("v0", "v1")
     labels = load_labels("v1")
@@ -222,6 +232,7 @@ def small_parent(base: Path, lr: Path) -> str:
 
 
 def cache_listing(d: Path) -> tuple[list[str], int]:
+    """(sorted relative file paths, total bytes) of a cache directory; ``([], 0)`` if it is missing."""
     files = sorted(p for p in d.rglob("*") if p.is_file()) if d.exists() else []
     return [str(p.relative_to(d)) for p in files], sum(p.stat().st_size for p in files)
 
@@ -279,6 +290,7 @@ def cache(summary: dict) -> None:
 
 
 def main() -> int:
+    """Run the selected checks (usage in the module docstring) and merge them into ``s4_summary.json``."""
     p = argparse.ArgumentParser()
     p.add_argument("--guard", action="store_true")
     p.add_argument("--padding", action="store_true")

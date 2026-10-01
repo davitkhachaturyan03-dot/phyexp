@@ -40,6 +40,20 @@ Deliberate divergences from the hub LIBERO datasets (``lerobot/libero``, ``Huggi
 Episode order in the output: suites in ``SUITES`` order, tasks in LIBERO benchmark order, demos in
 numeric ``demo_<k>`` order. LeRobot's ``episode_index`` is positional and is NOT the episode's identity;
 ``vlapoc.catalog`` assigns the stable ``episode_id``.
+
+Where it sits
+-------------
+First step of the pipeline (docs/dataflow.md, the "LIBERO demos (50/task, human teleop)" box):
+raw HDF5 under ``data/raw/libero/`` in, the v0 dataset under ``data/lerobot/libero_spatial_10/`` out.
+``vlapoc.catalog`` then hashes every stored episode, and ``vlapoc.lineage`` registers the result as
+version ``v0``. ``load_raw_episode`` is also reused by the catalog to re-hash raw data.
+
+Usage (from the repo root)::
+
+    .venv/bin/python -m vlapoc.libero_convert --out data/lerobot/libero_spatial_10
+    .venv/bin/python -m vlapoc.libero_convert --out data/scratch/smoke20 --limit-per-task 1   # smoke test
+
+The full conversion took 7.9 min and wrote 7.36 GB (file bytes) on the M4 Pro (execution log, S1).
 """
 
 from __future__ import annotations
@@ -113,8 +127,13 @@ FEATURES: dict[str, dict] = {
 
 @dataclass(frozen=True)
 class RawEpisodeRef:
-    """Where one raw demonstration lives. ``source_file`` is relative to the raw root's parent's
-    parent (i.e. to the repo root when using the default layout) so it is machine-independent."""
+    """Where one raw demonstration lives, plus its task coordinates.
+
+    ``source_file`` is a repo-relative POSIX path, so it is machine-independent; it falls back to the
+    absolute path only if the raw root lies outside the repository (see ``_rel``).
+    ``libero_task_id`` is the task's position in the LIBERO benchmark order *within its suite*
+    (0-9 in each suite), so it is not unique across suites; ``task_name`` is.
+    """
 
     suite: str
     libero_task_id: int
@@ -129,10 +148,16 @@ def raw_task_path(raw_root: Path, suite: str, task_name: str) -> Path:
 
 
 def _demo_keys(h5: h5py.File) -> list[str]:
+    """``demo_<k>`` keys of a raw file in numeric order (string order would put demo_10 before demo_2)."""
     return sorted(h5["data"].keys(), key=lambda s: int(s.split("_")[1]))
 
 
 def _rel(path: Path) -> str:
+    """Repo-relative POSIX path, or the absolute path for a file outside the repo.
+
+    Unlike ``vlapoc.lineage.rel``, this does not refuse outside paths: the converter may be pointed at
+    raw data anywhere, while the lineage store must never record an absolute path.
+    """
     try:
         return path.resolve().relative_to(REPO_ROOT).as_posix()
     except ValueError:
@@ -140,7 +165,13 @@ def _rel(path: Path) -> str:
 
 
 def iter_raw_episodes(raw_root: Path = DEFAULT_RAW_ROOT, limit_per_task: int | None = None):
-    """Yield every raw demo in output order: suite, LIBERO task order, numeric demo order."""
+    """Yield a ``RawEpisodeRef`` for every raw demo in output order: suite, LIBERO task order, numeric demo order.
+
+    This order *is* the converted dataset's ``episode_index`` order (the converter writes episodes in
+    it), which ``vlapoc.catalog.build_catalog`` relies on to line raw rows up with stored episodes.
+    ``limit_per_task`` keeps only the first k demos of each task (smoke tests). Raises
+    ``FileNotFoundError`` if any of the 20 task files is missing.
+    """
     for suite in SUITES:
         for task_id, task_name in enumerate(LIBERO_TASK_ORDER[suite]):
             path = raw_task_path(raw_root, suite, task_name)
@@ -205,6 +236,19 @@ def convert(
     """Write the LeRobot v3 dataset with LeRobot's own writer (create/add_frame/save_episode/finalize).
 
     No filtering: every demo in every raw file is written at full length.
+
+    Args:
+        out_root: dataset root to create. LeRobot refuses an existing root, so with ``overwrite=True``
+            an existing *LeRobot* root (one with ``meta/info.json``) is deleted first; any other
+            non-empty directory is refused.
+        raw_root: directory holding ``<suite>/<task>_demo.hdf5``.
+        repo_id: LeRobot repo id recorded in the dataset (local only; nothing is pushed).
+        limit_per_task: first k demos per task (smoke tests); ``None`` = all 50.
+        image_writer_threads: LeRobot's async PNG writer threads (4 measured 449 vs 296 frames/s at 0).
+        log_every: print progress every n episodes.
+
+    Returns:
+        ``{"episodes", "frames", "wall_time_s", "root"}`` with ``root`` repo-relative.
     """
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
@@ -260,6 +304,7 @@ def convert(
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entry (usage in the module docstring); prints the ``convert`` summary as JSON."""
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--out", type=Path, default=DEFAULT_OUT)
     p.add_argument("--raw", type=Path, default=DEFAULT_RAW_ROOT)

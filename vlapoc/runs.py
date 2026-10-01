@@ -37,6 +37,19 @@ How lineage is encoded in MLflow (all verified against mlflow 3.16.1 source/beha
   FAILED) but never becomes a lineage edge.
 - Stand-in stages (no real screening, rollouts or attribution yet) carry ``vlapoc.stand_in=true``
   and write only lineage keys plus clearly named placeholder payloads; no outcome numbers.
+
+Where it sits
+-------------
+This module records the whole of docs/dataflow.md as runs. Stage tags map to the diagram as
+follows: ``build``/``split``/``derive`` are the data preparation before Step 1, ``screen`` is Step 1,
+``train`` is the implicit training run between Steps 1 and 2 (dataflow.md, "Training is never
+numbered"), ``eval`` is Step 2, ``attribute`` is Step 3, and ``select`` plus the retraining is Step 4.
+``screen``, ``eval`` and ``attribute`` are stand-ins until their features exist. The queries
+(``trace``, ``consumers``, ``diff``, ``check_scores``) read the runs back.
+
+There is no CLI here; ``python -m vlapoc.lineage`` exposes ``build verify``, ``split make --track``,
+``derive``, ``trace``, ``consumers``, ``diff`` and ``check-scores`` (see its module docstring), and
+``scripts/lineage_dry_run.py`` drives every stage end to end.
 """
 
 from __future__ import annotations
@@ -55,13 +68,16 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+# Set before mlflow is imported: mlflow prints an "agent hint" on import otherwise (execution log, S5).
 os.environ.setdefault("MLFLOW_DISABLE_AGENT_HINT", "1")
+# Dataset sources are passed as repo-relative strings (see StageRun.input_subset); MLflow warns that
+# such a string matches more than one source type and then picks the local-artifact one.
 warnings.filterwarnings("ignore", message="The specified dataset source can be interpreted in multiple ways")
 
 import mlflow  # noqa: E402
 from mlflow.tracking import MlflowClient  # noqa: E402
 
-from vlapoc.catalog import sha256_file  # noqa: E402
+from vlapoc.catalog import build_catalog, raw_file_hashes, sha256_file  # noqa: E402
 from vlapoc.libero_convert import REPO_ROOT  # noqa: E402
 from vlapoc.lineage import (  # noqa: E402
     LineageError,
@@ -70,6 +86,8 @@ from vlapoc.lineage import (  # noqa: E402
     drop_group,
     drop_random_k,
     drop_top_k,
+    make_splits,
+    recompute_version_id,
     rel,
     resolve_version,
     score_table_digest,
@@ -93,15 +111,19 @@ BOOKKEEPING_PARAMS = {"output_dir", "run_name", "subset_id", "n_episodes", "n_fr
 
 
 def tracking_uri(lineage_root: Path | None = None) -> str:
+    """``sqlite:///<abs path>/mlflow.db`` of the lineage store (MLflow needs an absolute path here)."""
     return f"sqlite:///{(_root(lineage_root) / 'mlflow.db').resolve()}"
 
 
 def client(lineage_root: Path | None = None) -> MlflowClient:
+    """An ``MlflowClient`` on the store's SQLite DB (MLflow creates the tables on first use)."""
     _root(lineage_root).mkdir(parents=True, exist_ok=True)
     return MlflowClient(tracking_uri=tracking_uri(lineage_root))
 
 
 def experiment_id(lineage_root: Path | None = None) -> str:
+    """Id of the single experiment ``vlapoc-lineage``, created on first use with its artifacts in
+    ``<lineage_root>/mlartifacts``. Every stage run of every chain lives in this one experiment."""
     c = client(lineage_root)
     e = c.get_experiment_by_name(EXPERIMENT)
     if e is not None:
@@ -112,14 +134,12 @@ def experiment_id(lineage_root: Path | None = None) -> str:
 
 
 def git_state() -> dict:
+    """``{"sha": HEAD, "dirty": bool, "dirty_files": [...]}``; dirty means tracked or untracked changes
+    under ``vlapoc/`` or ``scripts/`` (changes elsewhere, e.g. in tracker/, do not count)."""
     sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, capture_output=True, text=True, check=True).stdout.strip()
     dirty = subprocess.run(["git", "status", "--porcelain", "--", *SOURCE_DIRS], cwd=REPO_ROOT,
                            capture_output=True, text=True, check=True).stdout.strip()
     return {"sha": sha, "dirty": bool(dirty), "dirty_files": dirty.splitlines()[:10]}
-
-
-def _sha256_bytes(b: bytes) -> str:
-    return hashlib.sha256(b).hexdigest()
 
 
 # ---------------------------------------------------------------------------------------------
@@ -128,7 +148,11 @@ def _sha256_bytes(b: bytes) -> str:
 
 
 class StageRun:
-    """Handle for the active MLflow run of one stage execution."""
+    """Handle for the active MLflow run of one stage execution (yielded by ``stage_run``).
+
+    Its methods record what the stage consumed (``input_*``) and produced (``produced``,
+    ``output_file``) in the encoding described in the module docstring.
+    """
 
     def __init__(self, run_id: str, lineage_root: Path | None):
         self.run_id = run_id
@@ -137,12 +161,19 @@ class StageRun:
 
     # inputs -------------------------------------------------------------------------------
     def input_subset(self, subset: Subset, role: str, label: str | None = None) -> None:
-        """Log the exact episode versions this stage consumes (one MLflow dataset input)."""
+        """Log the exact episode versions this stage consumes (one MLflow dataset input).
+
+        The dataset is the subset's (episode_id, content_hash) table; ``role`` becomes the MLflow
+        input context (e.g. ``training``, ``parent``) and ``label`` its display name.
+        """
         path = _root(self.lineage_root) / "subsets" / f"{subset.subset_id}.json"
         if not path.is_file():
             subset.save(self.lineage_root)
+        # ``source`` is the repo-relative manifest path as a plain string: MLflow resolves it to a
+        # LocalArtifactDatasetSource and keeps the relative URI (measured). That class is generated at
+        # run time in mlflow.data.artifact_dataset_sources and cannot be imported by name.
         ds = mlflow.data.from_pandas(
-            subset.keys(self.lineage_root), source=_local_source(rel(path)),
+            subset.keys(self.lineage_root), source=rel(path),
             name=label or f"subset:{subset.subset_id[:12]}", digest=subset.subset_id[:DIGEST_LEN],
         )
         mlflow.log_input(ds, context=role, tags={"vlapoc.kind": "subset", "vlapoc.id": subset.subset_id,
@@ -150,21 +181,24 @@ class StageRun:
         mlflow.set_tag(f"input.{role}", f"subset:{subset.subset_id}")
 
     def input_version(self, version: str, role: str) -> None:
+        """Log a whole dataset version as consumed (e.g. the parent of a derivation)."""
         v = resolve_version(version, self.lineage_root)
         vid = v["dataset_version_id"]
         keys = version_episodes(vid, self.lineage_root)[["episode_id", "content_hash"]]
         vpath = _root(self.lineage_root) / "versions" / vid / "version.json"
-        ds = mlflow.data.from_pandas(keys, source=_local_source(rel(vpath)), name=f"version:{v['name']}",
+        ds = mlflow.data.from_pandas(keys, source=rel(vpath), name=f"version:{v['name']}",
                                      digest=vid[:DIGEST_LEN])
         mlflow.log_input(ds, context=role, tags={"vlapoc.kind": "version", "vlapoc.id": vid,
                                                  "vlapoc.dataset_version_id": vid})
         mlflow.set_tag(f"input.{role}", f"version:{vid}")
 
     def input_entity(self, kind: str, entity_id: str, role: str) -> None:
+        """Record a non-episode input (checkpoint, score table, rollouts) as tag ``input.<role>``."""
         mlflow.set_tag(f"input.{role}", f"{kind}:{entity_id}")
 
     # outputs ------------------------------------------------------------------------------
     def produced(self, kind: str, entity_id: str, name: str) -> None:
+        """Mark ``entity_id`` as created by this run: ``produced.<id[:32]>`` is what ``producers`` searches."""
         mlflow.set_tag(f"produced.{entity_id[:DIGEST_LEN]}", f"{kind}:{entity_id}")
         mlflow.set_tag(f"output.{name}", f"{kind}:{entity_id}")
         self.outputs[name] = f"{kind}:{entity_id}"
@@ -179,23 +213,24 @@ class StageRun:
         return sha
 
     def params(self, d: dict) -> None:
+        """Log MLflow params; dict and list values are stored as sorted-key JSON strings."""
         mlflow.log_params({k: (json.dumps(v, sort_keys=True) if isinstance(v, (dict, list)) else v) for k, v in d.items()})
 
     def tags(self, d: dict) -> None:
+        """Set MLflow tags (values stringified)."""
         mlflow.set_tags({k: str(v) for k, v in d.items()})
-
-
-def _local_source(uri: str) -> str:
-    """Repo-relative manifest path; MLflow resolves it to a LocalArtifactDatasetSource with the relative
-    URI kept (measured). That class is generated dynamically in mlflow.data.artifact_dataset_sources and
-    cannot be imported by name, so the string is passed; the resolver's ambiguity warning is silenced."""
-    return uri
 
 
 @contextmanager
 def stage_run(stage: str, name: str, lineage_root: Path | None = None, stand_in: bool = False,
               allow_dirty: bool = False, chain: str | None = None, extra_tags: dict | None = None):
-    """One MLflow run for one execution of a PoC stage (see module docstring for the encoding)."""
+    """One MLflow run for one execution of a PoC stage (see module docstring for the encoding).
+
+    Yields a ``StageRun``. Raises ``LineageError`` before creating any run if ``vlapoc/`` or
+    ``scripts/`` has uncommitted changes (unless ``allow_dirty``). ``chain`` groups the runs of one
+    end-to-end experiment (tag ``vlapoc.chain``). An exception inside the block ends the run as
+    FAILED, and FAILED runs never form lineage edges.
+    """
     if stage not in STAGES:
         raise ValueError(f"stage must be one of {STAGES}")
     g = git_state()
@@ -225,10 +260,10 @@ def build_run(version: str = "v0", lineage_root: Path | None = None, chain: str 
     Mode ``verify_existing``: the conversion itself ran before tracking existed (S1). This run recomputes
     the version id from the stored bytes, re-hashes every episode from raw HDF5 (1000/1000 must match)
     and re-hashes the raw files, then records the version as this run's product.
-    """
-    from vlapoc.catalog import build_catalog, raw_file_hashes
-    from vlapoc.lineage import recompute_version_id
 
+    The raw files' sha256 table is logged as the artifact ``raw_files.parquet``; ``trace`` ends here
+    and reads it. Returns the run id (~50 s for v0 with ``verify_raw``).
+    """
     v = resolve_version(version, lineage_root)
     vid = v["dataset_version_id"]
     vdir = _root(lineage_root) / "versions" / vid
@@ -264,10 +299,12 @@ def build_run(version: str = "v0", lineage_root: Path | None = None, chain: str 
 
 
 def split_run(version: str = "v0", reference_per_task: int = 2, seed: int = 0, lineage_root: Path | None = None,
-              chain: str | None = None) -> str:
-    """Stage ``split``: held-out reference / candidate split (deterministic; same ids on re-run)."""
-    from vlapoc.lineage import make_splits
+              chain: str | None = None) -> tuple[str, dict]:
+    """Stage ``split``: held-out reference / candidate split (deterministic; same ids on re-run).
 
+    Consumes ``<version>/all``, produces the two subsets and the split record (``make_splits``).
+    Returns ``(run_id, split_record)``.
+    """
     v = resolve_version(version, lineage_root)
     all_s = Subset(v["dataset_version_id"], tuple(version_episodes(v["dataset_version_id"], lineage_root)["episode_id"]), {"op": "all"})
     with stage_run("split", f"split-{v['name']}", lineage_root, chain=chain) as r:
@@ -280,12 +317,17 @@ def split_run(version: str = "v0", reference_per_task: int = 2, seed: int = 0, l
         r.output_file("split_record", split_path, kind="split", entity_id=rec["split_id"])
         r.produced("subset", out["reference"].subset_id, f"subset.{v['name']}/reference")
         r.produced("subset", out["candidate"].subset_id, f"subset.{v['name']}/candidate")
-        return r.run_id
+        return r.run_id, rec
 
 
 def derive_run(parent: str = "v0", name: str = "v1", per_task: int = 5, seed: int = 0,
                lineage_root: Path | None = None, chain: str | None = None) -> tuple[str, dict]:
-    """Stage ``derive``: the S4 demo derivation (RoboDrop action noise) recorded as a run."""
+    """Stage ``derive``: the S4 demo derivation (RoboDrop action noise) recorded as a run.
+
+    Consumes the parent version and its ``candidate`` subset (the pool corrupted episodes are drawn
+    from); produces the child version, its labels and its three inherited subsets. Returns
+    ``(run_id, derive_version summary)``. Full scale: ~5 min and a ~6.8 GB dataset copy.
+    """
     from vlapoc.derive import derive_demo_action_noise
 
     pv = resolve_version(parent, lineage_root)
@@ -311,6 +353,7 @@ def derive_run(parent: str = "v0", name: str = "v1", per_task: int = 5, seed: in
 
 
 def _ckpt_files(pretrained: Path) -> dict[str, Path]:
+    """The files of a LeRobot ``pretrained_model`` checkpoint dir that a train run hashes and records."""
     files = {"weights": pretrained / "model.safetensors", "train_config": pretrained / "train_config.json",
              "policy_config": pretrained / "config.json"}
     norm = sorted(pretrained.glob("policy_preprocessor_step_*_normalizer_processor.safetensors"))
@@ -329,6 +372,21 @@ def train_run(subset_ref: str, name: str, seed: int = 0, steps: int = 5, batch_s
 
     Refuses to launch (raises ``VersionIntegrityError``, no MLflow run is created) if any file of the
     dataset copy differs from its registered digest.
+
+    Args:
+        subset_ref: the training subset (name or id). Its ``resolve()`` list becomes LeRobot's
+            ``dataset.episodes``; nothing else varies between runs of one experiment except ``seed``.
+        steps, batch_size, policy_type, policy_overrides, device: the LeRobot training config.
+        dataset_root: train on a copy elsewhere (it is verified against the version first).
+        runs_root: where ``<name>-<UTC stamp>/`` is created (default ``data/runs``).
+
+    Returns:
+        ``{"run_id", "checkpoint", "weights_sha256", "normalizer_sha256", "episodes_match",
+        "out_dir", "n_episodes", "seconds"}``, paths repo-relative.
+
+    LeRobot runs in a subprocess (``vlapoc.lerobot_train_entry``, stdout in ``train_stdout.log``). After
+    it finishes, the checkpoint's own ``train_config.json`` must list exactly the subset's episode
+    indices, or the run fails.
 
     Disk note (measured 2026-09-29): LeRobot 0.6.1 loads episodes with
     ``datasets.Dataset.from_parquet(paths, filters=episode_index.isin(...))``, and HF ``datasets`` writes an
@@ -527,7 +585,12 @@ def select_run(parent: str, name: str, op: str, k: int | None = None, seed: int 
     - ``drop_random_k`` (§9.1 Step 4 p.19 control): drop k random episodes, seeded. A random subset of
       size n for datamodels-style regression (§2.1 item 5 p.4) is ``k = N - n``.
     - ``drop_group`` (§2.1 item 5 p.3; §10 p.20 "Group-level leave-one-out ablations"): drop every
-      episode whose catalog ``column == value``.
+      episode whose catalog ``column == value`` (``task_name`` for leave-one-task-out; see
+      ``vlapoc.lineage.drop_group``).
+
+    Returns ``(run_id, child Subset)``. The ``select.dropped`` tag holds the dropped ids as JSON cut
+    at 7,900 characters (a prefix for large drops); the child's ``derivation["dropped"]`` is the full
+    record.
     """
     if op not in SELECT_OPS:
         raise ValueError(f"op must be one of {SELECT_OPS}")
@@ -578,6 +641,10 @@ def _inputs(run) -> list[dict]:
 
 
 def producers(entity_id: str, lineage_root: Path | None = None) -> list:
+    """FINISHED runs that tagged ``entity_id`` as produced (normally exactly one).
+
+    The tag search matches the 32-char prefix; the full id in the tag value is then compared.
+    """
     c = client(lineage_root)
     runs = c.search_runs([experiment_id(lineage_root)], filter_string=f"tags.`produced.{entity_id[:DIGEST_LEN]}` LIKE '%'")
     return [r for r in runs if r.info.status == "FINISHED"
@@ -585,6 +652,7 @@ def producers(entity_id: str, lineage_root: Path | None = None) -> list:
 
 
 def _short(run) -> dict:
+    """Compact run summary used in query results."""
     t = run.data.tags
     return {"run_id": run.info.run_id, "name": run.info.run_name, "stage": t.get("stage"),
             "stand_in": t.get("vlapoc.stand_in") == "true", "git": t.get("mlflow.source.git.commit", "")[:12],
@@ -592,7 +660,13 @@ def _short(run) -> dict:
 
 
 def trace(run_id: str, lineage_root: Path | None = None) -> dict:
-    """Walk upstream from a run through producer links to the build run and its raw-file sha256s."""
+    """Walk upstream from a run through producer links to the build run and its raw-file sha256s.
+
+    Breadth-first over "this run consumed X; which run produced X?". Returns ``{"root", "runs":
+    {run_id: summary}, "edges": [{"run", "consumes", "role", "produced_by"}], "entities",
+    "raw_files"}``. An edge whose ``produced_by`` is empty is a dead end: something was consumed that
+    no recorded run produced.
+    """
     c = client(lineage_root)
     nodes, edges, entities = {}, [], {}
     raw_files = None
@@ -623,7 +697,12 @@ def trace(run_id: str, lineage_root: Path | None = None) -> dict:
 
 
 def consumers(episode_id: str, content_hash: str, lineage_root: Path | None = None) -> list[dict]:
-    """Runs whose consumed episode sets contain this exact episode version."""
+    """Runs whose consumed episode sets contain this exact episode version.
+
+    First finds every subset and version (on disk) that contains (``episode_id``, ``content_hash``),
+    then searches runs by their dataset digests. The same episode at a different content hash (e.g.
+    its clean v0 version vs its corrupted v1 version) has different consumers.
+    """
     lr = _root(lineage_root)
     ids = []
     for p in sorted((lr / "subsets").glob("*.json")):
@@ -652,6 +731,7 @@ def consumers(episode_id: str, content_hash: str, lineage_root: Path | None = No
 
 
 def _training_subset(run, lineage_root) -> Subset:
+    """The subset a train run consumed in role ``training``."""
     for i in _inputs(run):
         if i["kind"] == "subset" and i["role"] == "training":
             return Subset.load(i["id"], lineage_root)
@@ -659,6 +739,7 @@ def _training_subset(run, lineage_root) -> Subset:
 
 
 def _flatten(d, prefix=""):
+    """Nested dict -> ``{"a.b.c": value}``, so two LeRobot configs can be compared key by key."""
     out = {}
     for k, v in d.items():
         key = f"{prefix}{k}"
@@ -671,7 +752,12 @@ def _flatten(d, prefix=""):
 
 def diff(run_a: str, run_b: str, lineage_root: Path | None = None) -> dict:
     """What changed between two train runs: episodes added / removed / changed version, seed and other
-    params, LeRobot config, git SHA (PoC §2.1 p.3 "what changed between the good run and the bad run?")."""
+    params, LeRobot config, git SHA (PoC §2.1 p.3 "what changed between the good run and the bad run?").
+
+    Keys that identify a run rather than define it (output dirs, run names, the episode list, which
+    is reported under ``data``) are left out of ``params``/``config`` and listed in
+    ``ignored_bookkeeping``. The configs compared are the checkpoints' own ``train_config.json``.
+    """
     c = client(lineage_root)
     ra, rb = c.get_run(run_a), c.get_run(run_b)
     sa, sb = _training_subset(ra, lineage_root), _training_subset(rb, lineage_root)
@@ -706,7 +792,12 @@ def diff(run_a: str, run_b: str, lineage_root: Path | None = None) -> dict:
 
 
 def check_scores(table: pd.DataFrame, train_run_id: str, lineage_root: Path | None = None) -> dict:
-    """Reject score rows whose (episode_id, content_hash) is not in the run's training subset (§9.2 p.19)."""
+    """Reject score rows whose (episode_id, content_hash) is not in the run's training subset (§9.2 p.19).
+
+    ``table`` needs ``episode_id`` and ``content_hash`` columns. Raises ``LineageError`` naming the
+    first bad row; otherwise returns ``{"rows", "training_episodes", "covered", "ok": True}``. Rows may
+    cover only part of the training subset (``covered`` says how much).
+    """
     run = client(lineage_root).get_run(train_run_id)
     subset = _training_subset(run, lineage_root)
     keys = set(subset.keys(lineage_root).itertuples(index=False, name=None))

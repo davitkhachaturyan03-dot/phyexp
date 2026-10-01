@@ -63,6 +63,23 @@ only ``reward == 1`` is at its last step (re-verified by ``--verify-raw``), so t
 first success and ``duration_s`` is the human time-to-success T that the evaluation feature uses as the
 HRT reference (PoC §3.5 pp. 7-8). The PoC notes this is approximate because demos and rollouts do not
 share initial states (p. 8).
+
+Where it sits
+-------------
+Second step (docs/dataflow.md, between "LIBERO demos" and the training dataset). It reads the
+dataset ``vlapoc.libero_convert`` wrote, and writes ``data/lineage/catalog/<dataset>/`` with
+``episodes.parquet`` (one row per episode, ``CATALOG_COLUMNS``), ``raw_files.parquet`` (sha256 of
+each raw HDF5 file) and ``catalog.json``. ``vlapoc.lineage.register_version`` copies these into the
+version directory. ``hash_stored_dataset`` and ``episode_content_hash`` are reused everywhere a
+hash is recomputed: version recompute (S3), derivation re-checks (S4) and the build run (S5).
+
+Usage (from the repo root)::
+
+    .venv/bin/python -m vlapoc.catalog --version v0 --verify-raw              # rebuild v0's catalog (~30 s)
+    .venv/bin/python -m vlapoc.catalog --version v0 --verify-raw --out data/scratch/catalog_check
+
+Without ``--out`` this overwrites ``data/lineage/catalog/libero_spatial_10/``. A rebuild from
+unchanged data is identical to the stored catalog (measured).
 """
 
 from __future__ import annotations
@@ -103,13 +120,20 @@ _SCENE_PREFIX = re.compile(r"^((?:[A-Z]+_)+SCENE\d+)_")
 
 
 def episode_id_of(ref: RawEpisodeRef) -> str:
+    """The stable ``episode_id``, ``"<suite>/<task_name>/demo_<k>"``, of a raw demo."""
     return f"{ref.suite}/{ref.task_name}/{ref.source_demo}"
 
 
 def episode_content_hash(
     task: str, action: np.ndarray, state: np.ndarray, image: np.ndarray, image2: np.ndarray
 ) -> str:
-    """sha256 of the canonical episode content (layout in the module docstring)."""
+    """sha256 (hex) of the canonical episode content (byte layout in the module docstring).
+
+    Inputs, all with T frames: ``action`` (T, 7) and ``state`` (T, 8), cast to little-endian float32;
+    ``image`` and ``image2`` (T, 128, 128, 3) uint8 decoded pixels; ``task`` the instruction string.
+    Every hash in the lineage layer goes through this one function, whether the arrays came from
+    raw HDF5, from the stored parquet, or from an edit's transform.
+    """
     n = len(action)
     if not (len(state) == len(image) == len(image2) == n):
         raise ValueError("per-frame arrays must have equal length")
@@ -132,6 +156,7 @@ def episode_content_hash(
 
 
 def sha256_file(path: Path, bufsize: int = 1 << 22) -> str:
+    """sha256 (hex) of a file's bytes, read in 4 MiB chunks."""
     h = hashlib.sha256()
     with open(path, "rb") as f:
         while chunk := f.read(bufsize):
@@ -154,6 +179,12 @@ def read_episodes_meta(root: Path) -> pd.DataFrame:
 
 
 def read_tasks(root: Path) -> dict[int, str]:
+    """``task_index -> task string`` from ``meta/tasks.parquet``.
+
+    Handles both pandas views of the file: a ``task`` column, or the task string as the index with
+    only ``task_index`` as a column, which is what ``to_pandas()`` gives for LeRobot 0.6.1's file
+    (it stores pandas metadata that restores ``task`` as the index; measured on v0).
+    """
     t = pq.read_table(Path(root) / "meta" / "tasks.parquet").to_pandas()
     if "task" in t.columns:
         return dict(zip(t["task_index"], t["task"]))
@@ -161,10 +192,16 @@ def read_tasks(root: Path) -> dict[int, str]:
 
 
 def data_files(root: Path) -> list[Path]:
+    """Every ``data/chunk-*/file-*.parquet`` of a LeRobot v3 dataset, sorted."""
     return sorted((Path(root) / "data").rglob("*.parquet"))
 
 
-def _decode_png(cell: dict) -> np.ndarray:
+def decode_png(cell: dict) -> np.ndarray:
+    """One stored image cell (``{"bytes": <PNG>, ...}``) -> (H, W, 3) uint8 RGB pixels.
+
+    The single stored-side decoder: ``vlapoc.derive.read_stored_episode`` uses it too, so a derived
+    episode's expected hash and its stored hash decode pixels the same way.
+    """
     return np.asarray(Image.open(io.BytesIO(cell["bytes"])).convert("RGB"))
 
 
@@ -182,8 +219,8 @@ def _hash_data_file(args: tuple[str, dict[int, str]]) -> list[dict]:
             raise ValueError(f"episode {ep_idx} has {len(task_idx)} tasks")
         action = np.stack(g["action"].to_numpy()).astype(np.float32)
         state = np.stack(g["observation.state"].to_numpy()).astype(np.float32)
-        img = np.stack([_decode_png(c) for c in g[IMAGE_KEYS[0]]])
-        img2 = np.stack([_decode_png(c) for c in g[IMAGE_KEYS[1]]])
+        img = np.stack([decode_png(c) for c in g[IMAGE_KEYS[0]]])
+        img2 = np.stack([decode_png(c) for c in g[IMAGE_KEYS[1]]])
         task = tasks[int(task_idx[0])]
         out.append(
             {
@@ -198,7 +235,14 @@ def _hash_data_file(args: tuple[str, dict[int, str]]) -> list[dict]:
 
 
 def hash_stored_dataset(root: Path, workers: int = 8) -> pd.DataFrame:
-    """Per-episode content hash computed from the stored LeRobot dataset (decoded PNG pixels)."""
+    """Per-episode content hash computed from the stored LeRobot dataset (decoded PNG pixels).
+
+    Returns one row per episode, sorted by ``episode_index``, with columns ``episode_index``,
+    ``content_hash``, ``task``, ``length_steps`` and the ``action_stats`` columns. Data files are
+    hashed in parallel, one process per file (``version recompute v0``, which is mostly this call,
+    takes 19 s on 8 workers; measured). Raises if an episode spans two data files, which the per-file
+    hashing assumes never happens.
+    """
     root = Path(root)
     tasks = read_tasks(root)
     meta = read_episodes_meta(root)
@@ -219,7 +263,11 @@ def hash_stored_dataset(root: Path, workers: int = 8) -> pd.DataFrame:
 
 
 def action_stats(action: np.ndarray) -> dict:
-    """§2.2 "basic action statistics (smoothness, idle time, gripper toggles)"; see module docstring."""
+    """§2.2 "basic action statistics (smoothness, idle time, gripper toggles)"; see module docstring.
+
+    ``action`` is (T, 7): six arm dims then the gripper. Returns ``smoothness`` (mean L2 step change of
+    the arm dims, action units per step), ``idle_steps``, ``idle_fraction`` and ``gripper_toggles``.
+    """
     a = action.astype(np.float64)
     d = np.diff(a[:, :6], axis=0)
     return {
@@ -269,7 +317,14 @@ def _raw_file_worker(args: tuple[str, list[tuple[int, dict]]]) -> list[dict]:
 
 
 def scan_raw(raw_root: Path = DEFAULT_RAW_ROOT, workers: int = 8) -> pd.DataFrame:
-    """One row per raw demo, in converter output order, with raw re-hash and catalog metadata."""
+    """One row per raw demo, in converter output order, with raw re-hash and catalog metadata.
+
+    Columns: the identity columns (``episode_id``, ``suite``, ``task_name``, ``libero_task_id``,
+    ``source_file``, ``source_demo``), ``raw_content_hash`` and ``language_instruction``, the
+    catalog metadata (``objects``, ``init_state_sha256``, ``problem_name``) and the raw checks
+    (``reward_sum``, ``first_success_step``, ``dones_last_only``, ``raw_num_samples``, ...).
+    One worker process per raw file.
+    """
     refs = list(iter_raw_episodes(raw_root))
     by_file: dict[str, list] = {}
     for i, r in enumerate(refs):
@@ -296,6 +351,7 @@ def raw_file_hashes(raw_root: Path = DEFAULT_RAW_ROOT, workers: int = 8) -> pd.D
 
 
 def scene_of(task_name: str, problem_name: str) -> str:
+    """``scene`` column: the ``<ROOM>_SCENE<n>`` task-name prefix, else the raw ``problem_name``."""
     m = _SCENE_PREFIX.match(task_name)
     return m.group(1) if m else problem_name
 
@@ -304,6 +360,7 @@ def scene_of(task_name: str, problem_name: str) -> str:
 # Catalog
 # ---------------------------------------------------------------------------------------------
 
+# Columns of episodes.parquet, in order. A derived version's table has these plus parent_content_hash.
 CATALOG_COLUMNS = [
     "episode_id", "episode_index", "content_hash", "suite", "task_name", "libero_task_id",
     "language_instruction", "scene", "objects", "source", "operator", "collection_date",
@@ -350,6 +407,8 @@ def build_catalog(root: Path = DEFAULT_OUT, raw_root: Path = DEFAULT_RAW_ROOT, w
 
 
 def write_catalog(cat: pd.DataFrame, raw_files: pd.DataFrame, out_dir: Path, root: Path) -> None:
+    """Write ``episodes.parquet``, ``raw_files.parquet`` and ``catalog.json`` (with the repo-relative
+    dataset root, which ``register_version`` checks) into ``out_dir``. ``root`` must be inside the repo."""
     out_dir.mkdir(parents=True, exist_ok=True)
     cat.to_parquet(out_dir / "episodes.parquet", index=False)
     raw_files.to_parquet(out_dir / "raw_files.parquet", index=False)
@@ -360,6 +419,8 @@ def write_catalog(cat: pd.DataFrame, raw_files: pd.DataFrame, out_dir: Path, roo
 
 
 def summarize(cat: pd.DataFrame) -> dict:
+    """Per-suite summary printed by the CLI: counts, duration_s [min, median, max], idle steps,
+    gripper toggle range, smoothness [min, median, max] and scenes."""
     s = {}
     for suite, g in cat.groupby("suite", sort=False):
         s[suite] = {
@@ -377,6 +438,7 @@ def summarize(cat: pd.DataFrame) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entry (usage in the module docstring). Exit 1 under ``--verify-raw`` if any hash mismatches."""
     p = argparse.ArgumentParser(description="Build the §2.2 episode catalog and check it against raw.")
     p.add_argument("--root", type=Path, default=DEFAULT_OUT, help="LeRobot dataset root")
     p.add_argument("--version", default=None, help="a registered version name (e.g. v0); overrides --root")

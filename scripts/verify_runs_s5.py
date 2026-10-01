@@ -8,6 +8,10 @@ Grounding: PoC §2.1 p.3 (tie-in list; "what changed between the good run and th
 
     .venv/bin/python scripts/verify_runs_s5.py          # AC5.1-AC5.6 (round 1; 4 tiny training runs)
     .venv/bin/python scripts/verify_runs_s5.py --r2     # AC5.8-AC5.10 (round 2; selections only, no training)
+
+Both record MLflow runs (in scratch DBs), so both refuse to start while ``vlapoc/`` or ``scripts/`` has
+uncommitted changes. The round-1 mode leaves ``data/lineage_scratch/s5`` (~2.3 GB) for inspection
+and replaces it on the next run; ``--r2`` uses a ``data/scratch/`` dir and deletes it.
 """
 
 from __future__ import annotations
@@ -36,6 +40,7 @@ RUNS = LR / "runs"
 
 
 def setup() -> None:
+    """(Re)create the round-1 scratch lineage root from copies of the real manifests (no MLflow DB)."""
     if LR.exists():
         shutil.rmtree(LR)
     LR.mkdir(parents=True)
@@ -45,6 +50,7 @@ def setup() -> None:
 
 
 def main() -> int:
+    """Round-1 checks AC5.1-AC5.6: build, split, 4 tiny train runs, a select, an eval stand-in, queries."""
     setup()
     s: dict = {}
     head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, capture_output=True, text=True).stdout.strip()
@@ -52,7 +58,7 @@ def main() -> int:
 
     # upstream runs so trace() can reach raw files
     b = runs.build_run("v0", lineage_root=LR, verify_raw=False)
-    sp = runs.split_run("v0", 2, 0, lineage_root=LR)
+    sp, _ = runs.split_run("v0", 2, 0, lineage_root=LR)
     ref = Subset.load("v0/reference", LR)
     # run A: train on v0/reference; select: drop 5 random; run B: train on the child
     a = runs.train_run("v0/reference", "s5-train-A", seed=0, steps=2, batch_size=2, runs_root=RUNS, lineage_root=LR)

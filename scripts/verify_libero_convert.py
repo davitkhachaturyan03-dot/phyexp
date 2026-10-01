@@ -4,7 +4,12 @@ Grounding: PoC §10 p.20 (LIBERO one or two suites + SmolVLA), §2.2 p.4 (LeRobo
 and the vla-build rule that no demo is filtered on an unverified premise (every demo is checked to
 end with its only reward == 1). Prints evidence for AC1.1-AC1.6 and writes a JSON summary.
 
-    .venv/bin/python scripts/verify_libero_convert.py [--root data/lerobot/libero_spatial_10]
+    .venv/bin/python scripts/verify_libero_convert.py [--root data/lerobot/libero_spatial_10] [--summary <abs path>]
+
+The summary defaults to the feature's ``artifacts/s1_summary.json``. A ``--summary`` given as a
+relative path is written, but the final print then fails (``relative_to`` on a relative path), so pass
+an absolute one. The full-dataset load writes a ~7 GB HF ``datasets`` cache under
+``HF_DATASETS_CACHE`` the first time (plan risk R1); later runs reuse it.
 """
 
 from __future__ import annotations
@@ -55,6 +60,7 @@ def feature_diff(ours: dict, ref: dict) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Print AC1.1-AC1.6 evidence for the dataset at ``--root`` and write the JSON summary."""
     p = argparse.ArgumentParser()
     p.add_argument("--root", type=Path, default=DEFAULT_OUT)
     p.add_argument("--summary", type=Path, default=FEATURE_DIR / "artifacts" / "s1_summary.json")
