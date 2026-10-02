@@ -131,14 +131,21 @@ In this repo I adopted OpenVLA's demonstration filter — which removes 189 of 1
 demos — on the assumption that LIBERO contained failed demonstrations that imitation
 learning should exclude. I never checked whether it did.
 
-LIBERO's HDF5 carries per-step `rewards` and `dones`. Every one of the 1000 demos ends with
-`reward == 1`: the goal predicate verified true. There were no failed demonstrations. I had
-printed those two fields' shapes during my first inspection of the file and never looked at
-their values.
+LIBERO's HDF5 carries per-step `rewards` and `dones`, and every one of the 1000 demos ends with
+`reward == 1`. At the time I read that as the goal predicate verified true and treated it as
+settling the question. It wasn't evidence: LIBERO's `scripts/create_dataset.py` (commit
+`8f1084e`, lines 228–231) sets `rewards[-1] = 1` and `dones[-1] = 1` unconditionally. The
+conclusion was right for a different reason, found one feature later: replaying each demo's
+stored states through LIBERO's own goal check succeeds in 1000/1000 (evaluation-layer plan,
+premise P8). There were no failed demonstrations.
 
 Cost: roughly an hour, 118 lines of matching code, a 22 MB download, and a corpus 19%
 smaller than it should have been — to apply a filter whose premise was false. The user
-challenged that premise three times before I ran the two-field check that settled it.
+challenged that premise three times before I ran a two-field check that, it later turned out,
+could not have settled it.
+
+The second lesson is the one that took longer to learn: a field's name is not its meaning.
+Before treating a stored value as evidence, read the code that produced it.
 
 The same session produced two more prose-vs-artifact mismatches, both caught only by
 checking the artifact:

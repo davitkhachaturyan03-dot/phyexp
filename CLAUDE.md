@@ -53,8 +53,11 @@ disk and the library's source, then official docs, then derived artifacts and su
 your own inference (which is not evidence). Corroborate across several sources; where one
 disagrees with the artifact, the artifact wins and you record the discrepancy. Before adopting
 any external filter, threshold or preprocessing step, confirm the problem it solves actually
-exists in our data — I once applied a filter that removed 19% of the corpus on a premise two
-fields in the raw files disproved.
+exists in our data — I once applied a filter that removed 19% of the corpus on a premise our
+data disproved (every LIBERO demo reaches its goal when replayed through LIBERO's own goal
+check, 1000/1000). Check how a field was produced before treating it as evidence: the HDF5
+`rewards` field I first cited for this is not a goal check, because LIBERO's `create_dataset.py`
+writes `rewards[-1] = 1` unconditionally.
 
 Verify by fetching the schema or reading the spec — not from memory. Then say plainly what
 exists, what it does not cover, and whether the gap justifies custom code. If it is already
