@@ -1,0 +1,16 @@
+AC4.1 libero_10 n_ops per task (BDDL) = [2, 2, 2, 2, 2, 1, 2, 2, 2, 2]; maintained = {8: ['(turnon flat_stove_1)']}; demos whose t0 truth gives the same n_ops: 500/500
+AC4.1 libero_spatial n_ops per task (BDDL) = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]; maintained = {}; demos whose t0 truth gives the same n_ops: 500/500
+AC4.3 libero_10: sum_k T_k == T_success_s for 500/500; demos with events == n_ops: 500/500; censored pairs: 0; operation samples: 950 from 500 demos
+AC4.3 libero_spatial: 1 op each: 500/500; T_op == T_success_s: 500/500
+ libero_task_id  n_demos  n_op_samples  median_T_op_all median_T_op_all_ci  rmst60_all  median_T_op1          median_T_op1_ci  median_T_op2 median_T_op2_ci  ci_width_ratio_clustered_vs_per_op
+              0       50           100             6.85        [6.55, 7.1]       7.043          7.20             [6.75, 7.35]          6.60    [6.25, 6.85]                               1.222
+              1       50           100             6.25        [6.1, 6.55]       6.208          6.80               [6.7, 6.9]          5.40    [5.25, 5.65]                               0.750
+              2       50           100             5.65         [5.2, 6.3]       6.326          4.25 [4.1, 4.551249999999999]          8.25     [7.7, 8.65]                               0.468
+              3       50           100             6.30        [5.95, 6.7]       5.942          7.15              [7.05, 7.3]          4.30      [4.1, 4.8]                               0.405
+              4       50           100             6.05         [5.8, 6.2]       5.963          5.10              [4.95, 5.4]          6.45    [6.25, 6.75]                               0.727
+              5       50            50             8.70        [8.45, 9.1]       8.860          8.70              [8.45, 9.1]           NaN             NaN                               1.000
+              6       50           100             5.85        [5.6, 6.05]       6.047          6.00               [5.8, 6.3]          5.30      [5.0, 6.1]                               0.900
+              7       50           100             6.40         [6.1, 6.6]       6.462          6.35 [6.098750000000001, 6.7]          6.45      [6.1, 6.6]                               1.111
+              8       50           100             9.70       [9.5, 10.05]      10.070          9.05             [8.75, 9.35]         10.50   [10.1, 11.05]                               1.000
+              9       50           100             7.05        [6.75, 7.4]       7.341          7.70             [7.35, 8.35]          6.00      [5.7, 6.4]                               0.867
+wrote data/eval/human_reference/human_operations.parquet (1450 operation rows), artifacts/s4_operations_table.csv, s4_human_operation_stats.csv, s4_fig_human_operation_cdfs.png

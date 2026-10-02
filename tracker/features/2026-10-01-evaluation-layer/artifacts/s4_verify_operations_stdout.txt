@@ -1,0 +1,11 @@
+AC4.2 SYNTHETIC two conjuncts, g0 then g1: n_ops 2 (maintained []), t_ops [40, 100] steps, pairs [(2.0, 1), (3.0, 1)] -> PASS
+AC4.2 SYNTHETIC two conjuncts, g1 then g0: n_ops 2 (maintained []), t_ops [40, 100] steps, pairs [(2.0, 1), (3.0, 1)] -> PASS
+AC4.2 SYNTHETIC conjunct toggles off and on: n_ops 2 (maintained []), t_ops [40, 100] steps, pairs [(2.0, 1), (3.0, 1)] -> PASS
+AC4.2 SYNTHETIC maintained conjunct broken mid-rollout: n_ops 2 (maintained ['g2']), t_ops [40, 110] steps, pairs [(2.0, 1), (3.5, 1)] -> PASS
+AC4.2 SYNTHETIC simultaneous completion: n_ops 2 (maintained []), t_ops [80, 80] steps, pairs [(4.0, 1), (0.0, 1)] -> PASS
+AC4.2 SYNTHETIC timeout after 1 of 2 ops: n_ops 2 (maintained []), t_ops [300] steps, pairs [(15.0, 1), (45.0, 0)] -> PASS
+AC4.2 SYNTHETIC zero ops done: n_ops 2 (maintained []), t_ops [] steps, pairs [(60.0, 0)] -> PASS
+AC4.2 7/7 synthetic cases pass
+AC4.5 definitions of operations_from_trace in vlapoc/ + scripts/: 1 (['vlapoc/libero_goals.py']); callers: {'scripts/human_reference.py': False}
+AC4.2 7/7 synthetic cases pass
+AC4.5 definitions of operations_from_trace in vlapoc/ + scripts/: 1 (['vlapoc/libero_goals.py']); callers: {'scripts/human_reference.py': True}

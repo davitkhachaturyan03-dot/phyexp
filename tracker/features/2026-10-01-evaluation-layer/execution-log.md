@@ -605,3 +605,76 @@ revision=…, local_dir="data/libero_assets")`; 17.5 min; `du` 415M; 586 files o
   unaffected. Rollout success semantics (first `check_success`) match it.
 - **Plan cost estimate:** "2–3 min for 1000 demos" was measured in planning with a different procedure.
   The demo-XML replay costs about 4 s per demo here (model compile).
+
+## Round 1 / Batch 2 (S4–S6): 2026-10-03
+
+### S4: Per-sub-task time-to-success T for libero_10 (required story)
+
+Re-read: PoC §3.5 A p. 7, §3.4 p. 7, §3.2 p. 6 (PDF dump); PhAIL §3.1 p. 4; LIBERO `bddl_utils.robosuite_parse_problem`
+(returns `initial_state` and `goal_state`) and the `_check_success` lines of the problem classes.
+
+**Files:**
+- `vlapoc/libero_goals.py`:
+  - `operations_table(bddl)`: static, from LIBERO's parser; maintained = goal ∩ `:init`.
+  - `operations_from_trace(truth, success, tau_end_steps, ...)`: the single rule. Its docstring declares
+    the rule. It builds the (T, E) pairs through `vlapoc.evaluation.libero_episode`, i.e. PhAIL's
+    `episode_to_T_pairs` with threshold 0.
+  - `rle_decode`.
+- `scripts/human_reference.py --operations`: S4 on the stored S3 traces, with no second replay. It writes
+  `data/eval/human_reference/human_operations.parquet`.
+- `scripts/verify_operations_s4.py` (new): the synthetic traces and the single-implementation grep.
+
+**Premises checked:**
+- The S3 parquet stores per-step conjunct truth. Checked by reading `conjunct_trace_rle` and
+  `success_trace_rle` per demo; `rle_decode` gives arrays of length `n_states`. **Holds**, so no re-replay.
+- libero_10 task 8's goal includes `(turnon flat_stove_1)`, which is also in `:init`. Checked by parsing
+  the installed BDDL: `init [... ['turnon', 'flat_stove_1']]`,
+  `goal [['on', 'moka_pot_1', 'flat_stove_1_cook_region'], ['on', 'moka_pot_2', 'flat_stove_1_cook_region'], ['turnon', 'flat_stove_1']]`.
+  **Holds** (P14).
+
+**Acceptance criteria:**
+- ✅ AC4.1: `libero_10 n_ops per task (BDDL) = [2, 2, 2, 2, 2, 1, 2, 2, 2, 2]; maintained = {8: ['(turnon
+  flat_stove_1)']}; demos whose t0 truth gives the same n_ops: 500/500`; `libero_spatial ... = [1, 1, 1,
+  1, 1, 1, 1, 1, 1, 1]; ... 500/500` (`artifacts/s4_operations_table.csv`). This matches P14 exactly, and
+  the static (BDDL) and dynamic (t0 truth) operation sets agree for every demo.
+- ✅ AC4.2: `7/7 synthetic cases pass` (LABELLED-SYNTHETIC; `artifacts/s4_verify_operations_stdout.txt`):
+  - two conjuncts in either order → `[(2.0, 1), (3.0, 1)]` both ways;
+  - a conjunct that toggles off and on → `[(2.0, 1), (3.0, 1)]`;
+  - a maintained conjunct broken over steps 50–110 → `t_ops [40, 110]`, `[(2.0, 1), (3.5, 1)]` (success
+    waits for the restore);
+  - simultaneous completion → `[(4.0, 1), (0.0, 1)]`;
+  - timeout after 1 of 2 ops (τ_end 1200) → `[(15.0, 1), (45.0, 0)]`;
+  - zero ops done → `[(60.0, 0)]`.
+- ✅ AC4.3: `libero_10: sum_k T_k == T_success_s for 500/500; demos with events == n_ops: 500/500;
+  censored pairs: 0; operation samples: 950 from 500 demos`; `libero_spatial: 1 op each: 500/500; T_op ==
+  T_success_s: 500/500` (`artifacts/s4_human_operations_stdout.txt`). The 950 equals the plan's inferred
+  "≈950" (19 ops × 50).
+- ✅ AC4.4: human per-operation CDFs per libero_10 task, KM over all events
+  (`artifacts/s4_fig_human_operation_cdfs.png`, inspected), with a per-op-index breakdown and
+  episode-clustered bootstrap CIs (n_boot 1000, `artifacts/s4_human_operation_stats.csv`). Examples:
+  - task 2: op1 median 4.25 s [4.10, 4.55], op2 8.25 s [7.70, 8.65];
+  - task 3: op1 7.15 s [7.05, 7.30], op2 4.30 s [4.10, 4.80];
+  - task 8: op1 9.05 s [8.75, 9.35], op2 10.50 s [10.10, 11.05];
+  - task 5 (1 op): 8.70 s [8.45, 9.10].
+- ⏳→✅ AC4.5 (complete once S5 is in; see S5): `definitions of operations_from_trace in vlapoc/ +
+  scripts/: 1 (['vlapoc/libero_goals.py'])`; callers `scripts/human_reference.py: True`.
+  `vlapoc/rollouts.py` (S5) is the second caller, and `verify_operations_s4.py` checks both.
+- ✅ AC4.6: the `operations_from_trace` docstring cites `PoC §3.5 A (p. 7)`, `PoC §3.4 (p. 7)`,
+  `PhAIL §3.1 (p. 4)`, `libero_tabletop_manipulation.py:135-143` and
+  `libero_kitchen_tabletop_manipulation.py:136-144`: all `True` (grep).
+
+**Demo artifacts produced:** `artifacts/s4_operations_table.csv`, `s4_human_operation_stats.csv`,
+`s4_fig_human_operation_cdfs.png`, `s4_verify_operations.json`; plus
+`data/eval/human_reference/human_operations.parquet` (1,450 rows; gitignored, regenerated in seconds).
+
+**Notes / divergences:**
+- **The clustered bootstrap can be narrower here.** For the *pooled* per-task median, the
+  episode-clustered CI is narrower than the per-operation CI in 6 of 9 two-op tasks (ratio 0.405–0.900),
+  and it is wider in 2 (tasks 0 and 7: 1.22, 1.11).
+  - The narrowing is strongest where op1 and op2 differ most (task 2: 0.468, task 3: 0.405).
+  - Inferred reason: each demo contributes exactly one op1 and one op2, so resampling whole demos acts like
+    stratification; per-operation resampling can unbalance the two kinds.
+  - The PoC rule (resample whole episodes) is applied regardless. The "clustered is always wider" intuition
+    (S1 AC1.5) holds for positively correlated operations, not in general.
+- **Threshold 0 vs PhAIL's 0.3 s** (declared in the docstring). With exact sim timestamps, simultaneous
+  completion gives T = 0 under both conventions.

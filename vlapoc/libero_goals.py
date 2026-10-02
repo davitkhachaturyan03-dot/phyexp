@@ -210,6 +210,104 @@ def rle(x: np.ndarray) -> list[list[int]]:
     return out
 
 
+def rle_decode(runs: list[list[int]]) -> np.ndarray:
+    """Inverse of ``rle``: ``[[value, length], ...]`` -> 1-D bool array."""
+    return np.concatenate([np.full(n, bool(v)) for v, n in runs]) if runs else np.zeros(0, dtype=bool)
+
+
+# ---------------------------------------------------------------------------------------------
+# operations: per-sub-task time-to-success (evaluation-layer S4)
+# ---------------------------------------------------------------------------------------------
+
+
+def operations_table(bddl_file: Path) -> dict:
+    """Static operations of a task from its BDDL: goal conjuncts, the *maintained* ones (goal conjuncts that
+    are also in ``:init``, i.e. true by construction at t0, e.g. libero_10 task 8's ``(turnon flat_stove_1)``)
+    and the *operations* (the rest). ``operations_from_trace`` uses each trace's own t0 truth; this table
+    is what it is expected to agree with (S4 AC4.1)."""
+    from libero.libero.envs import bddl_utils
+
+    p = bddl_utils.robosuite_parse_problem(str(bddl_file))
+    goal = [tuple(c) for c in p["goal_state"]]
+    init = {tuple(x.lower() for x in c) for c in p["initial_state"]}
+    maintained = [c for c in goal if tuple(x.lower() for x in c) in init]
+    return {"goal": [conjunct_label(c) for c in goal], "maintained": [conjunct_label(c) for c in maintained],
+            "operations": [conjunct_label(c) for c in goal if c not in maintained], "n_ops": len(goal) - len(maintained)}
+
+
+def operations_from_trace(conjunct_truth: np.ndarray, success: np.ndarray, tau_end_steps: int | None = None,
+                          fps: int = FPS, labels: list[str] | None = None, key: str = "") -> dict:
+    """Operation-level (T, event) pairs of one LIBERO trace (human demo replay or rollout). THE single
+    implementation: ``scripts/human_reference.py --operations`` and the rollout harness (``vlapoc.rollouts``)
+    both call it (S4 AC4.5).
+
+    Grounding: PoC §3.5 A (p. 7) "T = time (or steps) to task success per episode; for long-horizon LIBERO-10
+    tasks, per sub-task"; PoC §3.4 (p. 7) "Operation-level (T, event) pairs give several outcome samples per
+    rollout"; PoC §3.2 (p. 6) "each rollout yields several"; PhAIL §3.1 (p. 4) the T-pair extraction
+    (time since the previous success, censored tail for the unfinished attempt). LIBERO success is the
+    conjunction over ``parsed_problem["goal_state"]`` (``_check_success``,
+    ``envs/problems/libero_tabletop_manipulation.py:135-143``, ``libero_kitchen_tabletop_manipulation.py:136-144``).
+
+    The rule (declared; evaluation-layer plan S4):
+
+    - **Operations** = goal conjuncts that are false at t0 (index 0 of the trace: the post-settle state for a
+      rollout, stored state 0 for a demo). Conjuncts already true at t0 are **maintained conditions**, not
+      operations (libero_10 task 8's ``(turnon flat_stove_1)``).
+    - **Operation k < n completes** at the first step where at least k operation-conjuncts hold
+      *simultaneously* (counting, not identity: BDDL conjunct order is arbitrary, and a conjunct that
+      toggles off and on is not double-counted).
+    - **Operation n completes** at the first step where LIBERO's own ``_check_success`` holds (``success``),
+      so the last operation time equals whole-task T by construction, and a broken maintained condition
+      delays it until restored.
+    - **T_k = t_k - t_{k-1}** (t_0 = 0), in seconds = steps / ``fps``. If the trace ends without success,
+      the unfinished operation adds one right-censored pair ``(τ_end - t_last, 0)``; with no operation done,
+      ``(τ_end, 0)``. This is PhAIL's ``episode_to_T_pairs`` (applied through
+      ``vlapoc.evaluation.libero_episode``) with ``multi_grip_threshold_s = 0``: sim timestamps are exact,
+      and PhAIL's 0.3 s clustering exists for annotation jitter (a recorded divergence).
+
+    Args:
+        conjunct_truth: (T, C) bool, goal-conjunct truth at trace indices 0..T-1 (index t = after t actions).
+        success: (T,) bool, ``_check_success()`` at the same indices.
+        tau_end_steps: the trace's observed length in steps (a rollout's executed actions); default T - 1.
+            Used only for the censored tail of an unfinished trace.
+        labels: conjunct labels for diagnostics.
+
+    Returns ``{"n_ops", "maintained", "operations", "t_ops" (steps of completed operations), "op_conjuncts"
+    (operation-conjuncts that became true at each t_k; diagnostics), "success_step" (or None), "n_ops_done",
+    "censored", "trivial" (n_ops == 0), "episode" (``vlapoc.evaluation.Episode`` with the (T, E) pairs)}``.
+    """
+    from vlapoc.evaluation import libero_episode
+
+    truth = np.asarray(conjunct_truth, dtype=bool)
+    succ = np.asarray(success, dtype=bool)
+    if truth.ndim != 2 or len(truth) != len(succ) or len(succ) == 0:
+        raise ValueError(f"truth {truth.shape} and success {succ.shape} must be (T, C) and (T,), T > 0")
+    labels = labels or [f"c{c}" for c in range(truth.shape[1])]
+    tau_end = int(tau_end_steps) if tau_end_steps is not None else len(succ) - 1
+    ops = [c for c in range(truth.shape[1]) if not truth[0, c]]
+    maintained = [c for c in range(truth.shape[1]) if truth[0, c]]
+    n = len(ops)
+    t_succ = first_true(succ)
+    count = truth[:, ops].sum(axis=1) if ops else np.zeros(len(succ), dtype=int)
+    t_ops: list[int] = []
+    for k in range(1, n):
+        t_k = first_true(count >= k)
+        if t_k < 0 or (t_succ >= 0 and t_k > t_succ):
+            break
+        t_ops.append(t_k)
+    if n and t_succ >= 0:
+        t_ops = t_ops[: n - 1] + [t_succ]
+    if any(b < a for a, b in zip(t_ops, t_ops[1:])):
+        raise AssertionError(f"operation times not monotone: {t_ops}")
+    op_conj = [[labels[c] for c in ops if truth[t, c] and (t == 0 or not truth[t - 1, c])] for t in t_ops]
+    done = t_succ >= 0
+    duration_steps = t_succ if done else tau_end
+    ep = libero_episode(key, [t / fps for t in t_ops], duration_steps / fps, n)
+    return {"n_ops": n, "maintained": [labels[c] for c in maintained], "operations": [labels[c] for c in ops],
+            "t_ops": t_ops, "op_conjuncts": op_conj, "success_step": t_succ if done else None, "n_ops_done": len(t_ops),
+            "censored": any(e == 0 for _, e in ep.pairs), "trivial": n == 0, "episode": ep}
+
+
 def env_versions() -> dict:
     """Interpreter and sim-stack versions for run records (AC3.1)."""
     import importlib.metadata as md
@@ -228,7 +326,8 @@ def env_versions() -> dict:
 
 
 __all__ = ["setup_libero", "fetch_assets", "assets_digest", "bddl_path", "goal_conjuncts", "conjunct_label",
-           "make_replay_env", "demo_model_xml", "replay_goal_trace", "first_true", "rle", "env_versions",
+           "make_replay_env", "demo_model_xml", "replay_goal_trace", "first_true", "rle", "rle_decode", "env_versions",
+           "operations_table", "operations_from_trace",
            "LIBERO_CONFIG_DIR", "LIBERO_ASSETS_DIR", "ASSETS_REPO", "ASSETS_REVISION", "FPS"]
 
 if __name__ == "__main__":  # pragma: no cover

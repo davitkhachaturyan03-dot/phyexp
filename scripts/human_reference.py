@@ -8,6 +8,7 @@ demonstrations on the same tasks"; §10 (p. 20) "HRT against LIBERO demo duratio
     .venv/bin/python scripts/human_reference.py --bddl-check --only libero_10:8   # AC3.6: same states, BDDL-built scene
     .venv/bin/python scripts/human_reference.py --init-states    # AC3.7: 50 fixed init states per task (LeRobot)
     .venv/bin/python scripts/human_reference.py --summary        # AC3.3, AC3.4 tables + figure (metric layer, S1)
+    .venv/bin/python scripts/human_reference.py --operations     # S4: per-operation T (operations_from_trace) from stored traces
 
 Output: ``data/eval/human_reference/human_reference.parquet``, one row per v0 episode (keyed by
 ``episode_id`` + ``content_hash``): ``T_success_steps`` (first stored state where ``_check_success()``
@@ -227,6 +228,101 @@ def cmd_summary(a) -> None:
     print("wrote artifacts/s3_human_reference_table.csv, s3_gap_steps_per_task.csv, s3_fig_human_reference_cdfs.png")
 
 
+def cmd_operations(a) -> None:
+    """S4: per-operation human T from the stored S3 traces (no second replay), through the single rule
+    ``vlapoc.libero_goals.operations_from_trace``. AC4.1 operations table, AC4.3 consistency, AC4.4 CDFs."""
+    from vlapoc import evaluation as ev
+    from vlapoc import libero_goals as lg
+
+    lg.setup_libero()
+    df = pd.read_parquet(OUT_DIR / "human_reference.parquet")
+    # AC4.1: the static table from the installed BDDL files vs each demo's own t0 truth
+    table = []
+    for (suite, tid), g in df.groupby(["suite", "libero_task_id"]):
+        t = lg.operations_table(lg.bddl_path(suite, g["task_name"].iloc[0]))
+        dyn = [sum(not x for x in r) for r in g["conjunct_true_at_t0"]]
+        table.append({"suite": suite, "libero_task_id": int(tid), "task_name": g["task_name"].iloc[0], **t,
+                      "n_ops_from_t0_truth": sorted(set(dyn)), "demos_matching_bddl": int(sum(d == t["n_ops"] for d in dyn)),
+                      "n_demos": len(g)})
+    tab = pd.DataFrame(table)
+    tab.to_csv(ART / "s4_operations_table.csv", index=False)
+    for suite in ("libero_10", "libero_spatial"):
+        ts = tab[tab["suite"] == suite].sort_values("libero_task_id")
+        print(f"AC4.1 {suite} n_ops per task (BDDL) = {ts['n_ops'].tolist()}; maintained = "
+              f"{ {int(r.libero_task_id): r.maintained for r in ts.itertuples() if r.maintained} }; demos whose t0 truth "
+              f"gives the same n_ops: {int(ts['demos_matching_bddl'].sum())}/{int(ts['n_demos'].sum())}")
+    # operations per demo
+    rows, check = [], []
+    for r in df.itertuples():
+        traces = json.loads(r.conjunct_trace_rle)
+        truth = np.stack([lg.rle_decode(c) for c in traces], axis=1)
+        succ = lg.rle_decode(json.loads(r.success_trace_rle))
+        o = lg.operations_from_trace(truth, succ, len(succ) - 1, labels=list(r.conjuncts), key=r.episode_id)
+        T = [t for t, _ in o["episode"].pairs]
+        check.append({"episode_id": r.episode_id, "suite": r.suite, "libero_task_id": r.libero_task_id, "n_ops": o["n_ops"],
+                      "events": sum(e for _, e in o["episode"].pairs), "censored": o["censored"],
+                      "sum_T": float(np.sum(T)), "T_success_s": r.T_success_s})
+        prev = 0
+        for k, (t_k, conj) in enumerate(zip(o["t_ops"], o["op_conjuncts"]), start=1):
+            rows.append({"episode_id": r.episode_id, "content_hash": r.content_hash, "suite": r.suite,
+                         "libero_task_id": r.libero_task_id, "op_k": k, "n_ops": o["n_ops"], "t_start_steps": prev,
+                         "t_end_steps": t_k, "T_op_s": (t_k - prev) / lg.FPS, "event": 1, "conjuncts_completed": conj})
+            prev = t_k
+    ops = pd.DataFrame(rows)
+    ops.to_parquet(OUT_DIR / "human_operations.parquet", index=False)
+    ck = pd.DataFrame(check)
+    l10 = ck[ck["suite"] == "libero_10"]
+    ok = (l10["sum_T"] - l10["T_success_s"]).abs() <= 1e-9
+    print(f"AC4.3 libero_10: sum_k T_k == T_success_s for {int(ok.sum())}/{len(l10)}; demos with events == n_ops: "
+          f"{int((l10['events'] == l10['n_ops']).sum())}/{len(l10)}; censored pairs: {int(l10['censored'].sum())}; "
+          f"operation samples: {int(l10['events'].sum())} from {len(l10)} demos")
+    sp = ck[ck["suite"] == "libero_spatial"]
+    print(f"AC4.3 libero_spatial: 1 op each: {int((sp['n_ops'] == 1).sum())}/{len(sp)}; T_op == T_success_s: "
+          f"{int(((sp['sum_T'] - sp['T_success_s']).abs() <= 1e-9).sum())}/{len(sp)}")
+    # AC4.4: per-operation human CDFs per libero_10 task, per op index, clustered bootstrap
+    stats = []
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(2, 5, figsize=(16, 6), sharex=True, sharey=True)
+    grid = np.linspace(0, 20, 400)
+    for ax, (tid, g) in zip(axes.flat, ops[ops["suite"] == "libero_10"].groupby("libero_task_id")):
+        eps_all = [ev.Episode(eid, tuple((float(x), 1) for x in gg["T_op_s"])) for eid, gg in g.groupby("episode_id")]
+        ci_all = ev.cluster_bootstrap({"h": {"t": eps_all}}, lambda a: ev.median_T(a["h"]["t"]), 1000, np.random.default_rng(0))
+        per_op = ev.cluster_bootstrap({"h": {"t": eps_all}}, lambda a: ev.median_T(a["h"]["t"]), 1000, np.random.default_rng(0),
+                                      unit="operation")
+        row = {"libero_task_id": int(tid), "n_demos": len(eps_all), "n_op_samples": int(len(g)),
+               "median_T_op_all": ci_all["point"], "median_T_op_all_ci": [ci_all["lo"], ci_all["hi"]],
+               "rmst60_all": ev.rmst(eps_all, TAU_EPISODE)}
+        for k, gk in g.groupby("op_k"):
+            ek = [ev.Episode(r.episode_id, ((float(r.T_op_s), 1),)) for r in gk.itertuples()]
+            c = ev.cluster_bootstrap({"h": {"t": ek}}, lambda a: ev.median_T(a["h"]["t"]), 1000, np.random.default_rng(0))
+            row[f"median_T_op{k}"] = c["point"]
+            row[f"median_T_op{k}_ci"] = [c["lo"], c["hi"]]
+            ax.step(grid, ev.F_curve(ek, grid), where="post", label=f"op {k} (n={len(ek)})")
+        # clustered (whole demos) vs per-operation CI width for the pooled median (within-demo structure)
+        row["median_T_op_all_ci_per_operation"] = [per_op["lo"], per_op["hi"]]
+        row["ci_width_ratio_clustered_vs_per_op"] = (ci_all["hi"] - ci_all["lo"]) / max(per_op["hi"] - per_op["lo"], 1e-12)
+        stats.append(row)
+        ax.set_title(f"libero_10 task {tid}", fontsize=9, loc="left")
+        ax.legend(fontsize=7, loc="lower right")
+    for ax in axes[-1]:
+        ax.set_xlabel("per-operation T (s)")
+    for ax in axes[:, 0]:
+        ax.set_ylabel("F(t)")
+    fig.suptitle("Human per-operation time-to-success, libero_10 (KM over 50 demos per task; replay of LIBERO's goal check)", fontsize=10)
+    fig.tight_layout()
+    fig.savefig(ART / "s4_fig_human_operation_cdfs.png", dpi=120)
+    st = pd.DataFrame(stats)
+    st.to_csv(ART / "s4_human_operation_stats.csv", index=False)
+    with pd.option_context("display.width", 220, "display.max_columns", 20):
+        print(st.round(3).to_string(index=False))
+    print(f"wrote {(OUT_DIR / 'human_operations.parquet').relative_to(REPO_ROOT)} ({len(ops)} operation rows), "
+          "artifacts/s4_operations_table.csv, s4_human_operation_stats.csv, s4_fig_human_operation_cdfs.png")
+
+
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--suites", default="libero_spatial,libero_10")
@@ -234,6 +330,7 @@ def main() -> int:
     p.add_argument("--bddl-check", action="store_true")
     p.add_argument("--init-states", action="store_true")
     p.add_argument("--summary", action="store_true")
+    p.add_argument("--operations", action="store_true", help="S4: per-operation T from the stored traces")
     p.add_argument("--only", default=None, help='restrict --bddl-check to tasks, e.g. "libero_10:8"')
     a = p.parse_args()
     if a.bddl_check:
@@ -242,6 +339,8 @@ def main() -> int:
         cmd_init_states(a)
     elif a.summary:
         cmd_summary(a)
+    elif a.operations:
+        cmd_operations(a)
     else:
         cmd_replay(a)
     return 0
