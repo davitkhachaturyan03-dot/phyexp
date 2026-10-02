@@ -1,0 +1,173 @@
+{
+  "data": "SYNTHETIC (numpy, fixed seeds); no real rollout outcomes",
+  "AC1.1": {
+    "vendored_sha256": "802387d343463cd46a56e8d1dc4b4917b90c34b51fc72acce5b6e6cb915b46f2",
+    "clone_sha256": "802387d343463cd46a56e8d1dc4b4917b90c34b51fc72acce5b6e6cb915b46f2",
+    "byte_identical": true,
+    "clone_head": "18ce72d5703dcbbbb10a980336aa5a1622601fb4",
+    "license_identical": true,
+    "header_in_package_init": true
+  },
+  "AC1.2": {
+    "n_pairs": 400,
+    "n_events": 256,
+    "n_event_times": 146,
+    "ties": 226,
+    "max_abs_diff_S": 3.3306690738754696e-16,
+    "max_abs_diff_greenwood_halfwidth": 9.71445146547012e-17,
+    "pass": true
+  },
+  "AC1.3": {
+    "n_ops": 55,
+    "ghosts": 5,
+    "censored_pairs": 0,
+    "ghost_event_rate": 0.09090909090909088,
+    "g_over_n": 0.09090909090909091,
+    "abs_diff_rate": 2.7755575615628914e-17,
+    "F_asymptote_gap": 0.09090909090909083,
+    "rmst30": 14.55964694266428,
+    "mean_min_T_tau": 14.55964694266428,
+    "abs_diff_rmst": 0.0,
+    "pass": true
+  },
+  "AC1.4": {
+    "zero_success_pairs": [
+      [
+        60.0,
+        0
+      ]
+    ],
+    "full_pairs": [
+      [
+        5.0,
+        1
+      ],
+      [
+        7.0,
+        1
+      ]
+    ],
+    "partial_pairs": [
+      [
+        8.0,
+        1
+      ],
+      [
+        52.0,
+        0
+      ]
+    ],
+    "libero_simultaneous_pairs": [
+      [
+        10.0,
+        1
+      ],
+      [
+        0.0,
+        1
+      ]
+    ],
+    "pairs_in_cell": 5,
+    "censored_rate": 0.6666666666666666,
+    "S_after_first_event": 0.8,
+    "expected_S_after_first_event": 0.8,
+    "pass": true
+  },
+  "AC1.5": {
+    "rmst30": {
+      "point": 6.371941025643107,
+      "clustered_ci": [
+        5.147892905577083,
+        7.703067936786875
+      ],
+      "per_operation_ci": [
+        5.470636673794751,
+        7.297410863174818
+      ],
+      "width_ratio_clustered_over_per_op": 1.3987361142194124
+    },
+    "F10": {
+      "point": 0.8050000000000004,
+      "clustered_ci": [
+        0.7350000000000003,
+        0.8701250000000001
+      ],
+      "per_operation_ci": [
+        0.7500000000000002,
+        0.8600000000000001
+      ],
+      "width_ratio_clustered_over_per_op": 1.2284090909090908
+    },
+    "pass": true
+  },
+  "AC1.6": {
+    "n": 14,
+    "names": [
+      "F(\u03c4) / Success@\u03c4",
+      "median",
+      "RMST(\u03c4)",
+      "UPH",
+      "completion",
+      "MTBF/A",
+      "HRT",
+      "AUC vs reference",
+      "KS / macro-KS",
+      "P-P plot",
+      "ghost-event rate",
+      "censored rate",
+      "clustered bootstrap CI",
+      "stratified logrank (sanity)"
+    ],
+    "missing": [],
+    "pass": true
+  },
+  "equivalence": {
+    "macro_ks": {
+      "vendored": [
+        0.1902324217651046,
+        0.6866267465069861
+      ],
+      "ours": [
+        0.1902324217651046,
+        0.6866267465069861
+      ],
+      "identical": true
+    },
+    "logrank_vs_scipy": {
+      "ours_chi2": 0.5102598712972305,
+      "scipy_Z2": 0.5102598712972299,
+      "ours_p": 0.47502638142753595,
+      "scipy_p": 0.47502638142753617
+    },
+    "auc_hand": 0.6666666666666666,
+    "auc_ghost": 0.0,
+    "pp_area": 0.3581277777777776,
+    "auc": 0.3581666666666667,
+    "hrt": {
+      "cells": {
+        "c1": 0.5902079641028238,
+        "c2": 0.6210282276723994
+      },
+      "macro": 0.6056180958876116,
+      "ci_resample_human": [
+        0.519107764579245,
+        0.7110712125192351
+      ],
+      "ci_human_fixed": [
+        0.5486480342788427,
+        0.6707995519381086
+      ]
+    }
+  },
+  "AC1.7": {
+    "counts": {
+      "PoC \u00a73.2 (p. 6)": 1,
+      "PoC \u00a710 (p. 20)": 1,
+      "\u00a73.1 p. 4": 7,
+      "Table 1 p. 5": 2,
+      "\u00a73.2 p. 5": 6,
+      "\u00a73.3 p. 6": 3
+    },
+    "pass": true
+  }
+}

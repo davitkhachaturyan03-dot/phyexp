@@ -179,3 +179,115 @@ Two-row demo table:
   decisions).
 - **One unexplained 980 s stall** in `hash_stored_dataset` during a scratch derivation. It did not
   reproduce (3.1 s on re-run).
+
+### S1: Metric layer: PhAIL primitives over (T, E) pairs, with LIBERO-ready cells
+
+Re-read this session: PoC pp. 6–8 (§3.1–3.5) from the PDF. The PhAIL paper pp. 4–6 (§3.1 T pairs,
+Table 1, §3.2 HRT / P-P / CIs, §3.3 macro-KS + logrank) was read from
+`docs/papers/PhAIL_Real-Robot_VLA_Benchmark_arXiv-2605.29710.pdf`. Also read in the clone: `build/stats.py`
+(all of it), `build/explore_pp_plot.py:63-216`, `build/fig_qq_tradeoff.py:40-216`,
+`build/tab_leaderboard.py:1-90` and `build/explore_separation.py:61-160`.
+
+**Download (approved, brief 2026-10-02):** `https://github.com/Positronic-Robotics/phail-paper`.
+- Revision: `18ce72d5703dcbbbb10a980336aa5a1622601fb4` (2026-05-27, "Add Apache 2.0 LICENSE and drop stale
+  operator clip-generation script"; the head of `main`, per the GitHub API).
+- Fetched with depth 1 into `data/external/phail-paper/` (gitignored under `data/`).
+- Size (measured `du`): 87 MB in total, of which 12 MB is `.git`. The plan said ~52 MB, and the GitHub
+  API `size` field says 32,475 KB.
+
+**Files:**
+- `vlapoc/third_party/phail_stats.py`: verbatim `build/stats.py`.
+- `vlapoc/third_party/LICENSE-phail-paper`: verbatim `LICENSE`.
+- `vlapoc/third_party/__init__.py`: the attribution header (repo, commit, sha256, "unmodified", the
+  Apache-2.0 §4 reasoning).
+- `vlapoc/evaluation.py` (new):
+  - `Episode` plus `episode_from_ops`, which goes through PhAIL's `episode_to_T_pairs`;
+    `libero_episode`, with threshold 0 and no ghosts.
+  - Functionals of the KM F: `F_at`, `median_T`, `rmst`, `completion`, `uph` (+ `uph_conditional`),
+    `mtbfa`, `ghost_event_rate` (+ `ghost_fraction`), `censored_rate`.
+  - `macro`, `pooled`, `hrt_cells`, `hrt`; `auc_censored`, `auc`, `macro_auc`; `pp_curve`,
+    `macro_pp_curve`; `ks`, `macro_ks`; `logrank_stratified`.
+  - Bootstrap: `cluster_bootstrap` (episode or operation unit; fixed arms), `hrt_ci` (both variants),
+    `F_band`; and `uph_mtbf_sweep`.
+  - The `METRICS` registry plus `metric_registry()`, and `plot_km` / `plot_pp`.
+- `scripts/verify_metrics_s1.py` (new): the synthetic suite.
+
+**Premises checked:**
+- `build/stats.py` imports only numpy. Checked with `grep -n "^import\|^from"` → `from __future__ import
+  annotations`, `from typing import Protocol`, `import numpy as np`. **Holds** (measured).
+- LICENSE is Apache-2.0, "Copyright 2025-2026 Positronic Robotics". Read the file in the clone; the
+  GitHub API says `spdx_id: NOASSERTION`. **Holds** (quoted file).
+- Apache-2.0 §4(b): "You must cause any modified files to carry prominent notices stating that You
+  changed the files" (quoted LICENSE l.97–98), and the repo has no NOTICE file (`ls`). So an unmodified
+  copy plus the license text satisfies §4. **Holds.**
+- lifelines and statsmodels are not installed (`importlib` → `MISSING`). scipy 1.18.1 `stats.logrank`
+  signature is `(x, y, alternative)`, so it has no strata; `stats.ecdf(sample)` takes `CensoredData`.
+  pytest is not installed. **Measured.** As a result, the stratified logrank is written here (cross-checked
+  against scipy), and the suite is a script.
+- The vendored `_collect_T_E` always uses the default `multi_grip_threshold_s = 0.3`, while
+  `episode_to_T_pairs` accepts the threshold. Read in the source. **Holds.** So `evaluation.py` stores
+  pairs per episode and re-runs the bootstrap loops itself, in the same RNG order; the equivalence is
+  checked below.
+
+**Acceptance criteria:**
+- ✅ AC1.1: `verify_metrics_s1.py` → `vendored sha256 802387d343463cd4… == clone build/stats.py: True
+  (clone HEAD 18ce72d5703dcbbbb10a980336aa5a1622601fb4); LICENSE identical: True; attribution header:
+  True`. `shasum -a 256` gives `802387d343463cd46a56e8d1dc4b4917b90c34b51fc72acce5b6e6cb915b46f2` for both
+  files.
+- ✅ AC1.2: `AC1.2 SYNTHETIC finite censored data (400 pairs, 256 events, 226 tied values): max
+  |S_vendored - S_scipy.ecdf| over 146 event times = 3.331e-16; Greenwood 95% half-width max diff =
+  9.714e-17`.
+- ✅ AC1.3 (to floating point):
+  - `55 operations, 5 ghosts (T=inf), 0 censored: ghost_event_rate = 0.09090909090909088, g/n =
+    0.09090909090909091, |diff| = 2.8e-17`.
+  - `RMST(30 s) = 14.55964694266428; mean(min(T, 30)) with ghosts -> 30 = 14.55964694266428; |diff| = 0.0e+00`.
+  - "Exactly" holds to 2.8e-17: the KM cumulative product rounds in the last bits.
+- ✅ AC1.4:
+  - `zero-success episode (τ_episode 60 s, 2 ops) -> ((60.0, 0),); all ops done -> ((5.0, 1), (7.0, 1))
+    (no censored tail); 1 of 2 done -> ((8.0, 1), (52.0, 0)); LIBERO simultaneous ops (threshold 0) ->
+    ((10.0, 1), (0.0, 1))`.
+  - `the zero-success episode stays in the risk set: 5 pairs, S after the first event = 0.8 (= 1 - 1/5)`.
+- ✅ AC1.5, on 40 episodes × 5 correlated ops (SYNTHETIC):
+  - RMST(30) = 6.3719: `clustered 95% CI [5.1479, 7.7031] vs per-operation [5.4706, 7.2974]; width ratio 1.399`.
+  - F(10) = 0.8050: `[0.7350, 0.8701] vs [0.7500, 0.8600]; width ratio 1.228`.
+- ✅ AC1.6: `registry: 14 entries, every named function exists with a docstring; required missing: []`.
+  The table is in `artifacts/s1_metric_registry.md` (name → function → functional of F → τ → source).
+- ✅ AC1.7: `citations in vlapoc/evaluation.py: {'PoC §3.2 (p. 6)': 1, 'PoC §10 (p. 20)': 1, '§3.1 p. 4':
+  7, 'Table 1 p. 5': 2, '§3.2 p. 5': 6, '§3.3 p. 6': 3}`. The module docstring also cites App. L.
+
+**Equivalence checks (SYNTHETIC, measured), ahead of S2:**
+- macro-KS, on 3 cells with ghosts and censoring: `vendored per_obj_macro_bootstrap_ks
+  D=0.1902324217651046 p=0.6866267465069861; evaluation.macro_ks D=0.1902324217651046
+  p=0.6866267465069861; identical: True`.
+- Logrank, one stratum with ties: `ours chi2=0.5102598713 p=0.4750263814; scipy Z^2=0.5102598713
+  p=0.4750263814; |dchi2|=5.55e-16`.
+- AUC: the hand example gives `0.666667 (expected 2/3)`, and a ghost vs a 5 s event gives `0.0`. On
+  uncensored synthetic data, `P-P area 0.35813 vs AUC 0.35817 (|diff| 3.9e-05)`, the P-P area claim of
+  PhAIL §3.2 p. 5.
+- HRT, 2 cells: `macro 0.6056 (= mean: True)`; `CI resample human [0.5191, 0.7111] vs human fixed
+  [0.5486, 0.6708]`.
+
+**Demo artifacts produced:** `artifacts/s1_metric_registry.md` (the registry table),
+`artifacts/s1_verify_metrics.json`, `artifacts/s1_verify_metrics_stdout.txt`.
+
+**Notes / divergences from plan or spec:**
+- **AC1.1 wording conflict, resolved.** The AC says "byte-identical … and its license header is present".
+  A header inside the file would break byte identity, so the header lives in
+  `vlapoc/third_party/__init__.py`, next to `LICENSE-phail-paper`. Apache-2.0 does not require a header
+  in an unmodified file.
+- **Restated formulas, not imported.** `auc_censored`, `pp_curve`, `macro_pp_curve`, `macro_auc`, UPH
+  and MTBF/A, and the logrank arithmetic are restated from PhAIL's scripts, with each source function
+  cited. Those scripts import PhAIL's loader, `configuronic` and matplotlib at module level, so they
+  can't be imported here. S2 checks equality on PhAIL's data.
+- **`ghost_event_rate` is the KM mass at T = ∞.** With censoring, KM redistributes censored mass to the
+  right, including to ∞. That is PhAIL's "gap between the asymptote and 1". `ghost_fraction` (raw g/n)
+  is kept as a diagnostic.
+- **`censored_rate` = share of episodes ending in a censored pair.** This makes it the mean of S6's
+  per-rollout `ret_censored`, by construction.
+- **UPH adopted = 3600 / RMST(τ_episode)** (PhAIL `fig_qq_tradeoff.py`). Table 1's conditional form is
+  `uph_conditional`, computed in closed form from the KM: E[T | T ≤ τ] = (RMST − τ(1 − F(τ))) / F(τ).
+  The full three-form disclosure is S2 AC2.8.
+- **`mtbfa` returns `inf` when F(τ_episode) = 1.** PhAIL's figure code clips the denominator at 1e-9.
+- **`uph_mtbf_sweep` uses the exact step-integral RMST.** PhAIL's figure uses a 1500-point Riemann sum,
+  so figure-level differences are expected.
+- **HRT is returned as a ratio.** PhAIL reports it ×100 as a percentage.
