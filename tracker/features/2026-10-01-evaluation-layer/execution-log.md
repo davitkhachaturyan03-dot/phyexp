@@ -441,3 +441,62 @@ never downloaded.
 - **The KM CDFs start at F(0) ≈ 0.05** because PhAIL's multi-grip extras enter as T = 0 events
   (`episode_to_T_pairs`, threshold 0.3 s; the PhAIL default is kept for PhAIL data).
 - **Main `.venv` packages:** S2 changed none (the PhAIL env is separate).
+
+### S3: LIBERO simulator stack locally, and the human reference by replaying the demos' goal check (IN PROGRESS, partial entry)
+
+Re-read this session: PoC §3.5 A pp. 7–8, §9.1 Step 2 p. 18 and §10 p. 20 (PDF). Also read:
+- LIBERO `scripts/create_dataset.py` at `8f1084e5…` (fetched from GitHub raw; l. 123 `cap_index = 5`,
+  l. 130–153 the replay recipe, l. 226–231 `states = states[valid_index]`, `rewards[-1] = 1`, `dones[-1] = 1`).
+- The installed hf-libero 0.1.4 source:
+  - `libero/libero/__init__.py`: the config prompt, `_assets_path_cache`, HF asset download;
+  - `envs/env_wrapper.py` (`ControlEnv`);
+  - `envs/problems/*_manipulation.py` (`_check_success`, `_eval_predicate`);
+  - `envs/bddl_utils.py` (`robosuite_parse_problem`);
+  - `utils/utils.py` (`postprocess_model_xml`);
+  - LeRobot `envs/libero.py` (`get_task_init_states`, `num_steps_wait=10`).
+
+**Environment (plan rule: main `.venv` first).** The sim stack went into the main `.venv` (Python 3.14.0).
+- Before installing, `uv pip install --dry-run` showed additions only (32 packages, nothing changed).
+- It would have added `opencv-python` 5.0 next to the installed `opencv-python-headless` 4.13; both write
+  the `cv2` package (inferred risk to LeRobot). So robosuite and hf-libero were installed `--no-deps`, with
+  their other dependencies pinned.
+- The freeze diff before/after (`data/scratch/logs/venv_freeze_before_s3.txt` vs `_now.txt`) shows **only
+  added lines** (32 packages, 0 changed or removed). Among them: `hf-libero==0.1.4`, `robosuite==1.4.0`,
+  `mujoco==3.8.1` (hf-libero requires `mujoco<3.9.0,>=3.0.0`; 3.8.1 is proven by P10), `bddl==1.0.1`,
+  `numba==0.68.0`, `hydra-core==1.3.7`, `easydict`, `einops`, `cloudpickle`, `future`.
+- Skipped hf-libero dependencies: `robomimic`/`hf-egl-probe` (broken on macOS, P11), `wandb`, `thop`,
+  `transformers`, `opencv-python`.
+- No `.venv-sim` was needed.
+
+**LIBERO config (never `~/.libero`).** `import libero.libero` *prompts on stdin* when
+`$LIBERO_CONFIG_PATH/config.yaml` is missing (quoted, `libero/libero/__init__.py`), and the default path is
+`~/.libero`. So `vlapoc.libero_goals.setup_libero()` sets `LIBERO_CONFIG_PATH=data/libero_config` and writes
+`config.yaml` before the first import. The assets path is pinned through `libero.libero._assets_path_cache`,
+which `get_assets_path()` returns when it exists (quoted, l. 68–80). That replaces LIBERO's on-demand
+download to `~/.cache/libero/assets`. Measured: `ls ~/.libero` → `No such file or directory`, and
+`ls ~/.cache/libero` → `No such file or directory`.
+
+**Download (approved):** LIBERO assets from the HF dataset `lerobot/libero-assets` @
+`0b3ea86be5fe169d0fd036ae63d1070ec09e90f6` (last modified 2025-11-03). That is the repo id hard-coded in
+hf-libero's `download_utils.py:109`. 586 files, 422,320,936 bytes (HF API), via `snapshot_download(...,
+revision=…, local_dir="data/libero_assets")`; 17.5 min; `du` 415M; 586 files on disk.
+- The demos' model XML carries two absolute asset roots (measured over all 1000 demos):
+  `/Users/yifengz/workspace/libero-dev/chiliocosm/assets/` (14,500 refs) and
+  `/home/yifengz/workspace/libero-dev/chiliocosm/assets/` (12,050).
+- `demo_model_xml` maps both to `data/libero_assets/` and raises on any other unmapped root. Robosuite
+  paths are left to LIBERO's own `postprocess_model_xml`.
+
+**Files (so far):**
+- `vlapoc/libero_goals.py` (new): `setup_libero`, `fetch_assets`, `assets_digest`, `bddl_path`,
+  `goal_conjuncts` (LIBERO's parser), `make_replay_env` (`ControlEnv` with no renderer and no camera obs),
+  `demo_model_xml`, `replay_goal_trace` (LIBERO's `_eval_predicate` per conjunct + `_check_success` per
+  stored state), `first_true`, `rle`, `env_versions`. Its docstring covers the AC3.5 alignment conventions.
+- `scripts/human_reference.py` (new): replay → parquet + `sim_env.json`; `--bddl-check` (AC3.6);
+  `--init-states` (AC3.7); `--summary` (AC3.3/AC3.4 via the S1 metric layer).
+
+**Acceptance criteria so far:**
+- ✅ AC3.7: `human_reference.py --init-states` (LeRobot `get_task_init_states`) →
+  `libero_spatial: 10 tasks, init-state array shapes [(50, 92)]`; `libero_10: 10 tasks, init-state array
+  shapes [(50, 45), (50, 47), (50, 51), (50, 71), (50, 84), (50, 123)]`; `tasks with exactly 50 fixed
+  init states: 20/20` (`artifacts/s3_init_states_stdout.txt`, `s3_init_states.json`).
+- The 1000-demo replay is running in the background (`data/scratch/logs/human_reference_replay.txt`).
