@@ -1,0 +1,16 @@
+exported 990 episodes -> data/phail/cohort_mixed.parquet
+cohort_source  auto_validated  manual
+model_short                          
+ACT                        96      55
+GR00T                      60     104
+OpenPI                     54     109
+SmolVLA                    63      53
+Teleop                    300      96
+macro-KS (PhAIL per_obj_macro_bootstrap_ks, dashboard H1 order) OpenPI-GR00T: D=0.123916 p=0.117941
+macro-KS (PhAIL per_obj_macro_bootstrap_ks, dashboard H1 order) OpenPI-ACT: D=0.141798 p=0.122939
+macro-KS (PhAIL per_obj_macro_bootstrap_ks, dashboard H1 order) OpenPI-SmolVLA: D=0.465455 p=0.000500
+macro-KS (PhAIL per_obj_macro_bootstrap_ks, dashboard H1 order) GR00T-ACT: D=0.175409 p=0.010495
+macro-KS (PhAIL per_obj_macro_bootstrap_ks, dashboard H1 order) GR00T-SmolVLA: D=0.434398 p=0.000500
+macro-KS (PhAIL per_obj_macro_bootstrap_ks, dashboard H1 order) ACT-SmolVLA: D=0.360733 p=0.000500
+wrote tracker/features/2026-10-01-evaluation-layer/artifacts/s2_phail_reference.json
+exit 0

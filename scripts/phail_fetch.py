@@ -24,6 +24,7 @@ import argparse
 import json
 import ssl
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -93,8 +94,15 @@ def _get(o: dict) -> int:
         return 0
     dest.parent.mkdir(parents=True, exist_ok=True)
     url = f"{ENDPOINT}/{BUCKET}/{urllib.parse.quote(o['key'])}"
-    with _open(url, 120) as r:
-        data = r.read()
+    for attempt in range(4):  # the endpoint occasionally drops a connection (RemoteDisconnected, measured)
+        try:
+            with _open(url, 120) as r:
+                data = r.read()
+            break
+        except (urllib.error.URLError, ConnectionError, TimeoutError, OSError):
+            if attempt == 3:
+                raise
+            time.sleep(2 ** attempt)
     if len(data) != o["size"]:
         raise IOError(f"{o['key']}: got {len(data)} bytes, listed {o['size']}")
     dest.write_bytes(data)

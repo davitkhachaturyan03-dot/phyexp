@@ -292,7 +292,7 @@ Table 1, §3.2 HRT / P-P / CIs, §3.3 macro-KS + logrank) was read from
   so figure-level differences are expected.
 - **HRT is returned as a ratio.** PhAIL reports it ×100 as a percentage.
 
-### S2: Validate the metric layer on PhAIL's released real-robot data (IN PROGRESS, partial entry)
+### S2: Validate the metric layer on PhAIL's released real-robot data, and answer the §3.5 B data question
 
 **Environment created:** `.venv-phail/` (gitignored by the new `.venv-*/` rule in `.gitignore`).
 - Python 3.12.13, made with `uv venv --python 3.12`.
@@ -312,8 +312,9 @@ recipe does. Listing (measured, `scripts/phail_fetch.py --list`):
 - total 14,361 objects, 40.66 GB;
 - sidecars: 182.5 MB (2,166 files; 1,089 zero-byte directory-marker keys are skipped).
 
-The fetch is in progress into `data/phail/dataset/`. The fine-tuning set is listed and counted, never
-downloaded.
+The fetch is complete: 2,166 files, 182.5 MB (`du` 183 MB), in `data/phail/dataset/`. It resumed after one
+`RemoteDisconnected`, after which the script got a 4-try retry. The fine-tuning set is listed and counted,
+never downloaded.
 
 **Measured so far:**
 - Access probe (`scripts/phail_fetch.py --probe`): `s3://positronic-public/phail/v1.0/dataset/: HTTP 200`;
@@ -336,3 +337,107 @@ downloaded.
   PhAIL's `stats.per_obj_macro_bootstrap_ks` directly.
 - Third UPH form, `build/common.py:_derive_metrics`: `'UPH': 3600 * S / T` per episode (S successful
   items, T duration).
+
+**Files:**
+- `scripts/phail_fetch.py` (new; stdlib urllib, `certifi` CA bundle, retry).
+- `scripts/phail_export_cohort.py` (new; runs in `.venv-phail`). PhAIL's own `loader.load('mixed')` builds
+  the cohort, which is exported to `data/phail/cohort_mixed.parquet`. PhAIL's own functions then compute the
+  reference values: `tab_leaderboard._per_model_row`, `stats.*`, `explore_pp_plot._auc_censored` /
+  `_macro_auc` / `_pp_curve` / `_macro_pp_curve`, `explore_separation._logrank`, and
+  `stats.per_obj_macro_bootstrap_ks` in the `dashboard.py` H1 order.
+- `scripts/phail_validate.py` (new; runs in `.venv`). It computes our layer on the same parquet and
+  compares it with PhAIL's functions and with the published files; `--hrt-ci-seeds` covers AC2.5.
+
+**Premises checked:**
+- The loader and the needed scripts import only `pos3`, `configuronic`, numpy, scipy and matplotlib
+  (grep of the import lines). **Holds** (measured).
+- The cohort is incomplete: 990 of 995 episodes. **Holds**, and the missing five are identified below.
+
+**Acceptance criteria:**
+- ✅ AC2.1: implementation equivalence on identical input (`artifacts/s2_phail_validate_stdout.txt`):
+  - `max |ours - PhAIL| pooled_per_model (rmst240, median, F20/30/60, pct_of_human): 0.000e+00`;
+    `cells (rmst240, median, F20/30/60): 0.000e+00`; `cells censored AUC vs teleop: 0.000e+00`;
+    `cells HRT %: 3.553e-15`; `macro AUC: 0.000e+00`;
+    `KS distance per cell (24 = 6 pairs x 4 objects): 0.000e+00`; `P-P curve ACT|Batteries: 0.000e+00`;
+    `macro P-P curve ACT: 0.000e+00`; `pooled logrank chi2/p (one stratum): 4.868e-17`.
+  - `macro-KS D and p identical for all 6 pairs (same RNG): True`. Example: `OpenPI-GR00T: ours
+    D=0.123916 p=0.117941 | PhAIL D=0.123916 p=0.117941`.
+- ✅ AC2.2 (cohort incomplete; the missing episodes are named): `OpenPI 163/165, GR00T 164/165, ACT
+  151/151, SmolVLA 116/118, Teleop 396/396`. By cohort source: OpenPI 109 manual + 54 auto, GR00T 104 + 60,
+  ACT 55 + 96, SmolVLA 53 + 63, Teleop 96 + 300 (`artifacts/s2_phail_export_stdout.txt`).
+  - The 5 missing episodes are exactly the 5 `reviewed=True` annotations under the private
+    `s3://inference/phail_act_groot/` (HTTP 403). The loader drops them because their `static.json`
+    cannot be read.
+  - Joined to `out/release_classifier/episode_summary.csv`, all 5 are **USB-C Boxes**: 2 SmolVLA (1 + 1
+    placements), 1 GR00T (3), 2 OpenPI (1 + 1). That is 2/1/2 episodes and 2/3/2 events, exactly the
+    shortfall in episodes (165 − 163, …) and in events (631 − 629, 620 − 617, 154 − 152)
+    (`artifacts/s2_missing_episodes_check.txt`).
+  - USB-C Boxes has no teleop reference (PhAIL `explore_pp_plot.py:12`, quoted), so these episodes enter
+    only the pooled numbers.
+- ✅ AC2.3, under the "incomplete" branch: the deltas are reported and explained, and AC2.1 carries the
+  pass. Per-object published numbers are reproduced exactly:
+  - Macro HRT `ours 13.754838767437327 pub 13.754838767437327` (OpenPI), |diff| 0–1.8e-15 for all 4 models.
+  - All 16 per-cell censored AUCs equal `pp_summary.json`, max |diff| `0.00e+00`.
+  - Macro-AUC: ACT 0.1338 [0.111, 0.162] vs pub 0.134 [0.108, 0.162]; OpenPI 0.1004 [0.084, 0.117] vs
+    0.100 [0.084, 0.116]; GR00T 0.0949 [0.079, 0.111] vs 0.095 [0.080, 0.110]; SmolVLA 0.0268 [0.017, 0.037]
+    vs 0.027 [0.016, 0.036]. CI widths are within +3.6% / −3.7% of `pp_summary`.
+  - F(30 s): GR00T 0.5091, OpenPI 0.4741, ACT 0.4409, against the paper's 0.51 / 0.47 / 0.44, all within ±0.005.
+  - The pooled RMST points of the three models with USB-C episodes miss ±0.1 s: OpenPI 77.572 vs 77.693
+    (Δ −0.121 s), GR00T 77.313 vs 77.205 (+0.107 s), SmolVLA 166.373 vs 165.776 (+0.597 s). ACT
+    (100.929, Δ 0.0000) and Teleop (10.516, Δ 0.0000) are exact.
+  - RMST CI widths are within ±10% (+1.3%, −2.2%, +0.3%, −5.0%, −0.3%).
+  - Macro-KS OpenPI-GR00T: ours `D=0.123916 p=0.117941` vs `dashboard_per_obj_macro.json D=0.123916
+    p=0.119440` / paper p = 0.12, within ±0.03.
+  - Tolerance checks: 23/26 within. The 3 failures are those three pooled RMST points.
+- ✅ AC2.4: the four yardsticks were regenerated from the data:
+  - `F(30 s)`: GR00T 0.509 [0.471, 0.547], the winner.
+  - `HRT macro (%)`: OpenPI 13.755 [12.344, 15.674], the winner.
+  - `global RMST(240 s)`: GR00T 77.313 [69.171, 86.190], the winner.
+  - `AUC vs human (macro)`: ACT 0.134 [0.111, 0.162], the winner.
+  - Result: `published GR00T/OpenPI/GR00T/ACT reproduced: True; distinct top-1: 3`.
+- ✅ AC2.5: the HRT CI variant is decided with Monte-Carlo spread (`--hrt-ci-seeds 8`, n_boot 1000 per
+  seed; `artifacts/s2_hrt_ci_variants_seeds_stdout.txt`).
+  - Published endpoints as z-scores: human resampled gives OpenPI −1.14/+0.77, GR00T +0.65/+1.40, ACT
+    −0.09/+1.02, SmolVLA −2.23/+1.28; human fixed gives −3.14/+1.16, +0.39/+3.18, −1.08/+0.81, −3.44/+2.85.
+  - `sum of z^2 over 8 endpoints: human_resampled 11.92, human_fixed 43.35`.
+  - Adopted: resample the human anchor too, which is already `hrt_ci(resample_human=True)` by default.
+  - The single-seed run pointed the same way (summed endpoint error 0.58 vs 0.67 pp).
+  - Not an exact reproduction: PhAIL's Table 2 CI producer is unreleased (P19), so its RNG order is unknown.
+- ✅ AC2.6: the p. 8 caveat, answered with measured facts (table in `phail_validation.json` → `AC2.6`):
+  - The fine-tuning set is 449 episodes / 13.95 GB at `phail/v1.0/dataset/teleoperation/`, identical in
+    size and count to `datasets/phail/v1.0/training/` (5,841 files). It is public, anonymous HTTPS,
+    licensed CC BY 4.0 (`croissant.json`), and was not downloaded.
+  - The evaluation rollouts are 594 episodes / 26.64 GB; human, 40 episodes.
+  - Private: `s3://inference/phail_act_groot/`, `phail_final/`, `spoons_ablation/` (HTTP 403).
+  - Discrepancy: `croissant.json` says "352-episode" three times; the bucket and the paper say 449.
+  - Table 2's human anchor is the teleop cohort (`REFERENCE_MODEL = 'Robot teleoperated by Human'`, P22);
+    in the export, Teleop = 396 episodes, 96 manual + 300 auto-validated.
+- ✅ AC2.7: figures on real data:
+  - `artifacts/s2_fig_km_pp_ACT_Batteries.png`: ACT vs Teleop KM CDFs with 95% episode-clustered bands,
+    and the P-P plot, AUC 0.1575. That AUC equals PhAIL's `pp_summary` cell value 0.15754457702104840.
+  - `artifacts/s2_fig_uph_mtbfa_macro.png`: macro UPH vs MTBF/A as τ_episode sweeps 30→240 s.
+  - Both were inspected visually. `monotone over τ in [30, 240]`: UPH falls and MTBF/A rises for all four
+    models, which reproduces App. L's "UPH falls … MTBF/A rises".
+- ✅ AC2.8: the three UPH forms, at τ_episode = 240 s, pooled:
+  - OpenPI: 3600/RMST = 46.4; Table 1's 3600/E[T|T<240] = 97.1; `common.py`'s mean 3600·S/T = 63.2.
+  - GR00T 46.6 / 90.6 / 59.9; ACT 35.7 / 105.3 / 45.4; SmolVLA 21.6 / 66.9 / 13.1; Teleop 342.3 / 342.3 / 345.3.
+  - The forms differ by up to 3×, and they rank ACT differently. The adopted form is 3600/RMST(τ_episode),
+    from PhAIL's App. L figure code.
+
+**Demo artifacts produced:** `artifacts/phail_validation.json` (every number above),
+`artifacts/s2_phail_reference.json` (PhAIL-side values), the two figures, `artifacts/s2_missing_episodes_check.txt`,
+`artifacts/s2_hrt_ci_variants_seeds.json`, `artifacts/s2_phail_listing_summary.json`,
+`artifacts/s2_phail_access_probe.json` and `artifacts/s2_phail_other_prefixes.json`. The cohort parquet
+(`data/phail/cohort_mixed.parquet`, gitignored) is regenerated by `scripts/phail_export_cohort.py`.
+
+**Notes / divergences:**
+- **Two published files disagree on pooled RMST.** `tab_leaderboard.json` gives ACT 100.9451 and OpenPI
+  77.7027; `tab_headline_ci.json` (Table 2's source) gives ACT 100.9287 and OpenPI 77.6926. Ours matches
+  `tab_headline_ci.json` for ACT exactly. So the two sidecars come from different runs of the cohort;
+  the artifact wins, and this is recorded.
+- **"% of human" is computed two ways in PhAIL.** In `tab_leaderboard.md` it is the pooled RMST ratio
+  (GR00T 13.6%). In Table 2 / `tab_headline_ci.json`, HRT is the per-object macro (GR00T 13.349%). We
+  reproduce both: AC2.1 pooled `pct_of_human` |diff| 0, and the macro HRT above.
+- **The KM CDFs start at F(0) ≈ 0.05** because PhAIL's multi-grip extras enter as T = 0 events
+  (`episode_to_T_pairs`, threshold 0.3 s; the PhAIL default is kept for PhAIL data).
+- **Main `.venv` packages:** S2 changed none (the PhAIL env is separate).

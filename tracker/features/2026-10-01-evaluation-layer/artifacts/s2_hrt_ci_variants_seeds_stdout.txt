@@ -1,0 +1,10 @@
+AC2.5 seeds OpenPI   human_resampled lo 12.294±0.058 hi 15.685±0.061 | pub [12.227, 15.732] -> z_lo -1.14 z_hi +0.77
+AC2.5 seeds OpenPI   human_fixed     lo 12.328±0.032 hi 15.617±0.099 | pub [12.227, 15.732] -> z_lo -3.14 z_hi +1.16
+AC2.5 seeds GR00T    human_resampled lo 11.985±0.042 hi 15.105±0.086 | pub [12.012, 15.225] -> z_lo +0.65 z_hi +1.40
+AC2.5 seeds GR00T    human_fixed     lo 11.991±0.052 hi 15.086±0.044 | pub [12.012, 15.225] -> z_lo +0.39 z_hi +3.18
+AC2.5 seeds ACT      human_resampled lo 9.195±0.084 hi 13.082±0.071 | pub [9.188, 13.154] -> z_lo -0.09 z_hi +1.02
+AC2.5 seeds ACT      human_fixed     lo 9.259±0.066 hi 13.102±0.065 | pub [9.188, 13.154] -> z_lo -1.08 z_hi +0.81
+AC2.5 seeds SmolVLA  human_resampled lo 5.796±0.028 hi 7.364±0.070 | pub [5.734, 7.454] -> z_lo -2.23 z_hi +1.28
+AC2.5 seeds SmolVLA  human_fixed     lo 5.813±0.023 hi 7.333±0.042 | pub [5.734, 7.454] -> z_lo -3.44 z_hi +2.85
+AC2.5 seeds sum of z^2 over 8 endpoints (lower = closer to published): {'human_resampled': 11.918250763795402, 'human_fixed': 43.34869591446588}
+exit 0
