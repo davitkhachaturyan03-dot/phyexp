@@ -547,7 +547,7 @@ revision=…, local_dir="data/libero_assets")`; 17.5 min; `du` 415M; 586 files o
     demo-XML replay: 5` (`artifacts/s3_bddl_check_task8_stdout.txt`).
   - All 1000 → `replayed 1000 demos ... (BDDL scene) in 201.0s`; `no success at any state: 3/1000`
     (`KITCHEN_SCENE8_put_both_moka_pots_on_the_stove/demo_19`, `demo_33`;
-    `STUDY_SCENE1_pick_up_the_book_..._caddy/demo_27`); `different T: 9` (−23 to +11 steps). Only these 2
+    `STUDY_SCENE1_pick_up_the_book_..._caddy/demo_27`); `different T: 9` (BDDL − demo XML from −11 to +23 steps). Only these 2
     libero_10 tasks are affected (`artifacts/s3_bddl_check_all_stdout.txt`, `s3_bddl_vs_demo_xml.csv`).
   - P9's specific demo (task 8 demo_1) succeeds in both of our BDDL runs. The *kind* of discrepancy
     reproduces; the instance does not.
