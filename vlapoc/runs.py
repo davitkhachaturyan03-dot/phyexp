@@ -35,7 +35,7 @@ How lineage is encoded in MLflow (all verified against mlflow 3.16.1 source/beha
   code that ran (``allow_dirty=True`` overrides and is recorded as ``vlapoc.git_dirty=true``).
 - Only FINISHED runs count as producers or consumers; a run that fails part-way is kept (status
   FAILED) but never becomes a lineage edge.
-- Stand-in stages (no real screening, rollouts or attribution yet) carry ``vlapoc.stand_in=true``
+- Stand-in stages (no real screening or attribution yet; ``eval`` is real since evaluation-layer S5) carry ``vlapoc.stand_in=true``
   and write only lineage keys plus clearly named placeholder payloads; no outcome numbers.
 
 Where it sits
@@ -504,39 +504,79 @@ def screen_standin(candidate: str, reference: str, name: str, out_dir: Path, lin
         return r.run_id, path
 
 
-def eval_standin(train_run_id: str, name: str, out_dir: Path, rollouts_per_task: int = 50, seed_base: int = 0,
-                 lineage_root: Path | None = None, chain: str | None = None) -> tuple[str, Path]:
-    """Stage ``eval`` stand-in (PoC §9.1 Step 2): load the checkpoint, check its sha256 against the train
-    run, and record the rollout PLAN (task, init-state index, seed). Outcomes are ``not_run``: the LIBERO
-    simulator needs Linux (LeRobot docs), so no rollout happens and no outcome is recorded."""
+def eval_run(policy: str, tasks: list[tuple[str, int]], n_init: int, name: str, out_dir: Path | None = None,
+             seed_base: int = 0, init_offset: int = 0, tau_episode_steps: int = 1200, render_hw: int = 128,
+             batch_size: int = 1, device: str = "cpu", record_trajectories: bool = False,
+             lineage_root: Path | None = None, chain: str | None = None, allow_dirty: bool = False) -> dict:
+    """Stage ``eval`` (PoC §9.1 Step 2 p. 18): closed-loop LIBERO rollouts recorded as one MLflow run.
+
+    Grounding: PoC §2.1 item 1 (p. 3) "Every eval rollout should be tied back to that checkpoint" (the run's
+    input is the checkpoint's sha256, which ``trace`` follows to its train run and on to the dataset version);
+    §2.1 item 3 (p. 3) fixed seeds and initial states (rollout j: init state ``init_offset + j``, seed
+    ``seed_base + init_offset + j``). Replaces the round-1 ``eval_standin`` (single record system).
+
+    ``policy``: ``"noop"`` (LIBERO dummy action; smoke only), ``"train:<train_run_id>"`` (a checkpoint this
+    store recorded; its sha256 is re-checked) or ``"hf:<repo_id>@<revision>:<local dir>"`` (an external
+    checkpoint downloaded to ``<local dir>``; recorded as ``external_checkpoint``, never attribution-grade).
+    Writes ``<out_dir>/rollouts.parquet`` (``vlapoc.rollouts.RECORD_COLUMNS``, validated) and, with
+    ``record_trajectories``, a lossless LeRobot dataset at ``<out_dir>/trajectories``.
+    Returns ``{"run_id", "rollouts", "n_rollouts", "n_success", "trajectories", "out_dir"}``.
+    """
+    from vlapoc import libero_goals as lg
+    from vlapoc import rollouts as ro
+    from vlapoc.lineage import file_digests
+
     c = client(lineage_root)
-    tr = c.get_run(train_run_id)
-    pretrained = REPO_ROOT / tr.data.tags["checkpoint.path"]
-    sha = sha256_file(pretrained / "model.safetensors")
-    if sha != tr.data.tags["checkpoint.weights.sha256"]:
-        raise LineageError("checkpoint on disk differs from the one the train run recorded")
-    policy = load_checkpoint(pretrained)
-    n_params = int(sum(p.numel() for p in policy.parameters()))
-    subset = Subset.load(tr.data.tags["subset_id"], lineage_root)
-    tasks = subset.episodes(lineage_root)[["suite", "libero_task_id", "task_name"]].drop_duplicates()
-    rows = [{"suite": t.suite, "libero_task_id": int(t.libero_task_id), "task_name": t.task_name,
-             "init_state_index": i, "seed": seed_base + i, "checkpoint_sha256": sha, "outcome": "not_run",
-             "stand_in": True}
-            for t in tasks.sort_values(["suite", "libero_task_id"]).itertuples() for i in range(rollouts_per_task)]
-    plan = pd.DataFrame(rows)
+    train_run_id, external = "", ""
+    if policy == "noop":
+        spec = ro.noop_policy()
+    elif policy.startswith("train:"):
+        train_run_id = policy.split(":", 1)[1]
+        tr = c.get_run(train_run_id)
+        pretrained = REPO_ROOT / tr.data.tags["checkpoint.path"]
+        if sha256_file(pretrained / "model.safetensors") != tr.data.tags["checkpoint.weights.sha256"]:
+            raise LineageError("checkpoint on disk differs from the one the train run recorded")
+        spec = ro.checkpoint_policy(pretrained, device=device, train_run_id=train_run_id)
+    elif policy.startswith("hf:"):
+        external, local = policy[3:].rsplit(":", 1)
+        spec = ro.checkpoint_policy(REPO_ROOT / local, device=device, external=external)
+    else:
+        raise ValueError(f"unknown policy spec {policy!r}")
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    out_dir = Path(out_dir) if out_dir is not None else REPO_ROOT / "data" / "eval" / f"{name}-{stamp}"
     out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / "rollout_plan.STAND_IN.parquet"
-    plan.to_parquet(path, index=False)
-    with stage_run("eval", name, lineage_root, stand_in=True, chain=chain) as r:
-        r.input_entity("checkpoint", sha, "checkpoint")
-        r.params({"train_run_id": train_run_id, "checkpoint_sha256": sha, "suites": sorted(tasks["suite"].unique().tolist()),
-                  "libero_task_ids": {s: sorted(g["libero_task_id"].astype(int).tolist()) for s, g in tasks.groupby("suite")},
-                  "rollouts_per_task": rollouts_per_task, "init_state_indices": f"0..{rollouts_per_task - 1} (LIBERO fixed init states)",
-                  "seeds": f"seed_base + init_state_index, seed_base={seed_base}", "outcomes": "not_run (stand-in)"})
-        r.tags({"eval.train_run_id": train_run_id, "eval.checkpoint.sha256": sha, "eval.checkpoint.loaded": "true",
-                "eval.checkpoint.n_params": n_params})
+    plan = ro.plan_rollouts(tasks, n_init, seed_base, init_offset)
+    with stage_run("eval", name, lineage_root, chain=chain, allow_dirty=allow_dirty) as r:
+        if spec.checkpoint_sha256:
+            r.input_entity("checkpoint", spec.checkpoint_sha256, "checkpoint")
+        else:
+            r.input_entity("policy", spec.policy_type, "policy")
+        r.params({"policy": policy, "policy_type": spec.policy_type, "train_run_id": train_run_id,
+                  "external_checkpoint": external, "checkpoint_sha256": spec.checkpoint_sha256,
+                  "tasks": [list(t) for t in tasks], "n_init": n_init, "init_offset": init_offset, "seed_base": seed_base,
+                  "init_state_rule": "rollout j: init state init_offset + j, seed seed_base + init_offset + j",
+                  "tau_episode_steps": tau_episode_steps, "render_hw": render_hw, "batch_size": batch_size,
+                  "control_mode": "relative", "device": device, "record_trajectories": record_trajectories,
+                  "sim_env": lg.env_versions()})
+        r.tags({"eval.assets_revision": lg.ASSETS_REVISION, "eval.external_checkpoint": external or "none",
+                "eval.attribution_grade": str(bool(train_run_id)).lower()})
+        df, traj = ro.run_rollouts(spec, plan, tau_episode_steps, render_hw, batch_size, record_trajectories=record_trajectories,
+                                   traj_root=out_dir / "trajectories", eval_run_id=r.run_id)
+        errs = ro.validate_record(df)
+        if errs:
+            raise LineageError(f"rollout record fails its schema: {errs}")
+        path = out_dir / "rollouts.parquet"
+        df.to_parquet(path, index=False)
         r.output_file("rollouts", path, kind="rollouts")
-        return r.run_id, path
+        out = {"run_id": r.run_id, "rollouts": rel(path), "n_rollouts": len(df), "n_success": int(df["event"].sum()),
+               "trajectories": None, "out_dir": rel(out_dir)}
+        if traj is not None:
+            digest = sha256_json(file_digests(out_dir / "trajectories"))
+            r.produced("trajectories", digest, "trajectories")
+            r.tags({"eval.trajectories.frames": traj["frames"], "eval.trajectories.episodes": traj["episodes"]})
+            out["trajectories"] = {"root": rel(out_dir / "trajectories"), "digest": digest, **{k: traj[k] for k in ("episodes", "frames")}}
+        r.tags({"eval.n_rollouts": len(df), "eval.n_success": out["n_success"]})
+        return out
 
 
 def attribute_standin(train_run_id: str, eval_run_id: str, name: str, out_dir: Path,

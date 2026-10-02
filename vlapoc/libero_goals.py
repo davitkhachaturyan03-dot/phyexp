@@ -86,6 +86,10 @@ def setup_libero():
     assets = ``data/libero_assets``) if missing, sets ``LIBERO_CONFIG_PATH`` and pins the assets path.
     Raises if the pinned assets are not present (``scripts/human_reference.py --fetch-assets`` gets them).
     """
+    import sys
+
+    if "libero.libero" in sys.modules and os.environ.get("LIBERO_CONFIG_PATH") != str(LIBERO_CONFIG_DIR):
+        raise RuntimeError("libero was imported before setup_libero(); its config path is already fixed (~/.libero?)")
     os.environ["LIBERO_CONFIG_PATH"] = str(LIBERO_CONFIG_DIR)
     cfg = LIBERO_CONFIG_DIR / "config.yaml"
     if not cfg.is_file():

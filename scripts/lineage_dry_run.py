@@ -57,6 +57,9 @@ ART = FEATURE_DIR / "artifacts"
 SCRATCH_ROOT = REPO_ROOT / "data" / "scratch"  # gitignored (data/); never a session-bound path (AC3.9)
 
 
+EVAL_TASKS = [("libero_spatial", 0)]  # smoke-scale evals in the dry run (evaluation-layer S5); full protocol: server runbook
+
+
 def log(msg: str) -> None:
     print(msg, flush=True)
 
@@ -176,6 +179,8 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--steps", type=int, default=5)
     ap.add_argument("--batch-size", type=int, default=4)
+    ap.add_argument("--eval-n", type=int, default=1, help="init states per eval task (real LIBERO rollouts, smoke scale)")
+    ap.add_argument("--eval-tau", type=int, default=60, help="eval episode budget in steps (smoke scale)")
     ap.add_argument("--tamper-only", action="store_true",
                     help="run only the AC6.5 tamper refusal against the existing v1 (records no run)")
     a = ap.parse_args()
@@ -215,10 +220,11 @@ def main() -> int:
     tf1 = runs.train_run("v1/candidate", "train-full-s1", seed=1, steps=a.steps, batch_size=a.batch_size, chain=chain)
     log(f"[run] train-full-s1: {tf1['run_id'][:12]} ({tf1['seconds']}s)")
     R["train_full_s0"], R["train_full_s1"] = tf0["run_id"], tf1["run_id"]
-    R["eval_full_s0"], _ = runs.eval_standin(tf0["run_id"], "eval-train-full-s0 [stand-in]", out / "eval-full-s0", chain=chain)
+    R["eval_full_s0"] = runs.eval_run(f"train:{tf0['run_id']}", EVAL_TASKS, a.eval_n, "eval-train-full-s0 [smoke]",
+                                      out / "eval-full-s0", tau_episode_steps=a.eval_tau, chain=chain)["run_id"]
     R["attribute"], attr_path, attr_digest = runs.attribute_standin(tf0["run_id"], R["eval_full_s0"], "attribute-train-full-s0 [stand-in]",
                                                                     out / "attribute", chain=chain)
-    log(f"[run] eval + attribute stand-ins: {R['eval_full_s0'][:12]}, {R['attribute'][:12]}")
+    log(f"[run] eval (real, smoke scale) + attribute stand-in: {R['eval_full_s0'][:12]}, {R['attribute'][:12]}")
     parent = runs.client().get_run(tf0["run_id"]).data.tags["subset_id"]  # train-full's training subset
     R["select_top"], top = runs.select_run(parent, f"select-drop-top-{a.k}", "drop_top_k", a.k, score_path=attr_path,
                                            metric="placeholder_score", score_run_id=R["attribute"], chain=chain)
@@ -228,8 +234,10 @@ def main() -> int:
     tt = runs.train_run(top.subset_id, f"train-drop-top-{a.k}", seed=0, steps=a.steps, batch_size=a.batch_size, chain=chain)
     tr_ = runs.train_run(rnd.subset_id, f"train-drop-random-{a.k}", seed=0, steps=a.steps, batch_size=a.batch_size, chain=chain)
     R["train_top"], R["train_rand"] = tt["run_id"], tr_["run_id"]
-    R["eval_top"], _ = runs.eval_standin(tt["run_id"], f"eval-train-drop-top-{a.k} [stand-in]", out / "eval-top", chain=chain)
-    R["eval_rand"], _ = runs.eval_standin(tr_["run_id"], f"eval-train-drop-random-{a.k} [stand-in]", out / "eval-rand", chain=chain)
+    R["eval_top"] = runs.eval_run(f"train:{tt['run_id']}", EVAL_TASKS, a.eval_n, f"eval-train-drop-top-{a.k} [smoke]",
+                                  out / "eval-top", tau_episode_steps=a.eval_tau, chain=chain)["run_id"]
+    R["eval_rand"] = runs.eval_run(f"train:{tr_['run_id']}", EVAL_TASKS, a.eval_n, f"eval-train-drop-random-{a.k} [smoke]",
+                                   out / "eval-rand", tau_episode_steps=a.eval_tau, chain=chain)["run_id"]
     log(f"[run] train on drop-top-k {tt['run_id'][:12]}, drop-random-k {tr_['run_id'][:12]}; evals {R['eval_top'][:12]}, {R['eval_rand'][:12]}")
     summary: dict = {"chain": chain, "run_ids": R, "k": a.k, "seed": a.seed, "steps": a.steps}
 

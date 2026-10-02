@@ -50,7 +50,7 @@ def setup() -> None:
 
 
 def main() -> int:
-    """Round-1 checks AC5.1-AC5.6: build, split, 4 tiny train runs, a select, an eval stand-in, queries."""
+    """Round-1 checks AC5.1-AC5.6: build, split, 4 tiny train runs, a select, an eval (real since evaluation-layer S5), queries."""
     setup()
     s: dict = {}
     head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, capture_output=True, text=True).stdout.strip()
@@ -65,7 +65,10 @@ def main() -> int:
     sel, child = runs.select_run("v0/reference", "s5-select-random5", "drop_random_k", k=5, seed=0, lineage_root=LR)
     bb = runs.train_run(child.subset_id, "s5-train-B", seed=0, steps=2, batch_size=2, runs_root=RUNS, lineage_root=LR)
     a1 = runs.train_run("v0/reference", "s5-train-A-seed1", seed=1, steps=2, batch_size=2, runs_root=RUNS, lineage_root=LR)
-    ev, plan = runs.eval_standin(a["run_id"], "s5-eval-A", RUNS / "s5-eval-A", rollouts_per_task=50, lineage_root=LR)
+    # eval_standin was replaced by the real eval stage (evaluation-layer S5): one 20-step rollout, smoke scale
+    ev_out = runs.eval_run(f"train:{a['run_id']}", [("libero_spatial", 0)], 1, "s5-eval-A", out_dir=RUNS / "s5-eval-A",
+                           tau_episode_steps=20, lineage_root=LR)
+    ev, plan = ev_out["run_id"], REPO_ROOT / ev_out["rollouts"]
     c = runs.client(LR)
     exp = runs.experiment_id(LR)
 
