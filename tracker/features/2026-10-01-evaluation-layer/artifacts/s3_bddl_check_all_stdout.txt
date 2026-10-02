@@ -1,0 +1,15 @@
+replayed 1000 demos from 20 task files (BDDL scene) in 201.0s with 8 workers
+AC3.6 BDDL-scene replay: errors 0; no success at any state: 3/1000; success but different T than demo-XML replay: 9
+AC3.6   no success in BDDL scene: libero_10/KITCHEN_SCENE8_put_both_moka_pots_on_the_stove/demo_19 (demo-XML T = 418, error None)
+AC3.6   no success in BDDL scene: libero_10/KITCHEN_SCENE8_put_both_moka_pots_on_the_stove/demo_33 (demo-XML T = 445, error None)
+AC3.6   no success in BDDL scene: libero_10/STUDY_SCENE1_pick_up_the_book_and_place_it_in_the_back_compartment_of_the_caddy/demo_27 (demo-XML T = 185, error None)
+AC3.6   T differs: libero_10/KITCHEN_SCENE8_put_both_moka_pots_on_the_stove/demo_3: BDDL 418.0 vs demo XML 411
+AC3.6   T differs: libero_10/KITCHEN_SCENE8_put_both_moka_pots_on_the_stove/demo_13: BDDL 355.0 vs demo XML 366
+AC3.6   T differs: libero_10/KITCHEN_SCENE8_put_both_moka_pots_on_the_stove/demo_18: BDDL 367.0 vs demo XML 378
+AC3.6   T differs: libero_10/KITCHEN_SCENE8_put_both_moka_pots_on_the_stove/demo_35: BDDL 473.0 vs demo XML 466
+AC3.6   T differs: libero_10/KITCHEN_SCENE8_put_both_moka_pots_on_the_stove/demo_36: BDDL 488.0 vs demo XML 484
+AC3.6   T differs: libero_10/KITCHEN_SCENE8_put_both_moka_pots_on_the_stove/demo_38: BDDL 436.0 vs demo XML 438
+AC3.6   T differs: libero_10/STUDY_SCENE1_pick_up_the_book_and_place_it_in_the_back_compartment_of_the_caddy/demo_2: BDDL 172.0 vs demo XML 169
+AC3.6   T differs: libero_10/STUDY_SCENE1_pick_up_the_book_and_place_it_in_the_back_compartment_of_the_caddy/demo_42: BDDL 177.0 vs demo XML 179
+AC3.6   T differs: libero_10/STUDY_SCENE1_pick_up_the_book_and_place_it_in_the_back_compartment_of_the_caddy/demo_43: BDDL 216.0 vs demo XML 193
+exit 0

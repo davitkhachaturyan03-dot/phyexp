@@ -1,0 +1,6 @@
+DET demo-XML replay x3 KITCHEN_SCENE8_put_both_moka_pots_on_the_stove/demo_3: T = [411, 411, 411] (identical: True)
+BDDL-scene replay x3 KITCHEN_SCENE8_put_both_moka_pots_on_the_stove/demo_3: T = [409, 409, 409] (identical: True)
+DET demo-XML replay x3 KITCHEN_SCENE8_put_both_moka_pots_on_the_stove/demo_19: T = [418, 418, 418] (identical: True)
+BDDL-scene replay x3 KITCHEN_SCENE8_put_both_moka_pots_on_the_stove/demo_19: T = [419, -1, 419] (identical: False)
+DET demo-XML replay x3 STUDY_SCENE1_pick_up_the_book_and_place_it_in_the_back_compartment_of_the_caddy/demo_43: T = [193, 193, 193] (identical: True)
+BDDL-scene replay x3 STUDY_SCENE1_pick_up_the_book_and_place_it_in_the_back_compartment_of_the_caddy/demo_43: T = [233, 233, 233] (identical: True)

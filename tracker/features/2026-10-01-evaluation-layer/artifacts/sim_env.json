@@ -1,0 +1,29 @@
+{
+  "python": "3.14.0",
+  "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+  "packages": {
+    "hf-libero": "0.1.4",
+    "robosuite": "1.4.0",
+    "mujoco": "3.8.1",
+    "bddl": "1.0.1",
+    "numba": "0.68.0",
+    "numpy": "2.2.6",
+    "lerobot": "0.6.1",
+    "torch": "2.11.0"
+  },
+  "libero_config": "data/libero_config",
+  "assets_repo": "lerobot/libero-assets",
+  "assets_revision": "0b3ea86be5fe169d0fd036ae63d1070ec09e90f6",
+  "mujoco_gl": null,
+  "assets_digest": {
+    "files": 586,
+    "bytes": 422320936,
+    "sha256": "4cb93d37afaa096c3fcd8481995c72a615278b17e6e0feea883ec14940f2c259"
+  },
+  "LIBERO_CONFIG_PATH": "/Users/davit_khachaturyan/Projects/personal/vlaExp/data/libero_config",
+  "home_libero_exists_before": false,
+  "home_libero_exists_after": false,
+  "home_cache_libero_exists": false,
+  "n_demos": 1000,
+  "errors": 0
+}

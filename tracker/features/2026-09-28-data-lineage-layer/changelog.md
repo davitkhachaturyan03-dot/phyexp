@@ -59,3 +59,41 @@ Changes after the first release (2026-10-01), one dated entry per change, added 
     measured on the scratch derivation), because every frame is re-encoded (lossless; content hashes
     unchanged).
   - `isolate_hf_cache=False` now leaves 0 cache files, since the writer pass loads no HF dataset.
+
+## 2026-10-03: Reward evidence corrected; `duration_s` is demo length, not human time-to-success
+- **Why:** the evaluation-layer plan found two premises false: P6 (the stored reward is not a goal check)
+  and P8 (demos end after the first success). The owner approved correcting the wording on 2026-10-02
+  (brief "Owner answers": "Yes, correct it"). The orchestrator edited CLAUDE.md and vla-build; this entry
+  records the correction for this feature (evaluation-layer S3, AC3.8).
+- **Grounding:** PoC §3.5 A pp. 7–8 ("Human reference = durations of LIBERO's original
+  human-teleoperated demonstrations"), §9.1 Step 2.2 p. 18 ("using the benchmark's goal check").
+- **What was wrong, and the evidence:**
+  1. *"Every demo ends with its only `reward == 1` … so we keep them all"* (report, S1; catalog
+     docstring) used the reward as proof of success. It isn't one. LIBERO's `scripts/create_dataset.py`
+     (GitHub `8f1084e`, l. 228–231) sets `rewards = np.zeros(len(actions)); rewards[-1] = 1`, and the same
+     for `dones`, unconditionally (quoted). The conclusion still holds on a real check: replaying each
+     demo's stored states through LIBERO's own `_check_success` (the demo's XML, hf-libero 0.1.4) reaches
+     the goal in **1000/1000** demos, with 0 replay errors, and `_check_success == AND(conjuncts)` at every
+     state in 1000/1000 (measured, `scripts/human_reference.py`).
+  2. *"`duration_s` = human time-to-success … valid because every demo succeeds at its last step"*
+     (report S2 figure caption, `tracker/index.html` §3.5 A row) is false. The goal first holds before the
+     end in every demo. Per task, `length_steps − T_success_steps` is min 9–11, median 11.0–19.5, max
+     11–82 steps (measured). Collection stops only after the goal holds for 10 consecutive steps
+     (`collect_demonstration.py`: `task_completion_hold_count = 10`, quoted, P7). In 12/1000 demos the
+     goal no longer holds at the last stored state.
+- **Effect on the HRT anchor (measured, KM of the 500 demos per suite):**
+  - libero_spatial: median 5.30 s (T_success) vs 6.20 s (duration), RMST(60 s) 5.356 vs 6.225 s.
+  - libero_10: median 12.45 vs 13.15 s, RMST(60 s) 13.166 vs 13.809 s.
+  - An HRT anchored on `duration_s` would be **1.162×** too high on libero_spatial and **1.049×** on
+    libero_10 (per task, 1.119–1.227 and 1.033–1.082).
+- **Prior art:** LIBERO's own goal check and replay recipe (`create_dataset.py` l. 130–153), used as is.
+- **Files:** `report.html` (dated corrections at the reward paragraph, the S2 figure caption and "Next";
+  a "Changes since first release" line); `tracker/index.html` (§3.5 A row). The catalog's `duration_s`
+  column is unchanged and keeps its meaning (length / 20 Hz). The new anchor is
+  `data/eval/human_reference/human_reference.parquet` → `T_success_s` (evaluation layer).
+- **Evidence:**
+  - `scripts/human_reference.py --suites libero_spatial,libero_10` → `AC3.2 goal reached at some stored
+    state: 1000/1000; replay errors: 0; _check_success == AND(conjuncts) at every state: 1000/1000`.
+  - `--summary` → `T_success_s < duration_s: 1000/1000`; `an HRT anchored on duration_s is 1.162x too
+    high` (libero_spatial), `1.049x` (libero_10).
+- **Divergence:** none from the spec. This corrects this feature's own wording.

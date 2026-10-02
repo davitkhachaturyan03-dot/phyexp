@@ -1,0 +1,4 @@
+replayed 1000 demos from 20 task files (demo XML) in 10405.7s with 8 workers
+AC3.2 goal reached at some stored state: 1000/1000; replay errors: 0; _check_success == AND(conjuncts) at every state: 1000/1000
+wrote data/eval/human_reference/human_reference.parquet and tracker/features/2026-10-01-evaluation-layer/artifacts/sim_env.json
+exit 0

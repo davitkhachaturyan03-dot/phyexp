@@ -5,7 +5,7 @@ demonstrations on the same tasks"; §10 (p. 20) "HRT against LIBERO demo duratio
 "using the benchmark's goal check". Mechanism and alignment conventions: ``vlapoc.libero_goals``.
 
     .venv/bin/python scripts/human_reference.py --suites libero_spatial,libero_10   # replay (~minutes) -> parquet + sim_env.json
-    .venv/bin/python scripts/human_reference.py --bddl-check     # AC3.6: the same states in the BDDL-built scene
+    .venv/bin/python scripts/human_reference.py --bddl-check --only libero_10:8   # AC3.6: same states, BDDL-built scene
     .venv/bin/python scripts/human_reference.py --init-states    # AC3.7: 50 fixed init states per task (LeRobot)
     .venv/bin/python scripts/human_reference.py --summary        # AC3.3, AC3.4 tables + figure (metric layer, S1)
 
@@ -88,18 +88,22 @@ def _replay_task(args: tuple[str, list[dict], bool]) -> list[dict]:
     return rows
 
 
-def _tasks(suites: list[str]) -> list[tuple[str, list[dict]]]:
+def _tasks(suites: list[str], only: str | None = None) -> list[tuple[str, list[dict]]]:
+    """Episodes grouped by raw file; ``only`` = "suite:task_id,..." restricts to those tasks."""
     from vlapoc.lineage import version_episodes
 
     e = version_episodes("v0")
     e = e[e["suite"].isin(suites)]
+    if only:
+        keep = {(x.split(":")[0], int(x.split(":")[1])) for x in only.split(",")}
+        e = e[[(s, int(t)) in keep for s, t in zip(e["suite"], e["libero_task_id"])]]
     return [(sf, g.sort_values("source_demo", key=lambda s: s.str.split("_").str[1].astype(int)).to_dict("records"))
             for sf, g in e.groupby("source_file", sort=True)]
 
 
-def replay(suites: list[str], workers: int, use_demo_xml: bool = True) -> pd.DataFrame:
+def replay(suites: list[str], workers: int, use_demo_xml: bool = True, only: str | None = None) -> pd.DataFrame:
     t0 = time.time()
-    jobs = [(sf, eps, use_demo_xml) for sf, eps in _tasks(suites)]
+    jobs = [(sf, eps, use_demo_xml) for sf, eps in _tasks(suites, only)]
     with ProcessPoolExecutor(max_workers=workers) as ex:
         rows = [r for part in ex.map(_replay_task, jobs) for r in part]
     df = pd.DataFrame(rows)
@@ -134,7 +138,7 @@ def cmd_replay(a) -> None:
 
 
 def cmd_bddl_check(a) -> None:
-    df = replay(a.suites.split(","), a.workers, use_demo_xml=False)
+    df = replay(a.suites.split(","), a.workers, use_demo_xml=False, only=a.only)
     ref = pd.read_parquet(OUT_DIR / "human_reference.parquet").set_index("episode_id")
     df = df.set_index("episode_id")
     both = df.join(ref[["T_success_steps", "success_any"]], rsuffix="_demo_xml")
@@ -230,6 +234,7 @@ def main() -> int:
     p.add_argument("--bddl-check", action="store_true")
     p.add_argument("--init-states", action="store_true")
     p.add_argument("--summary", action="store_true")
+    p.add_argument("--only", default=None, help='restrict --bddl-check to tasks, e.g. "libero_10:8"')
     a = p.parse_args()
     if a.bddl_check:
         cmd_bddl_check(a)

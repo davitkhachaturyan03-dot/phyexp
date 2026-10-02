@@ -442,7 +442,7 @@ never downloaded.
   (`episode_to_T_pairs`, threshold 0.3 s; the PhAIL default is kept for PhAIL data).
 - **Main `.venv` packages:** S2 changed none (the PhAIL env is separate).
 
-### S3: LIBERO simulator stack locally, and the human reference by replaying the demos' goal check (IN PROGRESS, partial entry)
+### S3: LIBERO simulator stack locally, and the human reference by replaying the demos' goal check
 
 Re-read this session: PoC §3.5 A pp. 7–8, §9.1 Step 2 p. 18 and §10 p. 20 (PDF). Also read:
 - LIBERO `scripts/create_dataset.py` at `8f1084e5…` (fetched from GitHub raw; l. 123 `cap_index = 5`,
@@ -499,4 +499,109 @@ revision=…, local_dir="data/libero_assets")`; 17.5 min; `du` 415M; 586 files o
   `libero_spatial: 10 tasks, init-state array shapes [(50, 92)]`; `libero_10: 10 tasks, init-state array
   shapes [(50, 45), (50, 47), (50, 51), (50, 71), (50, 84), (50, 123)]`; `tasks with exactly 50 fixed
   init states: 20/20` (`artifacts/s3_init_states_stdout.txt`, `s3_init_states.json`).
-- The 1000-demo replay is running in the background (`data/scratch/logs/human_reference_replay.txt`).
+- ✅ AC3.1: the sim stack is installed in the project env (`.venv`) without touching `~/.libero`.
+  `artifacts/sim_env.json`:
+  - `"python": "3.14.0"`; packages `hf-libero 0.1.4, robosuite 1.4.0, mujoco 3.8.1, bddl 1.0.1, numba
+    0.68.0, numpy 2.2.6, lerobot 0.6.1, torch 2.11.0`;
+  - `"assets_revision": "0b3ea86be5fe169d0fd036ae63d1070ec09e90f6"`; `"assets_digest": {"files": 586,
+    "bytes": 422320936, "sha256": "4cb93d37afaa096c3fcd8481995c72a615278b17e6e0feea883ec14940f2c259"}`;
+  - `"home_libero_exists_before": false, "home_libero_exists_after": false, "home_cache_libero_exists": false`;
+  - `"LIBERO_CONFIG_PATH": ".../vlaExp/data/libero_config"`.
+- ✅ AC3.2: `human_reference.py --suites libero_spatial,libero_10 --workers 8` → `replayed 1000 demos from 20
+  task files (demo XML) in 10405.7s with 8 workers`; `AC3.2 goal reached at some stored state: 1000/1000;
+  replay errors: 0; _check_success == AND(conjuncts) at every state: 1000/1000`
+  (`artifacts/s3_replay_stdout.txt`). No demo failed, so none needed listing. `length_steps == n_states`
+  for 1000/1000.
+- ✅ AC3.3: `T_success_s < duration_s: 1000/1000`.
+  - Per task, `gap = length_steps - T_success_steps`: min 9–11, median 11.0–19.5, max 11–82
+    (`artifacts/s3_gap_steps_per_task.csv`).
+  - Planning measured "min 8–10, median 10–18, max 81". The planner counted the last stored *index*
+    minus first success, which is gap − 1. Under that definition ours is 8–10 / 10–18.5 / 81, matching.
+  - Success holds over the final stored states with a median tail run of 11 states. But it does **not**
+    hold at the last stored state in **12/1000** demos (`artifacts/s3_success_not_at_last_state.txt`):
+    e.g. `[[0, 266], [1, 10], [0, 1]]`, the goal holding 10 steps and then dropping in the final 1–2
+    stored states. Several demos also toggle before that (libero_spatial task 0 demo_5: on 7, off 44, on 9).
+  - T = *first* time the goal holds, which matches LeRobot rollouts terminating on the first
+    `check_success()` (P16).
+- ✅ AC3.4: human reference per task and per suite (`artifacts/s3_human_reference_table.csv`;
+  `artifacts/s3_summary_stdout.txt`). Built with the S1 metric layer: whole-task T, every demo an event,
+  no censoring. Per suite:
+  - libero_spatial (n 500): median T_success 5.30 s vs duration 6.20 s; RMST(60 s) 5.356 vs 6.225 s;
+    F(30 s) 1.0 / 1.0. An HRT anchored on `duration_s` is **1.162×** too high (per task 1.119–1.227).
+  - libero_10 (n 500): median 12.45 vs 13.15 s; RMST(60) 13.166 vs 13.809 s; F(30) 1.0 / 1.0. That
+    anchor is **1.049×** too high (per task 1.033–1.082).
+  - Figure `artifacts/s3_fig_human_reference_cdfs.png`: per-task and pooled KM CDFs of T_success vs
+    duration_s, both suites. Inspected visually.
+- ✅ AC3.5: the alignment conventions are documented in the `vlapoc/libero_goals.py` module docstring,
+  section "Alignment conventions (AC3.5)":
+  - human T counts from stored state 0 = original step 5 (`cap_index = 5`, quoted);
+  - rollout T counts from the post-settle state (`num_steps_wait = 10`, LeRobot);
+  - residual ≤ 5 steps = 0.25 s (inferred);
+  - "approximate, since demos and rollouts don't share initial states" (PoC p. 8);
+  - the demo-XML (human) vs BDDL-scene (rollouts) split.
+
+  The report text is the summarizer's.
+- ✅ AC3.6: the BDDL-scene vs demo-XML discrepancy is reproduced, and found to be wider and less stable
+  than P9 said:
+  - `--bddl-check --only libero_10:8` → `no success at any state: 2/50; success but different T than
+    demo-XML replay: 5` (`artifacts/s3_bddl_check_task8_stdout.txt`).
+  - All 1000 → `replayed 1000 demos ... (BDDL scene) in 201.0s`; `no success at any state: 3/1000`
+    (`KITCHEN_SCENE8_put_both_moka_pots_on_the_stove/demo_19`, `demo_33`;
+    `STUDY_SCENE1_pick_up_the_book_..._caddy/demo_27`); `different T: 9` (−23 to +11 steps). Only these 2
+    libero_10 tasks are affected (`artifacts/s3_bddl_check_all_stdout.txt`, `s3_bddl_vs_demo_xml.csv`).
+  - P9's specific demo (task 8 demo_1) succeeds in both of our BDDL runs. The *kind* of discrepancy
+    reproduces; the instance does not.
+  - **New (measured): the BDDL-scene replay is not deterministic; the demo-XML replay is.** Three repeats
+    in one process (`artifacts/s3_replay_determinism.txt`): demo-XML T = `[411, 411, 411]`,
+    `[418, 418, 418]`, `[193, 193, 193]`, all equal to the parquet. The BDDL scene gave demo_19 `T = [419,
+    -1, 419]`. Across runs, demo_3 gave 409 / 413 / 418 and demo_43 233 / 216.
+  - Rollouts will run in the BDDL scene (LeRobot's `LiberoEnv`) and the human reference uses the demo
+    XML, as the plan states.
+- ✅ AC3.7: as above, 20/20 tasks with exactly 50 init states.
+- ✅ AC3.8: records in the data+lineage feature folder.
+  - `changelog.md` entry "2026-10-03: Reward evidence corrected; `duration_s` is demo length, not human
+    time-to-success". It quotes `create_dataset.py` l. 228–231 (P6) and `task_completion_hold_count = 10`
+    (P7), and gives the replay 1000/1000 (P8 re-measured) and the 1.162× / 1.049× bias.
+  - `report.html`: dated corrections at the reward paragraph, the S2 durations caption and "Next", plus a
+    "Changes since first release" line.
+  - `tracker/index.html`: the §3.5 A row is reworded. The CLAUDE.md / vla-build wording was already
+    corrected by the orchestrator (brief); not touched here.
+
+**Demo artifacts produced:**
+- `artifacts/sim_env.json`; `artifacts/s3_human_reference_table.csv` (20 tasks + 2 suites);
+  `artifacts/s3_gap_steps_per_task.csv`; `artifacts/s3_fig_human_reference_cdfs.png`;
+  `artifacts/s3_bddl_vs_demo_xml.csv` (+ `_task8`); `artifacts/s3_replay_determinism.txt`;
+  `artifacts/s3_success_not_at_last_state.txt`; `artifacts/s3_init_states.json`.
+- The full per-demo table, with conjunct first-true steps, truth at t0 and RLE traces for S4, is
+  `data/eval/human_reference/human_reference.parquet` (gitignored), regenerated by
+  `scripts/human_reference.py`.
+
+**Notes / divergences:**
+- **Replay wall time was 10,405.7 s, not the planned "2–3 min".** Per-demo `replay_s`: median 3.9 s, p75
+  6.5 s, max 1,990.5 s, sum 81,474 s over 8 workers. The median implies about 9 min. The long tail
+  coincides with the session stall (inferred: process suspension or contention).
+  - Most of the per-demo cost is `reset_from_xml_string`, the per-demo model compile (inferred): the
+    BDDL-scene replay, which has no recompile, did 1000 demos in 201 s.
+  - I did not re-run the replay (coordinator instruction).
+- **The S4 inputs are stored now** (RLE conjunct and success traces), so S4 needs no second replay.
+- **Main `.venv` gained 32 packages** (none changed). LeRobot was not re-tested end to end here; S5 will
+  exercise it.
+
+### Findings for the analyzer (S1–S3)
+- **S2: the published cohort has 5 private episodes.** They are all USB-C Boxes (no teleop reference)
+  under `s3://inference/phail_act_groot/` (HTTP 403). Per-object results reproduce exactly; pooled
+  results differ only by those 5.
+- **S2: two published PhAIL sidecars disagree** (`tab_leaderboard.json` vs `tab_headline_ci.json`, pooled
+  RMST for ACT/OpenPI). Ours matches `tab_headline_ci.json` (Table 2's source).
+- **S2: PhAIL's `croissant.json` says the fine-tuning set has 352 episodes;** the bucket and the paper say 449.
+- **S2: PhAIL's `build/dashboard.py` can't be imported** (it needs the missing `build/fig_cdf.py`). Its
+  H1 loop is replicated in `scripts/phail_export_cohort.py`.
+- **S3 → S5 (risk for AC5.2 determinism and for success checks), measured:** the BDDL-built LIBERO scene
+  gives a different goal-check outcome for the same stored states across resets (demo_19: 419 / −1 / 419).
+  LeRobot rollouts run in that scene, so the same init state could succeed or not depending on reset
+  sampling. S5 should check AC5.2 with repeated resets, not only repeated actions. Inferred cause:
+  reset-time placement/region sampling that `set_init_state` does not overwrite.
+- **S3: in 12/1000 demos the goal stops holding in the last 1–2 stored states.** T = first success is
+  unaffected. Rollout success semantics (first `check_success`) match it.
+- **Plan cost estimate:** "2–3 min for 1000 demos" was measured in planning with a different procedure.
+  The demo-XML replay costs about 4 s per demo here (model compile).

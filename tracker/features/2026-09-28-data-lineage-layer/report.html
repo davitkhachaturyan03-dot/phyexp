@@ -287,7 +287,10 @@ given episode version, and explain the difference between two runs episode by ep
 <p>Ours: measured (S1, S2). Hub column: measured by the planner from the hub's pinned metadata
 (<a href="plan.md">plan.md</a>, prior art); not re-run for this report. The hub corpus is OpenVLA's
 "no-noops" set, which assumes some demos failed. Every one of our 1000 raw demos ends with its only
-<code>reward == 1</code> at the last step (measured, 1000/1000), so we keep them all.</p>
+<code>reward == 1</code> at the last step (measured, 1000/1000), so we keep them all. <b>Corrected 2026-10-03:</b>
+that reward is no evidence. LIBERO's <code>create_dataset.py</code> writes <code>rewards[-1] = 1</code>
+unconditionally. The conclusion stands on a different measurement: replaying each demo's stored states
+through LIBERO's own goal check succeeds in 1000/1000 (evaluation-layer S3; <a href="changelog.md">changelog</a>).</p>
 <figure>
   <img class="shot" src="artifacts/s1_orientation.png" alt="Raw HDF5 frames (upside down), our converted frames, and HuggingFaceVLA/libero frames for two tasks and both cameras">
   <figcaption><b>Raw, ours and hub, for two tasks and both cameras.</b> The raw frames (left) are upside down.
@@ -1677,7 +1680,11 @@ check that makes the recorded version trustworthy.</p>
   human-teleoperated demonstrations" that §3.5 names as the HRT reference, now one catalog column
   (<code>duration_s</code>). Note the scale: libero_spatial tasks (all "pick up the black bowl … place it on the
   plate") take 4.75–7.43 s at the median; libero_10 takes 9.32–20.42 s. The x axis is
-  <code>length_steps / 20</code>, valid because every demo succeeds at its last step. Table in
+  <code>length_steps / 20</code>, valid because every demo succeeds at its last step. <b>Corrected 2026-10-03:</b>
+  that premise is false. The goal first holds 9–82 steps before a demo ends (median gap per task 11–19.5
+  steps), so <code>duration_s</code> overstates human time-to-success. Anchoring HRT on it would inflate HRT by
+  1.162× (libero_spatial) and 1.049× (libero_10). In 12/1000 demos the goal no longer holds at the last stored
+  state. The HRT anchor is now <code>T_success_s</code> from the evaluation-layer replay. Table in
   <a href="S2-episode-identity-catalog.html">S2</a>.</figcaption>
 </figure>
 
@@ -1954,7 +1961,7 @@ run while reading.</p>
   <li><b>Foundation, remainder: SmolVLA training.</b> <code>train_run</code> already records every §2.1 field.
   This needs a GPU, a Python 3.12/3.13 venv (or the entry point), and the normalization-stats decision.</li>
   <li><b>Evaluation layer:</b> KM time-to-success CDFs, ghost events, censoring, HRT and macro-KS. The HRT
-  reference is the <code>duration_s</code> column. The eval run contract (checkpoint hash, suites, task ids,
+  reference is the <code>duration_s</code> column (superseded 2026-10-03 by <code>T_success_s</code>, evaluation-layer S3). The eval run contract (checkpoint hash, suites, task ids,
   init-state indices, seeds) is in place; the rollouts themselves need the LIBERO simulator (Linux), rendered
   at 128².</li>
   <li><b>Ground truth:</b> the injection experiment, which is the owner-approved separate feature. It needs
@@ -1974,6 +1981,9 @@ run while reading.</p>
   <li><b>2026-10-02:</b> answer-key leak closed. v1's <code>parent_content_hash</code> was removed (it moved to the
   lineage-only <code>parents.parquet</code>), <code>derive_version</code> keeps parent order, and v1 is fenced
   (Open decisions item 13). AC4.1/AC4.7 are amended. See <a href="changelog.md">changelog.md</a>.</li>
+  <li><b>2026-10-03:</b> reward evidence and human-T wording corrected. The stored reward is hard-coded by LIBERO,
+  so "no failed demos" now rests on a goal-check replay (1000/1000). <code>duration_s</code> is demo length,
+  not human time-to-success: the goal first holds 9–82 steps earlier. See <a href="changelog.md">changelog.md</a>.</li>
 </ul>
 <p>Later changes are logged in <a href="changelog.md">changelog.md</a>.</p>
 
