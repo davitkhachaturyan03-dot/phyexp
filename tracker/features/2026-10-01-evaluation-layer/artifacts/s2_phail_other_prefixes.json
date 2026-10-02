@@ -1,0 +1,28 @@
+{
+  "datasets/phail/v1.0/training/": {
+    "files": 5841,
+    "bytes": 13954176568,
+    "episodes_static_json": 449,
+    "top_dirs": [
+      "",
+      "000000000000"
+    ]
+  },
+  "phail/v1.0/": {
+    "files": 14448,
+    "bytes": 76985228716,
+    "episodes_static_json": 1083,
+    "top_dirs": [
+      "dataset",
+      "models"
+    ]
+  },
+  "datasets/phail/": {
+    "files": 13381,
+    "bytes": 36991284792,
+    "episodes_static_json": 1013,
+    "top_dirs": [
+      "v1.0"
+    ]
+  }
+}

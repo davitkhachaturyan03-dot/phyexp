@@ -1,0 +1,3 @@
+datasets/phail/v1.0/training/: 5841 files, 13.95 GB, 449 episodes (static.json); top-level: ['', '000000000000']
+phail/v1.0/: 14448 files, 76.99 GB, 1083 episodes (static.json); top-level: ['dataset', 'models']
+datasets/phail/: 13381 files, 36.99 GB, 1013 episodes (static.json); top-level: ['v1.0']

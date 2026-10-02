@@ -5,8 +5,9 @@
 # Data: raw LIBERO HDF5, converted LeRobot datasets, lineage store (versions, subsets, MLflow DB)
 data/
 
-# Python environment and caches
+# Python environment and caches (.venv-sim: LIBERO sim stack, .venv-phail: PhAIL analysis env; evaluation layer)
 .venv/
+.venv-*/
 __pycache__/
 *.py[cod]
 .pytest_cache/

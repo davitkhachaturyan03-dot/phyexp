@@ -1,0 +1,21 @@
+[
+  {
+    "url": "s3://positronic-public/phail/v1.0/dataset/",
+    "status": 200
+  },
+  {
+    "url": "s3://inference/phail_act_groot/",
+    "status": 403,
+    "reason": "Forbidden"
+  },
+  {
+    "url": "s3://inference/phail_final/",
+    "status": 403,
+    "reason": "Forbidden"
+  },
+  {
+    "url": "s3://inference/spoons_ablation/",
+    "status": 403,
+    "reason": "Forbidden"
+  }
+]

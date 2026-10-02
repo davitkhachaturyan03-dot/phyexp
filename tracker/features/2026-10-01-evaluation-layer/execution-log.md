@@ -291,3 +291,48 @@ Table 1, §3.2 HRT / P-P / CIs, §3.3 macro-KS + logrank) was read from
 - **`uph_mtbf_sweep` uses the exact step-integral RMST.** PhAIL's figure uses a 1500-point Riemann sum,
   so figure-level differences are expected.
 - **HRT is returned as a ratio.** PhAIL reports it ×100 as a percentage.
+
+### S2: Validate the metric layer on PhAIL's released real-robot data (IN PROGRESS, partial entry)
+
+**Environment created:** `.venv-phail/` (gitignored by the new `.venv-*/` rule in `.gitignore`).
+- Python 3.12.13, made with `uv venv --python 3.12`.
+- Packages pinned to the clone's `uv.lock`: pos3 0.2.2, configuronic 0.4.0, numpy 2.4.4, scipy 1.17.1,
+  matplotlib 3.10.8, pyarrow 23.0.1, boto3 1.42.83; pandas 3.0.6 (unpinned, used for the parquet export).
+- 348 MB, plus a 371 MB uv cache under `data/scratch/uv_cache`.
+- `positronic` is not installed. The loader and the scripts import only `pos3`/`configuronic`/numpy/
+  scipy/matplotlib; "positronic" appears in `common.py`/`loader.py` only in comments and strings (grep).
+
+**Downloads (approved):** PhAIL metadata sidecars from the public bucket `positronic-public`, endpoint
+`https://storage.eu-north1.nebius.cloud` (quoted from positronic `cfg/ds/__init__.py` at `498ef5e`),
+prefix `phail/v1.0/dataset/`. Everything except `*.parquet` and `*.mp4`, as the phail-paper README
+recipe does. Listing (measured, `scripts/phail_fetch.py --list`):
+- `human`: 40 episodes, 0.07 GB;
+- `rollouts`: 594 episodes, 26.64 GB;
+- `teleoperation`: 449 episodes, 13.95 GB;
+- total 14,361 objects, 40.66 GB;
+- sidecars: 182.5 MB (2,166 files; 1,089 zero-byte directory-marker keys are skipped).
+
+The fetch is in progress into `data/phail/dataset/`. The fine-tuning set is listed and counted, never
+downloaded.
+
+**Measured so far:**
+- Access probe (`scripts/phail_fetch.py --probe`): `s3://positronic-public/phail/v1.0/dataset/: HTTP 200`;
+  `s3://inference/phail_act_groot/`, `s3://inference/phail_final/` and `s3://inference/spoons_ablation/`:
+  `HTTP 403 Forbidden`.
+- Other prefixes: `datasets/phail/v1.0/training/`: 5,841 files, 13.95 GB, 449 episodes (static.json);
+  `phail/v1.0/`: 1,083 episodes, 76.99 GB (`dataset` + `models`).
+- `dataset/croissant.json` gives license `https://creativecommons.org/licenses/by/4.0/`, and three times
+  calls the fine-tuning set "352-episode", against 449 in the bucket and the paper.
+- Published values located in the clone (artifacts the paper's numbers come from):
+  - `out/paper/tab_headline_ci.json` (Table 2 RMST/HRT with CIs);
+  - `out/paper/tab_leaderboard.json` (F(20/30/60 s), pooled %-of-human);
+  - `out/explore/pp_summary.json` (per-cell AUC, macro-AUC CIs, n_boot 1000);
+  - `out/explore/ks_power/dashboard_per_obj_macro.json` (macro-KS: `OpenPI-GR00T D_macro_per_obj
+    0.12391553589925894 p 0.11944027986006997`, n_boot 2000 since p_min = 1/2001; producer
+    `build/dashboard.py` H1, `seed=42`).
+- `build/dashboard.py` cannot be imported. It does `from build import ... fig_cdf`, and
+  `build/fig_cdf.py` is absent from the commit (`ls` → No such file). Its H1 loop (`default_rng(42)`,
+  `combinations(POLICY_MODELS, 2)`) is therefore replicated in `scripts/phail_export_cohort.py`, calling
+  PhAIL's `stats.per_obj_macro_bootstrap_ks` directly.
+- Third UPH form, `build/common.py:_derive_metrics`: `'UPH': 3600 * S / T` per episode (S successful
+  items, T duration).

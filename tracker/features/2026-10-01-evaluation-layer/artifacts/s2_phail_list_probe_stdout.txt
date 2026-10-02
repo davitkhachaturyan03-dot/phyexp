@@ -1,0 +1,8 @@
+         human:   40 episodes (static.json),    202 files,    0.07 GB; by ext {'(none)': 42, '.parquet': 40, '.mp4': 40, '.json': 80}
+      rollouts:  594 episodes (static.json),   8318 files,   26.64 GB; by ext {'(none)': 596, '.parquet': 5346, '.mp4': 1188, '.json': 1188}
+ teleoperation:  449 episodes (static.json),   5841 files,   13.95 GB; by ext {'(none)': 451, '.parquet': 3594, '.mp4': 898, '.json': 898}
+total 14361 files 40.66 GB; sidecars (no .parquet/.mp4) 3255 files 182.5 MB
+probe s3://positronic-public/phail/v1.0/dataset/: HTTP 200 
+probe s3://inference/phail_act_groot/: HTTP 403 Forbidden
+probe s3://inference/phail_final/: HTTP 403 Forbidden
+probe s3://inference/spoons_ablation/: HTTP 403 Forbidden

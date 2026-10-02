@@ -1,0 +1,64 @@
+{
+  "endpoint": "https://storage.eu-north1.nebius.cloud",
+  "bucket": "positronic-public",
+  "prefix": "phail/v1.0/dataset/",
+  "total": {
+    "files": 14361,
+    "bytes": 40659686177,
+    "sidecar_files": 2166,
+    "sidecar_bytes": 182498051
+  },
+  "by_dir": {
+    "human": {
+      "files": 202,
+      "bytes": 69238311,
+      "episodes": 40,
+      "by_ext": {
+        "(none)": 42,
+        ".parquet": 40,
+        ".mp4": 40,
+        ".json": 80
+      },
+      "bytes_by_ext": {
+        "(none)": 0,
+        ".parquet": 485144,
+        ".mp4": 62031967,
+        ".json": 6721200
+      }
+    },
+    "rollouts": {
+      "files": 8318,
+      "bytes": 26636256032,
+      "episodes": 594,
+      "by_ext": {
+        "(none)": 596,
+        ".parquet": 5346,
+        ".mp4": 1188,
+        ".json": 1188
+      },
+      "bytes_by_ext": {
+        "(none)": 0,
+        ".parquet": 6337833810,
+        ".mp4": 20198105136,
+        ".json": 100317086
+      }
+    },
+    "teleoperation": {
+      "files": 5841,
+      "bytes": 13954191834,
+      "episodes": 449,
+      "by_ext": {
+        "(none)": 451,
+        ".parquet": 3594,
+        ".mp4": 898,
+        ".json": 898
+      },
+      "bytes_by_ext": {
+        "(none)": 0,
+        ".parquet": 2615976794,
+        ".mp4": 11262755275,
+        ".json": 75459765
+      }
+    }
+  }
+}
