@@ -1507,7 +1507,9 @@ the S6 artifacts. The first 5 of the 20 removed episodes are <code>KITCHEN_SCENE
   those 100 changed content hash; the other 900 are byte-identical in content. The 40 outlined squares are the
   clean reference split: the guard refuses to edit them, and none was edited. This map is the ground truth an
   injection test scores against. It lives only in <code>labels.parquet</code>: v1's episode table, which every
-  method reads, has no label column (AC4.7).</figcaption>
+  method reads, has no label column (AC4.7). <b>Corrected 2026-10-02:</b> the table did reveal the 100, through
+  <code>parent_content_hash</code> and through row order (they are <code>episode_index</code> 900–999). The column is
+  gone and v1 is fenced from method use; see Open decisions item 13.</figcaption>
 </figure>
 <p>What the noise does, measured on v1's bytes for this report
 (<code>artifacts/summarizer_v1_checks_stdout.txt</code>): 51.2% of corrupted frames have an action outside
@@ -1850,6 +1852,15 @@ features.</p>
   MLflow stores absolute paths in its own records.</li>
   <li><b>Cleanup the owner may want:</b> <code>data/lineage_scratch/</code> (2.3 GB; still holds a stale v1
   table with the leaked column, read by nothing) and <code>data/scratch/r2_strip_label_column.py</code>.</li>
+  <li><b>(2026-10-02) Answer-key leak in v1, found after release.</b> Methods could identify the 100 corrupted
+  episodes without the labels in two ways. First, <code>parent_content_hash</code> differed from
+  <code>content_hash</code> for exactly those rows (AC4.1 required that column). Second, row order:
+  <code>merge_datasets</code> appended them as <code>episode_index</code> 900–999, in their own data files 73–80.
+  The fix is evaluation-layer S0, under owner ruling A. <code>derive_version</code> now keeps parent order, the
+  pre-edit hashes moved to the lineage-only <code>parents.parquet</code>, and <code>check_blind</code> guards every
+  derivation. v1's tables lost the column. Its version id is unchanged, and it is fenced from method use
+  (<code>check_blind(v1) = ['episode_index']</code>). It stays valid as lineage evidence. Details are in
+  <a href="changelog.md">changelog.md</a>.</li>
 </ol>
 
 <h2>Process trail</h2>
@@ -1959,7 +1970,12 @@ run while reading.</p>
 </ul>
 
 <h2>Changes since first release</h2>
-<p class="empty">None yet. Later changes are logged in <a href="changelog.md">changelog.md</a>.</p>
+<ul class="tight">
+  <li><b>2026-10-02:</b> answer-key leak closed. v1's <code>parent_content_hash</code> was removed (it moved to the
+  lineage-only <code>parents.parquet</code>), <code>derive_version</code> keeps parent order, and v1 is fenced
+  (Open decisions item 13). AC4.1/AC4.7 are amended. See <a href="changelog.md">changelog.md</a>.</li>
+</ul>
+<p>Later changes are logged in <a href="changelog.md">changelog.md</a>.</p>
 
 <footer class="doc">
   Grounded in <a href="../../../docs/VLA_Data_Attribution_PoC.pdf">VLA_Data_Attribution_PoC.pdf</a>

@@ -98,11 +98,19 @@ session scratchpad): p.3 (§2.1, for S0).
   - after restore → `[]`;
   - `assert_blind(v1)` refused: `version v1 (16076b9c5cb2) is not blind to its edits: fenced=True,
     offending=['episode_index']`; `assert_blind(scratch child)` passed.
-- ⏳ AC0.6: pending. The data+lineage `changelog.md` entry and the report note are not yet written
-  (next step).
-- ⏳ AC0.7: pending a grep check. The docstrings citing PoC §2.1 item 4 p. 3 are in `derive.py` (module,
-  `derive_version`, `_derived_episode_table`), `lineage.py` (blindness section, `version_episodes`,
-  `parent_hashes`, `assert_blind`) and both new scripts.
+- ✅ AC0.6: records in the data+lineage feature folder.
+  - `tracker/features/2026-09-28-data-lineage-layer/changelog.md` has the entry "2026-10-02: Answer-key
+    leak closed …". It covers both channels (column; row order + own data files 73–80), the fix, the v1
+    disposition, and that its plan's AC4.1 required the column and AC4.7 asserted it.
+  - In `report.html`: the S4 figure caption carries a dated correction; Open decisions has a new item 13
+    (2026-10-02); "Changes since first release" has its first dated line.
+  - In `tracker/index.html`, the §2.5 row's divergence cell notes the order fix, `check_blind` and the
+    v1 fence.
+- ✅ AC0.7: `grep -n "§2.1 item 4" vlapoc/derive.py vlapoc/lineage.py scripts/fix_v1_leak_s0.py
+  scripts/verify_blind_s0.py` → 14 hits.
+  - `derive.py`: module docstring l.5 and l.34, `derive_version` l.244, `_derived_episode_table` l.421.
+  - `lineage.py`: `version_episodes` l.327, blindness section l.684, `parent_hashes` l.833.
+  - Both new scripts' module docstrings.
 
 **Other checks (measured):**
 - `verify_derive_s4.py --guard --columns --cache --v1 --artifacts artifacts/s0_verify_derive_s4`
@@ -113,8 +121,16 @@ session scratchpad): p.3 (§2.1, for S0).
     verify_version files ok: True (85)`;
   - `AC4.8 shared HF_DATASETS_CACHE ... identical listing and bytes: True`.
 
-  That run's summary JSON is `artifacts/s0_verify_derive_s4/s4_summary.json`. A second run, made only to
-  capture stdout to a file, was cut off by the 600 s tool timeout (status in the next entry).
+  That run's summary JSON is `artifacts/s0_verify_derive_s4/s4_summary.json`.
+- A second run, made only to capture stdout to a file (`artifacts/s0_verify_derive_s4/stdout.txt`), was
+  cut off by the 600 s tool timeout and the session stall.
+  - It got through `AC4.8 … isolated temp caches left`. Its scratch derivation logged
+    `'hash_and_blind_check': 980.3` s, against 1.8–2.0 s in the two earlier runs.
+  - A background re-run of `--cache` alone (`artifacts/s0_verify_derive_s4/cache_recheck_stdout.txt`)
+    gave `'hash_and_blind_check': 3.1`, `identical listing and bytes: True`, `0 cache files`, so the
+    stall did not reproduce.
+  - The cause is unknown. Inferred: the `ProcessPoolExecutor` in `hash_stored_dataset` was starved or
+    suspended during the session stall. Logged as a finding.
 - Behaviour change (measured): with the new writer, `isolate_hf_cache=False` leaves `0 cache files
   (0 .arrow, 0 parquet builder entries)`. The new mechanism no longer loads datasets through HF
   `datasets`; the old one left 13 entries (data+lineage analysis-r1 E3).
@@ -149,3 +165,17 @@ Two-row demo table:
   `dataset_from/to_index`) are exempt as data-derived: a length-changing edit legitimately moves later
   boundaries. With a sequential writer in parent order, edited episodes cannot be grouped into their
   own files. The scratch derivation shows identical file ranges.
+
+### Findings for the analyzer (S0)
+- **Third leak channel (measured).** v1's edited episodes are in their own data files (73–80), via
+  `merge_datasets`. It is closed for new versions by the order-preserving writer, and fenced for v1.
+- **Cross-version channel (inferred, not built).** `parent_hashes(v1)`, v0's own episode table and
+  `diff_versions(v0, v1)` all name the edited episodes. That is correct for lineage and evaluation code,
+  but a method under test must be confined to the derived version (plus its reference subset). The
+  docstrings say so. Nothing enforces it beyond `assert_blind` on the input version: screening and
+  attribution don't exist yet, so the entry-point call belongs to those features.
+- **`data/lineage_scratch/`** (data+lineage leftover, 2.3 GB) still holds a stale v1 table with the leaked
+  column. It is read by nothing. Not touched: the owner decides on cleanup (data+lineage report, Open
+  decisions).
+- **One unexplained 980 s stall** in `hash_stored_dataset` during a scratch derivation. It did not
+  reproduce (3.1 s on re-run).
