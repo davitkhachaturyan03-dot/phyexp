@@ -7,11 +7,16 @@ Grounding: PoC §2.1 item 4 p.3, §2.5 p.5, §8.7 p.15 ("corrupt only the traini
     .venv/bin/python scripts/verify_derive_s4.py --v1                # AC4.1, AC4.2, AC4.5 on the real v1
     .venv/bin/python scripts/verify_derive_s4.py --columns --cache   # AC4.7 column listing, AC4.8 cache check
 
+Evaluation-layer S0 (2026-10-02) changed two expectations: a derived version's episode tables now have
+exactly the parent's catalog columns (the pre-edit hash moved to the lineage-only ``parents.parquet``,
+read through ``parent_hashes``), and ``derive_version`` keeps parent order with one writer pass. Pass
+``--artifacts DIR`` to write the summary somewhere other than this feature's recorded evidence.
+
 Costs: ``--padding`` derives a full-scale copy of v0 (~7 GB, ~5 min) under ``data/lerobot/`` and
 deletes it; ``--v1`` loads all of v1 inside an isolated temp cache (~7 GB transient); ``--cache``
 converts and derives a 20-episode parent under ``data/scratch/`` (under a minute). ``--guard``, ``--columns``
 and ``--v1`` only read the real store. Every run merges its results into
-``artifacts/s4_summary.json`` (``--v1`` also rewrites ``artifacts/s4_labels_head10.csv``).
+``<artifacts>/s4_summary.json`` (``--v1`` also rewrites ``<artifacts>/s4_labels_head10.csv``).
 """
 
 from __future__ import annotations
@@ -43,6 +48,7 @@ from vlapoc.lineage import (  # noqa: E402
     LineageError,
     Subset,
     diff_versions,
+    parent_hashes,
     recompute_version_id,
     resolve_version,
     verify_version,
@@ -122,7 +128,7 @@ def padding(summary: dict) -> None:
     print(f"AC4.4 scratch dataset and scratch lineage root removed: {not SCRATCH_OUT.exists() and not SCRATCH_LINEAGE.exists()}")
 
 
-def v1(summary: dict) -> None:
+def v1(summary: dict, art: Path) -> None:
     """AC4.1, AC4.2, AC4.5 on the real v1: diff vs v0, recompute + verify, labels join, noise statistics."""
     v0, v1_ = resolve_version("v0"), resolve_version("v1")
     d = diff_versions("v0", "v1")
@@ -133,8 +139,8 @@ def v1(summary: dict) -> None:
           f"removed {len(d['removed'])}")
     print(f"AC4.1 v1 record parent_version_id == v0: {v1_['parent_version_id'] == v0['dataset_version_id']}; "
           f"changed ids == label ids: {set(d['changed_ids']) == set(labels['episode_id'])}")
-    pch = e1.set_index("episode_id")["parent_content_hash"]
-    print(f"AC4.1 parent_content_hash == v0 content_hash for all 1000 rows: {(pch == e0.loc[pch.index, 'content_hash']).all()}")
+    pch = parent_hashes("v1").set_index("episode_id")["parent_content_hash"]  # lineage-only since evaluation-layer S0
+    print(f"AC4.1 parent_hashes(v1) == v0 content_hash for all {len(pch)} rows: {(pch == e0.loc[pch.index, 'content_hash']).all()}")
     t0 = time.time()
     rec = recompute_version_id("v1")
     ver = verify_version("v1")
@@ -182,11 +188,12 @@ def v1(summary: dict) -> None:
     summary["AC4.5"] = {"per_task": sorted(set(per_task.tolist())), "tasks": int(len(per_task)),
                         "in_reference": len(set(labels["episode_id"]) & ref), "z_mean": np.round(z.mean(0), 4).tolist(),
                         "z_std": np.round(z.std(0), 4).tolist(), "obs_identical": same_obs, "v1_version_id": v1_["dataset_version_id"]}
-    labels.head(10).to_csv(FEATURE_DIR / "artifacts" / "s4_labels_head10.csv", index=False)
+    labels.head(10).to_csv(art / "s4_labels_head10.csv", index=False)
 
 
 def columns(summary: dict) -> None:
-    """AC4.7: a derived version's episode tables carry the parent's catalog columns + parent_content_hash only."""
+    """AC4.7 (as amended by evaluation-layer S0): a derived version's episode tables carry exactly the
+    parent's catalog columns; no label column and no parent_content_hash (it named the edited rows)."""
     from vlapoc.catalog import CATALOG_COLUMNS
 
     v1_ = resolve_version("v1")
@@ -198,11 +205,11 @@ def columns(summary: dict) -> None:
     res = {}
     for label, path in tables.items():
         cols = list(pd.read_parquet(path).columns)
-        label_cols = sorted(set(cols) & {"corruption_type", "params", "seed", "label", "corrupted"})
+        label_cols = sorted(set(cols) & {"corruption_type", "params", "seed", "label", "corrupted", "parent_content_hash"})
         res[label] = {"n_columns": len(cols), "label_columns": label_cols, "columns": cols}
         print(f"AC4.7 {label} ({path.relative_to(REPO_ROOT)}): {len(cols)} columns; label columns present: {label_cols}")
     v1cols = res["v1 version table"]["columns"]
-    print(f"AC4.7 v1 columns == v0 catalog columns + ['parent_content_hash']: {v1cols == list(CATALOG_COLUMNS) + ['parent_content_hash']}; "
+    print(f"AC4.7 v1 columns == v0 catalog columns (CATALOG_COLUMNS, no parent_content_hash): {v1cols == list(CATALOG_COLUMNS)}; "
           f"v1 version table == catalog copy columns: {v1cols == res['v1 catalog copy']['columns']}; "
           f"v0 columns == CATALOG_COLUMNS: {res['v0 version table']['columns'] == list(CATALOG_COLUMNS)}")
     summary["AC4.7_columns"] = res
@@ -297,21 +304,23 @@ def main() -> int:
     p.add_argument("--v1", action="store_true")
     p.add_argument("--columns", action="store_true", help="AC4.7 column listing")
     p.add_argument("--cache", action="store_true", help="AC4.8 small-scale derivation cache check")
+    p.add_argument("--artifacts", type=Path, default=FEATURE_DIR / "artifacts", help="where the summary goes")
     a = p.parse_args()
-    out = FEATURE_DIR / "artifacts" / "s4_summary.json"
+    a.artifacts.mkdir(parents=True, exist_ok=True)
+    out = a.artifacts / "s4_summary.json"
     summary = json.loads(out.read_text()) if out.is_file() else {}
     if a.guard:
         guard(summary)
     if a.padding:
         padding(summary)
     if a.v1:
-        v1(summary)
+        v1(summary, a.artifacts)
     if a.columns:
         columns(summary)
     if a.cache:
         cache(summary)
     out.write_text(json.dumps(summary, indent=2, default=str))
-    print(f"summary -> {out.relative_to(REPO_ROOT)}")
+    print(f"summary -> {out.resolve().relative_to(REPO_ROOT)}")
     return 0
 
 

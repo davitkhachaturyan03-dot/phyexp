@@ -60,6 +60,7 @@ Usage (from the repo root; every command prints JSON)::
     .venv/bin/python -m vlapoc.lineage version verify v0        # sha256 of every file vs files.json (~3 s)
     .venv/bin/python -m vlapoc.lineage version recompute v0     # re-hash every episode, recompute the id (~19 s)
     .venv/bin/python -m vlapoc.lineage version diff v0 v1 [--ids]
+    .venv/bin/python -m vlapoc.lineage version check-blind v1   # edits visible in method-facing tables?
     # splits and subsets
     .venv/bin/python -m vlapoc.lineage split make --version v0 --reference-per-task 2 --seed 0 [--track]
     .venv/bin/python -m vlapoc.lineage subset show v0/reference [--ids]
@@ -319,9 +320,15 @@ def resolve_version(ref: str, lineage_root: Path | None = None) -> dict:
 
 
 def version_episodes(ref: str, lineage_root: Path | None = None) -> pd.DataFrame:
-    """The version's episode table: one row per episode, ``CATALOG_COLUMNS`` (plus
-    ``parent_content_hash`` for a derived version). It maps ``episode_id`` to this copy's positional
-    ``episode_index``, and it is what screening and attribution read; it never holds ground truth."""
+    """The version's episode table: one row per episode, exactly ``CATALOG_COLUMNS``. It maps
+    ``episode_id`` to this copy's positional ``episode_index``, and it is what screening and attribution
+    read (method-facing).
+
+    For a derived version it must not reveal which episodes were edited (PoC §2.1 item 4 p. 3). That
+    holds only for versions that pass ``check_blind``: v1 (derived before evaluation-layer S0) still has
+    its edited episodes at ``episode_index`` 900-999 and is fenced (``fence_record``); use
+    ``assert_blind`` before handing a version to a method under test. Pre-edit hashes are lineage-only
+    (``parent_hashes``)."""
     vid = resolve_version(ref, lineage_root)["dataset_version_id"]
     return pd.read_parquet(_root(lineage_root) / "versions" / vid / "episodes.parquet")
 
@@ -581,7 +588,7 @@ def drop_random_k(parent: Subset, k: int, seed: int, lineage_root: Path | None =
 
 # Per-episode identity/hash columns: unique (or nearly) per episode, so "dropping a group" by them is
 # not a group ablation. drop_group refuses them.
-GROUP_COLUMNS_EXCLUDED = {"episode_id", "episode_index", "content_hash", "parent_content_hash", "init_state_sha256",
+GROUP_COLUMNS_EXCLUDED = {"episode_id", "episode_index", "content_hash", "init_state_sha256",
                           "source_file", "source_demo"}
 
 
@@ -672,6 +679,195 @@ def diff_versions(a: str, b: str, lineage_root: Path | None = None) -> dict:
 
 
 # ---------------------------------------------------------------------------------------------
+# blindness of derived versions (evaluation-layer S0)
+# ---------------------------------------------------------------------------------------------
+# Grounding: PoC §2.1 item 4 (p. 3): "Deliberately corrupt known subsets of training data ... Then check
+# whether your attribution method flags exactly those." Screening and attribution read a derived
+# version's method-facing tables (episode table, catalog copy, LeRobot ``meta/episodes``). If any
+# bookkeeping in them differs between edited and unedited episodes, a method can "flag exactly those"
+# without having learned anything. v1 had two such channels: a ``parent_content_hash`` column that
+# differed for exactly the 100 labelled rows, and row order (edited episodes at ``episode_index``
+# 900-999, in their own data files). Data-derived columns may differ (a noised episode's smoothness
+# does change); that is the signal a method is supposed to find.
+
+#: Columns whose value is computed from the episode's own frames; an edit may change them.
+DATA_DERIVED_COLUMNS = ("content_hash", "length_steps", "duration_s", "smoothness", "idle_fraction", "idle_steps",
+                        "gripper_toggles")
+#: Columns describing where an episode came from or sits; a derivation must copy them unchanged.
+#: Any other column found in a table (not data-derived, not ``episode_id``) is treated as bookkeeping too.
+BOOKKEEPING_COLUMNS = ("episode_index", "source_file", "source_demo", "init_state_sha256", "suite", "task_name",
+                       "libero_task_id", "language_instruction", "scene", "objects", "source", "operator",
+                       "collection_date")
+#: LeRobot ``meta/episodes`` columns compared per episode; every other column there (length, data-file
+#: and frame-range layout, per-episode stats) follows the stored bytes and is data-derived.
+META_BOOKKEEPING_COLUMNS = ("episode_index", "tasks")
+ROW_ORDER = "(row order)"
+META_MISMATCH = "(meta/episodes does not match the episode table)"
+
+
+def _canon(v) -> str:
+    """A comparable string for one table cell (numpy scalars and arrays become JSON values)."""
+    return json.dumps(v, sort_keys=True, default=lambda o: o.tolist() if hasattr(o, "tolist") else str(o))
+
+
+def _differing(a: pd.Series, b: pd.Series) -> int:
+    """Number of positions where two equally long series hold different values (cell by cell)."""
+    return sum(_canon(x) != _canon(y) for x, y in zip(a, b))
+
+
+def _compare_episode_tables(child: pd.DataFrame, parent: pd.DataFrame) -> dict:
+    """Rule 1 (same columns), same episodes, same row order, Rule 2 (bookkeeping equal per episode_id)."""
+    added = sorted(set(child.columns) - set(parent.columns))
+    removed = sorted(set(parent.columns) - set(child.columns))
+    out = {"added_columns": added, "removed_columns": removed, "differing_rows": {}}
+    off = added + removed
+    if len(child) != len(parent) or set(child["episode_id"]) != set(parent["episode_id"]) \
+            or child["episode_id"].duplicated().any():
+        out["offending"] = sorted(set(off + ["episode_id"]))
+        return out
+    if list(child["episode_id"]) != list(parent["episode_id"]):
+        off.append(ROW_ORDER)
+    c = child.set_index("episode_id")
+    p = parent.set_index("episode_id").loc[c.index]
+    for col in c.columns.intersection(p.columns):
+        n = _differing(c[col], p[col])
+        if n:
+            out["differing_rows"][col] = n
+            if col not in DATA_DERIVED_COLUMNS:
+                off.append(col)
+    out["offending"] = sorted(set(off))
+    return out
+
+
+def _meta_columns(root: Path) -> set[str]:
+    """Every column name in a LeRobot dataset's ``meta/episodes`` parquet files (stats columns included)."""
+    import pyarrow.parquet as pq
+
+    return {n for f in (Path(root) / "meta" / "episodes").rglob("*.parquet") for n in pq.read_schema(f).names}
+
+
+def _compare_meta(child_root: Path, child: pd.DataFrame, parent_root: Path, parent: pd.DataFrame) -> dict:
+    """LeRobot ``meta/episodes`` of the child vs the parent, joined to ``episode_id`` through each
+    version's own episode table: same column set, the table's lengths describe this copy, and
+    ``episode_index`` (physical order) and ``tasks`` equal per episode."""
+    from vlapoc.catalog import read_episodes_meta
+
+    cc, pc = _meta_columns(child_root), _meta_columns(parent_root)
+    out = {"added_columns": sorted(cc - pc), "removed_columns": sorted(pc - cc), "differing_rows": {}}
+    off = out["added_columns"] + out["removed_columns"]
+    metas = []
+    for root, table in ((child_root, child), (parent_root, parent)):
+        m = read_episodes_meta(root)
+        id_of = dict(zip(table["episode_index"], table["episode_id"]))
+        if sorted(id_of) != sorted(m["episode_index"]) or \
+                (m["length"].to_numpy() != m["episode_index"].map(dict(zip(table["episode_index"], table["length_steps"]))).to_numpy()).any():
+            out["offending"] = sorted(set(off + [META_MISMATCH]))
+            return out
+        metas.append(m.assign(episode_id=m["episode_index"].map(id_of)).set_index("episode_id"))
+    cm, pm = metas[0], metas[1].loc[metas[0].index]
+    for col in META_BOOKKEEPING_COLUMNS:
+        n = _differing(cm[col], pm[col])
+        if n:
+            out["differing_rows"][col] = n
+            off.append(col)
+    out["offending"] = sorted(set(off))
+    return out
+
+
+def compare_blind(child: pd.DataFrame, parent: pd.DataFrame, child_root: Path, parent_root: Path,
+                  catalog: pd.DataFrame | None = None) -> dict:
+    """Do a derived version's method-facing tables reveal which episodes were edited?
+
+    Compares, against the parent: the child's episode table (``child``), its catalog copy (``catalog``,
+    if given) and its LeRobot ``meta/episodes`` (under ``child_root``). Rules (evaluation-layer plan S0):
+
+    1. Column sets are identical (a derivation adds no column, e.g. no ``parent_content_hash``).
+    2. Every bookkeeping column (``BOOKKEEPING_COLUMNS``, and any column that is neither data-derived nor
+       ``episode_id``) equals the parent's value per ``episode_id``; so does the row order. In
+       ``meta/episodes``, ``episode_index`` (physical order) and ``tasks`` do.
+
+    Data-derived columns (``DATA_DERIVED_COLUMNS``; in ``meta/episodes`` length, file layout and stats)
+    are exempt. Returns ``{"offending": sorted column names (union over tables), "tables": per-table
+    detail}``; an empty ``offending`` means blind. ``derive_version`` calls this before registering.
+    """
+    tables = {"version_episodes": _compare_episode_tables(child, parent)}
+    if catalog is not None:
+        tables["catalog"] = _compare_episode_tables(catalog, parent)
+    tables["meta/episodes"] = _compare_meta(child_root, child, parent_root, parent)
+    return {"offending": sorted({c for t in tables.values() for c in t["offending"]}), "tables": tables}
+
+
+def _catalog_copy(v: dict, lineage_root: Path | None) -> Path:
+    """Where ``derive_version`` writes a version's catalog copy (``<lineage root>/catalog/<dataset dir>``)."""
+    return _root(lineage_root) / "catalog" / Path(v["lerobot_root"]).name / "episodes.parquet"
+
+
+def blind_report(ref: str, lineage_root: Path | None = None) -> dict:
+    """``compare_blind`` for a registered version against its parent, plus its fence record.
+
+    A root version (no parent) has nothing derived and reports no offending column.
+    """
+    v = resolve_version(ref, lineage_root)
+    out = {"version": v["dataset_version_id"], "name": v["name"], "parent": v.get("parent_version_id"),
+           "fence": fence_record(ref, lineage_root)}
+    if not v.get("parent_version_id"):
+        return {**out, "offending": [], "tables": {}}
+    pv = resolve_version(v["parent_version_id"], lineage_root)
+    cat = _catalog_copy(v, lineage_root)
+    res = compare_blind(version_episodes(ref, lineage_root), version_episodes(pv["dataset_version_id"], lineage_root),
+                        REPO_ROOT / v["lerobot_root"], REPO_ROOT / pv["lerobot_root"],
+                        pd.read_parquet(cat) if cat.is_file() else None)
+    return {**out, **res}
+
+
+def check_blind(ref: str, lineage_root: Path | None = None) -> list[str]:
+    """The method-facing columns of a derived version that differ from its parent where they must not
+    (``compare_blind``). ``[]`` means a method under test cannot tell edited episodes from the tables."""
+    return blind_report(ref, lineage_root)["offending"]
+
+
+def parent_hashes(ref: str, lineage_root: Path | None = None) -> pd.DataFrame:
+    """LINEAGE-ONLY: ``(episode_id, parent_content_hash)`` for every episode of a derived version.
+
+    The pre-edit fingerprint, kept in ``versions/<id>/parents.parquet`` and never in a method-facing
+    table (PoC §2.1 item 4 p. 3): comparing it with ``content_hash`` names the edited episodes, so
+    evaluation and lineage code may read it and a method under test may not. The same holds for the
+    parent version's own table and ``diff_versions(parent, child)``, which reveal the same thing.
+    """
+    v = resolve_version(ref, lineage_root)
+    p = _root(lineage_root) / "versions" / v["dataset_version_id"] / "parents.parquet"
+    if not p.is_file():
+        raise LineageError(f"version {ref} has no parents.parquet (not a derived version)")
+    return pd.read_parquet(p)
+
+
+def fence_record(ref: str, lineage_root: Path | None = None) -> dict | None:
+    """The version's ``fence.json`` (why it must not be given to a method under test), or ``None``."""
+    v = resolve_version(ref, lineage_root)
+    p = _root(lineage_root) / "versions" / v["dataset_version_id"] / "fence.json"
+    return json.loads(p.read_text()) if p.is_file() else None
+
+
+def write_fence(ref: str, reason: str, details: dict, lineage_root: Path | None = None) -> Path:
+    """Fence a version from method use: write ``versions/<id>/fence.json`` (lineage-only storage)."""
+    v = resolve_version(ref, lineage_root)
+    p = _root(lineage_root) / "versions" / v["dataset_version_id"] / "fence.json"
+    _write_json(p, {"dataset_version_id": v["dataset_version_id"], "name": v["name"], "method_use": "fenced",
+                    "reason": reason, "fenced_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    **details})
+    return p
+
+
+def assert_blind(ref: str, lineage_root: Path | None = None) -> None:
+    """Raise ``LineageError`` unless the version may be handed to a method under test: not fenced and
+    ``check_blind`` empty. Screening and attribution entry points call this on their input version."""
+    rep = blind_report(ref, lineage_root)
+    if rep["fence"] is not None or rep["offending"]:
+        raise LineageError(f"version {rep['name']} ({rep['version'][:12]}) is not blind to its edits: fenced="
+                           f"{rep['fence'] is not None}, offending={rep['offending']} (PoC §2.1 item 4 p.3)")
+
+
+# ---------------------------------------------------------------------------------------------
 # CLI (usage in the module docstring)
 # ---------------------------------------------------------------------------------------------
 # One handler per leaf command, attached with argparse's ``set_defaults(func=...)``. Handlers for the
@@ -716,6 +912,12 @@ def _cmd_version_diff(a) -> None:
         out["changed_ids"] = _head(out["changed_ids"], 3)
     _print(out)
     print(f"changed {out['changed']}, identical {out['identical']}, added {len(out['added'])}, removed {len(out['removed'])}")
+
+
+def _cmd_version_check_blind(a) -> None:
+    rep = blind_report(a.ref)
+    _print(rep)
+    print(f"check_blind({rep['name']}) = {rep['offending']}; fenced: {rep['fence'] is not None}")
 
 
 def _cmd_split_make(a) -> None:
@@ -816,6 +1018,9 @@ def _build_parser() -> argparse.ArgumentParser:
     c.add_argument("b")
     c.add_argument("--ids", action="store_true")
     c.set_defaults(func=_cmd_version_diff)
+    c = version.add_parser("check-blind", help="does a derived version's method-facing table reveal its edits?")
+    c.add_argument("ref")
+    c.set_defaults(func=_cmd_version_check_blind)
 
     c = sub.add_parser("split").add_subparsers(dest="scmd", required=True).add_parser("make")
     c.add_argument("--version", required=True)

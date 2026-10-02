@@ -1,0 +1,68 @@
+{
+  "action": "moved parent_content_hash to parents.parquet; tables rewritten in v0 row order",
+  "unchanged_files": {
+    "version.json": true,
+    "files.json": true,
+    "labels.parquet": true
+  },
+  "AC0.1": {
+    "v1_table_columns": [
+      "episode_id",
+      "episode_index",
+      "content_hash",
+      "suite",
+      "task_name",
+      "libero_task_id",
+      "language_instruction",
+      "scene",
+      "objects",
+      "source",
+      "operator",
+      "collection_date",
+      "length_steps",
+      "duration_s",
+      "init_state_sha256",
+      "smoothness",
+      "idle_fraction",
+      "idle_steps",
+      "gripper_toggles",
+      "source_file",
+      "source_demo"
+    ],
+    "catalog_copy_columns": [
+      "episode_id",
+      "episode_index",
+      "content_hash",
+      "suite",
+      "task_name",
+      "libero_task_id",
+      "language_instruction",
+      "scene",
+      "objects",
+      "source",
+      "operator",
+      "collection_date",
+      "length_steps",
+      "duration_s",
+      "init_state_sha256",
+      "smoothness",
+      "idle_fraction",
+      "idle_steps",
+      "gripper_toggles",
+      "source_file",
+      "source_demo"
+    ],
+    "equal_v0_columns": true,
+    "n_columns": 21,
+    "dataset_version_id": "16076b9c5cb2a0e8c5d291fc0766977dc7286c6b9f87df39bd87fe5c17cd85f8",
+    "version_id_unchanged": true
+  },
+  "AC0.2": {
+    "label_join_rows": 100,
+    "labels": 100,
+    "parent_hashes_rows": 1000,
+    "parent_hashes_equal_v0": true,
+    "labels_parent_hash_equal_parents_parquet": true
+  }
+}
+AC0.4 check_blind(v1) = ['episode_index']; fenced: True

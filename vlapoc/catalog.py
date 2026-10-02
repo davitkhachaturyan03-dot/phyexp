@@ -360,7 +360,8 @@ def scene_of(task_name: str, problem_name: str) -> str:
 # Catalog
 # ---------------------------------------------------------------------------------------------
 
-# Columns of episodes.parquet, in order. A derived version's table has these plus parent_content_hash.
+# Columns of episodes.parquet, in order. A derived version's table has exactly these too (evaluation-layer S0:
+# the pre-edit hash lives in the lineage-only versions/<id>/parents.parquet, never in a method-facing table).
 CATALOG_COLUMNS = [
     "episode_id", "episode_index", "content_hash", "suite", "task_name", "libero_task_id",
     "language_instruction", "scene", "objects", "source", "operator", "collection_date",

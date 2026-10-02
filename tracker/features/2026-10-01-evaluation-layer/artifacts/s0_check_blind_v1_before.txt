@@ -1,0 +1,62 @@
+{
+  "fence": null,
+  "name": "v1",
+  "offending": [
+    "(row order)",
+    "episode_index",
+    "parent_content_hash"
+  ],
+  "parent": "3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7",
+  "tables": {
+    "catalog": {
+      "added_columns": [
+        "parent_content_hash"
+      ],
+      "differing_rows": {
+        "content_hash": 100,
+        "episode_index": 988,
+        "gripper_toggles": 100,
+        "idle_fraction": 9,
+        "idle_steps": 9,
+        "smoothness": 100
+      },
+      "offending": [
+        "(row order)",
+        "episode_index",
+        "parent_content_hash"
+      ],
+      "removed_columns": []
+    },
+    "meta/episodes": {
+      "added_columns": [],
+      "differing_rows": {
+        "episode_index": 988
+      },
+      "offending": [
+        "episode_index"
+      ],
+      "removed_columns": []
+    },
+    "version_episodes": {
+      "added_columns": [
+        "parent_content_hash"
+      ],
+      "differing_rows": {
+        "content_hash": 100,
+        "episode_index": 988,
+        "gripper_toggles": 100,
+        "idle_fraction": 9,
+        "idle_steps": 9,
+        "smoothness": 100
+      },
+      "offending": [
+        "(row order)",
+        "episode_index",
+        "parent_content_hash"
+      ],
+      "removed_columns": []
+    }
+  },
+  "version": "16076b9c5cb2a0e8c5d291fc0766977dc7286c6b9f87df39bd87fe5c17cd85f8"
+}
+check_blind(v1) = ['(row order)', 'episode_index', 'parent_content_hash']; fenced: False

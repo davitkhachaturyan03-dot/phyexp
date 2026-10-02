@@ -1,0 +1,19 @@
+AC4.3 editing reference episode libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_14: LineageError raised: True
+AC4.3 message: refusing to edit 1 reference-split episode(s) (PoC §8.7 p.15: corrupt only the training copy): ['libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_14']
+AC4.3 nothing written: True; protected ids for v0: 40
+AC4.1 version diff v0 v1: changed 100, identical 900, added 0, removed 0
+AC4.1 v1 record parent_version_id == v0: True; changed ids == label ids: True
+AC4.1 parent_hashes(v1) == v0 content_hash for all 1000 rows: True
+AC4.1 v1 loads: episodes=1000 frames=200340; info total_episodes=1000 total_frames=200340 total_tasks=20 fps=20; recomputed id matches registered: True; verify_version files ok: True (85) (37s)
+AC4.2 labels.parquet: 100 rows, columns ['episode_id', 'parent_content_hash', 'content_hash', 'corruption_type', 'params', 'seed']; join with v1 episodes on (episode_id, content_hash): 100/100 matched, 1:1 (unique ids True); label parent hash == v0 hash: True
+AC4.5 corrupted per task: [5] over 20 tasks; in reference split: 0; corruption_type ['action_gaussian_noise']; seed [0]
+AC4.5 params[0]: std_scale=0.25 sigma_a=[0.3334, 0.3531, 0.4134, 0.0393, 0.0612, 0.0811, 0.999] dims='all 7 action dims, including the gripper...' source='v0 meta/stats.json action.std (1000 episodes)'
+AC4.5 10 corrupted episodes checked frame by frame (2014 frames): same length 10/10, observations bit-identical 10/10; (a_v1 - a_v0)/sigma_a per dim: mean [-0.004, -0.005, -0.004, 0.002, -0.006, -0.002, -0.001] std [0.253, 0.246, 0.254, 0.255, 0.247, 0.251, 0.251] (expected 0 and 0.25)
+AC4.7 v0 version table (data/lineage/versions/3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7/episodes.parquet): 21 columns; label columns present: []
+AC4.7 v1 version table (data/lineage/versions/16076b9c5cb2a0e8c5d291fc0766977dc7286c6b9f87df39bd87fe5c17cd85f8/episodes.parquet): 21 columns; label columns present: []
+AC4.7 v1 catalog copy (data/lineage/catalog/libero_spatial_10__v1/episodes.parquet): 21 columns; label columns present: []
+AC4.7 v1 columns == v0 catalog columns (CATALOG_COLUMNS, no parent_content_hash): True; v1 version table == catalog copy columns: True; v0 columns == CATALOG_COLUMNS: True
+AC4.8 scratch parent small20 bafb211603dd (20 episodes) registered in data/scratch/verify_s4_cache_arxi0mb9/lineage
+AC4.8 shared HF_DATASETS_CACHE = data/hf_datasets_cache: before 124 files / 28643158514 bytes; after isolated derive_version 124 files / 28643158514 bytes; identical listing and bytes: True
+AC4.8 derivation 6cbeb214cd4c: 1 edit, timing {'guards': 0.5, 'write': 45.0, 'hash_and_blind_check': 980.3, 'total': 1026.6}; derivation.json hf_datasets_cache: 'isolated temp dir under data/scratch, deleted after the derivation'
+AC4.8 isolated temp caches left under data/scratch/: []

@@ -19,28 +19,38 @@ Grounding
   lineage demo only. The corruption suite (time shift, instruction swap, viewpoint, hesitant demos,
   gripper-release noise) is a separate, owner-approved later feature (brief.md, 2026-09-29).
 
-Mechanism (LeRobot tools, no hand-written parquet surgery)
------------------------------------------------------------
-1. ``lerobot.datasets.dataset_tools.delete_episodes``: copy of the parent without the edited episodes
-   (parquet rows copied, PNG bytes untouched).
-2. ``LeRobotDataset.create`` / ``add_frame`` / ``save_episode``: the edited episodes, from the parent's
-   decoded frames passed through each edit's transform.
-3. ``lerobot.datasets.dataset_tools.merge_datasets``: kept + edited, in that order.
-Measured on lerobot 0.6.1 (smoke dataset): kept hashes unchanged and in order, edited episodes appended,
-length-changing edit consistent in ``meta/episodes``; no crash (cf. upstream issue #2283).
+Mechanism (LeRobot's own writer, no hand-written parquet surgery)
+------------------------------------------------------------------
+One ``LeRobotDataset.create`` / ``add_frame`` / ``save_episode`` / ``finalize`` pass over the parent in
+its own episode order: each stored episode is decoded (``iter_stored_episodes``), passed through its
+edit's transform if it has one, and written. This is the writer ``vlapoc.libero_convert.convert``
+uses, so every episode, edited or not, goes through the same code and the derived copy has the
+parent's order: **every episode keeps its parent's** ``episode_index``, and data-file boundaries follow
+byte sizes in that order.
+
+Why not ``delete_episodes`` + ``merge_datasets`` (the round-1/2 mechanism that wrote v1): it appends the
+edited episodes after the kept ones, so ``episode_index`` 900-999 of v1 *are* the 100 corrupted episodes,
+and they sit in their own data files (73-80; measured). A method under test could identify the answer
+from row order alone, without any label (PoC §2.1 item 4 p. 3: the method must "flag exactly those"
+on its own). v1 keeps that copy and is fenced from method use (``vlapoc.lineage.check_blind``;
+evaluation-layer S0, owner ruling A 2026-10-02). Cost of the fix: every frame is decoded and
+re-encoded (lossless PNG, content hashes unchanged) instead of copied; measured in the S0 log.
 
 Identity is re-established by content, not assumed: every kept episode must hash to its parent hash and
-every edited episode to the hash of its transformed arrays, or the derivation fails.
+every edited episode to the hash of its transformed arrays, or the derivation fails. The finished
+tables are then compared with the parent's by ``vlapoc.lineage.compare_blind``; any bookkeeping
+column that differs fails the derivation.
 
-Unedited episodes keep their ``content_hash``. LeRobot's ``episode_index`` is positional: edited
-episodes move to the end of the derived dataset, and the version's episodes table maps them back.
+Unedited episodes keep their ``content_hash``. The pre-edit hash of every episode goes to the
+lineage-only ``parents.parquet`` (``vlapoc.lineage.parent_hashes``), never into the method-facing
+episode table.
 
 Where it sits
 -------------
 The "corrupt 5-10% of a copy, ground-truth labels created here" box of docs/dataflow.md. It takes a
 registered version (``vlapoc.lineage``) and writes a child version next to it:
 ``data/lerobot/<parent>__<name>/`` plus ``data/lineage/versions/<id>/`` with ``labels.parquet`` (the
-ground truth) and ``derivation.json``. The parent's reference/candidate split is carried over, so
+ground truth), ``parents.parquet`` (pre-edit hashes, lineage-only) and ``derivation.json``. The parent's reference/candidate split is carried over, so
 the child's ``<name>/candidate`` is the training set later stages use. ``vlapoc.runs.derive_run``
 records a derivation as an MLflow run.
 
@@ -69,10 +79,12 @@ import pyarrow.parquet as pq
 from vlapoc.catalog import (
     DEFAULT_CATALOG_ROOT,
     IMAGE_KEYS,
+    data_files,
     decode_png,
     episode_content_hash,
     hash_stored_dataset,
     read_episodes_meta,
+    read_tasks,
 )
 from vlapoc.libero_convert import REPO_ROOT, SUITES
 from vlapoc.lineage import (
@@ -82,6 +94,7 @@ from vlapoc.lineage import (
     _demo_number,
     _root,
     _write_json,
+    compare_blind,
     isolated_hf_datasets_cache,
     register_version,
     rel,
@@ -90,6 +103,8 @@ from vlapoc.lineage import (
     verify_version,
     version_episodes,
 )
+
+MECHANISM = "one LeRobotDataset writer pass in parent episode order (episode_index preserved)"
 
 
 @dataclass(frozen=True)
@@ -133,6 +148,37 @@ def read_stored_episode(root: Path, episode_index: int) -> dict:
         "image": np.stack([decode_png(c) for c in g[IMAGE_KEYS[0]]]),
         "image2": np.stack([decode_png(c) for c in g[IMAGE_KEYS[1]]]),
     }
+
+
+def iter_stored_episodes(root: Path):
+    """Yield ``(episode_index, episode)`` for every stored episode, in ``episode_index`` order.
+
+    ``episode`` is the canonical dict ``read_stored_episode`` returns (task, action, state, image,
+    image2). Each data file is read once (``read_stored_episode`` per episode would re-read a ~100 MB
+    file for each of its ~13 episodes). Raises unless the indices come out as 0, 1, ..., N-1, which is
+    what a sequential LeRobot writer produces and what ``derive_version`` relies on to keep order.
+    """
+    root = Path(root)
+    tasks = read_tasks(root)
+    expected = 0
+    for path in data_files(root):
+        table = pq.read_table(path).to_pandas()
+        for ep_idx, g in table.groupby("episode_index", sort=True):
+            if int(ep_idx) != expected:
+                raise LineageError(f"{rel(path)}: episode_index {int(ep_idx)} where {expected} was expected; "
+                                   "episodes are not stored contiguously in index order")
+            expected += 1
+            g = g.sort_values("frame_index")
+            task_idx = g["task_index"].unique()
+            if len(task_idx) != 1:
+                raise LineageError(f"episode {int(ep_idx)} has {len(task_idx)} tasks")
+            yield int(ep_idx), {
+                "task": tasks[int(task_idx[0])],
+                "action": np.stack(g["action"].to_numpy()).astype(np.float32),
+                "state": np.stack(g["observation.state"].to_numpy()).astype(np.float32),
+                "image": np.stack([decode_png(c) for c in g[IMAGE_KEYS[0]]]),
+                "image2": np.stack([decode_png(c) for c in g[IMAGE_KEYS[1]]]),
+            }
 
 
 def _check_canonical(ep: dict, like: dict) -> None:
@@ -195,14 +241,17 @@ def derive_version(
     Returns a summary with the new ``dataset_version_id``, counts and paths. Raises ``LineageError``
     before writing anything if an edit targets a protected (reference) or unknown episode.
 
-    The derived version's episode table holds the parent's catalog columns plus ``parent_content_hash``
-    and nothing about the edits: ground truth lives only in ``labels.parquet`` (PoC §2.1 item 4 p.3, the
-    method under test must not read the answer; AC4.7).
+    Blindness (PoC §2.1 item 4 p. 3: the method under test must find the corrupted episodes without
+    being shown them; evaluation-layer S0). The derived version's method-facing tables (episode table,
+    catalog copy, LeRobot ``meta/episodes``) have exactly the parent's columns, rows and
+    ``episode_index`` values; only data-derived columns (content hash, length, action statistics) may
+    differ, and only for the edited episodes. Ground truth lives in ``labels.parquet``, the pre-edit
+    hashes in ``parents.parquet``; both are lineage-only. ``vlapoc.lineage.compare_blind`` checks this
+    before the version is registered and the derivation fails if any bookkeeping column differs.
 
-    ``isolate_hf_cache=True`` (default) routes the HF ``datasets`` caches written by the derivation's
-    ``LeRobotDataset`` loads (parent, kept, edit, merged) to a temp dir that is deleted afterwards, so a
-    derivation leaves the shared cache unchanged (AC4.8). ``False`` reproduces the round-1 behaviour
-    (orphaned caches) and exists only to measure it.
+    ``isolate_hf_cache=True`` (default) routes any HF ``datasets`` cache written during the derivation
+    to a temp dir that is deleted afterwards, so a derivation leaves the shared cache unchanged (AC4.8).
+    ``False`` writes to the shared cache and exists only to measure it.
 
     Args:
         parent: the parent version (name or id).
@@ -212,9 +261,10 @@ def derive_version(
         note: free text stored in ``version.json``.
         derivation: extra keys merged into ``derivation.json`` (e.g. the selection rule).
 
-    Steps: guards -> ``_write_derived_dataset`` (LeRobot tools) -> ``_derived_episode_table`` (identity
-    re-established from the stored bytes) -> catalog, registration, ``labels.parquet``,
-    ``derivation.json`` and the inherited splits.
+    Steps: guards -> ``_write_derived_dataset`` (one LeRobot writer pass in parent order) ->
+    ``_derived_episode_table`` (identity re-established from the stored bytes) -> ``compare_blind`` ->
+    catalog, registration, ``labels.parquet``, ``parents.parquet``, ``derivation.json`` and the
+    inherited splits.
     """
     t0 = time.time()
     pv = resolve_version(parent, lineage_root)
@@ -245,12 +295,19 @@ def derive_version(
     # --- write the derived dataset ---------------------------------------------------------------
     info = json.loads((parent_root / "meta" / "info.json").read_text())
     idx_of = dict(zip(eps["episode_id"], eps["episode_index"]))
-    edits = sorted(edits, key=lambda e: idx_of[e.episode_id])  # deterministic write order
-    expected, timing = _write_derived_dataset(parent_root, out_root, edits, idx_of, info, image_writer_threads,
-                                              isolate_hf_cache, t0)
+    edits = sorted(edits, key=lambda e: idx_of[e.episode_id])  # parent order (labels row order)
+    t_guard = time.time() - t0
+    expected = _write_derived_dataset(parent_root, out_root, edits, dict(zip(eps["episode_index"], eps["episode_id"])),
+                                      info, image_writer_threads, isolate_hf_cache)
+    t_write = time.time() - t0 - t_guard
 
-    # --- re-establish identity by content -----------------------------------------------------
+    # --- re-establish identity by content, then check blindness against the parent ---------------
     child = _derived_episode_table(eps, edits, expected, out_root, info["fps"])
+    blind = compare_blind(child, eps, out_root, parent_root)
+    if blind["offending"]:
+        raise LineageError(f"derived tables are not blind to the edits (PoC §2.1 item 4 p.3): {blind['offending']}; "
+                           f"details {blind['tables']}. Nothing registered; {rel(out_root)} left for inspection.")
+    t_check = time.time() - t0 - t_guard - t_write
 
     # --- catalog + registration + labels -------------------------------------------------------
     cat_dir = DEFAULT_CATALOG_ROOT / out_root.name if lineage_root is None else _root(lineage_root) / "catalog" / out_root.name
@@ -265,22 +322,29 @@ def derive_version(
     record = register_version(out_root, name, cat_dir, parent_version_id=pvid, note=note, lineage_root=lineage_root)
     vid = record["dataset_version_id"]
     vdir = _root(lineage_root) / "versions" / vid
+    parent_hash = dict(zip(eps["episode_id"], eps["content_hash"]))
     labels = pd.DataFrame([{
         "episode_id": e.episode_id,
-        "parent_content_hash": child.loc[child["episode_id"] == e.episode_id, "parent_content_hash"].item(),
+        "parent_content_hash": parent_hash[e.episode_id],
         "content_hash": expected[e.episode_id],
         "corruption_type": e.corruption_type,
         "params": json.dumps(e.params, sort_keys=True),
         "seed": e.seed,
     } for e in edits])
     labels.to_parquet(vdir / "labels.parquet", index=False)
+    # lineage-only: the pre-edit hash of every episode (vlapoc.lineage.parent_hashes)
+    eps[["episode_id", "content_hash"]].rename(columns={"content_hash": "parent_content_hash"}).to_parquet(
+        vdir / "parents.parquet", index=False)
     deriv = {
         "parent_version_id": pvid, "parent_name": pv["name"], "dataset_version_id": vid, "name": name,
-        "n_edits": len(edits), "mechanism": "lerobot delete_episodes + LeRobotDataset writer + merge_datasets",
+        "n_edits": len(edits), "mechanism": MECHANISM,
+        "episode_order": "parent order: every episode keeps its parent's episode_index",
+        "blind_check": {"offending": blind["offending"], "rule": "vlapoc.lineage.compare_blind"},
         "hf_datasets_cache": ("isolated temp dir under data/scratch, deleted after the derivation" if isolate_hf_cache
-                              else "shared HF_DATASETS_CACHE (derivation-time caches left behind)"),
+                              else "shared HF_DATASETS_CACHE"),
         "labels_sha256": hashlib.sha256((vdir / "labels.parquet").read_bytes()).hexdigest(),
         "labels_rows_digest": sha256_json(labels.sort_values("episode_id").to_dict("records")),
+        "parents_sha256": hashlib.sha256((vdir / "parents.parquet").read_bytes()).hexdigest(),
         **(derivation or {}),
     }
     _write_json(vdir / "derivation.json", deriv)
@@ -289,102 +353,86 @@ def derive_version(
         "dataset_version_id": vid, "name": name, "lerobot_root": rel(out_root), "parent_version_id": pvid,
         "n_edits": len(edits), "n_episodes": len(child), "n_frames": int(child["length_steps"].sum()),
         "labels": rel(vdir / "labels.parquet"), "labels_sha256": deriv["labels_sha256"],
-        "inherited_splits": inherited,
-        "timing_s": {"delete": round(timing["delete"], 1), "write_edits": round(timing["write_edits"], 1),
-                     "merge": round(timing["merge"], 1), "total": round(time.time() - t0, 1)},
+        "inherited_splits": inherited, "mechanism": MECHANISM, "blind_offending": blind["offending"],
+        "timing_s": {"guards": round(t_guard, 1), "write": round(t_write, 1), "hash_and_blind_check": round(t_check, 1),
+                     "total": round(time.time() - t0, 1)},
     }
 
 
-def _write_derived_dataset(parent_root: Path, out_root: Path, edits: list[EpisodeEdit], idx_of: dict, info: dict,
-                           image_writer_threads: int, isolate_hf_cache: bool,
-                           t0: float) -> tuple[dict[str, str], dict[str, float]]:
-    """Write the derived dataset to ``out_root`` with LeRobot's own tools (module docstring, "Mechanism").
+def _write_derived_dataset(parent_root: Path, out_root: Path, edits: list[EpisodeEdit], id_of_index: dict, info: dict,
+                           image_writer_threads: int, isolate_hf_cache: bool) -> dict[str, str]:
+    """Write the derived dataset to ``out_root``: one LeRobot writer pass in parent order (module docstring).
 
-    ``delete_episodes`` copies the parent without the edited episodes into a temp dir; LeRobot's writer
-    stores each edit's transformed episode into a second temp dir; ``merge_datasets`` joins them, kept
-    episodes first, then the edited ones in ``edits`` order. Both temp dirs are deleted.
+    Every parent episode is decoded in ``episode_index`` order, transformed if ``edits`` names it, and
+    written with ``add_frame``/``save_episode``, so stored episode i of the child is episode i of the
+    parent. The pass writes to a temp dir next to ``out_root`` and renames it on success, so a failed
+    pass leaves no half-written ``out_root``.
 
-    Returns ``(expected, timing)``: ``expected[episode_id]`` is the content hash each edited episode must
-    have once stored (computed from its transformed arrays), and ``timing`` the phase durations in
-    seconds. ``timing["delete"]`` counts from ``t0``, the start of ``derive_version``, so it includes
-    the guards, the parent's verification and, in a fresh process, the one-time LeRobot import below
-    (1.3-1.9 s, measured; the full-scale delete phase takes 166-181 s).
+    Returns ``expected``: ``expected[episode_id]`` is the content hash each edited episode must have
+    once stored (computed from its transformed arrays).
     """
-    from lerobot.datasets.dataset_tools import delete_episodes, merge_datasets
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
-    tmp_kept = out_root.parent / f".{out_root.name}.tmp_kept"
-    tmp_edit = out_root.parent / f".{out_root.name}.tmp_edit"
-    for t in (tmp_kept, tmp_edit):
-        if t.exists():
-            shutil.rmtree(t)
+    tmp = out_root.parent / f".{out_root.name}.tmp_write"
+    if tmp.exists():
+        shutil.rmtree(tmp)
     # LeRobotDataset.create adds these five bookkeeping features itself (DEFAULT_FEATURES).
     user_features = {k: v for k, v in info["features"].items()
                      if k not in ("timestamp", "frame_index", "episode_index", "index", "task_index")}
-    repo_id = f"local/{out_root.name}"
-    # Every LeRobotDataset load below writes an HF datasets Arrow cache (plan R1); route them all to a
-    # temp dir that is deleted with the temporary datasets (AC4.8, analysis-r1 E3).
+    by_id = {e.episode_id: e for e in edits}
+    expected: dict[str, str] = {}
     cache_ctx = isolated_hf_datasets_cache() if isolate_hf_cache else contextlib.nullcontext()
     with cache_ctx:
-        parent_ds = LeRobotDataset(f"local/{parent_root.name}", root=parent_root)
-        delete_episodes(parent_ds, [int(idx_of[e.episode_id]) for e in edits], output_dir=tmp_kept,
-                        repo_id=f"{repo_id}_kept")
-        t_delete = time.time() - t0
-
-        ed = LeRobotDataset.create(repo_id=f"{repo_id}_edit", fps=info["fps"], features=user_features, root=tmp_edit,
+        ds = LeRobotDataset.create(repo_id=f"local/{out_root.name}", fps=info["fps"], features=user_features, root=tmp,
                                    robot_type=info.get("robot_type"), use_videos=False,
                                    image_writer_threads=image_writer_threads)
-        expected: dict[str, str] = {}
-        for e in edits:
-            src = read_stored_episode(parent_root, int(idx_of[e.episode_id]))
-            new = e.transform(dict(src))
-            _check_canonical(new, src)
-            if new["task"] != src["task"]:
-                raise LineageError("task edits must go through LeRobot modify_tasks (not supported here)")
-            expected[e.episode_id] = episode_content_hash(new["task"], new["action"], new["state"], new["image"], new["image2"])
-            for i in range(len(new["action"])):
-                ed.add_frame({IMAGE_KEYS[0]: new["image"][i], IMAGE_KEYS[1]: new["image2"][i],
-                              "observation.state": new["state"][i], "action": new["action"][i], "task": new["task"]})
-            ed.save_episode()
-        ed.finalize()
-        staging = tmp_edit / "images"
-        if staging.is_dir() and not any(p.is_file() for p in staging.rglob("*")):
-            shutil.rmtree(staging)
-        t_edit = time.time() - t0 - t_delete
-
-        merge_datasets([LeRobotDataset(f"{repo_id}_kept", root=tmp_kept), LeRobotDataset(f"{repo_id}_edit", root=tmp_edit)],
-                       output_repo_id=repo_id, output_dir=out_root)
-        shutil.rmtree(tmp_kept)
-        shutil.rmtree(tmp_edit)
-    t_merge = time.time() - t0 - t_delete - t_edit
-    return expected, {"delete": t_delete, "write_edits": t_edit, "merge": t_merge}
+        for ep_idx, src in iter_stored_episodes(parent_root):
+            ep = src
+            e = by_id.get(id_of_index[ep_idx])
+            if e is not None:
+                ep = e.transform(dict(src))
+                _check_canonical(ep, src)
+                if ep["task"] != src["task"]:
+                    raise LineageError("task edits must go through LeRobot modify_tasks (not supported here)")
+                expected[e.episode_id] = episode_content_hash(ep["task"], ep["action"], ep["state"], ep["image"], ep["image2"])
+            for i in range(len(ep["action"])):
+                ds.add_frame({IMAGE_KEYS[0]: ep["image"][i], IMAGE_KEYS[1]: ep["image2"][i],
+                              "observation.state": ep["state"][i], "action": ep["action"][i], "task": ep["task"]})
+            ds.save_episode()
+        ds.finalize()
+    if set(expected) != set(by_id):
+        raise LineageError(f"{len(set(by_id) - set(expected))} edit(s) never met their episode in the parent pass")
+    staging = tmp / "images"
+    if staging.is_dir() and not any(p.is_file() for p in staging.rglob("*")):
+        shutil.rmtree(staging)
+    tmp.rename(out_root)
+    return expected
 
 
 def _derived_episode_table(eps: pd.DataFrame, edits: list[EpisodeEdit], expected: dict[str, str], out_root: Path,
                            fps: int) -> pd.DataFrame:
     """The derived version's episode table, rebuilt from the stored bytes and checked against the parent.
 
-    ``eps`` is the parent's table sorted by ``episode_index``. The merged dataset stores kept episodes
-    first (parent order) and edited ones after them (``edits`` order), so stored row i is ``order[i]``.
-    Every kept episode must hash to its parent hash, and every edited one to ``expected``, or
-    ``LineageError``. The result is the parent's rows in that order with ``parent_content_hash`` added
-    and this copy's ``episode_index``, ``content_hash``, length, action statistics and ``duration_s``.
-    Ground truth stays out of it (AC4.7): it lives only in ``labels.parquet``.
+    ``eps`` is the parent's table sorted by ``episode_index``. The child is stored in parent order, so
+    stored episode i must be the parent's row i: every kept episode must hash to its parent hash and
+    every edited one to ``expected``, or ``LineageError``. The result is the parent's rows, in the
+    parent's row order and with the parent's columns, carrying this copy's ``content_hash``, length,
+    action statistics and ``duration_s`` (the data-derived columns, ``vlapoc.lineage.DATA_DERIVED_COLUMNS``).
+    Nothing about the edits is added (PoC §2.1 item 4 p. 3): ground truth lives only in ``labels.parquet``.
     """
-    edited_ids = [e.episode_id for e in edits]
-    order = [i for i in eps["episode_id"] if i not in set(edited_ids)] + edited_ids
+    edited_ids = {e.episode_id for e in edits}
     stored = hash_stored_dataset(out_root)
-    if len(stored) != len(order):
-        raise LineageError(f"derived dataset has {len(stored)} episodes, expected {len(order)}")
-    child = eps.set_index("episode_id").loc[order].reset_index()
-    child["parent_content_hash"] = child["content_hash"]
+    if len(stored) != len(eps):
+        raise LineageError(f"derived dataset has {len(stored)} episodes, expected {len(eps)}")
+    if not (stored["episode_index"].to_numpy() == eps["episode_index"].to_numpy()).all():
+        raise LineageError("derived dataset's episode_index values differ from the parent's")
+    child = eps.copy()
     new_hash = stored["content_hash"].to_numpy()
     kept_mask = ~child["episode_id"].isin(edited_ids).to_numpy()
-    if not (new_hash[kept_mask] == child.loc[kept_mask, "parent_content_hash"].to_numpy()).all():
-        raise LineageError("a kept episode changed content during delete/merge")
-    if [expected[i] for i in edited_ids] != list(new_hash[~kept_mask]):
+    if not (new_hash[kept_mask] == child.loc[kept_mask, "content_hash"].to_numpy()).all():
+        raise LineageError("a kept episode changed content during the writer pass")
+    if [expected[i] for i in child.loc[~kept_mask, "episode_id"]] != list(new_hash[~kept_mask]):
         raise LineageError("stored edited episodes do not hash to their transformed content")
-    child["episode_index"] = stored["episode_index"].to_numpy()
     child["content_hash"] = new_hash
     for c in ("length_steps", "smoothness", "idle_fraction", "idle_steps", "gripper_toggles"):
         child[c] = stored[c].to_numpy()
@@ -535,4 +583,4 @@ def load_labels(version: str, lineage_root: Path | None = None) -> pd.DataFrame:
 
 __all__ = ["EpisodeEdit", "derive_version", "derive_demo_action_noise", "robodrop_action_noise",
            "idle_padding_edit", "select_per_task", "protected_episode_ids", "ancestry", "load_labels",
-           "read_stored_episode", "inherit_splits"]
+           "read_stored_episode", "iter_stored_episodes", "inherit_splits", "MECHANISM"]

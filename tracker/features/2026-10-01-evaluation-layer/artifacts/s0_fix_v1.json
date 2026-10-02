@@ -1,0 +1,151 @@
+{
+  "v1": "16076b9c5cb2a0e8c5d291fc0766977dc7286c6b9f87df39bd87fe5c17cd85f8",
+  "sha256_before": {
+    "version_table": "3fcca3a4da9733155cb462e4329ff9191a8bad93ea24ae7e592284b20d7103bf",
+    "catalog_copy": "3fcca3a4da9733155cb462e4329ff9191a8bad93ea24ae7e592284b20d7103bf",
+    "version.json": "a44e494e2eae2f7e6436d0b74cb11229c844eaf21ca0f0db1eaf248d878a17eb",
+    "files.json": "3003d5fc9a9a306a202ace5d2fae7894ee004c019d1829448d686fc2aa28d705",
+    "labels.parquet": "0915f27606d641b2fdd8f540e20616887c5ba0327f288772d86fdb2677740346"
+  },
+  "action": "moved parent_content_hash to parents.parquet; tables rewritten in v0 row order",
+  "sha256_after": {
+    "version_table": "f0cfdfc41d7c8cfa5871f57d76565d862089684822e3d2c86c59cf7c863f4e20",
+    "catalog_copy": "f0cfdfc41d7c8cfa5871f57d76565d862089684822e3d2c86c59cf7c863f4e20",
+    "version.json": "a44e494e2eae2f7e6436d0b74cb11229c844eaf21ca0f0db1eaf248d878a17eb",
+    "files.json": "3003d5fc9a9a306a202ace5d2fae7894ee004c019d1829448d686fc2aa28d705",
+    "labels.parquet": "0915f27606d641b2fdd8f540e20616887c5ba0327f288772d86fdb2677740346"
+  },
+  "unchanged_files": {
+    "version.json": true,
+    "files.json": true,
+    "labels.parquet": true
+  },
+  "AC0.1": {
+    "v1_table_columns": [
+      "episode_id",
+      "episode_index",
+      "content_hash",
+      "suite",
+      "task_name",
+      "libero_task_id",
+      "language_instruction",
+      "scene",
+      "objects",
+      "source",
+      "operator",
+      "collection_date",
+      "length_steps",
+      "duration_s",
+      "init_state_sha256",
+      "smoothness",
+      "idle_fraction",
+      "idle_steps",
+      "gripper_toggles",
+      "source_file",
+      "source_demo"
+    ],
+    "catalog_copy_columns": [
+      "episode_id",
+      "episode_index",
+      "content_hash",
+      "suite",
+      "task_name",
+      "libero_task_id",
+      "language_instruction",
+      "scene",
+      "objects",
+      "source",
+      "operator",
+      "collection_date",
+      "length_steps",
+      "duration_s",
+      "init_state_sha256",
+      "smoothness",
+      "idle_fraction",
+      "idle_steps",
+      "gripper_toggles",
+      "source_file",
+      "source_demo"
+    ],
+    "equal_v0_columns": true,
+    "n_columns": 21,
+    "dataset_version_id": "16076b9c5cb2a0e8c5d291fc0766977dc7286c6b9f87df39bd87fe5c17cd85f8",
+    "version_id_unchanged": true
+  },
+  "AC0.2": {
+    "label_join_rows": 100,
+    "labels": 100,
+    "parent_hashes_rows": 1000,
+    "parent_hashes_equal_v0": true,
+    "labels_parent_hash_equal_parents_parquet": true
+  },
+  "AC0.4": {
+    "check_blind": [
+      "episode_index"
+    ],
+    "tables": {
+      "version_episodes": {
+        "added_columns": [],
+        "removed_columns": [],
+        "differing_rows": {
+          "episode_index": 988,
+          "content_hash": 100,
+          "smoothness": 100,
+          "idle_fraction": 9,
+          "idle_steps": 9,
+          "gripper_toggles": 100
+        },
+        "offending": [
+          "episode_index"
+        ]
+      },
+      "catalog": {
+        "added_columns": [],
+        "removed_columns": [],
+        "differing_rows": {
+          "episode_index": 988,
+          "content_hash": 100,
+          "smoothness": 100,
+          "idle_fraction": 9,
+          "idle_steps": 9,
+          "gripper_toggles": 100
+        },
+        "offending": [
+          "episode_index"
+        ]
+      },
+      "meta/episodes": {
+        "added_columns": [],
+        "removed_columns": [],
+        "differing_rows": {
+          "episode_index": 988
+        },
+        "offending": [
+          "episode_index"
+        ]
+      }
+    }
+  },
+  "fence": {
+    "check_blind": [
+      "episode_index"
+    ],
+    "dataset_version_id": "16076b9c5cb2a0e8c5d291fc0766977dc7286c6b9f87df39bd87fe5c17cd85f8",
+    "fenced_utc": "2026-10-02T11:01:37Z",
+    "method_use": "fenced",
+    "name": "v1",
+    "reason": "positional leak: the 100 edited (labelled) episodes are episode_index 900-999 of the physical copy (delete_episodes + merge_datasets appended them) and sit in their own data files 73-80, so row order names the answer without labels (PoC \u00a72.1 item 4 p.3). Owner ruling A (2026-10-02): code fixed (derive_version preserves parent order), v1 not re-derived; the injection feature derives the real corrupted versions with the fixed code. v1 stays valid for lineage evidence (data+lineage S6).",
+    "table_rewrite": {
+      "by": "scripts/fix_v1_leak_s0.py (evaluation-layer S0)",
+      "sha256_after": {
+        "catalog_copy": "f0cfdfc41d7c8cfa5871f57d76565d862089684822e3d2c86c59cf7c863f4e20",
+        "version_table": "f0cfdfc41d7c8cfa5871f57d76565d862089684822e3d2c86c59cf7c863f4e20"
+      },
+      "sha256_before": {
+        "catalog_copy": "3fcca3a4da9733155cb462e4329ff9191a8bad93ea24ae7e592284b20d7103bf",
+        "version_table": "3fcca3a4da9733155cb462e4329ff9191a8bad93ea24ae7e592284b20d7103bf"
+      },
+      "what": "dropped parent_content_hash (moved to parents.parquet); rows reordered to v0's row order"
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "AC0.3": {
+    "parent": "bafb211603dd3d0f226930a11b8d1423c52e96f673e4df7e3a688a81dd1b3da4",
+    "child": "8ffab321d699cb13e4de52927a604c467d6031034d31f6003b23aa38b57137bc",
+    "n_episodes": 20,
+    "episode_index_equal": 20,
+    "edited_parent_index": [
+      3,
+      11,
+      16
+    ],
+    "edited_child_index": [
+      3,
+      11,
+      16
+    ],
+    "check_blind": [],
+    "timing_s": {
+      "guards": 0.5,
+      "write": 11.2,
+      "hash_and_blind_check": 2.0,
+      "total": 14.2
+    },
+    "frames_written": 4210,
+    "file_ranges_child": {
+      "0": [
+        0,
+        14
+      ],
+      "1": [
+        15,
+        19
+      ]
+    },
+    "file_ranges_parent": {
+      "0": [
+        0,
+        14
+      ],
+      "1": [
+        15,
+        19
+      ]
+    },
+    "write_frames_per_s": 375.9,
+    "pass": true
+  },
+  "AC0.5": {
+    "negatives": {
+      "extra bookkeeping column parent_content_hash": [
+        "parent_content_hash"
+      ],
+      "episode_index of parent rows 0 and 5 swapped": [
+        "(meta/episodes does not match the episode table)",
+        "episode_index"
+      ],
+      "source_demo changed on one edited row": [
+        "source_demo"
+      ],
+      "rows shuffled, values unchanged": [
+        "(row order)"
+      ]
+    },
+    "all_rejected": true,
+    "assert_blind_v1": "version v1 (16076b9c5cb2) is not blind to its edits: fenced=True, offending=['episode_index'] (PoC \u00a72.1 item 4 p.3)",
+    "assert_blind_child": "passed"
+  }
+}

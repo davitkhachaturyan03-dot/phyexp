@@ -340,7 +340,7 @@ def derive_run(parent: str = "v0", name: str = "v1", per_task: int = 5, seed: in
         vdir = _root(lineage_root) / "versions" / vid
         r.params({"parent_version_id": pv["dataset_version_id"], "corruption_type": "action_gaussian_noise",
                   "per_task": per_task, "seed": seed, "n_edits": out["n_edits"], "std_scale": 0.25,
-                  "mechanism": "lerobot delete_episodes + writer + merge_datasets"})
+                  "mechanism": out["mechanism"]})
         r.tags({f"derive.timing.{k}": v for k, v in out["timing_s"].items()})
         r.produced("version", vid, f"version.{name}")
         r.output_file("labels", vdir / "labels.parquet", kind="labels")
