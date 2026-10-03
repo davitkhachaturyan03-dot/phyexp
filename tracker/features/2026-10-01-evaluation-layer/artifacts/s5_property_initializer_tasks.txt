@@ -1,0 +1,5 @@
+tasks whose BDDL :init adds a LIBERO property initializer (open/close/turnon/turnoff), i.e. whose scene drifts with the env object's reset count: 4/20
+   ('libero_10', 3, ['open white_cabinet_1_bottom_region'])
+   ('libero_10', 8, ['turnon flat_stove_1'])
+   ('libero_10', 9, ['open microwave_1'])
+   ('libero_spatial', 4, ['open wooden_cabinet_1_top_region'])

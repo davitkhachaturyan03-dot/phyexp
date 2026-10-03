@@ -1,0 +1,8 @@
+{
+ "steps_completed": 990,
+ "failed_at_step": 991,
+ "error": "ValueError: executing action in terminated episode",
+ "terminated": false,
+ "horizon": 1000,
+ "settle_steps": 10
+}

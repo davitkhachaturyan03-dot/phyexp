@@ -1,0 +1,55 @@
+{
+ "batch1": [
+  {
+   "rollout_id": "libero_spatial/3/init000/seed0",
+   "init_state_index": 0,
+   "seed": 0,
+   "t0_state_sha256": "e93ab838f64ebd5e5a7c9a65af845dcc98f9e659821f177dad6843001cf2eadc"
+  },
+  {
+   "rollout_id": "libero_spatial/3/init001/seed1",
+   "init_state_index": 1,
+   "seed": 1,
+   "t0_state_sha256": "87f102636a27081b1c424eb1938fbf43d3b57051b4efed575bb17acf1f27f0d6"
+  },
+  {
+   "rollout_id": "libero_spatial/3/init002/seed2",
+   "init_state_index": 2,
+   "seed": 2,
+   "t0_state_sha256": "99289c8ec86afde2a4e40b42c8517e031ba02191828f1ee18ddb872a5f15d97b"
+  },
+  {
+   "rollout_id": "libero_spatial/3/init003/seed3",
+   "init_state_index": 3,
+   "seed": 3,
+   "t0_state_sha256": "b80a5d1a0dad740e02b46c4d63a06c3a6e538d1746f62fd09177115342fd6fa4"
+  }
+ ],
+ "batch4": [
+  {
+   "rollout_id": "libero_spatial/3/init000/seed0",
+   "init_state_index": 0,
+   "seed": 0,
+   "t0_state_sha256": "e93ab838f64ebd5e5a7c9a65af845dcc98f9e659821f177dad6843001cf2eadc"
+  },
+  {
+   "rollout_id": "libero_spatial/3/init001/seed1",
+   "init_state_index": 1,
+   "seed": 1,
+   "t0_state_sha256": "87f102636a27081b1c424eb1938fbf43d3b57051b4efed575bb17acf1f27f0d6"
+  },
+  {
+   "rollout_id": "libero_spatial/3/init002/seed2",
+   "init_state_index": 2,
+   "seed": 2,
+   "t0_state_sha256": "99289c8ec86afde2a4e40b42c8517e031ba02191828f1ee18ddb872a5f15d97b"
+  },
+  {
+   "rollout_id": "libero_spatial/3/init003/seed3",
+   "init_state_index": 3,
+   "seed": 3,
+   "t0_state_sha256": "b80a5d1a0dad740e02b46c4d63a06c3a6e538d1746f62fd09177115342fd6fa4"
+  }
+ ],
+ "identical": true
+}

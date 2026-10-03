@@ -34,7 +34,8 @@ VOLATILE = {"wall_seconds", "eval_run_id"}
 def _compare(a: pd.DataFrame, b: pd.DataFrame) -> dict:
     cols = [c for c in a.columns if c not in VOLATILE]
     a, b = a.sort_values("rollout_id").reset_index(drop=True), b.sort_values("rollout_id").reset_index(drop=True)
-    diff = {c: int(sum(json.dumps(x, default=str) != json.dumps(y, default=str) for x, y in zip(a[c], b[c]))) for c in cols}
+    norm = lambda v: json.dumps(v.tolist() if hasattr(v, "tolist") else v, default=str)  # noqa: E731 (parquet lists -> numpy)
+    diff = {c: int(sum(norm(x) != norm(y) for x, y in zip(a[c], b[c]))) for c in cols}
     return {"rows": len(a), "columns_compared": len(cols), "differing": {c: n for c, n in diff.items() if n}}
 
 
@@ -110,15 +111,21 @@ def horizon() -> None:
     env = LiberoEnv(ts, 0, "libero_spatial", episode_length=1200, observation_width=128, observation_height=128)
     env.reset(seed=0)
     t0 = time.time()
+    term, err, last_ok = False, None, 0
     for k in range(1, 1201):
-        _, _, term, trunc, info = env.step(np.array(get_libero_dummy_action(), dtype=np.float32))
+        try:
+            _, _, term, trunc, info = env.step(np.array(get_libero_dummy_action(), dtype=np.float32))
+        except ValueError as e:  # LIBERO's step replaces robosuite's done by _check_success (bddl_base_domain.py:808-809)
+            err = f"{type(e).__name__}: {e}"
+            break
+        last_ok = k
         if term or trunc:
             break
-    print(f"horizon: unpatched LeRobot LiberoEnv(episode_length=1200) terminated after {k} policy steps "
-          f"(terminated={term}, is_success={info['is_success']}, robosuite done={info.get('done')}); "
-          f"inner horizon = {env._env.env.horizon}; {time.time() - t0:.1f}s")
-    json.dump({"terminated_after_steps": k, "is_success": bool(info["is_success"]), "robosuite_done": bool(info.get("done")),
-               "horizon": env._env.env.horizon}, open(ART / "s5_horizon_check.json", "w"), indent=1)
+    print(f"horizon: unpatched LeRobot LiberoEnv(episode_length=1200), noop: {last_ok} policy steps completed, then "
+          f"{'exception ' + repr(err) if err else 'terminated=' + str(term)} at step {k}; inner horizon = "
+          f"{env._env.env.horizon}, settle steps = {env.num_steps_wait}; {time.time() - t0:.1f}s")
+    json.dump({"steps_completed": last_ok, "failed_at_step": k if err else None, "error": err, "terminated": bool(term),
+               "horizon": env._env.env.horizon, "settle_steps": env.num_steps_wait}, open(ART / "s5_horizon_check.json", "w"), indent=1)
 
 
 def pairing() -> None:
