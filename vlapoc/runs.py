@@ -453,12 +453,14 @@ def train_run(subset_ref: str, name: str, seed: int = 0, steps: int = 5, batch_s
                 "n_episodes": len(episodes), "seconds": round(time.time() - t0, 1)}
 
 
-def load_checkpoint(pretrained: Path):
+def load_checkpoint(pretrained: Path, config_overrides: dict | None = None):
     """Load a LeRobot policy checkpoint without ``from_pretrained``.
 
     ``PreTrainedConfig.from_pretrained`` builds a draccus argparse parser and fails on Python 3.14
     (``TypeError: typing.Dict[str, ...PolicyFeature] | None is not callable``, measured).
-    ``draccus.load`` decodes without argparse; weights load with ``safetensors`` in strict mode.
+    ``draccus.load`` decodes without argparse; weights load with ``safetensors`` in strict mode, so every
+    parameter must come from the checkpoint. ``config_overrides`` sets config attributes before the policy is
+    built (e.g. SmolVLA ``load_vlm_weights=False``: the checkpoint carries the VLM weights itself).
     """
     import draccus
     from lerobot.configs.policies import PreTrainedConfig
@@ -467,6 +469,8 @@ def load_checkpoint(pretrained: Path):
 
     with open(Path(pretrained) / "config.json") as f:
         cfg = draccus.load(PreTrainedConfig, f)
+    for k, v in (config_overrides or {}).items():
+        setattr(cfg, k, v)
     policy = get_policy_class(cfg.type)(cfg)
     load_model(policy, str(Path(pretrained) / "model.safetensors"), strict=True)
     return policy

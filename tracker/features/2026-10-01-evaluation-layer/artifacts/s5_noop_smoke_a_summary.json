@@ -1,0 +1,8 @@
+{
+ "run_id": "02bbe9eb1ab64dc2ae03175276101f87",
+ "rollouts": "data/eval/eval-noop-smoke-a/rollouts.parquet",
+ "n_rollouts": 6,
+ "n_success": 0,
+ "trajectories": null,
+ "out_dir": "data/eval/eval-noop-smoke-a"
+}

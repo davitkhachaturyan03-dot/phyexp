@@ -57,6 +57,7 @@ import pandas as pd
 
 from vlapoc.libero_convert import REPO_ROOT
 
+SMOLVLM_DIR = REPO_ROOT / "data" / "hf_models" / "SmolVLM2-500M-Instruct"  # config + tokenizer @ 7b375e1b, no weights
 TAU_EPISODE_STEPS = 1200  # 60 s at 20 Hz (plan: τ_episode = 60 s, owner default 2026-10-02)
 FPS = 20
 LIBERO_DUMMY_ACTION = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0]  # lerobot.envs.libero.get_libero_dummy_action
@@ -203,12 +204,19 @@ def checkpoint_policy(pretrained: Path, device: str = "cpu", train_run_id: str =
     from vlapoc.runs import load_checkpoint
 
     pretrained = Path(pretrained)
-    policy = load_checkpoint(pretrained)
+    cfg_type = json.loads((pretrained / "config.json").read_text())["type"]
+    cfg_over, pre_over = {}, {"device_processor": {"device": device}}
+    if cfg_type == "smolvla":
+        # The checkpoint holds every weight (strict load); only the VLM's config and the tokenizer are needed
+        # from HuggingFaceTB/SmolVLM2-500M-Instruct, pinned and repo-local (SMOLVLM_DIR), so nothing is
+        # downloaded at load time (smolvlm_with_expert.py:90-101).
+        cfg_over = {"load_vlm_weights": False, "vlm_model_name": str(SMOLVLM_DIR)}
+        pre_over["tokenizer_processor"] = {"tokenizer_name": str(SMOLVLM_DIR)}
+    policy = load_checkpoint(pretrained, cfg_over)
     policy.config.device = device
     policy.to(device)
     policy.eval()
-    pre, post = make_pre_post_processors(policy.config, pretrained_path=str(pretrained),
-                                         preprocessor_overrides={"device_processor": {"device": device}})
+    pre, post = make_pre_post_processors(policy.config, pretrained_path=str(pretrained), preprocessor_overrides=pre_over)
     return PolicySpec(policy, pre, post, policy.config.type, sha256_file(pretrained / "model.safetensors"),
                       train_run_id, external, device, {"pretrained": str(pretrained)})
 

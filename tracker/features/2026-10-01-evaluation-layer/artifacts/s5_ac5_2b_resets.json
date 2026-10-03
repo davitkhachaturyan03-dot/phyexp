@@ -1,0 +1,67 @@
+{
+ "env_resets": {
+  "seed 0 x3": [
+   {
+    "state": "54f7df61644e3dbc",
+    "body_pos": "1240ac26e199cb45",
+    "xpos": "2ca3f1814755faba"
+   },
+   {
+    "state": "54f7df61644e3dbc",
+    "body_pos": "d68c1c917901056f",
+    "xpos": "6f0881420f359e5f"
+   },
+   {
+    "state": "54f7df61644e3dbc",
+    "body_pos": "06eedc6577deedaa",
+    "xpos": "10ce91131249188b"
+   }
+  ],
+  "seed 1 x2": [
+   {
+    "state": "54f7df61644e3dbc",
+    "body_pos": "a1dbbe6375413c61",
+    "xpos": "749fe3ece60f7f67"
+   },
+   {
+    "state": "54f7df61644e3dbc",
+    "body_pos": "946b13557f52e49f",
+    "xpos": "d3f0cdf932d6fd8b"
+   }
+  ],
+  "unseeded x3": [
+   {
+    "state": "54f7df61644e3dbc",
+    "body_pos": "4e3dd495ccd4d78a",
+    "xpos": "f452d6ef98b9c3f1"
+   },
+   {
+    "state": "54f7df61644e3dbc",
+    "body_pos": "8ed26cd244338246",
+    "xpos": "eeccd1b639937f52"
+   },
+   {
+    "state": "54f7df61644e3dbc",
+    "body_pos": "1fb7d775c42100fd",
+    "xpos": "f48e12840152846d"
+   }
+  ]
+ },
+ "s3_case_replay": {
+  "seed 0 x3": [
+   -1,
+   420,
+   418
+  ],
+  "seed 1 x3": [
+   -1,
+   -1,
+   418
+  ],
+  "unseeded x3": [
+   -1,
+   -1,
+   420
+  ]
+ }
+}

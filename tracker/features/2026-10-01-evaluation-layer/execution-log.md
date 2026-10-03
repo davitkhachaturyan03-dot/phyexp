@@ -678,3 +678,80 @@ Re-read: PoC §3.5 A p. 7, §3.4 p. 7, §3.2 p. 6 (PDF dump); PhAIL §3.1 p. 4; 
     (S1 AC1.5) holds for positively correlated operations, not in general.
 - **Threshold 0 vs PhAIL's 0.3 s** (declared in the docstring). With exact sim timestamps, simultaneous
   completion gives T = 0 under both conventions.
+
+### S5: Rollout harness, rollout record and the eval stage (IN PROGRESS, partial entry)
+
+Read: LeRobot `lerobot_eval.rollout()` (`lerobot/scripts/lerobot_eval.py:167-410`), `LiberoEnv`
+(`lerobot/envs/libero.py`), `LiberoProcessorStep` (`processor/env_processor.py`), the env processors
+(`envs/configs.py:446-450`), `make_pre_post_processors`; robosuite `environments/base.py`; LIBERO
+`bddl_base_domain.seed`; SmolVLA `smolvlm_with_expert.py`.
+
+**Premises checked (all measured or quoted, before building):**
+- **LeRobot's `LiberoEnv` cannot run a 1200-step (60 s) episode as shipped.** The chain:
+  - robosuite: `self.done = (self.timestep >= self.horizon) and not self.ignore_done` (`base.py:429`).
+  - LIBERO's `ControlEnv` defaults to `horizon=1000`, and LeRobot's `OffScreenRenderEnv(...)` call doesn't
+    pass one.
+  - `LiberoEnv.step`: `terminated = done or is_success`.
+  - With the 10 settle steps, a policy gets at most 990 steps.
+  - The harness raises the inner horizon to τ + settle + 1. Measured: the AC5.1 no-op rollouts ran exactly
+    1200 steps. The unpatched check is `--horizon` (below).
+- **LeRobot's init-state assignment depends on batching:** `init_state_id = episode_index`, then
+  `+= n_envs` per reset (`self._reset_stride = n_envs`). The harness fixes it per env (`_reset_stride = 0`).
+- **Seeding** (mechanism of the S3 finding):
+  - LIBERO `seed(seed)` is `np.random.seed(seed)` (`bddl_base_domain.py:164-165`).
+  - robosuite's placement sampler draws from global `np.random` (`placement_samplers.py:167,183,196`).
+  - `LiberoEnv.reset(seed)` seeds and then hard-resets.
+  - So an unseeded reset samples the scene afresh. S3's replay called `reset()` unseeded.
+- **Image orientation:** our dataset is stored rotated 180° (data+lineage AC1.4, measured there), the
+  same flip `LiberoProcessorStep` applies, so LeRobot's processors match our training layout. The state
+  layout is 8-d `eef_pos(3) + axis-angle(3) + gripper_qpos(2)`, as in our data.
+- **SmolVLA loading:**
+  - `load_vlm_weights=True` makes it fetch the full SmolVLM2 weights (`smolvlm_with_expert.py:90-92`).
+  - `AutoProcessor.from_pretrained(model_id)` runs either way (l. 101).
+  - The checkpoint's `model.safetensors` holds every weight (strict load), so the harness sets
+    `load_vlm_weights=False` and points the VLM config and tokenizer at a pinned, repo-local copy of only
+    SmolVLM2's non-weight files.
+
+**Downloads (approved):**
+- `HuggingFaceVLA/smolvla_libero` @ `6721902bc4d61e50a3bfdb11dfb4cb626f05d102` (Apache-2.0, last modified
+  2025-09-17). 8 files, 1,218,055,540 bytes, in `data/hf_models/smolvla_libero` (`du` 1.1G).
+  - Its `config.json`: inputs 2 × 256² + state 8, `chunk_size 50`, `n_action_steps 1`, `num_steps 10`,
+    `"normalization_mapping": {"VISUAL": "IDENTITY", "STATE": "MEAN_STD", "ACTION": "MEAN_STD"}`,
+    `"vlm_model_name": "HuggingFaceTB/SmolVLM2-500M-Instruct"`, `"load_vlm_weights": true`.
+- A loading dependency: `HuggingFaceTB/SmolVLM2-500M-Instruct` @ `7b375e1b73b11138ff12fe22c8f2822d8fe03467`
+  (Apache-2.0). **Only its 11 non-weight files** (config, tokenizer, processor): 4,866,925 bytes, in
+  `data/hf_models/SmolVLM2-500M-Instruct`. The 2,029,990,624 bytes of weights are not downloaded.
+  - This is a small dependency of the approved checkpoint, recorded here. Flag for the owner, if the
+    approval was meant to exclude it.
+- Nothing is written to `~/.cache/huggingface` for these: both use `snapshot_download(local_dir=...)`.
+
+**Files:**
+- `vlapoc/rollouts.py` (new):
+  - `ProbedLiberoEnv`: fixed init state, horizon, per-step goal probe, t0 sim-state sha.
+  - `run_rollouts`: LeRobot `rollout()` unchanged, in a `SyncVectorEnv` with NEXT_STEP autoreset; first-
+    episode traces are kept across autoresets; operations via `operations_from_trace`; LeRobot's success
+    is cross-checked against the probe.
+  - `noop_policy`, `checkpoint_policy` (LeRobot's saved processors), `_Capture` + `write_trajectories`
+    (lossless LeRobot v3 dataset, training schema).
+  - `RECORD_COLUMNS` (32 columns), `validate_record`, `plan_rollouts`.
+- `vlapoc/runs.py`: `eval_run` replaces `eval_standin` (single record system); `load_checkpoint` gains
+  `config_overrides`.
+- `scripts/eval_smoke.py` (CLI); `scripts/verify_rollouts_s5.py` (checks).
+- `scripts/lineage_dry_run.py` and `scripts/verify_runs_s5.py` now call `eval_run` at smoke scale. The
+  dry run is exercised in S9; `verify_runs_s5.py` has not been re-run (see notes).
+- `vlapoc/libero_goals.py`: `setup_libero` now refuses if `libero` was already imported with another
+  config path.
+
+**Side effect caught and undone (measured):** the first debug run imported `libero.libero` before
+`setup_libero()` (inside `run_rollouts`). LIBERO's import created an empty `~/.libero` and prompted on
+stdin (EOFError). The empty directory was removed (`rmdir ~/.libero`; `ls` → No such file). Two fixes:
+`run_rollouts` calls `setup_libero()` first, and `setup_libero` now raises if `libero.libero` was imported
+earlier with another config path.
+
+**Acceptance criteria so far:**
+- ✅ AC5.1: `eval_smoke.py --policy noop --tasks libero_spatial:0,libero_10:8 --n 3 --batch-size 3
+  --track --name eval-noop-smoke-a` → MLflow eval run `02bbe9eb1ab64dc2ae03175276101f87`.
+  - All 6 rollouts: `censored at 1200 (0/1 ops)` for spatial and `(0/2 ops)` for libero_10 task 8.
+  - The record validates against the schema (`schema errors: [] | columns 32 == schema True`); pairs
+    `[[60.0, 0]]`; max arm action norm 0.0 (`artifacts/s5_ac5_1_stdout.txt`, `s5_noop_smoke_a_summary.json`).
+  - Throughput: about 23 s per 1200-step rollout in batches of 3 (≈ 51 env-steps/s at 128², noop, CPU).

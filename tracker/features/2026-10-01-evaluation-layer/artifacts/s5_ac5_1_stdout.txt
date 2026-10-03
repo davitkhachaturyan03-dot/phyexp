@@ -1,0 +1,9 @@
+schema errors: [] | columns 32 == schema True
+                    rollout_id  event  censored  sim_steps  n_ops  n_ops_done       pairs  T_steps
+libero_spatial/0/init000/seed0      0      True       1200      1           0 [[60.0, 0]]      NaN
+libero_spatial/0/init001/seed1      0      True       1200      1           0 [[60.0, 0]]      NaN
+libero_spatial/0/init002/seed2      0      True       1200      1           0 [[60.0, 0]]      NaN
+     libero_10/8/init000/seed0      0      True       1200      2           0 [[60.0, 0]]      NaN
+     libero_10/8/init001/seed1      0      True       1200      2           0 [[60.0, 0]]      NaN
+     libero_10/8/init002/seed2      0      True       1200      2           0 [[60.0, 0]]      NaN
+max arm action norm 0.0
