@@ -61,7 +61,7 @@ def main() -> int:
             spec = ro.checkpoint_policy(REPO_ROOT / local, device=a.device, external=ext)
         else:
             raise SystemExit("untracked mode supports noop and hf: policies; use --track for train:<run_id>")
-        out_dir = a.out or REPO_ROOT / "data" / "eval" / a.name
+        out_dir = (REPO_ROOT / a.out).resolve() if a.out else REPO_ROOT / "data" / "eval" / a.name
         out_dir.mkdir(parents=True, exist_ok=True)
         df, traj = ro.run_rollouts(spec, ro.plan_rollouts(tasks, a.n, a.seed_base, a.init_offset), a.tau, a.render,
                                    a.batch_size, record_trajectories=a.record_trajectories, traj_root=out_dir / "trajectories")

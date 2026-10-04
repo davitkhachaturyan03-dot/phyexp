@@ -36,6 +36,15 @@ What is LeRobot's and what is added (plan: reuse the eval loop, add only the pro
   (``bddl_base_domain.py:164-165``), and robosuite's placement sampler draws from the global ``np.random``
   (``placement_samplers.py:167,183,196``). Rollout j gets seed ``seed_base + j``. An *unseeded* reset
   samples a different scene each time (S3 finding).
+- **One env object per rollout, by design (measured, S5 AC5.2 (b)).** LIBERO's ``_load_model`` runs on every
+  hard reset and *appends* an OpenClose/TurnOnOff sampler to ``object_property_initializers``
+  (``bddl_base_domain.py:653,674``); ``_reset_internal`` draws from every one of them (l. 743) before the
+  placement sampler. So in the 4/20 tasks whose BDDL ``:init`` has open/close/turnon/turnoff, the k-th reset of
+  one env object places a fixture differently from the first, even with the same seed (libero_10 task 8:
+  ``flat_stove_1_main`` moves up to 7.2 mm per reset; ``set_init_state`` cannot undo it, because a fixture's
+  position is in the model, not in the flattened state). The first seeded reset of a fresh env is reproducible.
+  ``run_rollouts`` builds a fresh env per rollout and keeps only its first episode (``first_trace``); never
+  reuse an env object across rollouts. ``t0_state_sha256`` does not cover fixture placement.
 
 T convention: index 0 of a trace is the post-settle state, so ``T_steps`` = number of policy actions until
 LIBERO's goal check first holds, ``T_s = T_steps / 20``. A rollout that has not succeeded after
@@ -379,6 +388,8 @@ def run_rollouts(spec: PolicySpec, rollouts: list[RolloutSpec], tau_episode_step
                 rows.append(row)
                 log(f"[rollouts] {rid}: {'success at step ' + str(t_s) if t_s is not None else 'censored at ' + str(n_steps)}"
                     f" ({o['n_ops_done']}/{o['n_ops']} ops), {wall / len(batch):.1f}s")
+            if cap is not None:
+                cap.frames.clear()  # the batch's frames are copied into traj_eps above; free them before the next batch
             venv.close()
     df = pd.DataFrame(rows)
     for c in ("T_steps", "T_s", "traj_episode_index"):

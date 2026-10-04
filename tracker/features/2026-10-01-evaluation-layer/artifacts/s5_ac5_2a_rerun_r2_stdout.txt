@@ -1,0 +1,8 @@
+[rollouts] libero_10/8/init000/seed0: censored at 1200 (0/2 ops), 22.8s
+[rollouts] libero_10/8/init001/seed1: censored at 1200 (0/2 ops), 22.8s
+[rollouts] libero_10/8/init002/seed2: censored at 1200 (0/2 ops), 22.8s
+[rollouts] libero_spatial/0/init000/seed0: censored at 1200 (0/1 ops), 23.9s
+[rollouts] libero_spatial/0/init001/seed1: censored at 1200 (0/1 ops), 23.9s
+[rollouts] libero_spatial/0/init002/seed2: censored at 1200 (0/1 ops), 23.9s
+AC5.2 (a) re-run of eval-noop-smoke-a in a new process: 6 rollouts, 30 columns compared (all but ['eval_run_id', 'wall_seconds']); differing columns: none
+exit 0

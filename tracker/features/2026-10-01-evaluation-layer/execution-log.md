@@ -792,3 +792,79 @@ that looked contradictory. I traced each one from the files on disk (birth/modif
     one per invocation. MLflow start/end times are 1791012278012/1791012379092 and 1791012383802/1791012484064.
 - **AC5.3 trace recheck (measured).** `python -m vlapoc.lineage trace 3392bb4d…` (exit 0) is byte-equal to the
   uncommitted `s5_ac5_3_trace.json` (`recheck == s5_ac5_3_trace.json: True`), so that artifact is valid.
+
+#### S5 continuation: AC5.2, AC5.3 and AC5.6
+
+**New file:** `scripts/verify_resets_s5.py` (determinism across resets, separated by mechanism; the AC5.6 pairing
+re-checked on a property-initializer task). **Changed:** the `vlapoc/rollouts.py` module docstring now states the
+one-env-per-rollout constraint and why (below). `scripts/eval_smoke.py`: a relative `--out` path no longer crashes
+the summary print. The rollouts parquet was already written before the crash.
+
+**Premise checked: why the scene can differ across resets with the same seed.**
+- Read in LIBERO's source: `_load_model` runs on every hard reset and calls `_setup_placement_initializer`. That
+  *appends* an `OpenCloseSampler`/`TurnOnOffSampler` to `self.object_property_initializers`
+  (`bddl_base_domain.py:653,674`), and the list is never cleared. `_reset_internal` draws from every sampler in
+  the list from the global `np.random` (l. 743), before the placement sampler.
+- So in tasks whose BDDL `:init` has open/close/turnon/turnoff, the number of random draws taken before placement
+  grows with the reset count. That holds for 4/20 tasks (`artifacts/s5_property_initializer_tasks.txt`): libero_10
+  tasks 3, 8, 9 and libero_spatial task 4.
+- Inferred: this growth is unintended behaviour in LIBERO, not a designed feature. Not checked upstream.
+
+**Acceptance criteria:**
+- ✅ AC5.2 (a) **noop, re-run in a new process:** `verify_rollouts_s5.py --rerun data/eval/eval-noop-smoke-a` →
+  `6 rollouts, 30 columns compared (all but ['eval_run_id', 'wall_seconds']); differing columns: none`, `exit 0`.
+  - Measured twice: the previous executor's second re-run (11:25, `s5_verify_a.txt`), and mine (log
+    `s5_verify_a_r2.txt`, `artifacts/s5_ac5_2a_rerun_r2_stdout.txt`; it rewrote `s5_ac5_2a_rerun.json` with
+    identical content).
+  - Every column is compared in full, including the 1200-long `arm_action_norm` list and the per-step
+    `obj_pos`/conjunct traces.
+- ✅ AC5.2 (a) **ACT `train-full-s0` on CPU:** eval runs `3392bb4d` vs `613a53db`, two processes →
+  `{'rows': 4, 'columns_compared': 30, 'differing': {}}`. The independent exact check differs only in
+  `eval_run_id` and `wall_seconds` (`artifacts/s5_ac5_2_slip_recheck.txt`). Arm action norm range is
+  0.210029–0.282199, so the actions are real.
+  - MPS determinism for ACT was not tested. The plan asks for CPU, and it holds there. MPS determinism for SmolVLA:
+    see AC5.4.
+- ✅ AC5.2 (b) **across resets: deterministic for the harness's pattern, not for env reuse (measured,
+  `verify_resets_s5.py` → `artifacts/s5_ac5_2b_resets_r2.json`, `s5_ac5_2b_resets_r2_stdout.txt`).**
+  - libero_spatial task 0 (no property initializer), one env with `reset(seed=0)` × 3, and 3 fresh envs: all the
+    same, state `e7263aae8a32` and body_pos `9f2fca44bea7`. Property initializers `[0, 0, 0]`, `n_moved: 0`.
+  - libero_10 task 8, **one env, `reset(seed=0)` × 3**:
+    - the flattened state is identical (`54f7df61644e` × 3);
+    - but the model's body_pos is `['1240ac26e199', 'd68c1c917901', '06eedc6577de']`;
+    - property initializers `[3, 4, 5]`;
+    - reset 2 vs 1: `n_moved: 1, max_abs_m: 0.0072, moved_top: [('flat_stove_1_main', 0.0072)]`.
+    - So the stove (and its cook region, the goal's target) moves by 7.2 mm between resets of one env.
+  - libero_10 task 8, **3 fresh envs, first `reset(seed=0)` each** (what `run_rollouts` does): body_pos
+    `['1240ac26e199'] × 3`, property initializers `[3, 3, 3]`, `n_moved: 0`.
+  - **This explains the batch-1 S3 finding:** the BDDL replay env was one object, reset repeatedly. In round 1's
+    `--resets` (`s5_ac5_2b_resets.json`), demo_19's first success under seed 0 × 3 on one env was `[-1, 420, 418]`.
+  - **Consequence for the harness:** every recorded rollout comes from the first seeded reset of a fresh env.
+    `run_rollouts` builds one env per rollout, and `first_trace` discards the NEXT_STEP autoreset episodes. So
+    records are a function of (task, init state, seed), which the AC5.2 (a) re-runs confirm.
+  - Reusing an env object across rollouts would break this for 4/20 tasks. The constraint and its reason are now
+    in the `rollouts.py` docstring.
+  - `t0_state_sha256` cannot detect this drift, because a fixture's position is in the model, not the state. That
+    is a limit of the record's t0 identity (see Findings).
+- ✅ AC5.3 **lineage:** eval run `3392bb4d` (`eval-act-train-full-s0-a`), git `44004220`.
+  - Its input is `checkpoint:6f49bdae15db…`, produced by train run `ff64512b` (`train-full-s0`), and its param
+    `checkpoint_sha256` matches. `stand_in` is false on every run in the trace, and `eval.attribution_grade=true`.
+  - `python -m vlapoc.lineage trace 3392bb4d…` (exit 0) visits runs `eval → train-full-s0 → derive-v1 → build-v0,
+    split-v0`, with 20 raw files.
+  - Edges: the checkpoint ← `ff64512b`. `ff64512b` consumes subset `69684e60…` (**v1/candidate**, 960 episodes),
+    which comes from `30f34cd0` (derive-v1). derive-v1 consumes version `3c4dca68…` (**v0**) ← `bc8f7d09`
+    (build-v0), which ends at the 20 raw HDF5 files with sha256.
+  - The trace is byte-equal to `artifacts/s5_ac5_3_trace.json`. The 5-step smoke checkpoint was trained on v1's
+    candidate subset, so the chain reaches v0's raw files through derive-v1's parent edge.
+- ✅ AC5.6 **init-state pairing:**
+  - Round 1, valid (log `s5_verify_c.txt`, a real run): libero_spatial task 3 × 4 rollouts, batch 1 vs 4 →
+    identical `(init_state_index, seed, t0_state_sha256)`: `True` (`artifacts/s5_ac5_6_pairing.json`).
+  - That task has no property initializer, and t0_state does not cover fixtures. So I repeated the check on
+    libero_10 task 8 (init/seed 0–3) through the harness's `SyncVectorEnv`, comparing the model too.
+  - Batch 1 body_pos `['1240ac26e199', '7f7e8f06cae8', 'a6e239b125c4', '1db238954bf8']` equals batch 4. `(state,
+    body_pos, site_pos) identical: True`.
+  - Different seeds place the stove differently, as LIBERO's sampler intends; the same (init, seed) gives the same
+    scene regardless of batching.
+- **Horizon premise (measured, round 1, `s5_verify_c.txt`):** unpatched LeRobot `LiberoEnv(episode_length=1200)`
+  with noop actions completes `990 policy steps`, then raises `ValueError: executing action in terminated episode`
+  at step 991 (inner horizon 1000, 10 settle steps; `artifacts/s5_horizon_check.json`). `ProbedLiberoEnv` raises
+  the horizon, and AC5.1's rollouts ran 1200 steps.

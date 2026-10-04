@@ -1,0 +1,188 @@
+{
+ "libero_spatial:0": {
+  "same_env_resets_seed0": [
+   {
+    "state": "e7263aae8a32",
+    "body_pos": "9f2fca44bea7",
+    "site_pos": "9c1222b009c9",
+    "n_property_initializers": 0
+   },
+   {
+    "state": "e7263aae8a32",
+    "body_pos": "9f2fca44bea7",
+    "site_pos": "9c1222b009c9",
+    "n_property_initializers": 0
+   },
+   {
+    "state": "e7263aae8a32",
+    "body_pos": "9f2fca44bea7",
+    "site_pos": "9c1222b009c9",
+    "n_property_initializers": 0
+   }
+  ],
+  "same_env_reset2_vs_reset1": {
+   "same_body_names": true,
+   "n_bodies": 38,
+   "n_moved": 0,
+   "max_abs_m": 0.0,
+   "moved_top": []
+  },
+  "fresh_envs_seed0": [
+   {
+    "state": "e7263aae8a32",
+    "body_pos": "9f2fca44bea7",
+    "site_pos": "9c1222b009c9",
+    "n_property_initializers": 0
+   },
+   {
+    "state": "e7263aae8a32",
+    "body_pos": "9f2fca44bea7",
+    "site_pos": "9c1222b009c9",
+    "n_property_initializers": 0
+   },
+   {
+    "state": "e7263aae8a32",
+    "body_pos": "9f2fca44bea7",
+    "site_pos": "9c1222b009c9",
+    "n_property_initializers": 0
+   }
+  ],
+  "fresh_env2_vs_env1": {
+   "same_body_names": true,
+   "n_bodies": 38,
+   "n_moved": 0,
+   "max_abs_m": 0.0,
+   "moved_top": []
+  },
+  "fresh_env1_vs_same_env_reset1": {
+   "same_body_names": true,
+   "n_bodies": 38,
+   "n_moved": 0,
+   "max_abs_m": 0.0,
+   "moved_top": []
+  }
+ },
+ "libero_10:8": {
+  "same_env_resets_seed0": [
+   {
+    "state": "54f7df61644e",
+    "body_pos": "1240ac26e199",
+    "site_pos": "7edbbcfb0c3f",
+    "n_property_initializers": 3
+   },
+   {
+    "state": "54f7df61644e",
+    "body_pos": "d68c1c917901",
+    "site_pos": "7edbbcfb0c3f",
+    "n_property_initializers": 4
+   },
+   {
+    "state": "54f7df61644e",
+    "body_pos": "06eedc6577de",
+    "site_pos": "7edbbcfb0c3f",
+    "n_property_initializers": 5
+   }
+  ],
+  "same_env_reset2_vs_reset1": {
+   "same_body_names": true,
+   "n_bodies": 30,
+   "n_moved": 1,
+   "max_abs_m": 0.0072,
+   "moved_top": [
+    [
+     "flat_stove_1_main",
+     0.0072
+    ]
+   ]
+  },
+  "fresh_envs_seed0": [
+   {
+    "state": "54f7df61644e",
+    "body_pos": "1240ac26e199",
+    "site_pos": "7edbbcfb0c3f",
+    "n_property_initializers": 3
+   },
+   {
+    "state": "54f7df61644e",
+    "body_pos": "1240ac26e199",
+    "site_pos": "7edbbcfb0c3f",
+    "n_property_initializers": 3
+   },
+   {
+    "state": "54f7df61644e",
+    "body_pos": "1240ac26e199",
+    "site_pos": "7edbbcfb0c3f",
+    "n_property_initializers": 3
+   }
+  ],
+  "fresh_env2_vs_env1": {
+   "same_body_names": true,
+   "n_bodies": 30,
+   "n_moved": 0,
+   "max_abs_m": 0.0,
+   "moved_top": []
+  },
+  "fresh_env1_vs_same_env_reset1": {
+   "same_body_names": true,
+   "n_bodies": 30,
+   "n_moved": 0,
+   "max_abs_m": 0.0,
+   "moved_top": []
+  }
+ },
+ "pairing_libero_10_8_batch1_vs_batch4": {
+  "batch1": [
+   {
+    "state": "54f7df61644e",
+    "body_pos": "1240ac26e199",
+    "site_pos": "7edbbcfb0c3f",
+    "n_property_initializers": 3
+   },
+   {
+    "state": "cadf8e1096c9",
+    "body_pos": "7f7e8f06cae8",
+    "site_pos": "7edbbcfb0c3f",
+    "n_property_initializers": 3
+   },
+   {
+    "state": "4f7c8ae5588f",
+    "body_pos": "a6e239b125c4",
+    "site_pos": "7edbbcfb0c3f",
+    "n_property_initializers": 3
+   },
+   {
+    "state": "2a462b586a46",
+    "body_pos": "1db238954bf8",
+    "site_pos": "7edbbcfb0c3f",
+    "n_property_initializers": 3
+   }
+  ],
+  "batch4": [
+   {
+    "state": "54f7df61644e",
+    "body_pos": "1240ac26e199",
+    "site_pos": "7edbbcfb0c3f",
+    "n_property_initializers": 3
+   },
+   {
+    "state": "cadf8e1096c9",
+    "body_pos": "7f7e8f06cae8",
+    "site_pos": "7edbbcfb0c3f",
+    "n_property_initializers": 3
+   },
+   {
+    "state": "4f7c8ae5588f",
+    "body_pos": "a6e239b125c4",
+    "site_pos": "7edbbcfb0c3f",
+    "n_property_initializers": 3
+   },
+   {
+    "state": "2a462b586a46",
+    "body_pos": "1db238954bf8",
+    "site_pos": "7edbbcfb0c3f",
+    "n_property_initializers": 3
+   }
+  ],
+  "identical": true
+ }
+}
