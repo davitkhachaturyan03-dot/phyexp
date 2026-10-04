@@ -868,3 +868,88 @@ the summary print. The rollouts parquet was already written before the crash.
   with noop actions completes `990 policy steps`, then raises `ValueError: executing action in terminated episode`
   at step 991 (inner horizon 1000, 10 settle steps; `artifacts/s5_horizon_check.json`). `ProbedLiberoEnv` raises
   the horizon, and AC5.1's rollouts ran 1200 steps.
+
+### S6: One return per metric per rollout (and per operation): the attribution-ready output (IN PROGRESS: AC6.1 real and AC6.5 wait for the AC5.4 SmolVLA rollouts)
+
+Re-read: PoC §4.1 p. 9 (the four yardsticks), §4.2 p. 9, §4.3 p. 10 ("Success within 30 s → binary return; RMST
+→ negative capped time; AUC → win indicator against a sampled human time. HRT is a ratio, so it needs a
+first-order (linearized) approximation"), §4.4 p. 10, §3.2 p. 6 (primitives table), §3.4 p. 7; PhAIL Table 1
+p. 5 (the six scalars as functionals of F), PhAIL `build/explore_pp_plot.py::_auc_censored`.
+
+**Provenance.** The stalled executor wrote `vlapoc/returns.py`, `scripts/verify_returns_s6.py` and four `s6_*`
+artifacts but never logged them. I committed them unchanged as `5f141b1` ("unverified WIP"), so my changes show as a
+diff against that commit. Its synthetic run reproduces byte-for-byte: my re-run's stdout equals the WIP
+`s6_synthetic_stdout.txt` (`diff` → no difference).
+
+**Files (changes in this session, on top of `5f141b1`):**
+- `vlapoc/returns.py`:
+  - Renamed `ret_hrt_lin` → `ret_hrt60_lin`, `ret_censored` → `ret_censored60` and `ret_rmst_op` → `ret_rmst60_op`,
+    so every return column whose functional has a τ carries it (AC6.6). This diverges from the plan's proposed
+    names; the AC wording wins.
+  - Registry gains the two §3.2 primitives it lacked: **time-to-success T** and **Kaplan–Meier CDF F(t)**.
+    "censored tail" becomes "right-censoring / censored tail".
+  - UPH now states Table 1's literal functional, `3600 / E[T | T < τ_episode]` (∝ 1/RMST).
+  - The registry has 21 entries.
+- `vlapoc/evaluation.py`: one docstring reference follows the rename.
+- `scripts/verify_returns_s6.py`:
+  - The AC6.4 required list is now the PoC's own list: §3.2's ten primitives, Table 1's six scalars, and §4.1's
+    four yardsticks plus the ghost-event rate.
+  - The AC6.6 check parses each registry entry's τ and requires it in the column name. Under this check the old
+    names `ret_hrt_lin` and `ret_censored` would fail.
+  - `--join` now starts from a `returns.parquet`, as AC6.3 says, instead of from a train run id. It also checks
+    that the returns' `checkpoint_sha256` equals the train run's recorded weights sha.
+  - `AC6.2.pass` is stored as a JSON bool.
+
+**Premises checked:**
+- The returns' cell functionals equal S1's. Checked against `vlapoc/evaluation.py`, which defines
+  `hrt_cells = rmst(human)/rmst(model)`, macro = the equal-weight mean, `rmst` = ∫₀^τ (1−F), and `auc_censored`
+  as PhAIL's verified-pairs rule. **Holds** for the identities AC6.1 asks for.
+- **Ties diverge.** PhAIL's `_auc_censored` drops tied pairs from the denominator. `auc_expected` counts a tie as
+  ½. They agree when there are no ties, so the synthetic data is jittered off the 0.05 s grid.
+  - On real rollouts, model and human T share the 20 Hz grid, so ties can occur. There, mean(`ret_auc_expected`)
+    is the Mann–Whitney (ties-½) AUC, not PhAIL's ties-dropped AUC.
+  - The difference is recorded, not hidden. AC6.1 only requires the AUC identity on uncensored synthetic data.
+
+**Acceptance criteria:**
+- ✅ AC6.1 (synthetic part) `verify_returns_s6.py --synthetic` (LABELLED SYNTHETIC; `artifacts/s6_synthetic_stdout.txt`,
+  `s6_verify_returns.json`):
+  - 10% censoring, at τ_episode only: `max |mean(ret_rmst60) + RMST60_KM| = 1.07e-14`, `max |mean(ret_f30) - F30_KM| = 1.11e-16`.
+  - No censoring: `7.11e-15`, `1.11e-16`, and `max |mean(ret_auc_expected) - AUC_censored| = 2.78e-17`.
+  - All are ≤ 1e-9. The sampled AUC indicator differs from its expectation by sampling noise only, e.g. `syn/0`:
+    0.167 vs 0.1453 over 60 rollouts.
+- ⏳ AC6.1 (real part): on the AC5.4 SmolVLA rollouts, pending (see S5 AC5.4).
+- ✅ AC6.2 HRT linearization (LABELLED SYNTHETIC; `artifacts/s6_hrt_linearization_curve.csv`):
+  - HRT = 0.3796, and `sum_cells mean(ret_hrt60_lin) = -0.3796` (= −HRT at the expansion point).
+  - Worst relative error over the 12 perturbations with |ΔHRT|/HRT ≤ 5% is **9.51%** (criterion ≤ 10%): it passes,
+    narrowly.
+  - The curve shows relative error ≈ the per-cell relative change in T (δ = ±0.01 → 0.93–0.95%, ±0.03 → 2.8%,
+    ±0.06 → 5.6–5.7%, ±0.10 → 9.3–9.5%). That is the first-order behaviour of 1/RMST.
+  - The worst in-scope case is a 10% slowdown of one cell out of three. It moves macro HRT by only 3.55%, so the
+    "|ΔHRT|/HRT ≤ 5%" scope admits it.
+  - Inferred: the error bound that matters for attribution is the per-cell perturbation size, not the macro change.
+- ✅ AC6.3 join contract: `python -m vlapoc.returns --eval-run 3392bb4d…` (the ACT smoke eval; exit 0) wrote
+  `data/eval/returns-3392bb4d5491/returns.parquet` (4 rows) and `operation_returns.parquet` (4 rows). Its
+  `hrt_macro_at_policy` is 0.1518 (`artifacts/s6_returns_act_example.txt`). Then
+  `verify_returns_s6.py --join data/eval/returns-3392bb4d5491/returns.parquet`:
+  - `train run ff64512b4097; returns' checkpoint_sha256 == train run's weights sha: True`.
+  - `attribution frame: shape (960, 8)`. The rows are the training subset's (`episode_id`, `content_hash`), i.e.
+    v1/candidate. The metric columns are the 6 `RETURN_COLUMNS` (`== RETURN_COLUMNS: True`).
+  - `check_scores: {'rows': 960, 'training_episodes': 960, 'covered': 960, 'ok': True}`.
+  - `a stale content_hash is rejected: True` ("1/960 score rows are not episode versions trained on by run ff64512b4097").
+  - No influence is computed.
+- ✅ AC6.4 registry: 21 entries, `required ... missing: []`, `entries without status/reason: []`
+  (`artifacts/s6_metrics_registry.json`). Each entry has a transfer status and a reason:
+  - ghost-event rate: "not available";
+  - intervention/safety-stop: "not transferable";
+  - blind scheduling: "replaced";
+  - UPH: "projection only";
+  - MTBF/A: "adapted";
+  - wall-clock T: "adapted";
+  - the four PoC-named failure types without a LIBERO rule: "not built".
+- ⏳ AC6.5 failure-type subsets: the code path exists (`--real`); its demonstration on AC5.4 is pending.
+- ✅ AC6.6: every column carries its metric, and its τ where the functional has one:
+  `ret_f30` (30), `ret_rmst60`, `ret_hrt60_lin`, `ret_censored60`, `ret_rmst60_op` (60);
+  `ret_auc_sampled`/`ret_auc_expected` have no τ in the functional. Per-rollout registry columns ==
+  `RETURN_COLUMNS: True`.
+- ⏳ AC6.7 (pending server): returns for every AC5.8 rollout. That means
+  `python -m vlapoc.returns --eval-run <id>` per seed's eval run.

@@ -1,5 +1,23 @@
 [
  {
+  "metric": "time-to-success T",
+  "functional": "the random variable every functional below is taken of",
+  "tau": "censored at τ_episode = 60 s",
+  "return_column": null,
+  "transfer_status": "built (adapted)",
+  "reason": "per rollout (T_s in the rollout record) and per operation for libero_10 (T_op_s, S4); simulated seconds at 20 Hz, not wall clock (see 'wall-clock T')",
+  "source": "PoC §3.2 p.6, §3.5 A p.7"
+ },
+ {
+  "metric": "Kaplan–Meier CDF F(t)",
+  "functional": "F(t) = P(T <= t), estimated with censoring",
+  "tau": "up to τ_episode = 60 s",
+  "return_column": null,
+  "transfer_status": "built (vlapoc.evaluation.km / F_curve)",
+  "reason": "the curve itself has no per-rollout return; each return here is the per-rollout term of one functional of F",
+  "source": "PoC §3.2 p.6"
+ },
+ {
   "metric": "F(30 s) / Success@τ",
   "functional": "F(τ) = P(T <= τ)",
   "tau": "30 s",
@@ -30,16 +48,16 @@
   "metric": "HRT",
   "functional": "mean_o RMST_h,o / RMST_m,o",
   "tau": "60 s",
-  "return_column": "ret_hrt_lin",
+  "return_column": "ret_hrt60_lin",
   "transfer_status": "built (linearized)",
   "reason": "a ratio: first-order (delta-method) per-rollout return, weights at the evaluated policy",
   "source": "PoC §4.3 p.10"
  },
  {
-  "metric": "censored tail",
+  "metric": "right-censoring / censored tail",
   "functional": "share of rollouts timed out",
-  "tau": "τ_episode = 60 s",
-  "return_column": "ret_censored",
+  "tau": "60 s = τ_episode",
+  "return_column": "ret_censored60",
   "transfer_status": "built",
   "reason": "timeouts are censored, not failed",
   "source": "PoC §3.2 p.6, §3.4 p.7"
@@ -64,7 +82,7 @@
  },
  {
   "metric": "UPH",
-  "functional": "3600 / RMST(τ_episode)",
+  "functional": "3600 / E[T | T < τ_episode] (Table 1 literal; ∝ 1 / RMST(τ_episode))",
   "tau": "60 s",
   "return_column": null,
   "transfer_status": "projection only",
@@ -76,7 +94,7 @@
   "functional": "F(τ_episode)",
   "tau": "60 s",
   "return_column": null,
-  "transfer_status": "scoring only (= mean ret_censored complement)",
+  "transfer_status": "scoring only (= mean ret_censored60 complement)",
   "reason": "no separate return: 1 - censored rate when no ghosts",
   "source": "PhAIL Table 1 p.5"
  },
@@ -120,7 +138,7 @@
   "metric": "operation-level RMST",
   "functional": "−min(T_op, 60 s) per operation",
   "tau": "60 s",
-  "return_column": "ret_rmst_op (operation_returns.parquet)",
+  "return_column": "ret_rmst60_op (operation_returns.parquet)",
   "transfer_status": "built",
   "reason": "libero_10 per-sub-task T (S4)",
   "source": "PoC §3.4 p.7, §3.5 A p.7"

@@ -1,0 +1,47 @@
+AC6.1 SYNTHETIC (censoring only at tau_episode (10%), 3 cells x 60 rollouts): max |mean(ret_rmst60) + RMST60_KM| = 1.07e-14; max |mean(ret_f30) - F30_KM| = 1.11e-16
+AC6.1 SYNTHETIC (no censoring, 3 cells x 60 rollouts): max |mean(ret_rmst60) + RMST60_KM| = 7.11e-15; max |mean(ret_f30) - F30_KM| = 1.11e-16; max |mean(ret_auc_expected) - AUC_censored| = 2.78e-17
+AC6.1 SYNTHETIC ret_auc_sampled vs ret_auc_expected per cell (sampling noise): {'syn/0': (np.float64(0.167), np.float64(0.1453)), 'syn/1': (np.float64(0.133), np.float64(0.122)), 'syn/2': (np.float64(0.167), np.float64(0.1527))}
+AC6.2 SYNTHETIC HRT = 0.3796 (3 cells); sum_cells mean(ret_hrt60_lin) = -0.3796 (= -HRT at the expansion point)
+AC6.2   uniform  delta -0.10: dHRT/HRT +0.1026, exact +0.03894, linearized +0.03530, rel. error 9.36%
+AC6.2   one cell delta -0.10: dHRT/HRT +0.0355, exact +0.01347, linearized +0.01219, rel. error 9.51%
+AC6.2   uniform  delta -0.06: dHRT/HRT +0.0591, exact +0.02244, linearized +0.02118, rel. error 5.61%
+AC6.2   one cell delta -0.06: dHRT/HRT +0.0204, exact +0.00776, linearized +0.00732, rel. error 5.71%
+AC6.2   uniform  delta -0.03: dHRT/HRT +0.0287, exact +0.01089, linearized +0.01059, rel. error 2.81%
+AC6.2   one cell delta -0.03: dHRT/HRT +0.0099, exact +0.00377, linearized +0.00366, rel. error 2.85%
+AC6.2   uniform  delta -0.01: dHRT/HRT +0.0094, exact +0.00356, linearized +0.00353, rel. error 0.94%
+AC6.2   one cell delta -0.01: dHRT/HRT +0.0032, exact +0.00123, linearized +0.00122, rel. error 0.95%
+AC6.2   uniform  delta +0.01: dHRT/HRT -0.0092, exact -0.00350, linearized -0.00353, rel. error 0.93%
+AC6.2   one cell delta +0.01: dHRT/HRT -0.0032, exact -0.00121, linearized -0.00122, rel. error 0.95%
+AC6.2   uniform  delta +0.03: dHRT/HRT -0.0271, exact -0.01030, linearized -0.01059, rel. error 2.80%
+AC6.2   one cell delta +0.03: dHRT/HRT -0.0094, exact -0.00356, linearized -0.00366, rel. error 2.85%
+AC6.2   uniform  delta +0.06: dHRT/HRT -0.0528, exact -0.02005, linearized -0.02118, rel. error 5.61%
+AC6.2   one cell delta +0.06: dHRT/HRT -0.0182, exact -0.00692, linearized -0.00732, rel. error 5.71%
+AC6.2   uniform  delta +0.10: dHRT/HRT -0.0841, exact -0.03194, linearized -0.03489, rel. error 9.25%
+AC6.2   one cell delta +0.10: dHRT/HRT -0.0288, exact -0.01095, linearized -0.01197, rel. error 9.34%
+AC6.2 worst relative error over perturbations with |dHRT|/HRT <= 5%: 9.51% (12 cases; criterion <= 10%)
+AC6.4 registry: 21 entries; required (§3.2 primitives, Table 1, §4/§10 targets) missing: []; entries without status/reason: []
+AC6.4   time-to-success T                                              -> built (adapted)                        return: None
+AC6.4   Kaplan–Meier CDF F(t)                                          -> built (vlapoc.evaluation.km / F_curve) return: None
+AC6.4   F(30 s) / Success@τ                                            -> built                                  return: ret_f30
+AC6.4   RMST(τ)                                                        -> built                                  return: ret_rmst60
+AC6.4   AUC vs human                                                   -> built                                  return: ret_auc_sampled, ret_auc_expected
+AC6.4   HRT                                                            -> built (linearized)                     return: ret_hrt60_lin
+AC6.4   right-censoring / censored tail                                -> built                                  return: ret_censored60
+AC6.4   ghost-event rate                                               -> not available                          return: None
+AC6.4   median T                                                       -> scoring only                           return: None
+AC6.4   UPH                                                            -> projection only                        return: None
+AC6.4   completion                                                     -> scoring only (= mean ret_censored60 complement) return: None
+AC6.4   MTBF/A                                                         -> adapted, scoring only                  return: None
+AC6.4   KS / macro-KS                                                  -> significance gate (S7)                 return: None
+AC6.4   P-P plot                                                       -> visualization                          return: None
+AC6.4   clustered bootstrap CIs                                        -> built (vlapoc.evaluation)              return: None
+AC6.4   operation-level RMST                                           -> built                                  return: ret_rmst60_op (operation_returns.parquet)
+AC6.4   intervention / safety-stop rate                                -> not transferable                       return: None
+AC6.4   wall-clock T                                                   -> adapted                                return: None
+AC6.4   blind randomized scheduling                                    -> replaced                               return: None
+AC6.4   failure types: missed grasp, wrong object, ignored instruction, idle -> not built                              return: None
+AC6.4   failure types: success / timeout_no_progress / timeout_partial_k_of_n -> built                                  return: failure_type
+AC6.6 return columns vs their registry τ: {'ret_f30': {'tau_s': '30', 'ok': True}, 'ret_rmst60': {'tau_s': '60', 'ok': True}, 'ret_auc_sampled': {'tau_s': None, 'ok': True}, 'ret_auc_expected': {'tau_s': None, 'ok': True}, 'ret_hrt60_lin': {'tau_s': '60', 'ok': True}, 'ret_censored60': {'tau_s': '60', 'ok': True}, 'ret_rmst60_op': {'tau_s': '60', 'ok': True}}; per-rollout registry columns == RETURN_COLUMNS: True
+AC6.3 data/eval/returns-3392bb4d5491/returns.parquet: 4 rollouts of eval run(s) ['3392bb4d54914ddeb3df6a727aea09e5']; train run ff64512b4097; returns' checkpoint_sha256 == train run's weights sha: True
+AC6.3 attribution frame: shape (960, 8) (rows = training subset's (episode_id, content_hash); metric columns ['ret_f30', 'ret_rmst60', 'ret_auc_sampled', 'ret_auc_expected', 'ret_hrt60_lin', 'ret_censored60'] == RETURN_COLUMNS: True); check_scores: {'rows': 960, 'training_episodes': 960, 'covered': 960, 'ok': True}; a stale content_hash is rejected: True
+AC6.3 rejection message: 1/960 score rows are not episode versions trained on by run ff64512b4097 (e.g. libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_0@0000

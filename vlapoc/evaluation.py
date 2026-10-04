@@ -198,7 +198,7 @@ def ghost_fraction(eps: Iterable[Episode]) -> float:
 def censored_rate(eps: Iterable[Episode]) -> float:
     """Share of episodes that end with a right-censored pair (timed out or stopped with operations
     left; PoC §3.4 p. 7 "the censored tail"; PhAIL §3.1 p. 4). No τ beyond the protocol's τ_episode.
-    It is the mean of S6's per-rollout ``ret_censored``."""
+    It is the mean of S6's per-rollout ``ret_censored60``."""
     eps = list(eps)
     return float(np.mean([any(e == 0 for _, e in ep.pairs) for ep in eps])) if eps else 0.0
 

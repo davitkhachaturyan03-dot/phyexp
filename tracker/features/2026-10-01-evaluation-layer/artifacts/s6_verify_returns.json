@@ -144,23 +144,70 @@
    }
   ],
   "worst_in_scope": 0.09514619207211003,
-  "pass": "True"
+  "pass": true
  },
  "AC6.4": {
-  "n": 19,
+  "n": 21,
   "missing": [],
   "no_status": [],
   "pass": true
  },
  "AC6.6": {
-  "columns": [
+  "columns": {
+   "ret_f30": {
+    "tau_s": "30",
+    "ok": true
+   },
+   "ret_rmst60": {
+    "tau_s": "60",
+    "ok": true
+   },
+   "ret_auc_sampled": {
+    "tau_s": null,
+    "ok": true
+   },
+   "ret_auc_expected": {
+    "tau_s": null,
+    "ok": true
+   },
+   "ret_hrt60_lin": {
+    "tau_s": "60",
+    "ok": true
+   },
+   "ret_censored60": {
+    "tau_s": "60",
+    "ok": true
+   },
+   "ret_rmst60_op": {
+    "tau_s": "60",
+    "ok": true
+   }
+  },
+  "same_set": true,
+  "pass": true
+ },
+ "AC6.3": {
+  "returns": "data/eval/returns-3392bb4d5491/returns.parquet",
+  "train_run_id": "ff64512b40974587a9d711cd8e4f8b04",
+  "checkpoint_matches": true,
+  "shape": [
+   960,
+   8
+  ],
+  "metric_columns": [
    "ret_f30",
    "ret_rmst60",
    "ret_auc_sampled",
    "ret_auc_expected",
-   "ret_hrt_lin",
-   "ret_censored"
+   "ret_hrt60_lin",
+   "ret_censored60"
   ],
-  "pass": true
+  "check_scores": {
+   "rows": 960,
+   "training_episodes": 960,
+   "covered": 960,
+   "ok": true
+  },
+  "stale_rejected": true
  }
 }

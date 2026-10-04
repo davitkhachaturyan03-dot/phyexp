@@ -1,0 +1,10 @@
+                    rollout_id        failure_type  ret_f30  ret_rmst60  ret_auc_sampled  ret_auc_expected  ret_hrt60_lin  ret_censored60
+libero_spatial/0/init000/seed0 timeout_no_progress      0.0       -60.0              0.0               0.0      -0.034408             1.0
+libero_spatial/0/init001/seed1 timeout_no_progress      0.0       -60.0              0.0               0.0      -0.034408             1.0
+     libero_10/0/init000/seed0 timeout_no_progress      0.0       -60.0              0.0               0.0      -0.117383             1.0
+     libero_10/0/init001/seed1 timeout_no_progress      0.0       -60.0              0.0               0.0      -0.117383             1.0
+                    rollout_id  op_k  n_ops  t_start_steps  t_end_steps  T_op_s  event  ret_rmst60_op
+libero_spatial/0/init000/seed0     1      1              0         1200    60.0      0          -60.0
+libero_spatial/0/init001/seed1     1      1              0         1200    60.0      0          -60.0
+     libero_10/0/init000/seed0     1      2              0         1200    60.0      0          -60.0
+     libero_10/0/init001/seed1     1      2              0         1200    60.0      0          -60.0

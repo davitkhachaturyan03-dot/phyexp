@@ -43,7 +43,7 @@ from vlapoc.libero_convert import REPO_ROOT
 TAU_S = 60.0        # RMST cap = τ_episode (plan: 60 s)
 F_TAU_S = 30.0      # PoC §4.1 F(30 s)
 HUMAN_REF = REPO_ROOT / "data" / "eval" / "human_reference" / "human_reference.parquet"
-RETURN_COLUMNS = ["ret_f30", "ret_rmst60", "ret_auc_sampled", "ret_auc_expected", "ret_hrt_lin", "ret_censored"]
+RETURN_COLUMNS = ["ret_f30", "ret_rmst60", "ret_auc_sampled", "ret_auc_expected", "ret_hrt60_lin", "ret_censored60"]
 
 
 def human_times(path: Path = HUMAN_REF) -> dict[tuple[str, int], np.ndarray]:
@@ -90,12 +90,12 @@ def rollout_returns(rollouts: pd.DataFrame, human: dict | None = None, seed: int
       ``SeedSequence([seed, sha256(rollout_id)])``: the PoC's literal "win indicator against a sampled human time".
     - ``ret_auc_expected`` = E[``ret_auc_sampled``] (``auc_expected``): the same target without sampling noise
       (a divergence: deterministic expectation of the PoC's sampled indicator).
-    - ``ret_hrt_lin`` = −w_o · min(T, 60 s), w_o = (1/J) · RMST_h,o(60) / RMST_m,o(60)² evaluated at this eval's
+    - ``ret_hrt60_lin`` = −w_o · min(T, 60 s), w_o = (1/J) · RMST_h,o(60) / RMST_m,o(60)² evaluated at this eval's
       policy (J cells). For HRT = (1/J) Σ_o RMST_h,o / RMST_m,o, a change in the rollouts' capped times gives
-      ΔHRT ≈ Σ_o Δ mean_{i∈o}(ret_hrt_lin) (first-order / delta method; §4.3 only says "first-order
+      ΔHRT ≈ Σ_o Δ mean_{i∈o}(ret_hrt60_lin) (first-order / delta method; §4.3 only says "first-order
       (linearized)"; the form is this module's derivation, checked numerically in S6 AC6.2). At the
-      expansion point Σ_o mean_o(ret_hrt_lin) = −HRT. The weights are returned for the record.
-    - ``ret_censored`` = 1[timed out] (§3.4 "the censored tail"); mean = ``evaluation.censored_rate``.
+      expansion point Σ_o mean_o(ret_hrt60_lin) = −HRT. The weights are returned for the record.
+    - ``ret_censored60`` = 1[timed out] (§3.4 "the censored tail"); mean = ``evaluation.censored_rate``.
     - ``failure_type`` (``failure_type``).
 
     T here is whole-task time-to-success in seconds (simulated, 20 Hz). The human anchor is fixed (S3).
@@ -125,8 +125,8 @@ def rollout_returns(rollouts: pd.DataFrame, human: dict | None = None, seed: int
         rm = float(-g["ret_rmst60"].mean())
         weights[cell] = {"rmst_human_60": rh, "rmst_model_60": rm, "w": (rh / rm ** 2) / J if rm > 0 else float("nan"),
                          "hrt_cell": rh / rm if rm > 0 else float("nan"), "n_rollouts": int(len(g))}
-    out["ret_hrt_lin"] = [weights[c]["w"] * r for c, r in zip(out["cell"], out["ret_rmst60"])]
-    out["ret_censored"] = df["censored"].astype(float)
+    out["ret_hrt60_lin"] = [weights[c]["w"] * r for c, r in zip(out["cell"], out["ret_rmst60"])]
+    out["ret_censored60"] = df["censored"].astype(float)
     meta = {"tau_s": TAU_S, "f_tau_s": F_TAU_S, "auc_sample_seed": seed, "J_cells": J, "hrt_weights": weights,
             "hrt_macro_at_policy": float(np.nanmean([w["hrt_cell"] for w in weights.values()])),
             "human_reference": str(HUMAN_REF.relative_to(REPO_ROOT))}
@@ -136,7 +136,7 @@ def rollout_returns(rollouts: pd.DataFrame, human: dict | None = None, seed: int
 def operation_returns(rollouts: pd.DataFrame) -> pd.DataFrame:
     """Per-operation rows (PoC §3.4 "Operation-level (T, event) pairs"): ``rollout_id``, ``op_k`` (k-th pair,
     the last one possibly the censored tail), ``t_start_steps``/``t_end_steps`` (the segment whose (s', a') the
-    operation's return can be credited to), ``T_op_s``, ``event`` and ``ret_rmst_op`` = −min(T_op, 60 s)."""
+    operation's return can be credited to), ``T_op_s``, ``event`` and ``ret_rmst60_op`` = −min(T_op, 60 s)."""
     rows = []
     for r in rollouts.itertuples():
         pairs = json.loads(r.pairs)
@@ -146,7 +146,7 @@ def operation_returns(rollouts: pd.DataFrame) -> pd.DataFrame:
             rows.append({"eval_run_id": r.eval_run_id, "rollout_id": r.rollout_id, "train_run_id": r.train_run_id,
                          "checkpoint_sha256": r.checkpoint_sha256, "suite": r.suite, "libero_task_id": int(r.libero_task_id),
                          "op_k": k, "n_ops": int(r.n_ops), "t_start_steps": t, "t_end_steps": t + steps, "T_op_s": float(T_op),
-                         "event": int(e), "ret_rmst_op": -min(float(T_op), TAU_S)})
+                         "event": int(e), "ret_rmst60_op": -min(float(T_op), TAU_S)})
             t += steps
     return pd.DataFrame(rows)
 
@@ -157,22 +157,28 @@ def operation_returns(rollouts: pd.DataFrame) -> pd.DataFrame:
 
 REGISTRY = [
     # name, functional, tau, return column, transfer status, reason, source
+    ("time-to-success T", "the random variable every functional below is taken of", "censored at τ_episode = 60 s", None,
+     "built (adapted)", "per rollout (T_s in the rollout record) and per operation for libero_10 (T_op_s, S4); simulated "
+     "seconds at 20 Hz, not wall clock (see 'wall-clock T')", "PoC §3.2 p.6, §3.5 A p.7"),
+    ("Kaplan–Meier CDF F(t)", "F(t) = P(T <= t), estimated with censoring", "up to τ_episode = 60 s", None,
+     "built (vlapoc.evaluation.km / F_curve)", "the curve itself has no per-rollout return; each return here is the "
+     "per-rollout term of one functional of F", "PoC §3.2 p.6"),
     ("F(30 s) / Success@τ", "F(τ) = P(T <= τ)", "30 s", "ret_f30", "built",
      "transfers literally: τ_episode = 60 s keeps 30 s an interior point of the CDF", "PoC §4.1 p.9, §4.3 p.10"),
     ("RMST(τ)", "∫_0^τ (1 - F)", "60 s = τ_episode", "ret_rmst60", "built", "negative capped time", "PoC §4.3 p.10"),
     ("AUC vs human", "P(T_model < T_human)", "none (human T < 60 s)", "ret_auc_sampled, ret_auc_expected", "built",
      "sampled indicator (PoC literal) and its expectation", "PoC §4.3 p.10, §9.1 Step 3 p.19"),
-    ("HRT", "mean_o RMST_h,o / RMST_m,o", "60 s", "ret_hrt_lin", "built (linearized)",
+    ("HRT", "mean_o RMST_h,o / RMST_m,o", "60 s", "ret_hrt60_lin", "built (linearized)",
      "a ratio: first-order (delta-method) per-rollout return, weights at the evaluated policy", "PoC §4.3 p.10"),
-    ("censored tail", "share of rollouts timed out", "τ_episode = 60 s", "ret_censored", "built",
+    ("right-censoring / censored tail", "share of rollouts timed out", "60 s = τ_episode", "ret_censored60", "built",
      "timeouts are censored, not failed", "PoC §3.2 p.6, §3.4 p.7"),
     ("ghost-event rate", "KM mass at T = inf", "none", None, "not available",
      "LIBERO defines no unrecoverable-state rule (plan P13; owner decision 6): no ghost events exist", "PoC §3.2 p.6, §3.4 p.7"),
     ("median T", "inf{t: F(t) >= 0.5}", "none", None, "scoring only",
      "no per-rollout return in the PoC; computed per cell by vlapoc.evaluation", "PhAIL Table 1 p.5"),
-    ("UPH", "3600 / RMST(τ_episode)", "60 s", None, "projection only",
+    ("UPH", "3600 / E[T | T < τ_episode] (Table 1 literal; ∝ 1 / RMST(τ_episode))", "60 s", None, "projection only",
      "production UPH also needs reset and recovery time (PhAIL p.5); sim time excludes inference latency", "PhAIL Table 1 p.5"),
-    ("completion", "F(τ_episode)", "60 s", None, "scoring only (= mean ret_censored complement)",
+    ("completion", "F(τ_episode)", "60 s", None, "scoring only (= mean ret_censored60 complement)",
      "no separate return: 1 - censored rate when no ghosts", "PhAIL Table 1 p.5"),
     ("MTBF/A", "RMST(τ_episode) / (1 - F(τ_episode))", "60 s", None, "adapted, scoring only",
      "'failures/assists' become non-completions; no operator in simulation", "PhAIL Table 1 p.5"),
@@ -181,7 +187,7 @@ REGISTRY = [
     ("P-P plot", "(F_human(t), F_model(t))", "plot range", None, "visualization", "not a scalar", "PoC §3.2 p.6"),
     ("clustered bootstrap CIs", "episode resampling", "as the scalar", None, "built (vlapoc.evaluation)",
      "a CI procedure, not a metric", "PoC §3.2 p.6"),
-    ("operation-level RMST", "−min(T_op, 60 s) per operation", "60 s", "ret_rmst_op (operation_returns.parquet)", "built",
+    ("operation-level RMST", "−min(T_op, 60 s) per operation", "60 s", "ret_rmst60_op (operation_returns.parquet)", "built",
      "libero_10 per-sub-task T (S4)", "PoC §3.4 p.7, §3.5 A p.7"),
     ("intervention / safety-stop rate", "share of rollouts with an operator stop", "none", None, "not transferable",
      "no operator in simulation", "PoC §3.3 p.7"),

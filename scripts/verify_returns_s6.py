@@ -5,7 +5,7 @@ linearization (AC6.2), the attribution join contract (AC6.3), registry coverage 
 Grounding: PoC §4.3 p. 10, §9.1 Step 3 p. 19, §3.4 p. 7, p. 1 (episode × metric matrix); CUPID §5.1 p. 5.
 
     .venv/bin/python scripts/verify_returns_s6.py --synthetic                    # AC6.1 (synthetic), AC6.2, AC6.4, AC6.6
-    .venv/bin/python scripts/verify_returns_s6.py --join <train_run_id>          # AC6.3
+    .venv/bin/python scripts/verify_returns_s6.py --join data/eval/returns-<eval_run>/returns.parquet   # AC6.3
     .venv/bin/python scripts/verify_returns_s6.py --real data/eval/<run>         # AC6.1 (real), AC6.5
 """
 
@@ -105,38 +105,57 @@ def synthetic() -> None:
             curve.append({"delta": delta, "mode": mode, "rel_change_hrt": exact / h0, "exact": exact, "pred": pred,
                           "rel_err": abs(pred - exact) / abs(exact)})
     in_scope = [c for c in curve if abs(c["rel_change_hrt"]) <= 0.05]
-    print(f"AC6.2 SYNTHETIC HRT = {h0:.4f} (3 cells); sum_cells mean(ret_hrt_lin) = {base.groupby('cell')['ret_hrt_lin'].mean().sum():.4f} "
+    print(f"AC6.2 SYNTHETIC HRT = {h0:.4f} (3 cells); sum_cells mean(ret_hrt60_lin) = {base.groupby('cell')['ret_hrt60_lin'].mean().sum():.4f} "
           f"(= -HRT at the expansion point)")
     for c in curve:
         print(f"AC6.2   {c['mode']:8s} delta {c['delta']:+.2f}: dHRT/HRT {c['rel_change_hrt']:+.4f}, exact {c['exact']:+.5f}, "
               f"linearized {c['pred']:+.5f}, rel. error {c['rel_err']:.2%}")
     worst = max(c["rel_err"] for c in in_scope)
     print(f"AC6.2 worst relative error over perturbations with |dHRT|/HRT <= 5%: {worst:.2%} ({len(in_scope)} cases; criterion <= 10%)")
-    OUT["AC6.2"] = {"hrt0": h0, "curve": curve, "worst_in_scope": worst, "pass": worst <= 0.10}
+    OUT["AC6.2"] = {"hrt0": h0, "curve": curve, "worst_in_scope": worst, "pass": bool(worst <= 0.10)}
     pd.DataFrame(curve).to_csv(ART / "s6_hrt_linearization_curve.csv", index=False)
     # ---- AC6.4 / AC6.6: registry coverage and naming -------------------------------------------------------
     reg = rt.metrics_registry()
     names = " | ".join(r["metric"] for r in reg)
-    required = ["F(30 s)", "RMST", "AUC", "HRT", "ghost-event rate", "median", "UPH", "completion", "MTBF/A", "KS", "P-P",
-                "censored", "bootstrap"]
+    # §3.2 p. 6 primitives, PhAIL Table 1 p. 5 scalars, §4.1 p. 9 / §10 targets (F(30 s), HRT, RMST, AUC, ghost-event rate)
+    required = ["time-to-success T", "ghost-event rate", "right-censoring", "Kaplan–Meier CDF", "Success@τ", "median", "RMST",
+                "UPH", "completion", "MTBF/A", "HRT", "bootstrap", "macro-KS", "P-P", "F(30 s)", "AUC"]
     missing = [m for m in required if m not in names]
     no_status = [r["metric"] for r in reg if not r["transfer_status"] or not r["reason"]]
     print(f"AC6.4 registry: {len(reg)} entries; required (§3.2 primitives, Table 1, §4/§10 targets) missing: {missing}; "
           f"entries without status/reason: {no_status}")
     for r in reg:
-        print(f"AC6.4   {r['metric']:62s} -> {r['transfer_status']:32s} return: {r['return_column']}")
-    named = {c: bool(re.search(r"(f30|rmst60|auc|hrt|censored)", c)) for c in rt.RETURN_COLUMNS}
-    print(f"AC6.6 return columns carry metric (+ τ where it has one): {rt.RETURN_COLUMNS}; all named: {all(named.values())}")
+        print(f"AC6.4   {r['metric']:62s} -> {r['transfer_status']:38s} return: {r['return_column']}")
+    # AC6.6: every return column named in the registry carries its metric and, where the functional has a τ in
+    # seconds, that τ; the per-rollout ones are exactly RETURN_COLUMNS
+    naming = {}
+    for r in reg:
+        if not r["return_column"] or r["return_column"] == "failure_type":
+            continue
+        tau = re.match(r"(\d+) s", r["tau"])
+        for col in (c.split(" (")[0].strip() for c in r["return_column"].split(", ")):
+            naming[col] = {"tau_s": tau.group(1) if tau else None, "ok": tau is None or tau.group(1) in col}
+    per_rollout = [c for c in naming if not c.endswith("_op")]  # operation-level returns live in operation_returns.parquet
+    same_set = sorted(per_rollout) == sorted(rt.RETURN_COLUMNS)
+    print(f"AC6.6 return columns vs their registry τ: {naming}; per-rollout registry columns == RETURN_COLUMNS: {same_set}")
     OUT["AC6.4"] = {"n": len(reg), "missing": missing, "no_status": no_status, "pass": not missing and not no_status}
-    OUT["AC6.6"] = {"columns": rt.RETURN_COLUMNS, "pass": all(named.values())}
+    OUT["AC6.6"] = {"columns": naming, "same_set": same_set, "pass": same_set and all(v["ok"] for v in naming.values())}
     (ART / "s6_metrics_registry.json").write_text(json.dumps(reg, indent=1, ensure_ascii=False))
 
 
-def join(train_run_id: str) -> None:
+def join(returns_path: Path) -> None:
+    """AC6.3: returns.parquet + its train run's training subset -> the empty episode x metric frame (no influence)."""
     from vlapoc.lineage import LineageError
-    from vlapoc.runs import check_scores
+    from vlapoc.runs import check_scores, client
 
+    ret = pd.read_parquet(returns_path)
+    train_ids = sorted(set(ret["train_run_id"]))
+    if len(train_ids) != 1 or not train_ids[0]:
+        raise SystemExit(f"returns must come from one tracked train run, got {train_ids}")
+    train_run_id = train_ids[0]
+    ckpt_ok = set(ret["checkpoint_sha256"]) == {client().get_run(train_run_id).data.tags["checkpoint.weights.sha256"]}
     frame = rt.attribution_frame(train_run_id)
+    metric_cols = [c for c in frame.columns if c not in ("episode_id", "content_hash")]
     ok = check_scores(frame.fillna(0.0), train_run_id)
     bad = frame.copy()
     bad.loc[0, "content_hash"] = "0" * 64
@@ -145,10 +164,14 @@ def join(train_run_id: str) -> None:
         rejected = None
     except LineageError as e:
         rejected = str(e)[:160]
-    print(f"AC6.3 attribution frame for train run {train_run_id[:12]}: shape {frame.shape} (rows = training subset's (episode_id, "
-          f"content_hash); columns = {list(frame.columns)}); check_scores: {ok}; a stale content_hash is rejected: {rejected is not None}")
+    print(f"AC6.3 {returns_path.relative_to(REPO_ROOT)}: {len(ret)} rollouts of eval run(s) {sorted(set(ret['eval_run_id']))}; "
+          f"train run {train_run_id[:12]}; returns' checkpoint_sha256 == train run's weights sha: {ckpt_ok}")
+    print(f"AC6.3 attribution frame: shape {frame.shape} (rows = training subset's (episode_id, content_hash); metric columns "
+          f"{metric_cols} == RETURN_COLUMNS: {metric_cols == rt.RETURN_COLUMNS}); check_scores: {ok}; "
+          f"a stale content_hash is rejected: {rejected is not None}")
     print(f"AC6.3 rejection message: {rejected}")
-    OUT["AC6.3"] = {"shape": list(frame.shape), "check_scores": ok, "stale_rejected": rejected is not None}
+    OUT["AC6.3"] = {"returns": str(returns_path.relative_to(REPO_ROOT)), "train_run_id": train_run_id, "checkpoint_matches": ckpt_ok,
+                    "shape": list(frame.shape), "metric_columns": metric_cols, "check_scores": ok, "stale_rejected": rejected is not None}
 
 
 def real(path: Path) -> None:
@@ -160,9 +183,9 @@ def real(path: Path) -> None:
         eps = km_eps(ro[ro["rollout_id"].isin(g["rollout_id"])])
         diffs["rmst"].append(abs(g["ret_rmst60"].mean() + ev.rmst(eps, 60.0)))
         diffs["f30"].append(abs(g["ret_f30"].mean() - ev.F_at(eps, 30.0)))
-        diffs["censored"].append(abs(g["ret_censored"].mean() - ev.censored_rate(eps)))
+        diffs["censored"].append(abs(g["ret_censored60"].mean() - ev.censored_rate(eps)))
     print(f"AC6.1 REAL ({path.name}, {len(ret)} rollouts, {ret['cell'].nunique()} cells): max |mean(ret_rmst60) + RMST60| = "
-          f"{max(diffs['rmst']):.2e}; max |mean(ret_f30) - F30| = {max(diffs['f30']):.2e}; max |mean(ret_censored) - censored_rate| = "
+          f"{max(diffs['rmst']):.2e}; max |mean(ret_f30) - F30| = {max(diffs['f30']):.2e}; max |mean(ret_censored60) - censored_rate| = "
           f"{max(diffs['censored']):.2e}")
     by = ret.groupby(["cell", "failure_type"]).size().unstack(fill_value=0)
     print("AC6.5 rollouts per cell x failure_type:\n" + by.to_string())
@@ -181,13 +204,13 @@ def real(path: Path) -> None:
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--synthetic", action="store_true")
-    p.add_argument("--join")
+    p.add_argument("--join", type=Path, help="a returns.parquet from python -m vlapoc.returns")
     p.add_argument("--real", type=Path, action="append", default=[])
     a = p.parse_args()
     if a.synthetic:
         synthetic()
     if a.join:
-        join(a.join)
+        join((REPO_ROOT / a.join).resolve())
     for r in a.real:
         real(r)
     path = ART / "s6_verify_returns.json"
