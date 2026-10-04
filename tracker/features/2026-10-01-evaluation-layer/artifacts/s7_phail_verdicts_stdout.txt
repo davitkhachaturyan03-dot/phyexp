@@ -1,0 +1,36 @@
+OpenPI vs GR00T (4 cells, n 163/164 episodes, τ 240 s): macro-KS D̄ 0.1239 p 0.1099 (does not fire) -> outcome (iii)
+    F30  F(30 s), pooled                              OpenPI 0.4741 | GR00T 0.5091 | Δ -0.0350 [-0.0935, +0.0193] p 0.2418 Holm 0.9670 -> favours GR00T
+    HRT  HRT(τ), per-cell macro vs the human anchor   OpenPI 0.1375 | GR00T 0.1335 | Δ +0.0041 [-0.0171, +0.0268] p 0.6833 Holm 1.0000 -> favours OpenPI
+    RMST RMST(τ) s, pooled (global)                   OpenPI 77.5718 | GR00T 77.3125 | Δ +0.2592 [-12.2439, +11.5519] p 0.9570 Holm 1.0000 -> favours GR00T
+    AUC  AUC vs human, per-cell macro                 OpenPI 0.1004 | GR00T 0.0949 | Δ +0.0055 [-0.0162, +0.0282] p 0.6713 Holm 1.0000 -> favours OpenPI
+    sanity: stratified logrank chi2 0.06 p 0.803
+OpenPI vs ACT (4 cells, n 163/151 episodes, τ 240 s): macro-KS D̄ 0.1418 p 0.1109 (does not fire) -> outcome (iii)
+    F30  F(30 s), pooled                              OpenPI 0.4741 | ACT 0.4409 | Δ +0.0332 [-0.0347, +0.0974] p 0.3736 Holm 0.3736 -> favours OpenPI
+    HRT  HRT(τ), per-cell macro vs the human anchor   OpenPI 0.1375 | ACT 0.1049 | Δ +0.0327 [+0.0031, +0.0554] p 0.0300 Holm 0.0899 -> favours OpenPI
+    RMST RMST(τ) s, pooled (global)                   OpenPI 77.5718 | ACT 100.9287 | Δ -23.3569 [-42.6898, -5.4121] p 0.0100 Holm 0.0400 -> favours OpenPI *
+    AUC  AUC vs human, per-cell macro                 OpenPI 0.1004 | ACT 0.1338 | Δ -0.0333 [-0.0623, -0.0028] p 0.0360 Holm 0.0899 -> favours ACT
+    sanity: stratified logrank chi2 11.64 p 0.000644
+OpenPI vs SmolVLA (4 cells, n 163/116 episodes, τ 240 s): macro-KS D̄ 0.4655 p 0.0005 (fires) -> outcome (i), direction OpenPI
+    F30  F(30 s), pooled                              OpenPI 0.4741 | SmolVLA 0.1828 | Δ +0.2912 [+0.2167, +0.3653] p 0.0020 Holm 0.0080 -> favours OpenPI *
+    HRT  HRT(τ), per-cell macro vs the human anchor   OpenPI 0.1375 | SmolVLA 0.0644 | Δ +0.0731 [+0.0563, +0.0920] p 0.0020 Holm 0.0080 -> favours OpenPI *
+    RMST RMST(τ) s, pooled (global)                   OpenPI 77.5718 | SmolVLA 166.3727 | Δ -88.8009 [-109.0442, -69.4649] p 0.0020 Holm 0.0080 -> favours OpenPI *
+    AUC  AUC vs human, per-cell macro                 OpenPI 0.1004 | SmolVLA 0.0268 | Δ +0.0736 [+0.0562, +0.0920] p 0.0020 Holm 0.0080 -> favours OpenPI *
+    sanity: stratified logrank chi2 123.06 p 1.35e-28
+GR00T vs ACT (4 cells, n 164/151 episodes, τ 240 s): macro-KS D̄ 0.1754 p 0.0130 (fires) -> outcome (ii)
+    F30  F(30 s), pooled                              GR00T 0.5091 | ACT 0.4409 | Δ +0.0682 [+0.0051, +0.1363] p 0.0340 Holm 0.0679 -> favours GR00T
+    HRT  HRT(τ), per-cell macro vs the human anchor   GR00T 0.1335 | ACT 0.1049 | Δ +0.0286 [+0.0004, +0.0501] p 0.0500 Holm 0.0679 -> favours GR00T
+    RMST RMST(τ) s, pooled (global)                   GR00T 77.3125 | ACT 100.9287 | Δ -23.6162 [-42.8526, -6.4013] p 0.0060 Holm 0.0240 -> favours GR00T *
+    AUC  AUC vs human, per-cell macro                 GR00T 0.0949 | ACT 0.1338 | Δ -0.0388 [-0.0694, -0.0085] p 0.0140 Holm 0.0420 -> favours ACT *
+    sanity: stratified logrank chi2 11.76 p 0.000607
+GR00T vs SmolVLA (4 cells, n 164/116 episodes, τ 240 s): macro-KS D̄ 0.4344 p 0.0005 (fires) -> outcome (i), direction GR00T
+    F30  F(30 s), pooled                              GR00T 0.5091 | SmolVLA 0.1828 | Δ +0.3263 [+0.2556, +0.4013] p 0.0020 Holm 0.0080 -> favours GR00T *
+    HRT  HRT(τ), per-cell macro vs the human anchor   GR00T 0.1335 | SmolVLA 0.0644 | Δ +0.0690 [+0.0531, +0.0885] p 0.0020 Holm 0.0080 -> favours GR00T *
+    RMST RMST(τ) s, pooled (global)                   GR00T 77.3125 | SmolVLA 166.3727 | Δ -89.0601 [-110.4915, -69.6673] p 0.0020 Holm 0.0080 -> favours GR00T *
+    AUC  AUC vs human, per-cell macro                 GR00T 0.0949 | SmolVLA 0.0268 | Δ +0.0681 [+0.0510, +0.0868] p 0.0020 Holm 0.0080 -> favours GR00T *
+    sanity: stratified logrank chi2 122.48 p 1.82e-28
+ACT vs SmolVLA (4 cells, n 151/116 episodes, τ 240 s): macro-KS D̄ 0.3607 p 0.0005 (fires) -> outcome (i), direction ACT
+    F30  F(30 s), pooled                              ACT 0.4409 | SmolVLA 0.1828 | Δ +0.2580 [+0.1781, +0.3433] p 0.0020 Holm 0.0080 -> favours ACT *
+    HRT  HRT(τ), per-cell macro vs the human anchor   ACT 0.1049 | SmolVLA 0.0644 | Δ +0.0404 [+0.0238, +0.0692] p 0.0020 Holm 0.0080 -> favours ACT *
+    RMST RMST(τ) s, pooled (global)                   ACT 100.9287 | SmolVLA 166.3727 | Δ -65.4439 [-91.2552, -40.4195] p 0.0020 Holm 0.0080 -> favours ACT *
+    AUC  AUC vs human, per-cell macro                 ACT 0.1338 | SmolVLA 0.0268 | Δ +0.1069 [+0.0807, +0.1368] p 0.0020 Holm 0.0080 -> favours ACT *
+    sanity: stratified logrank chi2 63.75 p 1.42e-15

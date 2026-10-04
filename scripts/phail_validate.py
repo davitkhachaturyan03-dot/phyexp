@@ -45,13 +45,7 @@ OUT: dict = {}
 
 
 def load_arms() -> dict:
-    df = pd.read_parquet(REPO_ROOT / "data" / "phail" / "cohort_mixed.parquet")
-    arms: dict = {}
-    for r in df.itertuples(index=False):
-        ep = ev.episode_from_ops(r.s3_url, list(r.place_ts), r.duration_s, r.total_items, r.n_inf_events,
-                                 cohort_source=r.cohort_source)
-        arms.setdefault(r.model_short, {}).setdefault(r.eval_object, []).append(ep)
-    return {m: {o: arms[m][o] for o in sorted(arms[m])} for m in arms}
+    return ev.phail_cohort_arms()  # one loader, shared with vlapoc.verdict (S7)
 
 
 def maxdiff(a, b) -> float:

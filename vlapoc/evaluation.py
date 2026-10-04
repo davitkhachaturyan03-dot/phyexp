@@ -100,6 +100,22 @@ def libero_episode(key: str, place_ts_s: Iterable[float], duration_s: float, n_o
     return episode_from_ops(key, place_ts_s, duration_s, n_ops, n_inf_events=0, multi_grip_threshold_s=0.0, **meta)
 
 
+def phail_cohort_arms(path=None) -> dict[str, Arm]:
+    """PhAIL's released cohort (S2 export, ``data/phail/cohort_mixed.parquet``) as ``{model: {object: [Episode]}}``
+    through ``episode_from_ops`` with PhAIL's defaults (models: OpenPI, GR00T, ACT, SmolVLA, Teleop)."""
+    import pandas as pd
+
+    from vlapoc.libero_convert import REPO_ROOT
+
+    df = pd.read_parquet(path or REPO_ROOT / "data" / "phail" / "cohort_mixed.parquet")
+    arms: dict = {}
+    for r in df.itertuples(index=False):
+        ep = episode_from_ops(r.s3_url, list(r.place_ts), r.duration_s, r.total_items, r.n_inf_events,
+                              cohort_source=r.cohort_source)
+        arms.setdefault(r.model_short, {}).setdefault(r.eval_object, []).append(ep)
+    return {m: {o: arms[m][o] for o in sorted(arms[m])} for m in arms}
+
+
 def collect_TE(eps: Iterable[Episode]) -> tuple[np.ndarray, np.ndarray]:
     """All (T, E) pairs of ``eps``, concatenated: ``(T float64, E int64)``."""
     pairs = [p for ep in eps for p in ep.pairs]
@@ -534,7 +550,7 @@ def plot_pp(ax, model_eps: list[Episode], ref_eps: list[Episode], tau: float, co
     return auc(model_eps, ref_eps)
 
 
-__all__ = ["Episode", "episode_from_ops", "libero_episode", "collect_TE", "km", "F_curve", "F_at", "median_T", "rmst",
+__all__ = ["Episode", "episode_from_ops", "libero_episode", "phail_cohort_arms", "collect_TE", "km", "F_curve", "F_at", "median_T", "rmst",
            "completion", "uph", "uph_conditional", "mtbfa", "ghost_event_rate", "ghost_fraction", "censored_rate",
            "macro", "pooled", "hrt_cells", "hrt", "auc_censored", "auc", "macro_auc", "pp_curve", "macro_pp_curve", "ks",
            "macro_ks", "logrank_stratified", "cluster_bootstrap", "hrt_ci", "F_band", "uph_mtbf_sweep", "METRICS",

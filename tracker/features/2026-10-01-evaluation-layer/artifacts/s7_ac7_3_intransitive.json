@@ -1,0 +1,76 @@
+{
+ "sup_signs": {
+  "A-B": [
+   0.4,
+   "first"
+  ],
+  "B-C": [
+   0.5,
+   "first"
+  ],
+  "C-A": [
+   0.5,
+   "first"
+  ]
+ },
+ "rmst70": {
+  "A": 35.5,
+  "B": 21.099999999999998,
+  "C": 35.3
+ },
+ "verdict_A_B": {
+  "arms": [
+   "A",
+   "B"
+  ],
+  "cells": [
+   "x"
+  ],
+  "n_episodes": {
+   "A": 200,
+   "B": 200
+  },
+  "tau_s": 70.0,
+  "alpha": 0.05,
+  "gate": {
+   "test": "macro-KS (pooled-resample episode-clustered bootstrap)",
+   "D": 0.4,
+   "p": 0.0024937655860349127,
+   "D_cells": {
+    "x": 0.4
+   },
+   "n_boot": 400,
+   "fires": true
+  },
+  "metrics": {
+   "RMST": {
+    "label": "RMST(\u03c4) s, pooled (global)",
+    "tau_s": 70.0,
+    "A": 35.5,
+    "B": 21.099999999999998,
+    "diff": 14.400000000000002,
+    "ci95": [
+     9.025124999999994,
+     19.835249999999995
+    ],
+    "p": 0.004987531172069825,
+    "higher_is_better": false,
+    "diff_better": -14.400000000000002,
+    "favours": "B",
+    "p_holm": 0.004987531172069825,
+    "significant": true
+   }
+  },
+  "holm_family": [
+   "RMST"
+  ],
+  "outcome": "i",
+  "direction": "B",
+  "logrank_sanity": {
+   "chi2": 2.6894977168949774,
+   "p": 0.10101165099494101
+  },
+  "n_boot": 400,
+  "seed": 0
+ }
+}

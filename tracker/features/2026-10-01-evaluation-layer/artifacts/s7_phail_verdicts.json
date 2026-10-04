@@ -1,0 +1,692 @@
+[
+ {
+  "arms": [
+   "OpenPI",
+   "GR00T"
+  ],
+  "cells": [
+   "Batteries",
+   "Scissors",
+   "Towels",
+   "Wooden spoons"
+  ],
+  "n_episodes": {
+   "OpenPI": 163,
+   "GR00T": 164
+  },
+  "tau_s": 240.0,
+  "alpha": 0.05,
+  "gate": {
+   "test": "macro-KS (pooled-resample episode-clustered bootstrap)",
+   "D": 0.12391553589925894,
+   "p": 0.10994502748625687,
+   "D_cells": {
+    "Batteries": 0.11811222855619219,
+    "Scissors": 0.16279309909331807,
+    "Towels": 0.1380681898121061,
+    "Wooden spoons": 0.07668862613541938
+   },
+   "n_boot": 2000,
+   "fires": false
+  },
+  "metrics": {
+   "F30": {
+    "label": "F(30 s), pooled",
+    "tau_s": 30.0,
+    "A": 0.4740718018499158,
+    "B": 0.5091013807969105,
+    "diff": -0.035029578946994655,
+    "ci95": [
+     -0.09354172261625093,
+     0.01927656837756163
+    ],
+    "p": 0.24175824175824176,
+    "higher_is_better": true,
+    "diff_better": -0.035029578946994655,
+    "favours": "GR00T",
+    "p_holm": 0.967032967032967,
+    "significant": false
+   },
+   "HRT": {
+    "label": "HRT(\u03c4), per-cell macro vs the human anchor",
+    "tau_s": 240.0,
+    "A": 0.13754838767437327,
+    "B": 0.13349183206648715,
+    "diff": 0.00405655560788612,
+    "ci95": [
+     -0.017130608827004505,
+     0.02677115618314722
+    ],
+    "p": 0.6833166833166833,
+    "higher_is_better": true,
+    "diff_better": 0.00405655560788612,
+    "favours": "OpenPI",
+    "p_holm": 1.0,
+    "significant": false
+   },
+   "RMST": {
+    "label": "RMST(\u03c4) s, pooled (global)",
+    "tau_s": 240.0,
+    "A": 77.57178262020449,
+    "B": 77.31253986498288,
+    "diff": 0.25924275522160656,
+    "ci95": [
+     -12.243897822433459,
+     11.55191096776133
+    ],
+    "p": 0.957042957042957,
+    "higher_is_better": false,
+    "diff_better": -0.25924275522160656,
+    "favours": "GR00T",
+    "p_holm": 1.0,
+    "significant": false
+   },
+   "AUC": {
+    "label": "AUC vs human, per-cell macro",
+    "tau_s": null,
+    "A": 0.10040590187884432,
+    "B": 0.09492460393298947,
+    "diff": 0.005481297945854849,
+    "ci95": [
+     -0.01620210841114907,
+     0.028187911674389592
+    ],
+    "p": 0.6713286713286714,
+    "higher_is_better": true,
+    "diff_better": 0.005481297945854849,
+    "favours": "OpenPI",
+    "p_holm": 1.0,
+    "significant": false
+   }
+  },
+  "holm_family": [
+   "F30",
+   "HRT",
+   "RMST",
+   "AUC"
+  ],
+  "outcome": "iii",
+  "direction": null,
+  "logrank_sanity": {
+   "chi2": 0.06203469058393998,
+   "p": 0.8033084583379125
+  },
+  "n_boot": 1000,
+  "seed": 0
+ },
+ {
+  "arms": [
+   "OpenPI",
+   "ACT"
+  ],
+  "cells": [
+   "Batteries",
+   "Scissors",
+   "Towels",
+   "Wooden spoons"
+  ],
+  "n_episodes": {
+   "OpenPI": 163,
+   "ACT": 151
+  },
+  "tau_s": 240.0,
+  "alpha": 0.05,
+  "gate": {
+   "test": "macro-KS (pooled-resample episode-clustered bootstrap)",
+   "D": 0.14179755022503066,
+   "p": 0.11094452773613193,
+   "D_cells": {
+    "Batteries": 0.12460864527098381,
+    "Scissors": 0.10928515460544141,
+    "Towels": 0.1808865874438832,
+    "Wooden spoons": 0.1524098135798142
+   },
+   "n_boot": 2000,
+   "fires": false
+  },
+  "metrics": {
+   "F30": {
+    "label": "F(30 s), pooled",
+    "tau_s": 30.0,
+    "A": 0.4740718018499158,
+    "B": 0.4408681287160765,
+    "diff": 0.03320367313383932,
+    "ci95": [
+     -0.03474249126371358,
+     0.09738663967606459
+    ],
+    "p": 0.37362637362637363,
+    "higher_is_better": true,
+    "diff_better": 0.03320367313383932,
+    "favours": "OpenPI",
+    "p_holm": 0.37362637362637363,
+    "significant": false
+   },
+   "HRT": {
+    "label": "HRT(\u03c4), per-cell macro vs the human anchor",
+    "tau_s": 240.0,
+    "A": 0.13754838767437327,
+    "B": 0.10486851554435657,
+    "diff": 0.032679872130016704,
+    "ci95": [
+     0.0031023165358313298,
+     0.05535492735051421
+    ],
+    "p": 0.029970029970029972,
+    "higher_is_better": true,
+    "diff_better": 0.032679872130016704,
+    "favours": "OpenPI",
+    "p_holm": 0.08991008991008992,
+    "significant": false
+   },
+   "RMST": {
+    "label": "RMST(\u03c4) s, pooled (global)",
+    "tau_s": 240.0,
+    "A": 77.57178262020449,
+    "B": 100.92871455121983,
+    "diff": -23.35693193101534,
+    "ci95": [
+     -42.6898249436936,
+     -5.412142520013567
+    ],
+    "p": 0.00999000999000999,
+    "higher_is_better": false,
+    "diff_better": 23.35693193101534,
+    "favours": "OpenPI",
+    "p_holm": 0.03996003996003996,
+    "significant": true
+   },
+   "AUC": {
+    "label": "AUC vs human, per-cell macro",
+    "tau_s": null,
+    "A": 0.10040590187884432,
+    "B": 0.13375095761701644,
+    "diff": -0.03334505573817212,
+    "ci95": [
+     -0.062250315536597475,
+     -0.002752910797783078
+    ],
+    "p": 0.03596403596403597,
+    "higher_is_better": true,
+    "diff_better": -0.03334505573817212,
+    "favours": "ACT",
+    "p_holm": 0.08991008991008992,
+    "significant": false
+   }
+  },
+  "holm_family": [
+   "F30",
+   "HRT",
+   "RMST",
+   "AUC"
+  ],
+  "outcome": "iii",
+  "direction": null,
+  "logrank_sanity": {
+   "chi2": 11.644915604419216,
+   "p": 0.0006437825475783762
+  },
+  "n_boot": 1000,
+  "seed": 0
+ },
+ {
+  "arms": [
+   "OpenPI",
+   "SmolVLA"
+  ],
+  "cells": [
+   "Batteries",
+   "Scissors",
+   "Towels",
+   "Wooden spoons"
+  ],
+  "n_episodes": {
+   "OpenPI": 163,
+   "SmolVLA": 116
+  },
+  "tau_s": 240.0,
+  "alpha": 0.05,
+  "gate": {
+   "test": "macro-KS (pooled-resample episode-clustered bootstrap)",
+   "D": 0.4654550298864024,
+   "p": 0.0004997501249375312,
+   "D_cells": {
+    "Batteries": 0.5193514990269752,
+    "Scissors": 0.40886056781063973,
+    "Towels": 0.5479532582713723,
+    "Wooden spoons": 0.38565479443662254
+   },
+   "n_boot": 2000,
+   "fires": true
+  },
+  "metrics": {
+   "F30": {
+    "label": "F(30 s), pooled",
+    "tau_s": 30.0,
+    "A": 0.4740718018499158,
+    "B": 0.18284682527746743,
+    "diff": 0.2912249765724484,
+    "ci95": [
+     0.21672531666526593,
+     0.36532100611608526
+    ],
+    "p": 0.001998001998001998,
+    "higher_is_better": true,
+    "diff_better": 0.2912249765724484,
+    "favours": "OpenPI",
+    "p_holm": 0.007992007992007992,
+    "significant": true
+   },
+   "HRT": {
+    "label": "HRT(\u03c4), per-cell macro vs the human anchor",
+    "tau_s": 240.0,
+    "A": 0.13754838767437327,
+    "B": 0.0644478636659622,
+    "diff": 0.07310052400841108,
+    "ci95": [
+     0.056341129425432825,
+     0.0919960181196753
+    ],
+    "p": 0.001998001998001998,
+    "higher_is_better": true,
+    "diff_better": 0.07310052400841108,
+    "favours": "OpenPI",
+    "p_holm": 0.007992007992007992,
+    "significant": true
+   },
+   "RMST": {
+    "label": "RMST(\u03c4) s, pooled (global)",
+    "tau_s": 240.0,
+    "A": 77.57178262020449,
+    "B": 166.37265360894958,
+    "diff": -88.80087098874509,
+    "ci95": [
+     -109.04422860381483,
+     -69.46489848246503
+    ],
+    "p": 0.001998001998001998,
+    "higher_is_better": false,
+    "diff_better": 88.80087098874509,
+    "favours": "OpenPI",
+    "p_holm": 0.007992007992007992,
+    "significant": true
+   },
+   "AUC": {
+    "label": "AUC vs human, per-cell macro",
+    "tau_s": null,
+    "A": 0.10040590187884432,
+    "B": 0.026807801809722892,
+    "diff": 0.07359810006912143,
+    "ci95": [
+     0.05617724881603083,
+     0.09203249726486165
+    ],
+    "p": 0.001998001998001998,
+    "higher_is_better": true,
+    "diff_better": 0.07359810006912143,
+    "favours": "OpenPI",
+    "p_holm": 0.007992007992007992,
+    "significant": true
+   }
+  },
+  "holm_family": [
+   "F30",
+   "HRT",
+   "RMST",
+   "AUC"
+  ],
+  "outcome": "i",
+  "direction": "OpenPI",
+  "logrank_sanity": {
+   "chi2": 123.05996650989066,
+   "p": 1.3529735730558333e-28
+  },
+  "n_boot": 1000,
+  "seed": 0
+ },
+ {
+  "arms": [
+   "GR00T",
+   "ACT"
+  ],
+  "cells": [
+   "Batteries",
+   "Scissors",
+   "Towels",
+   "Wooden spoons"
+  ],
+  "n_episodes": {
+   "GR00T": 164,
+   "ACT": 151
+  },
+  "tau_s": 240.0,
+  "alpha": 0.05,
+  "gate": {
+   "test": "macro-KS (pooled-resample episode-clustered bootstrap)",
+   "D": 0.17540928625103427,
+   "p": 0.012993503248375811,
+   "D_cells": {
+    "Batteries": 0.1667998840046575,
+    "Scissors": 0.15480739798809673,
+    "Towels": 0.226966202062858,
+    "Wooden spoons": 0.15306366094852486
+   },
+   "n_boot": 2000,
+   "fires": true
+  },
+  "metrics": {
+   "F30": {
+    "label": "F(30 s), pooled",
+    "tau_s": 30.0,
+    "A": 0.5091013807969105,
+    "B": 0.4408681287160765,
+    "diff": 0.06823325208083397,
+    "ci95": [
+     0.005087480067920419,
+     0.13629818658610143
+    ],
+    "p": 0.03396603396603397,
+    "higher_is_better": true,
+    "diff_better": 0.06823325208083397,
+    "favours": "GR00T",
+    "p_holm": 0.06793206793206794,
+    "significant": false
+   },
+   "HRT": {
+    "label": "HRT(\u03c4), per-cell macro vs the human anchor",
+    "tau_s": 240.0,
+    "A": 0.13349183206648715,
+    "B": 0.10486851554435657,
+    "diff": 0.028623316522130585,
+    "ci95": [
+     0.0004057053585570253,
+     0.050130790924801
+    ],
+    "p": 0.04995004995004995,
+    "higher_is_better": true,
+    "diff_better": 0.028623316522130585,
+    "favours": "GR00T",
+    "p_holm": 0.06793206793206794,
+    "significant": false
+   },
+   "RMST": {
+    "label": "RMST(\u03c4) s, pooled (global)",
+    "tau_s": 240.0,
+    "A": 77.31253986498288,
+    "B": 100.92871455121983,
+    "diff": -23.616174686236945,
+    "ci95": [
+     -42.85260678631192,
+     -6.401265599961076
+    ],
+    "p": 0.005994005994005994,
+    "higher_is_better": false,
+    "diff_better": 23.616174686236945,
+    "favours": "GR00T",
+    "p_holm": 0.023976023976023976,
+    "significant": true
+   },
+   "AUC": {
+    "label": "AUC vs human, per-cell macro",
+    "tau_s": null,
+    "A": 0.09492460393298947,
+    "B": 0.13375095761701644,
+    "diff": -0.03882635368402697,
+    "ci95": [
+     -0.06940798789100298,
+     -0.008472751527613691
+    ],
+    "p": 0.013986013986013986,
+    "higher_is_better": true,
+    "diff_better": -0.03882635368402697,
+    "favours": "ACT",
+    "p_holm": 0.04195804195804196,
+    "significant": true
+   }
+  },
+  "holm_family": [
+   "F30",
+   "HRT",
+   "RMST",
+   "AUC"
+  ],
+  "outcome": "ii",
+  "direction": null,
+  "logrank_sanity": {
+   "chi2": 11.75585620885426,
+   "p": 0.000606521042077285
+  },
+  "n_boot": 1000,
+  "seed": 0
+ },
+ {
+  "arms": [
+   "GR00T",
+   "SmolVLA"
+  ],
+  "cells": [
+   "Batteries",
+   "Scissors",
+   "Towels",
+   "Wooden spoons"
+  ],
+  "n_episodes": {
+   "GR00T": 164,
+   "SmolVLA": 116
+  },
+  "tau_s": 240.0,
+  "alpha": 0.05,
+  "gate": {
+   "test": "macro-KS (pooled-resample episode-clustered bootstrap)",
+   "D": 0.4343981522594673,
+   "p": 0.0004997501249375312,
+   "D_cells": {
+    "Batteries": 0.5677344940816855,
+    "Scissors": 0.2752158250363109,
+    "Towels": 0.5626593372455643,
+    "Wooden spoons": 0.33198295267430855
+   },
+   "n_boot": 2000,
+   "fires": true
+  },
+  "metrics": {
+   "F30": {
+    "label": "F(30 s), pooled",
+    "tau_s": 30.0,
+    "A": 0.5091013807969105,
+    "B": 0.18284682527746743,
+    "diff": 0.32625455551944305,
+    "ci95": [
+     0.25561761725036075,
+     0.4013100008285538
+    ],
+    "p": 0.001998001998001998,
+    "higher_is_better": true,
+    "diff_better": 0.32625455551944305,
+    "favours": "GR00T",
+    "p_holm": 0.007992007992007992,
+    "significant": true
+   },
+   "HRT": {
+    "label": "HRT(\u03c4), per-cell macro vs the human anchor",
+    "tau_s": 240.0,
+    "A": 0.13349183206648715,
+    "B": 0.0644478636659622,
+    "diff": 0.06904396840052496,
+    "ci95": [
+     0.05312329701588902,
+     0.08846168058983478
+    ],
+    "p": 0.001998001998001998,
+    "higher_is_better": true,
+    "diff_better": 0.06904396840052496,
+    "favours": "GR00T",
+    "p_holm": 0.007992007992007992,
+    "significant": true
+   },
+   "RMST": {
+    "label": "RMST(\u03c4) s, pooled (global)",
+    "tau_s": 240.0,
+    "A": 77.31253986498288,
+    "B": 166.37265360894958,
+    "diff": -89.0601137439667,
+    "ci95": [
+     -110.4914767910628,
+     -69.66726831232555
+    ],
+    "p": 0.001998001998001998,
+    "higher_is_better": false,
+    "diff_better": 89.0601137439667,
+    "favours": "GR00T",
+    "p_holm": 0.007992007992007992,
+    "significant": true
+   },
+   "AUC": {
+    "label": "AUC vs human, per-cell macro",
+    "tau_s": null,
+    "A": 0.09492460393298947,
+    "B": 0.026807801809722892,
+    "diff": 0.06811680212326658,
+    "ci95": [
+     0.05102422803752872,
+     0.08681342700674202
+    ],
+    "p": 0.001998001998001998,
+    "higher_is_better": true,
+    "diff_better": 0.06811680212326658,
+    "favours": "GR00T",
+    "p_holm": 0.007992007992007992,
+    "significant": true
+   }
+  },
+  "holm_family": [
+   "F30",
+   "HRT",
+   "RMST",
+   "AUC"
+  ],
+  "outcome": "i",
+  "direction": "GR00T",
+  "logrank_sanity": {
+   "chi2": 122.47703298869929,
+   "p": 1.815041820821175e-28
+  },
+  "n_boot": 1000,
+  "seed": 0
+ },
+ {
+  "arms": [
+   "ACT",
+   "SmolVLA"
+  ],
+  "cells": [
+   "Batteries",
+   "Scissors",
+   "Towels",
+   "Wooden spoons"
+  ],
+  "n_episodes": {
+   "ACT": 151,
+   "SmolVLA": 116
+  },
+  "tau_s": 240.0,
+  "alpha": 0.05,
+  "gate": {
+   "test": "macro-KS (pooled-resample episode-clustered bootstrap)",
+   "D": 0.3607332691290364,
+   "p": 0.0004997501249375312,
+   "D_cells": {
+    "Batteries": 0.4482616787754652,
+    "Scissors": 0.3489407071327122,
+    "Towels": 0.381985596726118,
+    "Wooden spoons": 0.2637450938818502
+   },
+   "n_boot": 2000,
+   "fires": true
+  },
+  "metrics": {
+   "F30": {
+    "label": "F(30 s), pooled",
+    "tau_s": 30.0,
+    "A": 0.4408681287160765,
+    "B": 0.18284682527746743,
+    "diff": 0.2580213034386091,
+    "ci95": [
+     0.17809094694629432,
+     0.343307828732641
+    ],
+    "p": 0.001998001998001998,
+    "higher_is_better": true,
+    "diff_better": 0.2580213034386091,
+    "favours": "ACT",
+    "p_holm": 0.007992007992007992,
+    "significant": true
+   },
+   "HRT": {
+    "label": "HRT(\u03c4), per-cell macro vs the human anchor",
+    "tau_s": 240.0,
+    "A": 0.10486851554435657,
+    "B": 0.0644478636659622,
+    "diff": 0.04042065187839437,
+    "ci95": [
+     0.02380398089188661,
+     0.06919157907656982
+    ],
+    "p": 0.001998001998001998,
+    "higher_is_better": true,
+    "diff_better": 0.04042065187839437,
+    "favours": "ACT",
+    "p_holm": 0.007992007992007992,
+    "significant": true
+   },
+   "RMST": {
+    "label": "RMST(\u03c4) s, pooled (global)",
+    "tau_s": 240.0,
+    "A": 100.92871455121983,
+    "B": 166.37265360894958,
+    "diff": -65.44393905772975,
+    "ci95": [
+     -91.25521420621308,
+     -40.4194726712131
+    ],
+    "p": 0.001998001998001998,
+    "higher_is_better": false,
+    "diff_better": 65.44393905772975,
+    "favours": "ACT",
+    "p_holm": 0.007992007992007992,
+    "significant": true
+   },
+   "AUC": {
+    "label": "AUC vs human, per-cell macro",
+    "tau_s": null,
+    "A": 0.13375095761701644,
+    "B": 0.026807801809722892,
+    "diff": 0.10694315580729355,
+    "ci95": [
+     0.08068376769777828,
+     0.13684049953530333
+    ],
+    "p": 0.001998001998001998,
+    "higher_is_better": true,
+    "diff_better": 0.10694315580729355,
+    "favours": "ACT",
+    "p_holm": 0.007992007992007992,
+    "significant": true
+   }
+  },
+  "holm_family": [
+   "F30",
+   "HRT",
+   "RMST",
+   "AUC"
+  ],
+  "outcome": "i",
+  "direction": "ACT",
+  "logrank_sanity": {
+   "chi2": 63.74572842882211,
+   "p": 1.4156017620509848e-15
+  },
+  "n_boot": 1000,
+  "seed": 0
+ }
+]

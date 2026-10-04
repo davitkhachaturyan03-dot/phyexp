@@ -1,0 +1,5 @@
+AC7.x holm: hand example [0.01, 0.04, 0.03, 0.005] -> [0.03, 0.06, 0.06, 0.02]; single p unchanged; capped at 1: pass
+AC7.x outcome rule: (iii) without the gate, (i) A, (i) B, (ii), gate_only on labelled-synthetic metric sets: pass
+AC7.3 SYNTHETIC App. I CDFs: KS sup-sign winners A vs B: sup 0.40 -> A; B vs C: sup 0.50 -> B; C vs A: sup 0.50 -> C (a cycle A≻B≻C≻A)
+AC7.3 RMST(70 s): A 35.50, B 21.10, C 35.30 (transitive: B < C < A)
+AC7.3 verdict A vs B: gate D̄ 0.40 (unsigned) p 0.0025 -> outcome (i), direction B from RMST Δ +14.40 s [+9.03, +19.84], while the KS sup-sign favours A
