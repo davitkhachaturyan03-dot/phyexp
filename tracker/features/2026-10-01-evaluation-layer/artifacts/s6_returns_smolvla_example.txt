@@ -1,0 +1,41 @@
+== returns-e138fec97361 (eval run e138fec9, external HuggingFaceVLA/smolvla_libero@6721902bc4d61e50a3bfdb11dfb4cb626f05d102) ==
+                    rollout_id  T_s        failure_type  ret_f30  ret_rmst60  ret_auc_sampled  ret_auc_expected  ret_hrt60_lin  ret_censored60
+libero_spatial/0/init000/seed0  NaN timeout_no_progress      0.0      -60.00              0.0              0.00        -0.3613             1.0
+libero_spatial/0/init001/seed1  NaN timeout_no_progress      0.0      -60.00              0.0              0.00        -0.3613             1.0
+libero_spatial/0/init002/seed2  NaN timeout_no_progress      0.0      -60.00              0.0              0.00        -0.3613             1.0
+libero_spatial/0/init003/seed3 3.55             success      1.0       -3.55              1.0              0.92        -0.0214             0.0
+libero_spatial/0/init004/seed4  NaN timeout_no_progress      0.0      -60.00              0.0              0.00        -0.3613             1.0
+libero_spatial/0/init005/seed5 3.35             success      1.0       -3.35              1.0              0.98        -0.0202             0.0
+libero_spatial/0/init006/seed6 3.65             success      1.0       -3.65              0.0              0.82        -0.0220             0.0
+libero_spatial/0/init007/seed7 3.75             success      1.0       -3.75              0.0              0.71        -0.0226             0.0
+libero_spatial/0/init008/seed8 3.85             success      1.0       -3.85              0.0              0.62        -0.0232             0.0
+libero_spatial/0/init009/seed9 3.70             success      1.0       -3.70              1.0              0.75        -0.0223             0.0
+== returns-e92604a8b995 (eval run e92604a8, external HuggingFaceVLA/smolvla_libero@6721902bc4d61e50a3bfdb11dfb4cb626f05d102) ==
+               rollout_id   T_s           failure_type  ret_f30  ret_rmst60  ret_auc_sampled  ret_auc_expected  ret_hrt60_lin  ret_censored60
+libero_10/8/init000/seed0   NaN    timeout_no_progress      0.0      -60.00              0.0              0.00        -0.5158             1.0
+libero_10/8/init001/seed1   NaN timeout_partial_1_of_2      0.0      -60.00              0.0              0.00        -0.5158             1.0
+libero_10/8/init002/seed2   NaN    timeout_no_progress      0.0      -60.00              0.0              0.00        -0.5158             1.0
+libero_10/8/init003/seed3 23.45                success      1.0      -23.45              0.0              0.06        -0.2016             0.0
+libero_10/8/init004/seed4   NaN    timeout_no_progress      0.0      -60.00              0.0              0.00        -0.5158             1.0
+libero_10/8/init005/seed5   NaN timeout_partial_1_of_2      0.0      -60.00              0.0              0.00        -0.5158             1.0
+libero_10/8/init006/seed6 20.20                success      1.0      -20.20              0.0              0.41        -0.1737             0.0
+libero_10/8/init007/seed7 20.35                success      1.0      -20.35              0.0              0.38        -0.1749             0.0
+libero_10/8/init008/seed8   NaN    timeout_no_progress      0.0      -60.00              0.0              0.00        -0.5158             1.0
+libero_10/8/init009/seed9   NaN    timeout_no_progress      0.0      -60.00              0.0              0.00        -0.5158             1.0
+               rollout_id  op_k  t_start_steps  t_end_steps  T_op_s  event  ret_rmst60_op
+libero_10/8/init000/seed0     1              0         1200   60.00      0         -60.00
+libero_10/8/init001/seed1     1              0          796   39.80      1         -39.80
+libero_10/8/init001/seed1     2            796         1200   20.20      0         -20.20
+libero_10/8/init002/seed2     1              0         1200   60.00      0         -60.00
+libero_10/8/init003/seed3     1              0          159    7.95      1          -7.95
+libero_10/8/init003/seed3     2            159          469   15.50      1         -15.50
+libero_10/8/init004/seed4     1              0         1200   60.00      0         -60.00
+libero_10/8/init005/seed5     1              0          968   48.40      1         -48.40
+libero_10/8/init005/seed5     2            968         1200   11.60      0         -11.60
+libero_10/8/init006/seed6     1              0          162    8.10      1          -8.10
+libero_10/8/init006/seed6     2            162          404   12.10      1         -12.10
+libero_10/8/init007/seed7     1              0          202   10.10      1         -10.10
+libero_10/8/init007/seed7     2            202          407   10.25      1         -10.25
+libero_10/8/init008/seed8     1              0         1200   60.00      0         -60.00
+libero_10/8/init009/seed9     1              0         1200   60.00      0         -60.00
+libero_10:8 operation level, 15 pairs (2 censored tails < 60 s): mean(ret_rmst60_op) = 32.267 s; KM RMST60 over the same pairs = 36.986 s; censored pairs with T_op < 60: 2

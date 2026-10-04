@@ -869,7 +869,7 @@ the summary print. The rollouts parquet was already written before the crash.
   at step 991 (inner horizon 1000, 10 settle steps; `artifacts/s5_horizon_check.json`). `ProbedLiberoEnv` raises
   the horizon, and AC5.1's rollouts ran 1200 steps.
 
-### S6: One return per metric per rollout (and per operation): the attribution-ready output (IN PROGRESS: AC6.1 real and AC6.5 wait for the AC5.4 SmolVLA rollouts)
+### S6: One return per metric per rollout (and per operation): the attribution-ready output (COMPLETE locally: AC6.1–AC6.6 ✅; AC6.7 pending server)
 
 Re-read: PoC §4.1 p. 9 (the four yardsticks), §4.2 p. 9, §4.3 p. 10 ("Success within 30 s → binary return; RMST
 → negative capped time; AUC → win indicator against a sampled human time. HRT is a ratio, so it needs a
@@ -1058,3 +1058,71 @@ caffeinate -i` so it could outlive the session (`data/scratch/run_ac5_4.sh`).
 - `--trajectories` now takes several dirs. It checks `frame_index` = policy step and the episode ↔ rollout mapping,
   and writes one JSON per run.
 - Data (gitignored): `data/eval/eval-smolvla-harness-{spatial0-20261004T150110Z,l10t8-20261004T153306Z}/`.
+
+#### S6 continuation: AC6.1 (real) and AC6.5 on the AC5.4 rollouts (S6 complete locally)
+
+- ✅ AC6.1 (real part): `python -m vlapoc.returns --eval-run e138fec9…` and `… e92604a8…` both exit 0. They write
+  `data/eval/returns-e138fec97361/` (10 rows, 10 operation rows; `hrt_macro_at_policy` 0.1577) and
+  `data/eval/returns-e92604a8b995/` (10 rows, 15 operation rows; 0.4161). Then
+  `verify_returns_s6.py --real <spatial dir> --real <l10t8 dir>` (`artifacts/s6_real_stdout.txt`):
+  - spatial:0: `max |mean(ret_rmst60) + RMST60| = 0.00e+00; max |mean(ret_f30) - F30| = 0.00e+00;
+    max |mean(ret_censored60) - censored_rate| = 0.00e+00`.
+  - libero_10:8: `7.11e-15`, `5.55e-17`, `0.00e+00`.
+  - All are ≤ 1e-9. Censoring occurs only at τ_episode = 60 s, which is the AC's condition.
+- ✅ AC6.5 failure-type subsets (`artifacts/s6_real_stdout.txt`). Rollouts per cell × `failure_type`:
+  - spatial:0: `success 6, timeout_no_progress 4`.
+  - libero_10:8: `success 3, timeout_no_progress 5, timeout_partial_1_of_2 2`.
+  - S1 metrics recomputed per subset:
+    - spatial success: F(30 s) 1.000, RMST(60) 3.64 s, mean `ret_auc_expected` 0.800;
+    - libero_10:8 success: F(30 s) 1.000, RMST(60) 21.33 s, mean `ret_auc_expected` 0.283;
+    - the timeout subsets: F(30 s) 0, RMST(60) 60 s.
+  - Each eval run here is one task, so the task filter is the run. `returns.parquet` carries `suite`,
+    `libero_task_id` and `cell` for multi-task runs.
+- **Example tables for the report:** `artifacts/s6_returns_smolvla_example.txt`, both runs' returns and libero_10:8's
+  15 operation rows. Libero_10:8 init 3 shows the structure:
+  - op 1 covers steps 0–159 (7.95 s) and op 2 covers steps 159–469 (15.50 s); Σ = T = 23.45 s;
+  - a partial rollout (init 1) has op 1 = 39.80 s (event) and a censored tail of 20.20 s.
+
+**Notes / divergences (S6):**
+- **Operation-level returns with an early-censored tail are lower bounds (measured).** `ret_rmst60_op = −min(T_op,
+  60 s)` is the plan's definition. For a censored tail shorter than 60 s (after 1 of 2 operations), it is not the
+  per-op term of an RMST.
+  - On libero_10:8's 15 operation pairs (2 such tails): mean(−`ret_rmst60_op`) = 32.27 s, but KM RMST(60) over the
+    same pairs = 36.99 s.
+  - The `event` column marks these rows. Using operation returns with censoring (e.g. §3.4's "negative
+    time-to-success with a penalty for ghost events") is the attribution feature's decision. Not changed here.
+- **AUC ties:** see the S6 premise above. On the 20 real rollouts, mean(`ret_auc_expected`) is the ties-½ AUC.
+- **`ret_hrt60_lin` weights are evaluated at each eval run's own policy, and J = the cells in that run.** For a
+  run per task (as here) J = 1. A multi-task eval run gets one J across its cells. The attribution feature must
+  compute the weights over the cells it attributes against (inferred; the form is still to be confirmed there, as
+  the plan says).
+- Renamed columns, as above: `ret_hrt60_lin`, `ret_censored60`, `ret_rmst60_op`.
+
+### Findings for the analyzer (batch 2: S4–S6)
+- **Evidence slip (S5 AC5.2), resolved.**
+  - The committed `{arm_action_norm: 6}` was a comparator artifact: `str(ndarray)` vs a JSON list. I reproduced it
+    by comparing a record against itself.
+  - The ACT stdout from a stdin heredoc, where the previous executor reported a stub import, is kept as
+    `s5_ac5_2_ac5_3_act_stdout.INVALID.txt`.
+  - Every AC5.2 claim now rests on comparisons I re-ran without stubs.
+- **LIBERO scene drift with reset count (measured, inferred to be unintended upstream).** `object_property_initializers`
+  grows by one on every hard reset (`bddl_base_domain.py:653,674`), so in 4/20 tasks a reused env object places
+  fixtures differently (task 8 stove, 7.2 mm).
+  - The harness is immune because it uses one fresh env per rollout. The S3 human replay (one env, many resets) is
+    not; this is the mechanism behind the S3 demo_19 419/−1/419 finding.
+  - S3's 1000/1000 replay used the demos' own model XML, so its headline is unaffected (inferred from S3's log:
+    the "BDDL scene" variant is the one that drifts).
+  - `t0_state_sha256` cannot see fixture placement. A `t0_model_sha256` column would close that gap. **Not built:
+    it is a schema change the plan does not ask for.** Planner decision.
+- **Stochastic-policy outcomes depend on the batch plan (measured on SmolVLA).** Same init/seed, batch 1 vs 5:
+  init 4 succeeds at step 71 vs never. AC5.6 as worded (init states) passes.
+  - Per-rollout policy RNG would need patching LeRobot policy internals (noise sampling), which is out of scope.
+  - AC5.8 should fix `batch_size` (it is recorded). Planner: decide whether attribution needs batch-independent
+    rollouts.
+- **New dependency:** `transformers 5.5.4` + `num2words 0.5.14` (the `lerobot[smolvla]` extra; S8 needs it too).
+- **SmolVLA cost on this Mac:** ≈ 0.29–0.4 s per env-step on MPS. The checkpoint replans every step
+  (`n_action_steps 1`), so one failed 1200-step rollout is ≈ 6 min. AC5.8 (1000 rollouts × seeds) is server-only.
+- **Not re-run in this batch:** `scripts/verify_runs_s5.py` (the data+lineage S5 checks, switched to `eval_run` in
+  `4448ed2`) and `scripts/lineage_dry_run.py`. Both train tiny ACT runs and belong to S9's end-to-end check.
+- **AC6.2 passes narrowly (9.51% ≤ 10%).** The linearization error tracks the per-cell perturbation size, not the
+  macro |ΔHRT|.

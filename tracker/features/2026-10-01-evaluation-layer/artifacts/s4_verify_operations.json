@@ -255,8 +255,9 @@
    "vlapoc/libero_goals.py"
   ],
   "callers": {
-   "scripts/human_reference.py": true
+   "scripts/human_reference.py": true,
+   "vlapoc/rollouts.py": true
   },
-  "pass": false
+  "pass": true
  }
 }

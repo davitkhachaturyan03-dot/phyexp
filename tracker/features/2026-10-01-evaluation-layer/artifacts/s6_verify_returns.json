@@ -209,5 +209,34 @@
    "ok": true
   },
   "stale_rejected": true
+ },
+ "AC6.1_real_eval-smolvla-harness-spatial0-20261004T150110Z": {
+  "rmst": 0.0,
+  "f30": 0.0,
+  "censored": 0.0
+ },
+ "AC6.5_eval-smolvla-harness-spatial0-20261004T150110Z": {
+  "success": {
+   "libero_spatial/0": 6
+  },
+  "timeout_no_progress": {
+   "libero_spatial/0": 4
+  }
+ },
+ "AC6.1_real_eval-smolvla-harness-l10t8-20261004T153306Z": {
+  "rmst": 7.105427357601002e-15,
+  "f30": 5.551115123125783e-17,
+  "censored": 0.0
+ },
+ "AC6.5_eval-smolvla-harness-l10t8-20261004T153306Z": {
+  "success": {
+   "libero_10/8": 3
+  },
+  "timeout_no_progress": {
+   "libero_10/8": 5
+  },
+  "timeout_partial_1_of_2": {
+   "libero_10/8": 2
+  }
  }
 }

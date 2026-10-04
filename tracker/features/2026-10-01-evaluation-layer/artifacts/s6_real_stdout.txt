@@ -1,0 +1,17 @@
+AC6.1 REAL (eval-smolvla-harness-spatial0-20261004T150110Z, 10 rollouts, 1 cells): max |mean(ret_rmst60) + RMST60| = 0.00e+00; max |mean(ret_f30) - F30| = 0.00e+00; max |mean(ret_censored60) - censored_rate| = 0.00e+00
+AC6.5 rollouts per cell x failure_type:
+failure_type      success  timeout_no_progress
+cell                                          
+libero_spatial/0        6                    4
+AC6.5 subset failure_type=success: n 6, F(30 s) 1.000, RMST(60) 3.64 s, mean ret_auc_expected 0.800
+AC6.5 subset failure_type=timeout_no_progress: n 4, F(30 s) 0.000, RMST(60) 60.00 s, mean ret_auc_expected 0.000
+AC6.1 REAL HRT linearization weights {"libero_spatial/0": 0.006022}; macro HRT at policy 0.1577; operation rows 10
+AC6.1 REAL (eval-smolvla-harness-l10t8-20261004T153306Z, 10 rollouts, 1 cells): max |mean(ret_rmst60) + RMST60| = 7.11e-15; max |mean(ret_f30) - F30| = 5.55e-17; max |mean(ret_censored60) - censored_rate| = 0.00e+00
+AC6.5 rollouts per cell x failure_type:
+failure_type  success  timeout_no_progress  timeout_partial_1_of_2
+cell                                                              
+libero_10/8         3                    5                       2
+AC6.5 subset failure_type=success: n 3, F(30 s) 1.000, RMST(60) 21.33 s, mean ret_auc_expected 0.283
+AC6.5 subset failure_type=timeout_no_progress: n 5, F(30 s) 0.000, RMST(60) 60.00 s, mean ret_auc_expected 0.000
+AC6.5 subset failure_type=timeout_partial_1_of_2: n 2, F(30 s) 0.000, RMST(60) 60.00 s, mean ret_auc_expected 0.000
+AC6.1 REAL HRT linearization weights {"libero_10/8": 0.008597}; macro HRT at policy 0.4161; operation rows 15
