@@ -1,0 +1,46 @@
+[rollouts] libero_spatial/0/init000/seed0: censored at 1200 (0/1 ops), 349.8s
+[rollouts] libero_spatial/0/init001/seed1: censored at 1200 (0/1 ops), 349.8s
+[rollouts] libero_spatial/0/init002/seed2: censored at 1200 (0/1 ops), 349.8s
+[rollouts] libero_spatial/0/init003/seed3: success at step 71 (1/1 ops), 349.8s
+[rollouts] libero_spatial/0/init004/seed4: censored at 1200 (0/1 ops), 349.8s
+[rollouts] libero_spatial/0/init005/seed5: success at step 67 (1/1 ops), 24.2s
+[rollouts] libero_spatial/0/init006/seed6: success at step 73 (1/1 ops), 24.2s
+[rollouts] libero_spatial/0/init007/seed7: success at step 75 (1/1 ops), 24.2s
+[rollouts] libero_spatial/0/init008/seed8: success at step 77 (1/1 ops), 24.2s
+[rollouts] libero_spatial/0/init009/seed9: success at step 74 (1/1 ops), 24.2s
+{
+ "run_id": "e138fec973614c01af870d91ea8c7ad5",
+ "rollouts": "data/eval/eval-smolvla-harness-spatial0-20261004T150110Z/rollouts.parquet",
+ "n_rollouts": 10,
+ "n_success": 6,
+ "trajectories": {
+  "root": "data/eval/eval-smolvla-harness-spatial0-20261004T150110Z/trajectories",
+  "digest": "9ab3d9ad78d7761bf63f37e4f20d83b146496432da64163bf9b9d3cdd972325a",
+  "episodes": 10,
+  "frames": 5237
+ },
+ "out_dir": "data/eval/eval-smolvla-harness-spatial0-20261004T150110Z"
+}
+[rollouts] libero_10/8/init000/seed0: censored at 1200 (0/2 ops), 347.2s
+[rollouts] libero_10/8/init001/seed1: censored at 1200 (1/2 ops), 347.2s
+[rollouts] libero_10/8/init002/seed2: censored at 1200 (0/2 ops), 347.2s
+[rollouts] libero_10/8/init003/seed3: success at step 469 (2/2 ops), 347.2s
+[rollouts] libero_10/8/init004/seed4: censored at 1200 (0/2 ops), 347.2s
+[rollouts] libero_10/8/init005/seed5: censored at 1200 (1/2 ops), 348.6s
+[rollouts] libero_10/8/init006/seed6: success at step 404 (2/2 ops), 348.6s
+[rollouts] libero_10/8/init007/seed7: success at step 407 (2/2 ops), 348.6s
+[rollouts] libero_10/8/init008/seed8: censored at 1200 (0/2 ops), 348.6s
+[rollouts] libero_10/8/init009/seed9: censored at 1200 (0/2 ops), 348.6s
+{
+ "run_id": "e92604a8b9954a29badfbaf8d2d986e3",
+ "rollouts": "data/eval/eval-smolvla-harness-l10t8-20261004T153306Z/rollouts.parquet",
+ "n_rollouts": 10,
+ "n_success": 3,
+ "trajectories": {
+  "root": "data/eval/eval-smolvla-harness-l10t8-20261004T153306Z/trajectories",
+  "digest": "197a7f884278846007522ab7d7ee6d8cf32a811d07bd040c806078e350043f15",
+  "episodes": 10,
+  "frames": 9680
+ },
+ "out_dir": "data/eval/eval-smolvla-harness-l10t8-20261004T153306Z"
+}

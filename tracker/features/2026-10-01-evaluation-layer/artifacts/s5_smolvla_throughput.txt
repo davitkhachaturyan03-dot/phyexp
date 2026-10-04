@@ -1,0 +1,2 @@
+s5_smolvla_tp_mps_b1: Running rollout with at most 40 steps: 100%|██████████| 40/40 [00:21<00:00,  2.41it/s, run
+s5_smolvla_tp_mps_b10: Running rollout with at most 30 steps: 100%|██████████| 30/30 [01:26<00:00,  2.69s/it, run

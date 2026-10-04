@@ -1,0 +1,6 @@
+SmolVLA smolvla_libero@6721902b, MPS, libero_spatial:0, same (init state j, seed j): batch 5 (tracked run e138fec9, tau 1200) vs batch 1 (untracked, tau 280)
+  init 0: batch 5 -> no success by 1200; batch 1 -> no success by 280; t0_state_sha256 equal: True
+  init 1: batch 5 -> no success by 1200; batch 1 -> no success by 280; t0_state_sha256 equal: True
+  init 2: batch 5 -> no success by 1200; batch 1 -> no success by 280; t0_state_sha256 equal: True
+  init 3: batch 5 -> success at step 71; batch 1 -> success at step 78; t0_state_sha256 equal: True
+  init 4: batch 5 -> no success by 1200; batch 1 -> success at step 71; t0_state_sha256 equal: True

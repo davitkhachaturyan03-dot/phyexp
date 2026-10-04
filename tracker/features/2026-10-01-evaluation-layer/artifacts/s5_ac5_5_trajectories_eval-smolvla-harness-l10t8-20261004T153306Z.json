@@ -1,0 +1,14 @@
+{
+ "run_dir": "eval-smolvla-harness-l10t8-20261004T153306Z",
+ "episodes": 10,
+ "frames": 9680,
+ "sum_sim_steps": 9680,
+ "lengths_match": true,
+ "frame_index_is_policy_step": true,
+ "video_keys": [],
+ "image_shape": [
+  3,
+  256,
+  256
+ ]
+}

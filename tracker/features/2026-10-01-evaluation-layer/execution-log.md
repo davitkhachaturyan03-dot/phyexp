@@ -679,7 +679,7 @@ Re-read: PoC §3.5 A p. 7, §3.4 p. 7, §3.2 p. 6 (PDF dump); PhAIL §3.1 p. 4; 
 - **Threshold 0 vs PhAIL's 0.3 s** (declared in the docstring). With exact sim timestamps, simultaneous
   completion gives T = 0 under both conventions.
 
-### S5: Rollout harness, rollout record and the eval stage (IN PROGRESS, partial entry)
+### S5: Rollout harness, rollout record and the eval stage (COMPLETE locally: AC5.1–AC5.7 ✅; AC5.8 pending server)
 
 Read: LeRobot `lerobot_eval.rollout()` (`lerobot/scripts/lerobot_eval.py:167-410`), `LiberoEnv`
 (`lerobot/envs/libero.py`), `LiberoProcessorStep` (`processor/env_processor.py`), the env processors
@@ -911,8 +911,8 @@ diff against that commit. Its synthetic run reproduces byte-for-byte: my re-run'
   - The difference is recorded, not hidden. AC6.1 only requires the AUC identity on uncensored synthetic data.
 
 **Acceptance criteria:**
-- ✅ AC6.1 (synthetic part) `verify_returns_s6.py --synthetic` (LABELLED SYNTHETIC; `artifacts/s6_synthetic_stdout.txt`,
-  `s6_verify_returns.json`):
+- ✅ AC6.1 (synthetic part) `verify_returns_s6.py --synthetic` (LABELLED SYNTHETIC; `artifacts/s6_verify_stdout_r2.txt` with the current column names, and
+  `s6_verify_returns.json`. `s6_synthetic_stdout.txt` is the WIP run: same numbers, old names):
   - 10% censoring, at τ_episode only: `max |mean(ret_rmst60) + RMST60_KM| = 1.07e-14`, `max |mean(ret_f30) - F30_KM| = 1.11e-16`.
   - No censoring: `7.11e-15`, `1.11e-16`, and `max |mean(ret_auc_expected) - AUC_censored| = 2.78e-17`.
   - All are ≤ 1e-9. The sampled AUC indicator differs from its expectation by sampling noise only, e.g. `syn/0`:
@@ -953,3 +953,108 @@ diff against that commit. Its synthetic run reproduces byte-for-byte: my re-run'
   `RETURN_COLUMNS: True`.
 - ⏳ AC6.7 (pending server): returns for every AC5.8 rollout. That means
   `python -m vlapoc.returns --eval-run <id>` per seed's eval run.
+
+#### S5 continuation: AC5.4, AC5.5, AC5.7 and AC4.5 (S5 complete locally)
+
+Placed under S5, although it comes after the S6 entry in the file: S6's first part was logged while these runs
+were in flight.
+
+**New dependency (logged per the executor rules).** `HuggingFaceVLA/smolvla_libero` could not load:
+`ImportError: 'transformers' is required but not installed. Install it with: pip install 'lerobot[smolvla]'`
+(`modeling_smolvla.py:162`).
+- What the extra needs, read from installed lerobot's `METADATA`: `lerobot[transformers-dep]` →
+  `transformers<5.6.0,>=5.4.0`; `num2words<0.6.0,>=0.5.14`; and `lerobot[accelerate-dep]` (accelerate 1.15.0 was
+  already installed).
+- Installed in `.venv`: `pip install "transformers>=5.4.0,<5.6.0" "num2words>=0.5.14,<0.6.0"` (exit 0).
+- The freeze diff is exactly `docopt 0.6.2, num2words 0.5.14, regex 2026.9.29, rich 15.0.0, shellingham 1.5.4,
+  tokenizers 0.22.2, transformers 5.5.4, typer 0.27.2` (`data/scratch/logs/venv_freeze_{before,after}_smolvla.txt`;
+  the after list is in `artifacts/s5_venv_freeze_after_smolvla.txt`).
+- No other way exists: SmolVLA's VLM backbone is a `transformers` model. S8 (SmolVLA training) needs the same package.
+- All SmolVLA runs set `HF_HUB_OFFLINE=1`, so nothing was downloaded at load time.
+
+**Throughput on MPS, measured before sizing AC5.4** (`artifacts/s5_smolvla_throughput.txt`). The checkpoint's
+config has `n_action_steps: 1`, so the policy runs a full flow-matching inference (10 steps) at every env step.
+- batch 1: about 2.4–2.5 policy steps/s at steady state, ≈ 0.4 s per env-step (40 steps in 21 s including warm-up).
+- batch 10: 2.69 s per vector step, ≈ 0.27 s per env-step.
+- batch 5 (the AC5.4 runs): 1.45 s per vector step, ≈ 0.29 s per env-step.
+- A failed rollout runs the full 1200 steps, so a batch of 5 with one failure costs ≈ 29 min.
+- I kept **10 init states per task, as the plan asks**: the count was not reduced. Each task ran as its own
+  tracked eval run, so an interruption loses at most one task.
+
+**MPS determinism (measured, `artifacts/s5_smolvla_mps_determinism.txt`):** libero_spatial:0, init/seed 0–9,
+batch 10, 30 steps, two processes → `{'rows': 10, 'columns_compared': 30, 'differing': {}}`. Arm action norms
+(0.3666–1.3040) agree to the record's 1e-6 rounding. So at a fixed batch plan, SmolVLA on MPS is reproducible at
+record precision.
+
+**An interrupted run, recorded and closed.** The first AC5.4 attempt was eval run `8fae29c4`
+(`eval-smolvla-libero-harness`, both tasks in one run). It died when the app session ended (2026-10-03 20:38), at
+policy step 311/1200 of its first batch, with no rollouts and no outputs. I set it to MLflow status `KILLED`, with
+tag `eval.interrupted` saying why, and removed its empty output dir. The rerun went through `screen -dmS …
+caffeinate -i` so it could outlive the session (`data/scratch/run_ac5_4.sh`).
+
+**Acceptance criteria:**
+- ✅ AC5.4 **real-policy harness validation.** External checkpoint (not trained on our data), harness validation,
+  not attribution-grade. `HuggingFaceVLA/smolvla_libero@6721902bc4d61e50a3bfdb11dfb4cb626f05d102`, weights sha256
+  `71d9563c8295…`.
+  - Settings: MPS, render 256² (the checkpoint's input size), τ_episode 1200 steps (60 s), `control_mode=relative`,
+    batch 5, seed_base 0, `record_trajectories=True`.
+  - Code at git `2dc6dcb`. MLflow: `e138fec9…` (`eval-smolvla-harness-spatial0`, 1902 s) and `e92604a8…`
+    (`eval-smolvla-harness-l10t8`, 3529 s). Both are `FINISHED`, `eval.attribution_grade=false`, and
+    `eval.external_checkpoint` names the hub id@rev (`artifacts/s5_ac5_4_mlflow_runs.txt`).
+  - Outcomes, from `verify_rollouts_s5.py --summary` (`artifacts/s5_ac5_4_summary.json`, `s5_ac5_4_5_verify_stdout.txt`,
+    `s5_ac5_4_eval_stdout.txt`); KM via S1:
+
+    | Task | Success (≤ 1200 steps) | Within LeRobot's budget | T of successes (steps) | Ops done | KM F(30 s) | KM median | KM RMST(60) | Operation pairs |
+    |---|---|---|---|---|---|---|---|---|
+    | libero_spatial:0 | 6/10 | 6/10 (280 steps) | 67, 71, 73, 74, 75, 77 | {0: 4, 1: 6} of 1 | 0.60 | 3.75 s | 26.19 s | 10 |
+    | libero_10:8 (two moka pots on the stove) | 3/10 | 3/10 (520 steps) | 404, 407, 469 | {0: 5, 1: 2, 2: 3} of 2 | 0.30 | ∞ (F < 0.5) | 48.40 s | 15 |
+
+  - **T, ops and censoring are recorded per rollout.** Every failure is censored at exactly 1200 steps. The two
+    partial rollouts on task 8 (init 1 and 5) did 1 of 2 operations, giving one event plus a censored tail.
+  - LeRobot's own success flag agrees with the probe's goal check on every rollout: `run_rollouts` raises if they
+    disagree.
+  - No success came after LeRobot's budget, so on these 20 rollouts τ = 1200 changes no outcome against LeRobot's
+    280/520-step protocol.
+  - The published LIBERO success rates for this checkpoint are not given on its model card or in the LeRobot LIBERO
+    docs (both fetched 2026-10-04). So **these numbers are not compared against a reference, and are not evidence
+    about the checkpoint's quality.** They show only that the harness runs a real policy and records real outcomes.
+- ✅ AC5.5 **trajectory store** (`verify_rollouts_s5.py --trajectories`; `artifacts/s5_ac5_5_trajectories_*.json`):
+  - spatial: `LeRobotDataset loads: 10 episodes, 5237 frames; sum(sim_steps) = 5237`.
+  - libero_10:8: `10 episodes, 9680 frames; sum(sim_steps) = 9680`.
+  - Both: `episodes == rollouts' traj_episode_index and per-episode length == sim_steps: True`;
+    `frame_index == policy step 0..sim_steps-1 in every episode: True`.
+  - `video keys: []`, so the images are lossless PNG, not video. Frame image is (3, 256, 256), state (8,), action (7,).
+  - Each frame is the observation the policy acted on at that step plus the action executed, so (s′, a′) per
+    CUPID Prop. 1 is recoverable as (`rollout_id` via `traj_episode_index`, policy step).
+  - Size on disk: 569 MB + 1.0 GB (gitignored). The dataset digests are logged as each run's
+    `output.trajectories` (`9ab3d9ad…`, `197a7f88…`).
+- ✅ AC5.6 **addendum: init state yes, policy noise no (measured, `artifacts/s5_smolvla_batch_effect.txt`).**
+  - Rollouts with the same (init j, seed j) of spatial:0 at batch 1 vs batch 5 start from identical t0 sim states
+    (`t0_state_sha256 equal: True` × 5).
+  - The policy's outcomes differ:
+    - init 3 succeeds at step 71 (batch 5) vs 78 (batch 1);
+    - init 4 never succeeds within 1200 steps at batch 5, but succeeds at step 71 at batch 1;
+    - inits 0–2 fail both ways.
+  - Inferred cause: SmolVLA samples flow-matching noise from torch's global RNG for the whole batch. `run_rollouts`
+    seeds that RNG once per batch with the batch's first seed, as its docstring already says. So a stochastic
+    policy's outcome is a function of (checkpoint, init, seed, **batch plan**).
+  - AC5.6 as written, init-state pairing independent of batch size, holds. Reproducing a stochastic policy's
+    outcomes additionally needs the same `batch_size`, which every record and MLflow run carries (see Findings).
+- ✅ AC5.7 **grounding** (grep, `artifacts/s5_ac5_7_grounding.txt`): `vlapoc/rollouts.py` + `runs.py` cite
+  `PoC §9.1 Step 2 (p. 18)`, `§2.1 item 1 (p. 3)`, `§2.1 item 3 (p. 3)`, `§3.5 A (pp. 7-8)`,
+  `lerobot.scripts.lerobot_eval.rollout`, and `CUPID Prop. 1 (p. 5)`: all `True`.
+- ✅ AC4.5 (S4, now complete): `verify_operations_s4.py` → `definitions of operations_from_trace in vlapoc/ +
+  scripts/: 1 (['vlapoc/libero_goals.py']); callers: {'scripts/human_reference.py': True, 'vlapoc/rollouts.py': True}`.
+  Synthetic cases: `7/7` (`artifacts/s5_ac4_5_single_impl_r2.txt`).
+- ⏳ AC5.8 (pending server), unchanged: the S8 SmolVLA base policy × 50 init states × 20 tasks, τ 60 s, 128²,
+  `record_trajectories=True`, for each training seed.
+  - Add: use a **fixed `--batch-size`** across seeds and re-runs. The batch-effect addendum shows outcomes depend on
+    it.
+  - Budget for the cost: at the measured ≈ 0.29 s per env-step on MPS, one failed 1200-step rollout is ≈ 6 min of
+    policy compute. The server's GPU throughput is unmeasured.
+
+**Files:** `scripts/verify_rollouts_s5.py`:
+- `--summary` (AC5.4: outcomes, the LeRobot-budget column, per-task whole-task and operation KM via S1).
+- `--trajectories` now takes several dirs. It checks `frame_index` = policy step and the episode ↔ rollout mapping,
+  and writes one JSON per run.
+- Data (gitignored): `data/eval/eval-smolvla-harness-{spatial0-20261004T150110Z,l10t8-20261004T153306Z}/`.

@@ -1,0 +1,3 @@
+SmolVLA (smolvla_libero@6721902b) on MPS, libero_spatial:0, init/seed 0-9, batch 10, tau 30 steps, two processes: {'rows': 10, 'columns_compared': 30, 'differing': {}}
+max |arm_action_norm a - b| per rollout (record rounds to 1e-6): [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+arm_action_norm range: 0.366603 1.304016 | device param n/a (untracked); policy_type smolvla | external HuggingFaceVLA/smolvla_libero@6721902bc4d61e50a3bfdb11dfb4cb626f05d102

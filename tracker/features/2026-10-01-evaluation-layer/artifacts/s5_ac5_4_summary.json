@@ -1,0 +1,74 @@
+{
+ "runs": [
+  "e138fec973614c01af870d91ea8c7ad5",
+  "e92604a8b9954a29badfbaf8d2d986e3"
+ ],
+ "external_checkpoint": [
+  "HuggingFaceVLA/smolvla_libero@6721902bc4d61e50a3bfdb11dfb4cb626f05d102"
+ ],
+ "label": "external checkpoint (not trained on our data), harness validation, not attribution-grade",
+ "tasks": {
+  "libero_10:8": {
+   "n": 10,
+   "successes": 3,
+   "censored": 7,
+   "success_within_lerobot_budget_520_steps": 3,
+   "T_steps_successes": [
+    404,
+    407,
+    469
+   ],
+   "n_ops": 2,
+   "n_ops_done": {
+    "0": 5,
+    "1": 2,
+    "2": 3
+   },
+   "whole_task_KM": {
+    "F30": 0.30000000000000004,
+    "F60": 0.30000000000000004,
+    "median_s": Infinity,
+    "RMST60_s": 48.39999999999999
+   },
+   "operation_KM": {
+    "n_pairs": 15,
+    "F30": 0.41333333333333333,
+    "RMST60_s": 36.98552380952381
+   },
+   "wall_s_per_rollout_mean": 347.9,
+   "sim_steps_total": 9680
+  },
+  "libero_spatial:0": {
+   "n": 10,
+   "successes": 6,
+   "censored": 4,
+   "success_within_lerobot_budget_280_steps": 6,
+   "T_steps_successes": [
+    67,
+    71,
+    73,
+    74,
+    75,
+    77
+   ],
+   "n_ops": 1,
+   "n_ops_done": {
+    "0": 4,
+    "1": 6
+   },
+   "whole_task_KM": {
+    "F30": 0.6,
+    "F60": 0.6,
+    "median_s": 3.75,
+    "RMST60_s": 26.185000000000002
+   },
+   "operation_KM": {
+    "n_pairs": 10,
+    "F30": 0.6,
+    "RMST60_s": 26.185000000000002
+   },
+   "wall_s_per_rollout_mean": 187.0,
+   "sim_steps_total": 5237
+  }
+ }
+}

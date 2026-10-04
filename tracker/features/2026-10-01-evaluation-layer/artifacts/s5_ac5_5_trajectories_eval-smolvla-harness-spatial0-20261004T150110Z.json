@@ -1,0 +1,14 @@
+{
+ "run_dir": "eval-smolvla-harness-spatial0-20261004T150110Z",
+ "episodes": 10,
+ "frames": 5237,
+ "sum_sim_steps": 5237,
+ "lengths_match": true,
+ "frame_index_is_policy_step": true,
+ "video_keys": [],
+ "image_shape": [
+  3,
+  256,
+  256
+ ]
+}

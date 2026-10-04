@@ -1,0 +1,1 @@
+AC5.7 grounding citations in vlapoc/rollouts.py + runs.py: {'PoC §9.1 Step 2 (p. 18)': True, '§2.1 item 1 (p. 3)': True, '§2.1 item 3 (p. 3)': True, '§3.5 A (pp. 7-8)': True, 'LeRobot rollout() source': True, 'CUPID Prop. 1 (p. 5)': True}
