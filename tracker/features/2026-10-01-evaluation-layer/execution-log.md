@@ -1110,8 +1110,9 @@ caffeinate -i` so it could outlive the session (`data/scratch/run_ac5_4.sh`).
   fixtures differently (task 8 stove, 7.2 mm).
   - The harness is immune because it uses one fresh env per rollout. The S3 human replay (one env, many resets) is
     not; this is the mechanism behind the S3 demo_19 419/−1/419 finding.
-  - S3's 1000/1000 replay used the demos' own model XML, so its headline is unaffected (inferred from S3's log:
-    the "BDDL scene" variant is the one that drifts).
+  - S3's 1000/1000 human reference used the demos' own model XML (`reset_from_xml_string`), so it is unaffected. S3
+    measured that replay as deterministic, e.g. demo-XML T = `[411, 411, 411]` (`artifacts/s3_replay_determinism.txt`);
+    only its BDDL-scene variant drifts.
   - `t0_state_sha256` cannot see fixture placement. A `t0_model_sha256` column would close that gap. **Not built:
     it is a schema change the plan does not ask for.** Planner decision.
 - **Stochastic-policy outcomes depend on the batch plan (measured on SmolVLA).** Same init/seed, batch 1 vs 5:
