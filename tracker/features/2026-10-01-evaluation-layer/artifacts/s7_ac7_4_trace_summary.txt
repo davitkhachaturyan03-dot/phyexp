@@ -1,0 +1,10 @@
+runs: [('split', 'split-v0', False), ('derive', 'derive-v1', False), ('verify', 'verify-smoke-act-vs-smolvla-spatial0', False), ('build', 'build-v0', False), ('eval', 'eval-smolvla-harness-spatial0', False), ('eval', 'eval-act-train-full-s0-spatial0-n10', False), ('train', 'train-full-s0', False)]
+edge 5bb1615b rollouts:b2844f80ee99ebf626978 rollouts_a <- ['fe507fa3']
+edge 5bb1615b rollouts:a820e98977e3edcfb6f65 rollouts_b <- ['e138fec9']
+edge fe507fa3 checkpoint:6f49bdae15dba157a9a checkpoint <- ['ff64512b']
+edge e138fec9 checkpoint:71d9563c8295284acba checkpoint <- []
+edge ff64512b subset:69684e60952903867d9a40f training <- ['30f34cd0']
+edge 30f34cd0 version:3c4dca68d6f196c10d249b parent <- ['bc8f7d09']
+edge 30f34cd0 subset:8ee096b72b5a4e2b8697cc2 selection_pool <- ['30411f67']
+edge 30411f67 subset:58b3c415836322d270ffa43 population <- ['bc8f7d09']
+raw files: 20

@@ -1,0 +1,10 @@
+GR00T vs ACT seed 0: gate p 0.0130 -> (ii); Holm p F30 0.068->GR00T, HRT 0.068->GR00T, RMST 0.024->GR00T, AUC 0.042->ACT
+GR00T vs ACT seed 1: gate p 0.0115 -> (ii); Holm p F30 0.092->GR00T, HRT 0.092->GR00T, RMST 0.032->GR00T, AUC 0.042->ACT
+GR00T vs ACT seed 2: gate p 0.0095 -> (ii); Holm p F30 0.100->GR00T, HRT 0.100->GR00T, RMST 0.030->GR00T, AUC 0.024->ACT
+GR00T vs ACT seed 3: gate p 0.0120 -> (ii); Holm p F30 0.084->GR00T, HRT 0.084->GR00T, RMST 0.008->GR00T, AUC 0.030->ACT
+GR00T vs ACT seed 4: gate p 0.0085 -> (ii); Holm p F30 0.100->GR00T, HRT 0.100->GR00T, RMST 0.018->GR00T, AUC 0.016->ACT
+OpenPI vs ACT seed 0: gate p 0.1109 -> (iii); Holm p F30 0.374->OpenPI, HRT 0.090->OpenPI, RMST 0.040->OpenPI, AUC 0.090->ACT
+OpenPI vs ACT seed 1: gate p 0.1104 -> (iii); Holm p F30 0.328->OpenPI, HRT 0.090->OpenPI, RMST 0.024->OpenPI, AUC 0.090->ACT
+OpenPI vs ACT seed 2: gate p 0.1084 -> (iii); Holm p F30 0.392->OpenPI, HRT 0.102->OpenPI, RMST 0.064->OpenPI, AUC 0.102->ACT
+OpenPI vs ACT seed 3: gate p 0.1199 -> (iii); Holm p F30 0.384->OpenPI, HRT 0.078->OpenPI, RMST 0.040->OpenPI, AUC 0.078->ACT
+OpenPI vs ACT seed 4: gate p 0.1089 -> (iii); Holm p F30 0.384->OpenPI, HRT 0.088->OpenPI, RMST 0.048->OpenPI, AUC 0.066->ACT

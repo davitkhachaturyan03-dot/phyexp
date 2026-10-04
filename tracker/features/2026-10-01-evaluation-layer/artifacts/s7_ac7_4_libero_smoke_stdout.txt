@@ -1,0 +1,7 @@
+eval-act-train-full-s0-spatial0-n10 vs eval-smolvla-harness-spatial0 (1 cells, n 10/10 episodes, τ 60 s): macro-KS D̄ 0.6000 p 0.0090 (fires) -> outcome (i), direction eval-smolvla-harness-spatial0
+    F30  F(30 s), pooled                              eval-act-train-full-s0-spatial0-n10 0.0000 | eval-smolvla-harness-spatial0 0.6000 | Δ -0.6000 [-0.9000, -0.3000] p 0.0020 Holm 0.0080 -> favours eval-smolvla-harness-spatial0 *
+    HRT  HRT(τ), per-cell macro vs the human anchor   eval-act-train-full-s0-spatial0-n10 0.0688 | eval-smolvla-harness-spatial0 0.1577 | Δ -0.0889 [-0.3768, -0.0270] p 0.0020 Holm 0.0080 -> favours eval-smolvla-harness-spatial0 *
+    RMST RMST(τ) s, pooled (global)                   eval-act-train-full-s0-spatial0-n10 60.0000 | eval-smolvla-harness-spatial0 26.1850 | Δ +33.8150 [+16.8850, +50.7350] p 0.0020 Holm 0.0080 -> favours eval-smolvla-harness-spatial0 *
+    AUC  AUC vs human, per-cell macro                 eval-act-train-full-s0-spatial0-n10 0.0000 | eval-smolvla-harness-spatial0 0.4795 | Δ -0.4795 [-0.7427, -0.2222] p 0.0020 Holm 0.0080 -> favours eval-smolvla-harness-spatial0 *
+    sanity: stratified logrank chi2 8.29 p 0.00398
+verify run 5bb1615b2a3c4536b29e49a7bc3a2d4f (smoke: at least one arm is not attribution-grade (external checkpoint or untrained policy); exercises the code only)

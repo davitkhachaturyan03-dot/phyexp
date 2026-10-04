@@ -1127,3 +1127,122 @@ caffeinate -i` so it could outlive the session (`data/scratch/run_ac5_4.sh`).
   `4448ed2`) and `scripts/lineage_dry_run.py`. Both train tiny ACT runs and belong to S9's end-to-end check.
 - **AC6.2 passes narrowly (9.51% ≤ 10%).** The linearization error tracks the per-cell perturbation size, not the
   macro |ΔHRT|.
+
+## Round 1 / Batch 3 (S7–S9): 2026-10-04
+
+### S7: The verification gate: the two-step verdict (macro-KS, then per-metric CIs) (AC7.1 ❌ in part; AC7.2–AC7.4 ✅; AC7.5 pending server)
+
+Re-read: PoC §4.4 p. 10, §3.2 p. 6, §3.4 p. 7, §2.6 p. 5, §9.1 Step 4 p. 19 (PDF dump); PhAIL §3.3 p. 6 (outcomes
+(i)/(ii)/(iii), the gate is "regimes (i)+(ii) vs (iii)", "Direction ... comes from a scalar"), §5.1 Table 3 p. 8, §5.3
+pp. 9–10, App. I p. 18, App. J and Table 8 pp. 18–19; PhAIL `build/dashboard.py` (`KS_HOLDS = 0.05`,
+`KS_WEAK = 0.20`) and `out/explore/ks_power/dashboard_per_obj_macro.json`.
+
+**Prior art:**
+- The gate, the logrank sanity line and the four scalars already exist in S1 (`evaluation.macro_ks`, equal to
+  PhAIL's `per_obj_macro_bootstrap_ks` on PhAIL's data, S2 AC2.1). S7 adds only the wrapper.
+- Holm: statsmodels is not installed, and scipy 1.18.1 has no Holm. `scipy.stats.false_discovery_control` is
+  Benjamini–Hochberg only. So `holm()` is a 6-line function, checked against a hand-computed example.
+
+**Files:**
+- `vlapoc/verdict.py` (new):
+  - `compare_policies`: step 1 is the macro-KS gate. Step 2 bootstraps the four PoC §4.1 yardsticks jointly,
+    episode-clustered, with the human anchor fixed:
+    - F(30 s) pooled;
+    - HRT(τ) per-cell macro;
+    - RMST(τ) pooled;
+    - AUC vs human, macro.
+  - Each metric gets a 95% CI, a two-sided percentile-bootstrap p, and a Holm-adjusted p.
+  - `outcome` gives (i), (ii) or (iii), or `gate_only` (see the divergence below). The direction comes only from
+    scalars, and the KS value is exposed unsigned. The stratified logrank is the sanity line.
+  - `libero_arm` builds an arm from rollout records (operation pairs); `libero_human_arm` uses S4's
+    `human_operations.parquet` (all 1000 v0 originals).
+  - `null_calibration` implements App. J setup (i). `verify_run` is a new **`verify` stage** MLflow run whose
+    inputs are both eval runs' rollouts entities.
+  - CLI: `--phail A B`, `--phail-all`, `--null-calibration M`, `--eval-runs A B`.
+- `vlapoc/runs.py`: `STAGES` gains `verify`.
+- `vlapoc/evaluation.py`: `phail_cohort_arms()`. The S2 loader moved here, so S2 and S7 share one loader.
+  `scripts/phail_validate.py::load_arms` now delegates to it; the old and new loaders return identical arms
+  (`True`; counts Teleop 396, OpenPI 163, GR00T 164, ACT 151, SmolVLA 116).
+- `scripts/verify_verdict_s7.py` (new): Holm, the outcome rule, and the App. I test. It runs as a script or under
+  pytest (`3 passed`).
+
+**Premise checked before AC7.1, and FALSE for one pair.** The plan expects "ACT vs OpenPI → (ii) (published: KS
+rejects ...)". PhAIL's own released macro-KS for that pair does not reject at α = 0.05:
+- `dashboard_per_obj_macro.json`: `['OpenPI', 'ACT'] D 0.141798 p 0.102949 WEAK`. Under `dashboard.py`, `HOLDS`
+  means p < 0.05 and `WEAK` means p < 0.20.
+- S2's re-run of PhAIL's own function (dashboard H1 order, rng 42) gives p 0.122939.
+- In the same file, GR00T vs ACT is `p 0.015992 HOLDS`.
+- Inferred: §5.3's "ACT and OpenPI/GR00T are different (KS rejects)" holds for GR00T–ACT in PhAIL's released
+  numbers, not for OpenPI–ACT. For OpenPI–ACT only the pooled logrank rejects (Table 3, 7.2e-4).
+- I built the gate as the PoC specifies (macro-KS is the gate; logrank is only the sanity line) and report what it
+  gives.
+
+**Acceptance criteria:**
+- AC7.1, PhAIL S2 cohort, τ 240 s, n_boot 1000, n_boot_ks 2000, seed 0, α 0.05 (`python -m vlapoc.verdict --phail-all`;
+  `artifacts/s7_phail_verdicts_stdout.txt`, `s7_phail_verdicts.json`):
+  - ✅ **OpenPI vs GR00T → (iii):** macro-KS D̄ 0.1239, **p 0.1099** (published 0.12; PhAIL's JSON 0.1194). No
+    metric is significant after Holm. Logrank p 0.803.
+  - ❌ **ACT vs OpenPI → (iii), not the plan's (ii):** macro-KS D̄ 0.1418, p 0.1109, so the gate does not fire.
+    - The scalars do show the crossing: RMST favours OpenPI (Holm 0.040), and AUC favours ACT (raw 0.036, Holm 0.090).
+    - Logrank p 6.4e-4, in line with Table 3.
+    - (iii) in all 5 seeds (gate p 0.108–0.120; `artifacts/s7_ac7_1_seed_sweep_stdout.txt`).
+    - This is the false premise above. **Planner decision:** restate the expectation as GR00T vs ACT → (ii), or
+      state that PhAIL's prose and its released macro-KS disagree.
+  - ✅ **(ii) is reproduced on GR00T vs ACT, the pair PhAIL's released macro-KS rejects:**
+    - gate D̄ 0.1754, p 0.0130, fires;
+    - **RMST favours GR00T** (Δ −23.6 s [−42.9, −6.4], Holm 0.024);
+    - **AUC favours ACT** (Δ −0.039 [−0.069, −0.009], Holm 0.042);
+    - F(30 s) and HRT favour GR00T but are not significant after Holm (0.068).
+    - This is §5.3's crossing: ACT wins the early-time AUC, and GR00T wins integrated RMST.
+    - (ii) in 5/5 seeds; AUC Holm p 0.016–0.042, RMST 0.008–0.032.
+  - ✅ **Any model vs SmolVLA → (i):** OpenPI, GR00T and ACT each beat SmolVLA. Gate p 0.0005 in each pair, all four
+    metrics significant after Holm (each 0.008), and every metric favours the non-SmolVLA model.
+- ✅ AC7.2 null calibration, App. J setup (i): same-model halves, 200 trials × 500 inner resamples
+  (`artifacts/s7_ac7_2_null_calibration_stdout.txt`, `s7_ac7_2_null_*.json`). Rejection rate at α = 0.05, ±1.96 SE:
+
+  | Arm | Ours: rejection rate | Ours: mean p | PhAIL Table 8 (500 trials): rate | PhAIL: mean p |
+  |---|---|---|---|---|
+  | OpenPI | 0.040 ± 0.027 | 0.438 | 0.072 ± 0.023 | 0.441 |
+  | GR00T | 0.040 ± 0.027 | 0.480 | 0.050 | 0.455 |
+  | ACT | 0.035 ± 0.025 | 0.405 | 0.042 | 0.416 |
+  | SmolVLA | 0.035 ± 0.025 | 0.380 | 0.070 | 0.408 |
+  | Teleop | 0.070 ± 0.035 | 0.490 | 0.050 | 0.479 |
+
+  - All five are inside the plan's [0.02, 0.10] band.
+  - Mean p below 0.5 matches PhAIL's own "mild upward bias".
+- ✅ AC7.3 KS never ranks (LABELLED SYNTHETIC, App. I shape; `artifacts/s7_verify_stdout.txt`, `s7_ac7_3_intransitive.json`):
+  - KS sup-sign winners: `A vs B: sup 0.40 -> A; B vs C: sup 0.50 -> B; C vs A: sup 0.50 -> C`, a cycle.
+  - RMST(70 s): A 35.50, B 21.10, C 35.30, which is transitive.
+  - The verdict for A vs B: gate D̄ 0.40 (unsigned), p 0.0025 → (i), **direction B**, from RMST Δ +14.40 s
+    [+9.03, +19.84]. The KS sup-sign favours A.
+  - The verdict dict's gate carries only `{test, D, p, D_cells, n_boot, fires}`; there is no sign field.
+- ✅ AC7.4 LIBERO smoke, recorded as a run. Labelled smoke: the policies differ in architecture and training data,
+  and the SmolVLA arm is an external checkpoint.
+  - ACT `train-full-s0` was evaluated on libero_spatial:0 init 0–9 (eval run `fe507fa3`, 128², CPU, batch 5,
+    τ 1200 steps): **0/10 succeeded**, all censored at 1200, as expected for a 5-step smoke checkpoint.
+  - The SmolVLA arm is AC5.4's `e138fec9`: the same task and init/seed 0–9, **6/10 succeeded**.
+  - `python -m vlapoc.verdict --eval-runs fe507fa3… e138fec9… --name verify-smoke-act-vs-smolvla-spatial0` produced
+    **verify run `5bb1615b`**:
+    - gate D̄ 0.60, p 0.0090, fires → (i), direction SmolVLA;
+    - all four metrics are significant after Holm (each 0.008): F(30 s) 0.0 vs 0.6, RMST 60.0 vs 26.19 s, HRT
+      0.069 vs 0.158, AUC 0.000 vs 0.480;
+    - logrank p 0.004.
+  - The run's tags: `verify.outcome=i`, `verify.attribution_grade=false`. The label says "smoke ... exercises the
+    code only" (`artifacts/s7_ac7_4_libero_smoke_stdout.txt`, `s7_ac7_4_libero_smoke_verdict.json`).
+  - `trace(5bb1615b)` (`artifacts/s7_ac7_4_trace_summary.txt`): the verify run consumes `rollouts:b2844f80…` ←
+    `fe507fa3`, which comes from checkpoint ← `train-full-s0` ← v1/candidate ← derive-v1 ← v0 ← build-v0, ending
+    at **20 raw files**. It also consumes `rollouts:a820e989…` ← `e138fec9` ← checkpoint `71d9563c…` ← **no
+    producer**. That dead end is visible, as an external checkpoint should be.
+- ⏳ AC7.5 (pending server): full-data SmolVLA vs a drop-20-random retrain, each evaluated per AC5.8. Then
+  `python -m vlapoc.verdict --eval-runs <full> <drop20> --name verify-full-vs-drop20-seed<s>`. See the runbook (S9).
+
+**Divergences / notes (S7):**
+- **`gate_only` outcome.** When the gate fires but no metric is significant after Holm, the verdict says so instead
+  of forcing (i) or (ii). PhAIL's taxonomy has no name for this case. It did not occur on PhAIL's pairs.
+- **The human anchor is held fixed in the difference bootstrap.** It is the common yardstick of both arms (plan:
+  the HRT anchor is fixed across arms). S2's single-policy HRT CI resamples the human, matching PhAIL's Table 2.
+  For a difference of two policies on one anchor, holding it fixed removes common-mode noise (inferred).
+- **The p-value floor.** With n_boot 1000 the smallest bootstrap p is 2/1001 ≈ 0.002, and Holm × 4 gives 0.008.
+  The macro-KS floor at 2000 is 0.0005.
+- **LIBERO arms use operation pairs (S4 rule), as S1 does.** This is the same granularity as PhAIL's per-operation
+  CDFs. libero_spatial's single operation equals whole-task T.
