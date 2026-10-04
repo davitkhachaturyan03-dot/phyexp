@@ -1,0 +1,173 @@
+[
+ {
+  "metric": "F(30 s) / Success@τ",
+  "functional": "F(τ) = P(T <= τ)",
+  "tau": "30 s",
+  "return_column": "ret_f30",
+  "transfer_status": "built",
+  "reason": "transfers literally: τ_episode = 60 s keeps 30 s an interior point of the CDF",
+  "source": "PoC §4.1 p.9, §4.3 p.10"
+ },
+ {
+  "metric": "RMST(τ)",
+  "functional": "∫_0^τ (1 - F)",
+  "tau": "60 s = τ_episode",
+  "return_column": "ret_rmst60",
+  "transfer_status": "built",
+  "reason": "negative capped time",
+  "source": "PoC §4.3 p.10"
+ },
+ {
+  "metric": "AUC vs human",
+  "functional": "P(T_model < T_human)",
+  "tau": "none (human T < 60 s)",
+  "return_column": "ret_auc_sampled, ret_auc_expected",
+  "transfer_status": "built",
+  "reason": "sampled indicator (PoC literal) and its expectation",
+  "source": "PoC §4.3 p.10, §9.1 Step 3 p.19"
+ },
+ {
+  "metric": "HRT",
+  "functional": "mean_o RMST_h,o / RMST_m,o",
+  "tau": "60 s",
+  "return_column": "ret_hrt_lin",
+  "transfer_status": "built (linearized)",
+  "reason": "a ratio: first-order (delta-method) per-rollout return, weights at the evaluated policy",
+  "source": "PoC §4.3 p.10"
+ },
+ {
+  "metric": "censored tail",
+  "functional": "share of rollouts timed out",
+  "tau": "τ_episode = 60 s",
+  "return_column": "ret_censored",
+  "transfer_status": "built",
+  "reason": "timeouts are censored, not failed",
+  "source": "PoC §3.2 p.6, §3.4 p.7"
+ },
+ {
+  "metric": "ghost-event rate",
+  "functional": "KM mass at T = inf",
+  "tau": "none",
+  "return_column": null,
+  "transfer_status": "not available",
+  "reason": "LIBERO defines no unrecoverable-state rule (plan P13; owner decision 6): no ghost events exist",
+  "source": "PoC §3.2 p.6, §3.4 p.7"
+ },
+ {
+  "metric": "median T",
+  "functional": "inf{t: F(t) >= 0.5}",
+  "tau": "none",
+  "return_column": null,
+  "transfer_status": "scoring only",
+  "reason": "no per-rollout return in the PoC; computed per cell by vlapoc.evaluation",
+  "source": "PhAIL Table 1 p.5"
+ },
+ {
+  "metric": "UPH",
+  "functional": "3600 / RMST(τ_episode)",
+  "tau": "60 s",
+  "return_column": null,
+  "transfer_status": "projection only",
+  "reason": "production UPH also needs reset and recovery time (PhAIL p.5); sim time excludes inference latency",
+  "source": "PhAIL Table 1 p.5"
+ },
+ {
+  "metric": "completion",
+  "functional": "F(τ_episode)",
+  "tau": "60 s",
+  "return_column": null,
+  "transfer_status": "scoring only (= mean ret_censored complement)",
+  "reason": "no separate return: 1 - censored rate when no ghosts",
+  "source": "PhAIL Table 1 p.5"
+ },
+ {
+  "metric": "MTBF/A",
+  "functional": "RMST(τ_episode) / (1 - F(τ_episode))",
+  "tau": "60 s",
+  "return_column": null,
+  "transfer_status": "adapted, scoring only",
+  "reason": "'failures/assists' become non-completions; no operator in simulation",
+  "source": "PhAIL Table 1 p.5"
+ },
+ {
+  "metric": "KS / macro-KS",
+  "functional": "sup |F_a - F_b|, mean over cells",
+  "tau": "none",
+  "return_column": null,
+  "transfer_status": "significance gate (S7)",
+  "reason": "a two-sample test, not a per-rollout quantity",
+  "source": "PoC §3.2 p.6, §3.4 p.7"
+ },
+ {
+  "metric": "P-P plot",
+  "functional": "(F_human(t), F_model(t))",
+  "tau": "plot range",
+  "return_column": null,
+  "transfer_status": "visualization",
+  "reason": "not a scalar",
+  "source": "PoC §3.2 p.6"
+ },
+ {
+  "metric": "clustered bootstrap CIs",
+  "functional": "episode resampling",
+  "tau": "as the scalar",
+  "return_column": null,
+  "transfer_status": "built (vlapoc.evaluation)",
+  "reason": "a CI procedure, not a metric",
+  "source": "PoC §3.2 p.6"
+ },
+ {
+  "metric": "operation-level RMST",
+  "functional": "−min(T_op, 60 s) per operation",
+  "tau": "60 s",
+  "return_column": "ret_rmst_op (operation_returns.parquet)",
+  "transfer_status": "built",
+  "reason": "libero_10 per-sub-task T (S4)",
+  "source": "PoC §3.4 p.7, §3.5 A p.7"
+ },
+ {
+  "metric": "intervention / safety-stop rate",
+  "functional": "share of rollouts with an operator stop",
+  "tau": "none",
+  "return_column": null,
+  "transfer_status": "not transferable",
+  "reason": "no operator in simulation",
+  "source": "PoC §3.3 p.7"
+ },
+ {
+  "metric": "wall-clock T",
+  "functional": "time per operation",
+  "tau": "none",
+  "return_column": null,
+  "transfer_status": "adapted",
+  "reason": "simulated time at 20 Hz; excludes policy inference latency (PhAIL's wall clock includes it)",
+  "source": "PoC §3.2 p.6"
+ },
+ {
+  "metric": "blind randomized scheduling",
+  "functional": "protocol",
+  "tau": "none",
+  "return_column": null,
+  "transfer_status": "replaced",
+  "reason": "fixed init states + seeds give scene-level pairing PhAIL cannot have ('initial physical configurations are not replayed')",
+  "source": "PoC §3.4 p.7; PhAIL §3.3 p.6"
+ },
+ {
+  "metric": "failure types: missed grasp, wrong object, ignored instruction, idle",
+  "functional": "rules over simulator state",
+  "tau": "none",
+  "return_column": null,
+  "transfer_status": "not built",
+  "reason": "LIBERO defines no such rule (P13); the catalog's exact-zero idle rule does not transfer to policy actions; raw signals are recorded so rules can be added without new rollouts",
+  "source": "PoC §2.1 item 3 p.3, §9.1 Step 2 p.18"
+ },
+ {
+  "metric": "failure types: success / timeout_no_progress / timeout_partial_k_of_n",
+  "functional": "operation rule (S4)",
+  "tau": "τ_episode",
+  "return_column": "failure_type",
+  "transfer_status": "built",
+  "reason": "from goal-conjunct traces",
+  "source": "PoC §9.1 Step 2-3 pp.18-19"
+ }
+]
