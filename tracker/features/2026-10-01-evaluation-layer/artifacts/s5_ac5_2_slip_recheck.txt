@@ -1,0 +1,8 @@
+modules with 'libero' or 'lerobot' or 'vlapoc.rollouts' imported: []
+ACT a vs b (current comparator): {'rows': 4, 'columns_compared': 30, 'differing': {}}
+ACT a vs b (independent np.array_equal): {'eval_run_id': 4, 'wall_seconds': 4}
+ACT eval_run_id a/b: 3392bb4d 613a53db | checkpoint sha equal: True 6f49bdae15db | policy_type act | rollouts ['libero_10/0/init000/seed0', 'libero_10/0/init001/seed1', 'libero_spatial/0/init000/seed0', 'libero_spatial/0/init001/seed1']
+ACT arm_action_norm range: 0.210029 0.282199 | len [1200, 1200, 1200, 1200]
+noop record vs ITSELF with list-typed arm_action_norm, OLD comparator: {'rows': 6, 'columns_compared': 30, 'differing': {'arm_action_norm': 6}}
+same, CURRENT comparator: {'rows': 6, 'columns_compared': 30, 'differing': {}}
+type in parquet: ndarray | json.dumps(default=str) of it starts: "[0. 0. 0. ... 0. 0. 0.]"

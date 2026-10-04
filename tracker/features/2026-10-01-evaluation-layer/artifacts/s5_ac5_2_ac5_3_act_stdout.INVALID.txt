@@ -1,0 +1,10 @@
+AC5.2 ACT train-full-s0 on CPU, two eval runs (3392bb4d…, 613a53db…): 4 rollouts, 30 columns compared; differing: none; arm action norm range 0.2100-0.2822 (non-zero: real policy actions)
+AC5.3 eval run 3392bb4d: stage=eval stand_in=false input.checkpoint=checkpoint:6f49bdae15dba157a9a… checkpoint_sha256 param == train run's weights sha: True; output.rollouts.sha256 6623ab1a53dbd0cc…; attribution_grade=true
+Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 8848.74it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 5652.70it/s]
+AC5.3 trace(eval run) keys: ['root', 'runs', 'edges', 'entities', 'raw_files']
+Traceback (most recent call last):
+  File "<stdin>", line 20, in <module>
+AttributeError: 'str' object has no attribute 'get'
+AC5.3 runs on trace(eval 3392bb4d): [('eval', 'eval-act-train-full-s0-a', False), ('train', 'train-full-s0', False), ('derive', 'derive-v1', False), ('build', 'build-v0', False), ('split', 'split-v0', False)]
+AC5.3 edges: 5 | entities: 12 | raw_files: list 20
+AC5.3 raw_files sample: [{"source_file": "data/raw/libero/libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it_demo.hdf5", "sha256": "6b30906a52a5741e98ef447d27e7066d6c0be4a5f7acd7ecaf1cb7468aca4aa9"}, {"source_file": "data/raw/libero/libero_10/KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer_of_the_

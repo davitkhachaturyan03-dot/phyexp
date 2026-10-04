@@ -1,7 +1,5 @@
 {
  "rows": 6,
  "columns_compared": 30,
- "differing": {
-  "arm_action_norm": 6
- }
+ "differing": {}
 }

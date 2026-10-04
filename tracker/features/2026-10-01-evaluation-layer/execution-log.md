@@ -755,3 +755,40 @@ earlier with another config path.
   - The record validates against the schema (`schema errors: [] | columns 32 == schema True`); pairs
     `[[60.0, 0]]`; max arm action norm 0.0 (`artifacts/s5_ac5_1_stdout.txt`, `s5_noop_smoke_a_summary.json`).
   - Throughput: about 23 s per 1200-step rollout in batches of 3 (≈ 51 env-steps/s at 128², noop, CPU).
+
+#### S5 continuation (2026-10-03, replacement executor): the AC5.2 evidence slip, investigated
+
+The previous executor stalled after writing "That stub import was a slip on my part". It left three AC5.2 results
+that looked contradictory. I traced each one from the files on disk (birth/modify times by `stat`, the logs under
+`data/scratch/logs/`, and the run dirs under `data/eval/`), then recomputed every comparison myself without stubs.
+
+**The three results compare different things, and none of them shows a real difference in values:**
+
+| Artifact | What it compared | Produced by | Verdict |
+|---|---|---|---|
+| `s5_ac5_2a_rerun.json` as committed in `4400422`: `rows 6, differing {arm_action_norm: 6}` | noop smoke (6 rollouts) re-run in a new process vs `data/eval/eval-noop-smoke-a` | first `--rerun` (log `s5_verify_a.txt`, born 11:15:21) with the comparator from **before** `4400422` | **comparator artifact**, explained below |
+| `s5_ac5_2a_rerun.json` uncommitted overwrite (11:25:07): `rows 6, differing {}` | same comparison | second `--rerun`, same log file overwritten in place (`s5_verify_a.txt`, modified 11:25:07). It shows the sim loading, 6 × 1200-step rollouts, the result line and `exit 0` | **valid** (a real process, no stub) |
+| `s5_ac5_2_ac5_3_act_stdout.txt` (13:33): "4 rollouts, 30 columns compared; differing: none" | ACT `train-full-s0`, eval runs `3392bb4d` (`-a`) vs `613a53db` (`-b`), 4 rollouts each | a stdin heredoc (its traceback reads `File "<stdin>", line 20`); no script in the repo writes this line, and no copy of the heredoc survives | **invalid: provenance cannot be checked**, and the previous executor said a stub import was involved. Renamed to `s5_ac5_2_ac5_3_act_stdout.INVALID.txt` and kept. Superseded by the clean recheck below, which reaches the same conclusion |
+
+- **Why the committed result said `arm_action_norm: 6` (measured).**
+  - `run_rollouts` returns `arm_action_norm` as a Python list (`vlapoc/rollouts.py:364`), but a parquet read returns
+    a numpy array.
+  - The old comparator ran `json.dumps(x, default=str)` on both. For an array that is `str(ndarray)`, which numpy
+    truncates (`"[0. 0. 0. ... 0. 0. 0.]"`). For a list it is the full JSON. So the two never match.
+  - Reproduced: the old comparator applied to the noop record against **itself**, with only that column re-typed
+    as lists, gives `{'rows': 6, 'columns_compared': 30, 'differing': {'arm_action_norm': 6}}`, exactly the
+    committed result. The current comparator (`.tolist()` first) gives `{}` (`artifacts/s5_ac5_2_slip_recheck.txt`).
+  - A second flaw in the old comparator: because numpy truncates, it could not see a difference in the middle of an
+    array when both sides were arrays. The current comparator compares full lists.
+- **Clean recheck of the ACT comparison (measured).** I imported `scripts/verify_rollouts_s5.py` for real; no libero,
+  lerobot or `vlapoc.rollouts` module was loaded, because the comparator needs only pandas. Then I compared the two
+  stored records (`artifacts/s5_ac5_2_slip_recheck.txt`):
+  - `ACT a vs b (current comparator): {'rows': 4, 'columns_compared': 30, 'differing': {}}`
+  - An independent exact check (`np.array_equal` per cell, every column) differs only in the two volatile columns:
+    `{'eval_run_id': 4, 'wall_seconds': 4}`.
+  - Both runs: checkpoint sha `6f49bdae15db…`, `policy_type act`, MLflow param `device cpu`. The arm action norm lies
+    in 0.210029–0.282199 over 4 × 1200 steps, so these are real (non-zero) policy actions.
+  - The two runs were separate processes. `s5_act.txt` holds two JSON summaries, and `eval_smoke.py` prints exactly
+    one per invocation. MLflow start/end times are 1791012278012/1791012379092 and 1791012383802/1791012484064.
+- **AC5.3 trace recheck (measured).** `python -m vlapoc.lineage trace 3392bb4d…` (exit 0) is byte-equal to the
+  uncommitted `s5_ac5_3_trace.json` (`recheck == s5_ac5_3_trace.json: True`), so that artifact is valid.
