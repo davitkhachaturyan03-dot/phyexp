@@ -367,7 +367,8 @@ def _ckpt_files(pretrained: Path) -> dict[str, Path]:
 def train_run(subset_ref: str, name: str, seed: int = 0, steps: int = 5, batch_size: int = 4,
               policy_type: str = "act", policy_overrides: dict | None = None, device: str = "mps",
               dataset_root: Path | None = None, runs_root: Path | None = None, lineage_root: Path | None = None,
-              chain: str | None = None, allow_dirty: bool = False) -> dict:
+              chain: str | None = None, allow_dirty: bool = False, normalization: str = "per_subset",
+              pretrained_path: Path | None = None) -> dict:
     """Verify the dataset copy, then run LeRobot training on exactly ``subset`` and record every §2.1 field.
 
     Refuses to launch (raises ``VersionIntegrityError``, no MLflow run is created) if any file of the
@@ -379,6 +380,14 @@ def train_run(subset_ref: str, name: str, seed: int = 0, steps: int = 5, batch_s
         steps, batch_size, policy_type, policy_overrides, device: the LeRobot training config.
         dataset_root: train on a copy elsewhere (it is verified against the version first).
         runs_root: where ``<name>-<UTC stamp>/`` is created (default ``data/runs``).
+        normalization: ``"per_subset"`` (default; owner decision 3, evaluation-layer S8): state/action mean/std
+            are LeRobot ``aggregate_stats`` over the training subset's own per-episode stats
+            (``vlapoc.subset_stats``), written to ``<out_dir>/subset_stats.json``, injected by
+            ``vlapoc.lerobot_train_entry.install_subset_stats``, and recorded as tag
+            ``train.subset_stats.sha256``. ``"full"``: LeRobot's default, the version's ``meta/stats.json``
+            (how the data+lineage feature's smoke runs were trained).
+        pretrained_path: a LeRobot checkpoint dir to fine-tune from (e.g. ``data/hf_models/smolvla_base``);
+            its weights sha256 is recorded as tag ``train.pretrained.weights.sha256``.
 
     Returns:
         ``{"run_id", "checkpoint", "weights_sha256", "normalizer_sha256", "episodes_match",
@@ -409,7 +418,21 @@ def train_run(subset_ref: str, name: str, seed: int = 0, steps: int = 5, batch_s
             "episodes": episodes, "policy_type": policy_type, "policy_overrides": overrides, "steps": steps,
             "batch_size": batch_size, "num_workers": 0, "seed": seed, "output_dir": rel(out_dir / "lerobot"), "job_name": name,
             "image_transforms_enable": False, "use_imagenet_stats": True}
+    if pretrained_path is not None:
+        spec["policy_pretrained_path"] = rel(Path(pretrained_path).resolve())
     stats_path = root / "meta" / "stats.json"
+    if normalization not in ("per_subset", "full"):
+        raise ValueError("normalization must be 'per_subset' or 'full'")
+    norm_param = ("per-subset: LeRobot aggregate_stats over the training subset's per-episode meta/episodes stats "
+                  "for every non-camera feature (vlapoc.subset_stats); camera features: ImageNet stats "
+                  "(use_imagenet_stats=true)") if normalization == "per_subset" else \
+                 "full dataset meta/stats.json of the version (LeRobot default), camera stats replaced by ImageNet stats (use_imagenet_stats=true)"
+    sub_stats = None
+    if normalization == "per_subset":
+        from vlapoc.subset_stats import stats_digest, subset_stats, to_json
+
+        sub_stats = subset_stats(root, episodes)
+        spec["subset_stats_json"] = rel(out_dir / "subset_stats.json")
     with stage_run("train", name, lineage_root, chain=chain, allow_dirty=allow_dirty) as r:
         r.input_subset(subset, "training", subset_ref if "/" in subset_ref else None)
         r.params({"dataset_version_id": vid, "subset_id": subset.subset_id, "n_episodes": len(episodes),
@@ -418,11 +441,16 @@ def train_run(subset_ref: str, name: str, seed: int = 0, steps: int = 5, batch_s
                   "policy_overrides": overrides, "output_dir": rel(out_dir),
                   "mixture_weights": "uniform over the subset's frames (LeRobot default sampler; sample_weighting=None)",
                   "augmentation": "none (dataset.image_transforms.enable=false)",
-                  "normalization_stats": "full dataset meta/stats.json of the version (LeRobot default), "
-                                         "camera stats replaced by ImageNet stats (use_imagenet_stats=true)"})
+                  "normalization_stats": norm_param, "pretrained_path": spec.get("policy_pretrained_path", "none")})
         r.tags({"dataset_version_id": vid, "subset_id": subset.subset_id, "seed": seed,
-                "dataset.stats_json.sha256": sha256_file(stats_path)})
+                "dataset.stats_json.sha256": sha256_file(stats_path), "train.normalization": normalization})
         out_dir.mkdir(parents=True, exist_ok=True)  # LeRobot writes into out_dir/lerobot, which must not exist yet
+        if sub_stats is not None:
+            (out_dir / "subset_stats.json").write_text(json.dumps(to_json(sub_stats), indent=1))
+            mlflow.log_artifact(str(out_dir / "subset_stats.json"))
+            r.tags({"train.subset_stats.sha256": stats_digest(sub_stats), "train.subset_stats.n_episodes": len(episodes)})
+        if pretrained_path is not None:
+            r.tags({"train.pretrained.weights.sha256": sha256_file(Path(pretrained_path) / "model.safetensors")})
         spec_path = out_dir / "vlapoc_train_spec.json"
         spec_path.write_text(json.dumps(spec, indent=2))
         mlflow.log_artifact(str(spec_path))
@@ -828,7 +856,14 @@ def diff(run_a: str, run_b: str, lineage_root: Path | None = None) -> dict:
         "data": {"subset_a": sa.subset_id, "subset_b": sb.subset_id,
                  "dataset_version_a": sa.dataset_version_id, "dataset_version_b": sb.dataset_version_id,
                  "added": added, "removed": removed, "changed_version": changed,
-                 "n_added": len(added), "n_removed": len(removed), "n_changed_version": len(changed)},
+                 "n_added": len(added), "n_removed": len(removed), "n_changed_version": len(changed),
+                 # per-subset normalization stats are a function of the training data (owner decision 3), so their
+                 # difference is reported here, with the episodes, not under params/config
+                 "normalization": {"a": ra.data.tags.get("train.normalization", "full"),
+                                   "b": rb.data.tags.get("train.normalization", "full"),
+                                   "stats_sha256_a": ra.data.tags.get("train.subset_stats.sha256"),
+                                   "stats_sha256_b": rb.data.tags.get("train.subset_stats.sha256"),
+                                   "differ": ra.data.tags.get("train.subset_stats.sha256") != rb.data.tags.get("train.subset_stats.sha256")}},
         "params": params, "config": config,
         "git": {"a": ga, "b": gb, "same": ga == gb},
         "ignored_bookkeeping": sorted(BOOKKEEPING_CONFIG_KEYS | BOOKKEEPING_PARAMS),

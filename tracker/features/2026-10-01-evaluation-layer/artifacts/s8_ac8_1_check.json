@@ -1,0 +1,21 @@
+{
+ "version": "v0",
+ "dataset_version_id": "3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7",
+ "n_episodes": 1000,
+ "max_abs_diff": {
+  "observation.state": {
+   "mean": 4.163336342344337e-17,
+   "std": 2.4314289470694916e-10,
+   "min": 0.0,
+   "max": 0.0,
+   "count": 0.0
+  },
+  "action": {
+   "mean": 5.551115123125783e-17,
+   "std": 1.9342005774802828e-10,
+   "min": 0.0,
+   "max": 0.0,
+   "count": 0.0
+  }
+ }
+}
