@@ -1,0 +1,1 @@
+AC8.4 grounding citations in subset_stats.py + lerobot_train_entry.py: {'PoC p. 1': True, 'PoC §2.3 (p. 4)': True, 'owner decision 3 (brief)': True, 'brief.md': True}

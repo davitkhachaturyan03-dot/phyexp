@@ -1,0 +1,4 @@
+smolvla_base tensors 500, checkpoint tensors 500, common 500
+dtypes (base, checkpoint): [('torch.bfloat16', 'torch.bfloat16'), ('torch.bfloat16', 'torch.float32'), ('torch.float32', 'torch.float32')]
+common tensors equal (as float32) to smolvla_base after 2 steps: 378; changed: 122
+changed tensors containing 'vlm_with_expert.vlm' (the frozen VLM): 0 | containing 'expert': 112 | others: ['model.action_in_proj.bias', 'model.action_in_proj.weight', 'model.action_out_proj.bias', 'model.action_out_proj.weight', 'model.action_time_mlp_in.bias', 'model.action_time_mlp_in.weight']

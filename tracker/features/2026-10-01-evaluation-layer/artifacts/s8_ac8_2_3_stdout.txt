@@ -1,0 +1,21 @@
+AC8.2 policy_preprocessor_step_5_normalizer_processor.safetensors: observation.state.mean (float32) max |saved - subset stats| = 4.54e-08; max |saved - full stats.json| = 1.09e-02
+AC8.2 policy_preprocessor_step_5_normalizer_processor.safetensors: observation.state.std (float32) max |saved - subset stats| = 2.77e-08; max |saved - full stats.json| = 4.95e-02
+AC8.2 policy_preprocessor_step_5_normalizer_processor.safetensors: action.mean (float32) max |saved - subset stats| = 1.71e-09; max |saved - full stats.json| = 9.00e-03
+AC8.2 policy_preprocessor_step_5_normalizer_processor.safetensors: action.std (float32) max |saved - subset stats| = 2.80e-08; max |saved - full stats.json| = 6.26e-03
+AC8.2 policy_postprocessor_step_0_unnormalizer_processor.safetensors: observation.state.mean (float32) max |saved - subset stats| = 4.54e-08; max |saved - full stats.json| = 1.09e-02
+AC8.2 policy_postprocessor_step_0_unnormalizer_processor.safetensors: observation.state.std (float32) max |saved - subset stats| = 2.77e-08; max |saved - full stats.json| = 4.95e-02
+AC8.2 policy_postprocessor_step_0_unnormalizer_processor.safetensors: action.mean (float32) max |saved - subset stats| = 1.71e-09; max |saved - full stats.json| = 9.00e-03
+AC8.2 policy_postprocessor_step_0_unnormalizer_processor.safetensors: action.std (float32) max |saved - subset stats| = 2.80e-08; max |saved - full stats.json| = 6.26e-03
+AC8.2 run 0a33bc75bb71 (smolvla, 40 episodes): train.subset_stats.sha256 tag == recomputed digest: True (e9e51a0cf12a77ca…); pass: True
+AC8.2 policy_preprocessor_step_3_normalizer_processor.safetensors: observation.state.mean (float32) max |saved - subset stats| = 4.54e-08; max |saved - full stats.json| = 1.09e-02
+AC8.2 policy_preprocessor_step_3_normalizer_processor.safetensors: action.mean (float32) max |saved - subset stats| = 1.71e-09; max |saved - full stats.json| = 9.00e-03
+AC8.2 policy_postprocessor_step_0_unnormalizer_processor.safetensors: observation.state.mean (float32) max |saved - subset stats| = 4.54e-08; max |saved - full stats.json| = 1.09e-02
+AC8.2 policy_postprocessor_step_0_unnormalizer_processor.safetensors: action.mean (float32) max |saved - subset stats| = 1.71e-09; max |saved - full stats.json| = 9.00e-03
+AC8.2 run a8647af86f74 (act, 40 episodes): train.subset_stats.sha256 tag == recomputed digest: True (e9e51a0cf12a77ca…); pass: True
+AC8.2 policy_preprocessor_step_3_normalizer_processor.safetensors: observation.state.mean (float32) max |saved - subset stats| = 5.98e-08; max |saved - full stats.json| = 1.17e-02
+AC8.2 policy_preprocessor_step_3_normalizer_processor.safetensors: action.mean (float32) max |saved - subset stats| = 2.79e-09; max |saved - full stats.json| = 1.39e-02
+AC8.2 policy_postprocessor_step_0_unnormalizer_processor.safetensors: observation.state.mean (float32) max |saved - subset stats| = 5.98e-08; max |saved - full stats.json| = 1.17e-02
+AC8.2 policy_postprocessor_step_0_unnormalizer_processor.safetensors: action.mean (float32) max |saved - subset stats| = 2.79e-09; max |saved - full stats.json| = 1.39e-02
+AC8.2 run fea7ac62d234 (act, 35 episodes): train.subset_stats.sha256 tag == recomputed digest: True (ac940b921e6e2cfb…); pass: True
+AC8.3 diff a8647af8 vs fea7ac62: data.n_removed 5, n_added 0; data.normalization {"a": "per_subset", "b": "per_subset", "stats_sha256_a": "e9e51a0cf12a77ca5c98a3519a7d5f19d0bc5b3c003ad13e5871f18e3b0aa8a2", "stats_sha256_b": "ac940b921e6e2cfb3913712ca32694dd4e5347a56f3844b7d154ca12de3bf65c", "differ": true}
+AC8.3 params that differ: []; config keys that differ: []; git same: True

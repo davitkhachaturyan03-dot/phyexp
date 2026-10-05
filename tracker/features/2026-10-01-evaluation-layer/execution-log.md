@@ -1246,3 +1246,107 @@ rejects ...)". PhAIL's own released macro-KS for that pair does not reject at α
   The macro-KS floor at 2000 is 0.0005.
 - **LIBERO arms use operation pairs (S4 rule), as S1 does.** This is the same granularity as PhAIL's per-operation
   CDFs. libero_spatial's single operation equals whole-task T.
+
+### S8: SmolVLA base-policy training definition with per-subset normalization (AC8.1–AC8.4 ✅; AC8.5 pending server)
+
+Re-read: brief owner decision 3; PoC p. 1, §2.3 p. 4, §10 p. 20; LeRobot `lerobot_train.py:212-400` (where
+`dataset.meta.stats` feeds `make_policy`, the processors' `dataset_stats`, and, with a pretrained policy, the
+normalizer/unnormalizer overrides at l. 376-377), `datasets/factory.py` (ImageNet stats on camera keys),
+`datasets/compute_stats.py:582-640` (`aggregate_feature_stats`, `aggregate_stats`), `datasets/dataset_tools.py:852-950`
+(LeRobot's own subset metadata path), `policies/factory.py:240-345` (`make_policy` with `pretrained_path`).
+
+**Prior art (measured from LeRobot's source):**
+- LeRobot already computes a subset's stats the way owner decision 3 needs. When its dataset tools copy a subset
+  of episodes, they `aggregate_stats` the kept episodes' stored `stats/<feature>/<stat>` columns from
+  `meta/episodes` and write that as the new dataset's `stats.json` (`dataset_tools.py:885-950`).
+- What LeRobot lacks is a way to train on `episodes=[...]` of an existing dataset with those stats: `DatasetConfig`
+  has no stats field, and `train()` always uses the full `meta/stats.json`.
+- So `vlapoc/subset_stats.py` calls LeRobot's `aggregate_stats` on the stored per-episode stats. There are no frame
+  reads, and no 7 GB `recompute_stats` copy. `lerobot_train_entry.install_subset_stats` puts the result into
+  `dataset.meta.stats`, which every downstream consumer in `train()` reads.
+
+**Files:**
+- `vlapoc/subset_stats.py` (new): `episode_stats`, `subset_stats`, `to_json`, `stats_digest`, `check`, and a CLI.
+- `vlapoc/lerobot_train_entry.py`:
+  - `install_subset_stats` wraps `make_train_eval_datasets` in the training subprocess. After LeRobot builds the
+    dataset and puts ImageNet stats on the cameras, it replaces every non-camera feature's stats.
+  - `policy_pretrained_path`: the config is read via `draccus.load` from the pretrained dir, its features are
+    cleared so they come from our dataset, overrides are applied, and `pretrained_path` is set. This is what
+    `lerobot-train --policy.path=...` does in `TrainPipelineConfig.validate`.
+- `vlapoc/runs.py`, `train_run`:
+  - `normalization="per_subset"` is now the **default** (owner decision 3); `"full"` reproduces LeRobot's default.
+  - It writes `<out_dir>/subset_stats.json`, logs it as an artifact, and sets tags `train.normalization`,
+    `train.subset_stats.sha256` and `train.subset_stats.n_episodes`. The param `normalization_stats` holds a
+    constant string.
+  - `pretrained_path` adds the tag `train.pretrained.weights.sha256`.
+  - `diff()` reports `data.normalization` (both digests and `differ`).
+- `scripts/verify_subset_stats_s8.py` (new): `--check`, `--train-smolvla`, `--train-act`, `--normalizer`,
+  `--drop-subset`, `--diff`.
+
+**Downloads (owner-approved; source, revision, size recorded):**
+- `lerobot/smolvla_base` @ `d9f33c94a60fb382c90dea2164c96845bd955e28` (Apache-2.0, last modified 2026-09-17), into
+  `data/hf_models/smolvla_base`. I fetched only `model.safetensors` (906,712,520 bytes, sha256 `7cd549ac2351…`),
+  `config.json`, `README.md` and the four `policy_*` processor files. `du` 865M. I skipped the 8 MB gif and the
+  notebook. Log: `data/scratch/logs/smolvla_base_download.txt`, exit 0.
+- **No VLM weights downloaded.**
+  - smolvla_base's config names `HuggingFaceTB/SmolVLM2-500M-Video-Instruct`. The HF API shows that
+    `HuggingFaceTB/SmolVLM2-500M-Instruct` (batch 2's local copy) **redirects to the same repo at the same sha
+    `7b375e1b…`** (`id HuggingFaceTB/SmolVLM2-500M-Video-Instruct`, measured). So batch 2's 11 non-weight files are
+    the right ones (`cmp`: `tokenizer.json`, `config.json` identical).
+  - For SmolVLA training, the same 11 files (4.7 MB) are placed in a repo-local HF cache,
+    `data/hf_home/hub/models--HuggingFaceTB--SmolVLM2-500M-Video-Instruct`, with `refs/main = 7b375e1b…`. This is
+    needed because smolvla_base's saved preprocessor names the tokenizer by hub id. The run uses
+    `HF_HOME=data/hf_home HF_HUB_OFFLINE=1` (offline `AutoConfig` and `AutoProcessor` load: measured OK).
+  - The VLM weights come from smolvla_base's own `model.safetensors` (`load_vlm_weights=false`).
+  - Nothing is written to `~/.cache/huggingface`.
+
+**Acceptance criteria:**
+- ✅ AC8.1 `python -m vlapoc.subset_stats --check v0` / `verify_subset_stats_s8.py --check v0`
+  (`artifacts/s8_ac8_1_check.json`): `aggregate_stats` over all 1000 episodes vs `meta/stats.json`:
+  - `observation.state`: mean 4.16e-17, **std 2.43e-10**, min/max/count 0;
+  - `action`: mean 5.55e-17, std 1.93e-10, min/max/count 0;
+  - all ≤ 1e-9, matching P23's 2.4e-10.
+- ✅ AC8.2 **SmolVLA, 2 steps, MPS, per-subset stats, fine-tuned from smolvla_base on `v0/reference` (40 episodes).**
+  - Train run `0a33bc75` (`train-smolvla-2step-persubset-v0ref`), 18.0 s. Losses 1.594 and 2.749; `episodes_match: true`.
+  - Its `train_config.json`: `policy.type smolvla`, `pretrained_path data/hf_models/smolvla_base`, `device mps`,
+    `load_vlm_weights False`, input features `observation.images.image`, `observation.images.image2`,
+    `observation.state` (taken from our dataset), 40 episodes.
+  - `--normalizer 0a33bc75` (`artifacts/s8_ac8_2_normalizer_smolvla_0a33bc75.json`, `s8_ac8_2_3_stdout.txt`), for
+    the normalizer **and** the unnormalizer, max |saved − subset stats|:
+    - `observation.state.mean` 4.54e-08, `.std` 2.77e-08;
+    - `action.mean` 1.71e-09, `.std` 2.80e-08.
+    - All are ≤ 1e-6 (the saved tensors are float32).
+  - The same tensors vs the full `stats.json`: 1.09e-02, 4.95e-02, 9.00e-03, 6.26e-03, so they differ.
+  - Tag `train.subset_stats.sha256` == recomputed digest: `True` (`e9e51a0cf12a…`).
+  - **The pretrained weights were really loaded** (`artifacts/s8_ac8_2_pretrained_weights_check.txt`). 500/500
+    tensor names match smolvla_base. **378 tensors are bit-equal to smolvla_base after 2 steps**, i.e. the frozen
+    VLM (0 changed tensors under `.vlm.`). The 122 that changed are the trainable action expert and its projections
+    (`train_expert_only=true`).
+  - One failed attempt first: train run FAILED, dir `data/runs/train-smolvla-2step-persubset-v0ref-20261005T012655Z`.
+    It died offline on `AutoConfig.from_pretrained(<hub id>)`, because the repo-local cache lacked `refs/main`.
+    Fixed by recording `refs/main` (same sha). FAILED runs form no lineage edges.
+  - The same check on the two ACT runs below passes too: per-subset mean/std are within ≤ 6e-8 of the subset
+    stats and 1e-2 away from `stats.json`.
+- ✅ AC8.3 two subsets differing by k = 5 episodes. `v0/reference` (40) and `drop_random_k(v0/reference, 5, seed 0)` =
+  subset `e470d671…` (35). Two ACT 2-step per-subset runs: `a8647af8` and `fea7ac62`. `--diff`
+  (`artifacts/s8_ac8_3_diff.json`):
+  - `data.n_removed 5, n_added 0`;
+  - `data.normalization {"stats_sha256_a": "e9e51a0c…", "stats_sha256_b": "ac940b92…", "differ": true}`;
+  - `params that differ: []; config keys that differ: []; git same: True`.
+  - So the stats difference appears with the data, and nothing in params or config differs.
+- ✅ AC8.4 grounding (grep, `artifacts/s8_ac8_4_grounding.txt`): `PoC p. 1`, `§2.3 (p. 4)` and "owner decision 3"
+  (brief) are cited in `subset_stats.py` and `lerobot_train_entry.py`. All `True`.
+- ⏳ AC8.5 (pending server): SmolVLA on `v0/candidate` (960 episodes), per-subset stats, 2–3 seeds, fixed config
+  and steps. Command and estimates are in the runbook (S9).
+
+**Divergences / notes (S8):**
+- **Which initialization the server recipe uses is open.** The plan's training spec is LeRobot's LIBERO docs example
+  (quoted, fetched 2026-10-04): `--policy.type=smolvla --policy.load_vlm_weights=true --steps=100000
+  --batch_size=64`. That initializes from the SmolVLM2 backbone and needs its 2.03 GB weights on the server.
+  - The local check fine-tuned from `lerobot/smolvla_base`, the approved download.
+  - Both keep data as the only variable if fixed across seeds. **Planner/owner: pick one for AC8.5.**
+  - The hook is the same either way. The runbook lists both commands.
+- **Default changed:** `train_run` now normalizes per subset unless told `normalization="full"`. The data+lineage
+  smoke runs (`train-full-s0` etc.) were trained with full stats; their MLflow params say so and are unchanged.
+- **Quantile stats** (q01…q99) are aggregated by LeRobot as count-weighted means of per-episode quantiles, which is
+  an approximation. Neither ACT nor SmolVLA uses them (MEAN_STD); a QUANTILES-normalized policy (pi05) would.

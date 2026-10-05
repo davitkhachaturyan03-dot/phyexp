@@ -1,0 +1,54 @@
+{
+ "run_id": "fea7ac62d2344101b31a6ae17d163253",
+ "policy_type": "act",
+ "n_episodes": 35,
+ "digest_recomputed": "ac940b921e6e2cfb3913712ca32694dd4e5347a56f3844b7d154ca12de3bf65c",
+ "digest_tag": "ac940b921e6e2cfb3913712ca32694dd4e5347a56f3844b7d154ca12de3bf65c",
+ "files": {
+  "policy_preprocessor_step_3_normalizer_processor.safetensors": {
+   "observation.state.mean": {
+    "max_abs_vs_subset": 5.981244699526655e-08,
+    "max_abs_vs_full_stats_json": 0.011743954234300635,
+    "dtype": "float32"
+   },
+   "observation.state.std": {
+    "max_abs_vs_subset": 3.232340328729322e-08,
+    "max_abs_vs_full_stats_json": 0.021473734727843308,
+    "dtype": "float32"
+   },
+   "action.mean": {
+    "max_abs_vs_subset": 2.7940607327803235e-09,
+    "max_abs_vs_full_stats_json": 0.013860968126223158,
+    "dtype": "float32"
+   },
+   "action.std": {
+    "max_abs_vs_subset": 2.32927682697337e-08,
+    "max_abs_vs_full_stats_json": 0.009510766375935786,
+    "dtype": "float32"
+   }
+  },
+  "policy_postprocessor_step_0_unnormalizer_processor.safetensors": {
+   "observation.state.mean": {
+    "max_abs_vs_subset": 5.981244699526655e-08,
+    "max_abs_vs_full_stats_json": 0.011743954234300635,
+    "dtype": "float32"
+   },
+   "observation.state.std": {
+    "max_abs_vs_subset": 3.232340328729322e-08,
+    "max_abs_vs_full_stats_json": 0.021473734727843308,
+    "dtype": "float32"
+   },
+   "action.mean": {
+    "max_abs_vs_subset": 2.7940607327803235e-09,
+    "max_abs_vs_full_stats_json": 0.013860968126223158,
+    "dtype": "float32"
+   },
+   "action.std": {
+    "max_abs_vs_subset": 2.32927682697337e-08,
+    "max_abs_vs_full_stats_json": 0.009510766375935786,
+    "dtype": "float32"
+   }
+  }
+ },
+ "pass": true
+}
