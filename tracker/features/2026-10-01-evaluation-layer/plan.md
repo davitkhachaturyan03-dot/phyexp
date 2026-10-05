@@ -1,11 +1,130 @@
 # Plan: Evaluation layer (PhAIL primitives on LIBERO, validated on PhAIL's real-robot data)
 
-**Round:** 1 (first draft, written 2026-10-02 after the planning research; items not yet checked are marked
-"to verify during execution").
-**Feature folder:** `tracker/features/2026-10-01-evaluation-layer/`. **Brief:** [`brief.md`](brief.md) (binding).
+**Round:** 2 (plan rework after `analysis-r1.md`, 2026-10-05). Round 1 was written 2026-10-02.
+**Feature folder:** `tracker/features/2026-10-01-evaluation-layer/`. **Brief:** [`brief.md`](brief.md) (binding,
+including the owner answers of 2026-10-02).
 
 Evidence labels used throughout: **quoted** (from a source, with the quote or file/line), **measured** (run in
-this planning session; command or probe named), **inferred** (planner's reasoning, unverified).
+a planning session, or measured by the executor/analyzer and cited from `execution-log.md` /
+`analysis-r1.md`), **inferred** (planner's reasoning, unverified).
+
+## Changes in this revision (r2)
+
+Routed to the planner by `analysis-r1.md` (F-P1 to F-P5), plus the executor items turned into checkable ACs.
+Round-2 work for the executor is every AC marked **(r2)**.
+
+1. **F-P2: one declared functional per metric on libero_10** (new section "Declared functionals (r2)"):
+   - **Choice: option (a).** Per-rollout returns (S6) and the verdict's gate and per-metric CIs (S7) both use
+     **whole-task T** for the five rollout metrics: F(30 s), RMST(60), AUC vs human, HRT(60), censored(60).
+   - Per-sub-task T (§3.5 A) is kept as a **separately declared operation family `*_op`**. It has its own
+     verdict mode and its own operation-sample returns.
+   - Justification and a counterexample showing why option (b) fails: see that section.
+   - New identity ACs AC6.10 and AC7.7: mean(return) equals the verdict's cell metric to ≤ 1e-9, for both
+     families, with the documented weighting for HRT.
+   - The AUC functional on LIBERO is declared with ties counted ½. PhAIL validation keeps PhAIL's
+     ties-dropped rule.
+2. **F-P3: the operation return for an unfinished attempt is −60** (the cap), so it cannot outrank a completed
+   operation. The operation family's attribution functional is renamed `rmst60_op_cap` and is declared with
+   the same convention. AC6.11 checks the ranking on real data. The PhAIL-semantics operation KM (censored)
+   stays as the descriptive per-sub-task CDF (S4).
+3. **F-P1: AC7.1 is restated from PhAIL's released artifact** (`dashboard_per_obj_macro.json`), not its p. 9
+   prose:
+   - OpenPI–GR00T → (iii); OpenPI–ACT → (iii), with the discrepancy recorded; GR00T–ACT → (ii); any vs
+     SmolVLA → (i).
+   - Each holds in 5/5 seeds on the deterministic export.
+4. **F-P4: AC8.5 fine-tunes from `lerobot/smolvla_base@d9f33c94`.** The round-1 spec
+   (`--policy.type=smolvla --policy.load_vlm_weights=true`, 2.03 GB SmolVLM2 backbone, not approved by the
+   owner) is recorded as a divergence under S8.
+5. **F-P5: a fixed batch plan is written into AC5.8 and AC7.5.** `compare_policies` refuses arms whose batch
+   plans differ (new AC7.8).
+6. **E1 → AC5.9 and AC7.9.** Attribution grade is asserted by the caller and checked against the protocol.
+   Smoke runs are labelled "smoke"; `lineage_dry_run --eval-smoke` gives `verify.attribution_grade=false`.
+   The mis-tagged round-1 runs are documented.
+7. **E2 → AC6.8.** One metric registry is consumed by S1, S6 and S7. UPH = 3600 / RMST(τ_episode), matching
+   `evaluation.uph`. The registry carries each metric's family and T definition.
+8. **E3 → AC2.9.** The PhAIL cohort export is sorted by `s3_url` and byte-identical across `PYTHONHASHSEED`
+   values. The S2 and S7 artifacts are regenerated, and p-values are disclosed as Monte-Carlo draws
+   conditional on episode order.
+9. **E5 → AC6.9.** No temporary directories leak from `returns` or `verdict`; the 11 leaked ones are removed.
+10. **Non-blocking `t0_model_sha256`: IN (AC5.10).** `t0_state_sha256` cannot see fixture placement (measured,
+    AC5.2b). A model-placement hash makes the "fixed initial states" of §2.1 item 3 p. 3 checkable per
+    rollout.
+11. **Non-blocking items folded in:**
+    - AC5.3 reworded to "JSON-equal".
+    - S7 records the accepted `gate_only` state and the fixed human anchor in the difference bootstrap.
+    - The report must state the not-built failure types next to the ghost-event statement (AC6.4 note).
+    - The fence must be enforced by later features (Out of scope).
+    - pos3 is named as the reproduction route (AC2.9 note).
+    - BLOCKING Q1 is marked resolved (owner: A).
+12. **No rebuttals.** Every analyzer item is accepted.
+
+---
+
+## Declared functionals (r2)
+
+This answers F-P2. The registry (AC6.8) is the single place that records it.
+
+**Families.**
+
+| Family | T | Censoring | Used by |
+|---|---|---|---|
+| **W (whole-task), the declared attribution family, both suites** | Time to full task success (`T_s`, the env's own `_check_success`). On libero_spatial this is the single operation | Only at τ_episode = 60 s = τ (a harness invariant: a rollout ends early only by success). So min(T, 60) is exactly observed for every rollout | S6 per-rollout returns; S7 gate (macro-KS on whole-task CDFs per task) and per-metric CIs; S1 headline tables; human anchor = whole-task `human_reference.parquet` |
+| **O (operation), PoC §3.5 A "per sub-task"** | Inter-completion time T_k of operation k (S4 rule; PhAIL §3.1 semantics) | (1) Descriptive: PhAIL KM with the unfinished attempt as a censored pair (S4 CDFs, `rmst60_op`, `hrt60_op`), labelled descriptive. (2) Attribution: `rmst60_op_cap`, which counts the unfinished attempt as reaching the cap (60 s) | S4 reporting; S6 `operation_returns.parquet`; S7 `family="op"` (its own gate and CIs, labelled); human anchor = `human_operations.parquet` |
+
+**Metrics and their per-rollout returns (family W).** "Cell" is (policy, task); macro is the equal-weight mean
+over tasks.
+
+| Metric (registry key) | Declared functional | Return column | Identity (per cell, ≤ 1e-9) |
+|---|---|---|---|
+| `f30` | F(30 s) of whole-task T | `ret_f30` = 1[event ∧ T ≤ 30] | mean = F(30) |
+| `rmst60` | RMST(60) = ∫₀⁶⁰ (1 − F) | `ret_rmst60` = −min(T, 60) (censored → −60) | mean = −RMST(60) |
+| `auc_h` | P(T < T_h) + ½ P(T = T_h), T_h from the task's whole-task human reference (Mann–Whitney; ties ½ because model and human share the 20 Hz grid) | `ret_auc_expected` = P(T_h > T) + ½ P(T_h = T); `ret_auc_sampled` = 1[T < T_h*] + ½·1[T = T_h*], recorded seed | mean(expected) = AUC; mean(sampled) = AUC up to sampling noise |
+| `hrt60` | macro over tasks of RMST_h,o(60) / RMST_m,o(60) | `ret_hrt60_lin` = w_o·(−min(T, 60)), with w_o = (1/J)·RMST_h,o / RMST_m,o², evaluated at this policy | Σ_cells mean(`ret_hrt60_lin`) = −HRT(60) at the expansion point (the documented weighting) |
+| `censored60` | 1 − F(60) | `ret_censored60` = 1[no success by 60 s] | mean = 1 − F(60) |
+
+The ghost-event rate has no LIBERO return (owner decision 6). Median, UPH, completion and MTBF/A are
+scoring-only (registry).
+
+**Family O returns (operation samples).** In `operation_returns.parquet`, one row per operation sample: the
+PhAIL pairs, i.e. completed operations plus the one unfinished attempt per incomplete rollout.
+- `ret_rmst60_op_cap` = −min(T_k, 60) for a completed operation, and **−60 for the unfinished attempt**. It
+  cannot exceed the return of any completed operation, since a completed operation has −min(T, 60) ≥ −60.
+- Each row carries `t_start`/`t_end` steps, the segment whose (s′, a′) the operation's return can be credited
+  to (§3.4 "several outcome samples per rollout").
+- Identity, per cell over operation samples: mean(`ret_rmst60_op_cap`) = −`rmst60_op_cap`, as the S7 op arm
+  computes it.
+
+**Why (a), from the PoC:**
+1. **The returns are per rollout.** §9.1 Step 3 p. 19: "Define one 'return' per metric for each rollout".
+   §4.3 p. 10 lists rollout-level returns. CUPID's estimator weights a whole rollout by R(τ) (Prop. 1 p. 5)
+   (quoted).
+2. **Exactness.** In family W every rollout's capped time is observed, because censoring occurs only at
+   τ_episode = τ. So each cell mean of a return *is* the KM functional, and the gate verifies exactly the
+   attributed functional (§3.4 p. 7 "Declared targets"; §4.4 p. 10 "for that metric") (inferred from the
+   harness invariant; checked by AC6.10).
+3. **Option (b) cannot be both KM-consistent and progress-monotone** (inferred, worked example).
+   - Under PhAIL's pair rule, a rollout that never finishes operation 1 contributes one censored pair. A
+     rollout that finishes operation 1 at 10 s and then stalls contributes an event plus a censored pair.
+   - Any per-rollout sum of KM-consistent per-pair terms (each censored term is the KM conditional
+     expectation E[min(T, 60) | T > c] ≥ c) gives the second rollout ≈ −10 − 55 = −65. The first gets ≈ −60.
+   - So rollouts that made progress would rank **below** those that made none.
+4. **§3.5 A p. 7 ("for long-horizon LIBERO-10 tasks, per sub-task") is still honoured.** The per-sub-task T is
+   built (S4), reported as the PhAIL-style per-operation CDF, verifiable by S7 in `family="op"`, and it
+   carries operation-sample returns for the finer §3.4 signal. Its declared attribution functional is
+   `rmst60_op_cap` (F-P3).
+5. **Divergence, recorded.** On libero_10 the headline per-metric results are whole-task, not per-sub-task.
+   The registry, report and every claim label state the family (§4.4 p. 10 "Label every claim with its metric
+   and time cap τ").
+
+**Why −60 for the unfinished attempt (F-P3), and how it squares with §3.2's censoring rule.**
+- §3.2 p. 6's rule ("recorded as censored, not failed") governs how F is *estimated*. S1 and S4 keep it for
+  every CDF.
+- The return is an attribution target. §3.4 p. 7 already lets returns carry penalties ("a return based on
+  negative time-to-success with a penalty for ghost events").
+- `rmst60_op_cap` is therefore a declared, pessimistic functional: it equals the KM operation RMST only when no
+  operation is censored before 60 s. Its `_cap` name and registry entry say so.
+- A KM-consistent imputation (E[min(T, 60) | T > c]) would keep the identity with the descriptive KM. But it can
+  still rank a censored attempt above a slow completed one, which F-P3 rules out (inferred).
 
 ---
 
@@ -363,6 +482,8 @@ LIBERO's own predicates. Custom code only where nothing exists:**
     - (i) A cell abstraction: (policy/arm, cell = task or object) → list of episodes, each with its
       operation-level (T, E) pairs. LIBERO episodes carry `place_ts` = operation completion times,
       `duration_s` = the rollout's observed duration, `total_items` = n_ops and `n_inf_events` = 0.
+      **(r2)** A LIBERO cell is built in either declared family: W (one whole-task pair per rollout, the
+      headline) or O (operation pairs). The family comes from the single registry (AC6.8).
     - (ii) Scalars per cell and macro: F(τ) for any τ, median, RMST(τ), UPH (= 3600/RMST(τ_episode), following
       PhAIL's code, with Table 1's form noted), completion F(τ_episode), MTBF/A, ghost-event rate,
       censored-tail rate.
@@ -426,6 +547,19 @@ LIBERO's own predicates. Custom code only where nothing exists:**
     - Its P-P plot (cf. PhAIL Fig. 2).
     - The macro UPH-vs-MTBF/A sweep (cf. Fig. 10) [PoC §3.2 p. 6, §4.1 p. 9; PhAIL App. L]
   - [ ] AC2.8 The UPH formula discrepancy (P-table "Prior art": three forms) is recorded, with the one adopted [vla-build: record discrepancies]
+  - [ ] AC2.9 **(r2, E3)** Deterministic cohort export.
+    - **Why:** PhAIL's loader iterates a Python set (`for url in candidate_urls:`, quoted by the analyzer), so
+      row order depends on hash randomization and every bootstrap p moves.
+    - `scripts/phail_export_cohort.py` sorts rows by `s3_url` before writing.
+    - Two exports in fresh processes with `PYTHONHASHSEED` 0 and 1 (and one unset) give byte-identical parquet
+      files; their sha256 is recorded.
+    - `s2_phail_reference.json`, `phail_validation.json` and the S7 artifacts are regenerated from the sorted
+      export, and the p-values quoted in the log are updated.
+    - The report states that bootstrap p-values are Monte-Carlo draws conditional on episode order and seed;
+      D and the point estimates do not depend on order.
+    - The report names pos3 (`pos3.download(..., profile=PUBLIC)`, the phail-paper README recipe) as the
+      reproduction route for the fetch.
+    - Sources: [analysis-r1 E3; PhAIL §3.3 p. 6 "pooled-resample ... bootstrap"; vla-build reproducibility]
 - **Verify by:**
   - `.venv/bin/python scripts/phail_validate.py --out artifacts/phail_validation.json`.
   - The executor saves the cohort-count and comparison tables.
@@ -495,7 +629,7 @@ LIBERO's own predicates. Custom code only where nothing exists:**
   - [ ] AC4.1 The operations table for all 20 tasks (task → goal conjuncts → maintained conjuncts → n_ops) is generated from the installed BDDL files and matches P14: libero_10 n_ops = [2, 2, 2, 2, 2, 1, 2, 2, 2, 2], task 8 having one maintained conjunct; libero_spatial n_ops = 1 [PoC §3.5 A p. 7; LIBERO BDDL]
   - [ ] AC4.2 Unit tests on labelled-synthetic traces cover: two conjuncts in either order; a conjunct that toggles off and on; a maintained conjunct broken mid-rollout (success delayed until restored); simultaneous completion (T = 0 for the second op); timeout after k < n ops (censored tail present); zero ops done (one censored pair of length τ_end) [PhAIL §3.1 p. 4]
   - [ ] AC4.3 On the 500 libero_10 human demos: Σ_k T_k equals whole-task `T_success_s` for 500/500, and every demo has n_ops events and no censored pair [consistency with S3]
-  - [ ] AC4.4 Human per-operation CDFs per libero_10 task (KM, all events) and a per-op-index breakdown (first vs second operation) are produced. The clustered bootstrap is used, since operations within one demo are correlated [PoC §3.2 p. 6 clustered bootstrap]
+  - [ ] AC4.4 Human per-operation CDFs per libero_10 task (KM, all events) and a per-op-index breakdown (first vs second operation) are produced. The clustered bootstrap is used, since operations within one demo are correlated. **(r2)** These PhAIL-semantics operation CDFs (`rmst60_op`, `hrt60_op`; unfinished attempts censored) are labelled *descriptive* in the registry. The family-O attribution functional is `rmst60_op_cap` (S6, "Declared functionals (r2)") [PoC §3.2 p. 6 clustered bootstrap, §3.5 A p. 7]
   - [ ] AC4.5 The harness (S5) imports this same function. There is one implementation, enforced by a grep in the verify script [vla-build; single record system]
   - [ ] AC4.6 Grounding docstring cites PoC §3.5 A p. 7, §3.4 p. 7, PhAIL §3.1 p. 4 and the LIBERO source lines for `_check_success` [vla-build]
 - **Verify by:** `pytest` on the synthetic traces; `<sim-python> scripts/human_reference.py --suites libero_10
@@ -550,13 +684,52 @@ LIBERO's own predicates. Custom code only where nothing exists:**
 - **Acceptance criteria (local):**
   - [ ] AC5.1 No-op policy smoke (dummy action): on 1 libero_spatial and 1 libero_10 task × 3 init states, every rollout is censored at τ_episode, n_ops_done = 0, and the record validates against the schema [PoC §3.2 p. 6 right-censoring]
   - [ ] AC5.2 Determinism: re-running the no-op smoke (same init state, seed) gives bit-identical records except `wall_seconds`. The same holds for the ACT checkpoint on CPU (MPS determinism: to verify during execution) [PoC §2.1 item 3 p. 3]
-  - [ ] AC5.3 Lineage: the ACT smoke checkpoint `train-full-s0` (128², on our data) is evaluated on ≥ 2 tasks × 2 init states. The eval run's input is that checkpoint's sha, `trace(eval_run)` reaches v0's raw files, and `stand_in` is false [PoC §2.1 item 1 p. 3]
+  - [ ] AC5.3 Lineage: the ACT smoke checkpoint `train-full-s0` (128², on our data) is evaluated on ≥ 2 tasks × 2 init states. The eval run's input is that checkpoint's sha, `trace(eval_run)` reaches v0's raw files (the CLI output is JSON-equal to the stored trace artifact; formatting may differ), and `stand_in` is false. The run is a smoke run and is tagged `eval.attribution_grade=false` (AC5.9) [PoC §2.1 item 1 p. 3]
   - [ ] AC5.4 Real-policy harness validation on `HuggingFaceVLA/smolvla_libero@6721902b` (256², per its config, P24), on ≥ 1 libero_spatial task and the libero_10 task with the most operations (task 8), × ≥ 10 init states each. Real outcomes; T, ops and censoring recorded; per-task KM computed with S1. Labelled "external checkpoint (not trained on our data), harness validation, not attribution-grade". Throughput on MPS is measured first; if it is too slow, the count is reduced and the reason recorded (to verify during execution) [PoC §9.1 Step 2 p. 18; owner decision 2 SmolVLA]
   - [ ] AC5.5 Trajectory store: for the AC5.4 rollouts, the dataset loads with `LeRobotDataset`. Frame count equals Σ sim_steps, and every frame maps to (`rollout_id`, `policy_step`) [CUPID Prop. 1 p. 5]
   - [ ] AC5.6 Init-state pairing: rollout j uses init state j regardless of `batch_size` (checked by running the same 4 rollouts with batch sizes 1 and 4: identical `init_state_index` → sim state at t0 sha) [P16, P17]
   - [ ] AC5.7 Grounding docstrings cite PoC §9.1 Step 2 p. 18, §2.1 items 1 and 3 p. 3, §3.5 A pp. 7–8, and LeRobot's `rollout()` source [vla-build]
 - **Acceptance criteria (pending server: exactly what will be run there):**
-  - [ ] AC5.8 (pending server) The SmolVLA base policy from S8 is evaluated at 50 rollouts per task × 20 tasks (init states 0–49, seed_base 0), τ_episode 60 s, 128², `record_trajectories=True`, for each of the 2–3 training seeds. Output: rollouts parquet + trajectories + MLflow eval runs [PoC §2.1 item 3 p. 3, §2.3 p. 4, §9.1 Step 2 p. 18]
+  - [ ] AC5.8 (pending server) The SmolVLA base policy from S8 is evaluated at 50 rollouts per task × 20 tasks (init states 0–49, seed_base 0), τ_episode 60 s, 128², `record_trajectories=True`, for each of the 2–3 training seeds. Output: rollouts parquet + trajectories + MLflow eval runs.
+    - **(r2, F-P5) The batch plan is fixed.**
+      - One task per batch, `batch_size = 50` (all 50 init states of the task in one batch).
+      - Tasks in `libero_task_id` order, libero_spatial before libero_10; init states 0–49 in order.
+      - Eval seed 0. This is identical for every training seed and for every arm it will ever be compared with.
+      - Source (quoted, LeRobot LIBERO docs): "use the same `--seed`, keep `--env.init_states=true`, and run
+        each task in a single batch (`--eval.batch_size` equal to episodes per task)".
+      - If server GPU memory forbids 50, use one smaller divisor of 50 (e.g. 10) for **all** arms and seeds, and
+        record it.
+    - The plan (batch size, task order, init order, eval seed) is stored as the `eval.batch_plan` param with
+      its digest.
+    - **Why:** measured — SmolVLA outcomes depend on the batch plan (same init and seed, batch 1 vs 5: init 4
+      succeeds at step 71 vs never; analysis-r1, reproduced).
+    - The runs are asserted attribution-grade by the runbook command (AC5.9).
+    - Sources: [PoC §2.1 item 3 p. 3, §2.3 p. 4, §9.1 Step 2 p. 18; analysis-r1 F-P5]
+  - [ ] AC5.9 **(r2, E1)** Attribution grade is asserted by the caller.
+    - `eval_run(..., attribution_grade=False)` is the default.
+    - `true` is accepted only if the caller asserts it **and** the protocol check passes:
+      - 50 init states per task for every task of both suites;
+      - τ_episode = 1200 steps;
+      - a fixed `eval.batch_plan`;
+      - the train run is not tagged `smoke`.
+    - Otherwise it raises.
+    - Smoke runs carry `vlapoc.smoke=true` and a run name containing "smoke".
+    - Tests: (a) an eval with `attribution_grade=True` on 2 init states is refused; (b) the default gives
+      `eval.attribution_grade=false`.
+    - The round-1 runs mis-tagged `true` (`eval-act-train-full-s0-a`, `eval-act-train-full-s0-spatial0-n10`,
+      `verify-ref-vs-drop-random-5 [eval-smoke]`) are listed in the log with how to read them ("tag meant
+      'has a train run'"). They are not rewritten; MLflow history stays append-only.
+    - Sources: [analysis-r1 E1; PoC §2.1 item 1 p. 3; §2.4 p. 4 "final claims should be about closed-loop behavior"]
+  - [ ] AC5.10 **(r2, t0_model_sha256)** Fixture placement is part of the "fixed initial state".
+    - Every rollout record carries `t0_model_sha256`: a sha256 of the post-reset model placement (`body_pos`
+      and `site_pos` arrays; the executor chooses the exact bytes and documents them) next to
+      `t0_state_sha256`.
+    - Equality: for the same (task, init state), it is identical across rollouts, eval runs and batch sizes.
+    - Negative test: a reused env reset 3× on libero_10 task 8 yields a different `t0_model_sha256` (the
+      measured 7.2 mm stove drift).
+    - `validate_record` requires the column.
+    - **Why:** measured AC5.2b — `t0_state_sha256` misses fixture placement.
+    - Sources: [PoC §2.1 item 3 p. 3 "fixed seeds and initial states"; analysis-r1 Non-blocking]
 - **Verify by:** `<sim-python> scripts/eval_smoke.py --policy noop|ckpt:<train_run>|hf:HuggingFaceVLA/smolvla_libero@6721902b
   --tasks ... --n ...`; `python -m vlapoc.lineage trace <eval_run>`.
 - **Demo value:** the first real closed-loop rollouts in the repo: SmolVLA on LIBERO, run on this Mac, with T
@@ -573,22 +746,33 @@ LIBERO's own predicates. Custom code only where nothing exists:**
 - **Depends on:** S1, S3, S4, S5
 - **Deliverables:**
   - **`vlapoc/returns.py`** → `returns.parquet`, keyed (`eval_run_id`, `rollout_id`) and carrying
-    `train_run_id`, `checkpoint_sha256` and the cell. One column per metric, each named with its τ:
-    - `ret_f30` = 1[event ∧ T ≤ 30 s] (§4.3 "binary return").
-    - `ret_rmst60` = −min(T, 60 s), with censored → −60 (§4.3 "negative capped time").
-    - `ret_auc_sampled` = 1[T < T_h*], T_h* drawn from the same task's human reference with a recorded seed
-      (§9.1 Step 3, literal).
-    - `ret_auc_expected` = P(T_h > T) under the human KM, ties ½: the deterministic expectation of the
-      sampled indicator (a divergence, recorded; inferred lower variance).
-    - `ret_hrt_lin` = w_o · (−min(T, 60 s)), with w_o = (1/J) · RMST_h,o / RMST_m,o² evaluated at the
-      current policy. This is the first-order (delta-method) linearization of the macro ratio: the form is
-      inferred and must be confirmed by the attribution feature; §4.3 only says "first-order (linearized)".
-    - `ret_censored` = 1[timeout] (§3.4 "the censored tail").
-    - `failure_type`.
-  - **`operation_returns.parquet`** (libero_10): `rollout_id`, `op_k`, `t_start`/`t_end` steps (the segment
-    whose (s′, a′) the operation's return can be credited to), `T_op`, `event`, `ret_rmst_op`. This answers
-    §3.4 "Operation-level (T, event) pairs".
-  - **`metrics_registry.json`**, for every PoC metric:
+    `train_run_id`, `checkpoint_sha256` and the cell.
+    - **(r2) All per-rollout returns are family W: whole-task T, whole-task human anchor**, exactly as tabled
+      in "Declared functionals (r2)".
+    - One column per metric, each named with its τ:
+      - `ret_f30` = 1[event ∧ T ≤ 30 s] (§4.3 "binary return").
+      - `ret_rmst60` = −min(T, 60 s), with censored → −60 (§4.3 "negative capped time").
+      - `ret_auc_sampled` = 1[T < T_h*] + ½·1[T = T_h*], T_h* drawn from the same task's whole-task human
+        reference with a recorded seed (§9.1 Step 3, literal; ties ½ in r2).
+      - `ret_auc_expected` = P(T_h > T) + ½ P(T_h = T) under the human reference: the deterministic
+        expectation of the sampled indicator (a divergence, recorded; inferred lower variance).
+      - `ret_hrt60_lin` = w_o · (−min(T, 60 s)), with w_o = (1/J) · RMST_h,o / RMST_m,o² evaluated at the
+        current policy. This is the first-order (delta-method) linearization of the macro ratio: the form is
+        inferred and must be confirmed by the attribution feature; §4.3 only says "first-order (linearized)".
+      - `ret_censored60` = 1[no success by 60 s] (§3.4 "the censored tail").
+      - `failure_type`.
+    - Round-1 executor names (`ret_hrt60_lin`, `ret_censored60`) are kept.
+  - **`operation_returns.parquet`** (libero_10, family O): one row per operation sample (PhAIL pairs).
+    - Columns: `rollout_id`, `op_k`, `t_start`/`t_end` steps (the segment whose (s′, a′) the operation's
+      return can be credited to), `T_op`, `event`.
+    - **`ret_rmst60_op_cap` = −min(T_op, 60) for a completed operation, −60 for the unfinished attempt (r2,
+      F-P3).** This replaces round 1's `ret_rmst60_op`, which used −T_tail for the unfinished attempt.
+    - This answers §3.4 "Operation-level (T, event) pairs".
+  - **(r2, E2) One metric registry**: a single module (e.g. `vlapoc/metrics_registry.py`) that S1
+    (`evaluation`), S6 (`returns`) and S7 (`verdict`) all import. `metrics_registry.json` is its serialization.
+    It replaces `evaluation.METRICS`, `returns.REGISTRY` and `verdict.METRICS`.
+  - Per entry: key, family (W / O / scoring-only), T definition, τ, censoring convention, return column(s),
+    verdict metric name, and the identity relation. For every PoC metric:
     - The functional of F, τ, and the return definition or "scoring only, no per-rollout return in the PoC"
       (median, UPH, completion, MTBF/A).
     - **Transfer status to LIBERO, with the reason:**
@@ -597,7 +781,10 @@ LIBERO's own predicates. Custom code only where nothing exists:**
       - Blind randomized scheduling: replaced by fixed init states + seeds, which allow scene-level pairing
         that PhAIL cannot do. PhAIL: "initial physical configurations are not replayed", quoted.
       - Wall-clock T: sim time, excludes inference latency.
-      - UPH: a projection only; production UPH needs reset time (PhAIL p. 5, quoted).
+      - UPH: a projection only; production UPH needs reset time (PhAIL p. 5, quoted). **(r2) Declared
+        functional `3600 / RMST(τ_episode)`, matching `evaluation.uph` and S2 AC2.8.** Table 1's
+        `3600 / E[T | T < τ_episode]` and `common.py`'s per-episode `3600·S/T` are named as notes; they
+        differ by up to 3× (measured, S2).
       - MTBF/A: "failures/assists" become non-completions.
       - F(30 s) transfers literally with τ_episode = 60 s.
   - **Failure types**, PoC-named, with what is and isn't built:
@@ -608,17 +795,53 @@ LIBERO's own predicates. Custom code only where nothing exists:**
       (goal-conjunct truth, task-object positions, arm-action norm) are in the record, so they can be added
       without re-running rollouts.
 - **Acceptance criteria:**
-  - [ ] AC6.1 Return identities on the AC5.4 rollouts and on synthetic data. Per cell:
-    - mean(`ret_rmst60`) = −RMST(60 s) from KM, to ≤ 1e-9 when censoring occurs only at τ_episode ≥ 60 s.
-    - mean(`ret_f30`) = F(30 s), to ≤ 1e-9 under the same condition.
-    - mean(`ret_auc_expected`) = the censored AUC vs human from S1 to ≤ 1e-9, on uncensored synthetic data [PoC §4.3 p. 10, §3.2 p. 6]
-  - [ ] AC6.2 HRT linearization check on synthetic perturbations (labelled synthetic): for policy-time perturbations with |ΔHRT|/HRT ≤ 5%, Σ_rollouts Δ(mean `ret_hrt_lin`) predicts ΔHRT_exact with relative error ≤ 10% (inferred: the first-order error is O(Δ²)). The measured error curve is saved [PoC §4.3 p. 10 "first-order (linearized) approximation"]
+  - [ ] AC6.1 **(r2 restated)** Family-W return identities on synthetic data and on **both** AC5.4 eval runs (libero_spatial:0 and libero_10:8), against the whole-task KM. Per cell, to ≤ 1e-9:
+    - mean(`ret_rmst60`) = −RMST(60);
+    - mean(`ret_f30`) = F(30);
+    - mean(`ret_censored60`) = 1 − F(60);
+    - mean(`ret_auc_expected`) = AUC_h (ties ½).
+    - Real libero_10:8 must now give the whole-task values (the analyzer measured RMST(60) 48.400 s, F(30)
+      0.300 as the whole-task numbers).
+    - Sources: [PoC §4.3 p. 10, §3.2 p. 6; "Declared functionals (r2)"]
+  - [ ] AC6.2 HRT linearization check on synthetic perturbations (labelled synthetic): for policy-time perturbations with |ΔHRT|/HRT ≤ 5%, Σ_rollouts Δ(mean `ret_hrt60_lin`) predicts ΔHRT_exact with relative error ≤ 10% (inferred: the first-order error is O(Δ²)). The measured error curve is saved [PoC §4.3 p. 10 "first-order (linearized) approximation"]
   - [ ] AC6.3 Attribution join contract (no influence computed): `returns.parquet` + the train run's training subset produce the empty episode × metric frame (rows = (`episode_id`, `content_hash`) of the subset that passes `check_scores`; columns = registry metrics with a return). Its shape is printed [PoC §4.2 p. 9, §9.1 Step 3 p. 19; lineage contract]
-  - [ ] AC6.4 The registry covers 100% of §3.2 primitives, Table 1 scalars and the §4/§10 targets (F(30 s), HRT, RMST, AUC, ghost-event rate). Each has a transfer status and a reason; none is silently missing [owner decision 4; brief "say so rather than silently dropping it"]
+  - [ ] AC6.4 The registry covers 100% of §3.2 primitives, Table 1 scalars and the §4/§10 targets (F(30 s), HRT, RMST, AUC, ghost-event rate). Each has a transfer status and a reason; none is silently missing. The report states the not-built failure types (missed grasp, wrong object, ignored instruction, idle) next to the ghost-event statement [owner decision 4; brief "say so rather than silently dropping it"; PoC §2.1 item 3 p. 3]
   - [ ] AC6.5 Per-failure-type subsets: returns can be filtered by `failure_type` and by task, and S1 metrics recomputed on the subset. Demonstrated on AC5.4 [PoC §9.1 Step 3.3 p. 19]
   - [ ] AC6.6 Every return column name carries its metric and τ (e.g. `ret_rmst60`); the registry states the declared functional [PoC §3.4 p. 7 "Declared targets", §4.4 p. 10 "Label every claim with its metric and time cap τ"]
   - [ ] AC6.7 (pending server) Returns for every AC5.8 rollout (1000 per seed) [PoC §9.1 Step 3 p. 19]
-- **Verify by:** `.venv/bin/python -m vlapoc.returns --eval-run <id>` + the identity test script.
+  - [ ] AC6.8 **(r2, E2) One registry.**
+    - A grep finds no metric-definition table outside the registry module (no `METRICS =`/`REGISTRY =` in
+      `evaluation.py`, `returns.py` or `verdict.py`), and all three import it.
+    - `metrics_registry.json` is regenerated, and its UPH entry reads `3600 / RMST(τ_episode)`.
+    - Every entry with a return or a verdict metric has a `family` and a `T` field matching "Declared
+      functionals (r2)".
+    - `uph()`'s output on the S2 cohort equals 3600 / `rmst(τ_episode)` to ≤ 1e-9.
+    - Sources: [analysis-r1 E2; single record system; PoC §3.4 p. 7 "Declared targets"]
+  - [ ] AC6.9 **(r2, E5) No temp-dir leaks.**
+    - The count of `data/scratch/verdict_*` and `data/scratch/returns_*` is the same before and after one
+      `returns` run and one `verdict --eval-runs` run (`TemporaryDirectory`, or deletion after reading).
+    - The 11 leaked directories from round 1 are removed, and their count before and after is logged.
+    - Sources: [analysis-r1 E5; brief: disk]
+  - [ ] AC6.10 **(r2, F-P2) Returns and verdict agree on the declared functional.** On both AC5.4 eval runs,
+    for every family-W metric and every cell:
+    - mean(return) equals the metric that `verdict.compare_policies` reports for that arm and cell (its point
+      estimate) to ≤ 1e-9, with sign/weighting per the identity column: `ret_rmst60` ↔ −RMST(60);
+      Σ_cells mean(`ret_hrt60_lin`) ↔ −HRT(60).
+    - For family O: mean over operation samples of `ret_rmst60_op_cap` equals −`rmst60_op_cap` from the
+      verdict's `family="op"` arm to ≤ 1e-9.
+    - The comparison table is saved, and it replaces the analyzer's mismatch table (48.4 vs 37.0 s).
+    - Sources: [analysis-r1 F-P2; PoC §3.4 p. 7, §4.4 p. 10]
+  - [ ] AC6.11 **(r2, F-P3) The operation return ranks correctly.**
+    - On `operation_returns.parquet` of the libero_10:8 eval run, every unfinished attempt has
+      `ret_rmst60_op_cap` = −60, and no unfinished attempt's return exceeds any completed operation's return in
+      the same cell.
+    - Explicitly: `init005` op 2 (event 0) now scores −60, below `init003` op 2 (−15.50) and `init006` op 2
+      (−12.10).
+    - Synthetic test: an unfinished attempt with a short tail never outranks a completed operation.
+    - Sources: [analysis-r1 F-P3; PoC §3.4 p. 7]
+- **Verify by:** `.venv/bin/python -m vlapoc.returns --eval-run <id>` + the identity test script;
+  `scripts/verify_returns_s6.py --real --against-verdict` (r2) on both AC5.4 eval runs, against a scratch lineage
+  copy.
 - **Demo value:** the episode × metric matrix's input made concrete. One table where each rollout carries five
   returns, each a declared functional with its τ. This is what CUPID's binary `success_mask` becomes in this PoC.
 
@@ -640,15 +863,50 @@ LIBERO's own predicates. Custom code only where nothing exists:**
       - (i) gate fires and all significant metrics agree in sign;
       - (ii) gate fires and metrics disagree (CDFs cross, the trade-off signature);
       - (iii) gate does not fire, so the arms are indistinguishable at this N.
+      - **(r2, accepted divergence) `gate_only`:** the gate fires but no metric's Holm-adjusted CI excludes 0,
+        so no direction is established. PoC §4.4 p. 10: "each metric's bootstrap CI gives the direction"
+        (quoted); `verdict.py:101-102`.
     - Stratified logrank as the sanity line.
+  - **(r2, F-P2) Families.** LIBERO arms default to **family W**: whole-task (T, E) per rollout, a whole-task
+    macro-KS gate per task, the family-W metrics, and the whole-task human anchor.
+    - `family="op"` gives the operation-family verdict: operation pairs, operation-level gate,
+      `rmst60_op_cap`, and the `human_operations.parquet` anchor.
+    - The family is a recorded param and appears in every verdict label.
+    - PhAIL arms keep PhAIL's own semantics (operation pairs, ties-dropped AUC) for S2/S7 reproduction.
+  - **(r2, recorded) The human anchor is held fixed in the difference bootstrap.** Inferred: this removes
+    common-mode noise. S2's single-policy HRT CI resamples it, to match PhAIL Table 2.
+  - **(r2, F-P5) Batch-plan guard.** `compare_policies` reads each eval run's `eval.batch_plan` and refuses arms
+    whose plans differ, unless `allow_plan_mismatch=True`, which labels the verdict "unpaired plan".
   - **CLI** over two eval runs, recorded as a `verify` MLflow run, or under `select`/`eval` per the existing
     stage list (the executor decides; extend `STAGES` if needed).
 - **Acceptance criteria:**
-  - [ ] AC7.1 On PhAIL data (S2 cohort): OpenPI vs GR00T → (iii), with macro-KS p reported (published 0.12). ACT vs OpenPI → (ii) (published: KS rejects, AUC and RMST disagree, §5.3). Any model vs SmolVLA → (i) [PhAIL §3.3 p. 6, §5.1–5.3 pp. 7–10; PoC §4.4 p. 10]
+  - [ ] AC7.1 **(r2 restated from PhAIL's released artifact, F-P1)** On the S2 cohort (sorted export, AC2.9), in 5/5 bootstrap seeds (0–4):
+    - **OpenPI vs GR00T → (iii).**
+    - **OpenPI vs ACT → (iii) at this N.** PhAIL's released `out/explore/ks_power/dashboard_per_obj_macro.json`
+      gives OpenPI–ACT `p 0.10294852573713144, status WEAK` (measured, analysis-r1). Our gate measured 0.105–0.123.
+    - **GR00T vs ACT → (ii)**, the §5.3 crossing: the released JSON gives p 0.016 `HOLDS`; RMST favours GR00T and
+      AUC favours ACT, both Holm-significant (executor measured, 5/5 seeds).
+    - **Any model vs SmolVLA → (i).**
+    - **The prose-vs-artifact discrepancy is recorded in the report.** PhAIL p. 9 says "ACT and OpenPI/GR00T
+      are different (KS rejects)" (quoted), but its own released macro-KS does not reject OpenPI–ACT at
+      α = 0.05. PoC §3.3 p. 7's "resolved … OpenPI vs. ACT at 30 rollouts per … cell" is a detection rate from
+      PhAIL §5.2's subsampling experiment at τ = 120 s (p. 8), not a full-cohort rejection.
+    - The artifact wins.
+    - Sources: [PhAIL §3.3 p. 6, §5.1–5.3 pp. 7–10, released `dashboard_per_obj_macro.json`; PoC §3.3 p. 7, §4.4 p. 10]
   - [ ] AC7.2 Null calibration smoke (cf. PhAIL App. J): over ≥ 200 random half-splits of one PhAIL model's episodes, the empirical rejection rate at α = 0.05 is reported. PhAIL reports 0.042–0.078 (quoted); ours is expected inside [0.02, 0.10] (inferred band at 200 trials) [PhAIL App. J p. 18–19]
   - [ ] AC7.3 KS is never used for direction: the verdict object exposes direction only from scalar CIs, and a unit test using PhAIL App. I's three intransitive CDFs shows sup-signs cycling while the verdict's direction comes from RMST [PoC §3.2 p. 6 "KS cannot rank on its own"; PhAIL App. I]
   - [ ] AC7.4 On LIBERO smoke data (AC5.3 ACT vs AC5.4 SmolVLA on a shared task and init states): the verdict runs end to end and is recorded as a run. Labelled smoke: the policies differ in training data and architecture, so this exercises the code, not a PoC claim [PoC §9.1 Step 4 p. 19]
-  - [ ] AC7.5 (pending server) Full-data SmolVLA vs a "drop k random" retrain (k = 20, existing `drop_random_k`), each evaluated per AC5.8 → verdict recorded. This is the first real counterfactual gate on LIBERO [PoC §2.6 p. 5, §9.1 Step 4 p. 19]
+  - [ ] AC7.5 (pending server) Full-data SmolVLA vs a "drop k random" retrain (k = 20, existing `drop_random_k`), each evaluated per AC5.8 → verdict recorded. This is the first real counterfactual gate on LIBERO.
+    - **(r2, F-P5)** Both arms are trained with the same seeds and evaluated with the **identical** fixed batch
+      plan of AC5.8: batch 50 = one task per batch, task and init order fixed, eval seed 0. If a smaller divisor
+      is forced, the same one is used for both arms and all seeds.
+    - The verdict's batch-plan guard (AC7.8) passes without override.
+    - Family W is the declared verdict. Family O is reported alongside, labelled.
+    - Sources: [PoC §2.6 p. 5, §9.1 Step 4 p. 19; LeRobot LIBERO docs, paired comparisons (quoted in AC5.8)]
+  - [ ] AC7.6 **(r2)** The verdict artifacts of AC7.1–AC7.4 are regenerated from the sorted PhAIL export (AC2.9) and the family-W LIBERO arms. The logged p-values are updated, and the S7 log notes that the p-values are Monte-Carlo draws conditional on episode order and seed [analysis-r1 E3, E4]
+  - [ ] AC7.7 **(r2, F-P2)** Family consistency on LIBERO: for both AC5.4 eval runs, the verdict's per-arm family-W metrics equal the S6 cell means of the matching returns (AC6.10 run from the verdict side), and the op-family `rmst60_op_cap` equals the operation-sample mean of `ret_rmst60_op_cap`. A label check: every verdict label contains its family [PoC §3.4 p. 7, §4.4 p. 10]
+  - [ ] AC7.8 **(r2, F-P5)** The batch-plan guard: `compare_policies` on two eval runs with different `eval.batch_plan` raises without the override. With the override, the label contains "unpaired plan". Two runs with the same plan pass [LeRobot docs paired comparison; measured batch effect]
+  - [ ] AC7.9 **(r2, E1)** Smoke verdicts are labelled smoke: `verify_run` sets `verify.attribution_grade=true` only when both eval runs carry an asserted `eval.attribution_grade=true` (AC5.9). `lineage_dry_run --eval-smoke` re-run gives `verify.attribution_grade=false` and a label containing "smoke", and `artifacts/s9_summary.json` is regenerated accordingly [analysis-r1 E1]
 - **Verify by:** `.venv/bin/python -m vlapoc.verdict --phail OpenPI GR00T` (and the other pairs);
   `--eval-runs <a> <b>`.
 - **Demo value:** PhAIL's three resolution outcomes reproduced by our gate on real data. The gate the
@@ -673,15 +931,36 @@ LIBERO's own predicates. Custom code only where nothing exists:**
     mechanism is the executor's choice.
   - `train_run` params: `normalization_stats = "per-subset (aggregate_stats over N episodes)"` plus the
     stats digest.
-  - A SmolVLA training spec (LeRobot SmolVLA defaults, `--policy.type=smolvla`, `load_vlm_weights=true`; steps
-    and batch size per the LeRobot LIBERO docs example, `--steps=100000 --batch_size=64` (quoted), to be
-    confirmed for our 128² data).
+  - **(r2, F-P4) The SmolVLA training spec fine-tunes from `lerobot/smolvla_base@d9f33c94`**
+    (`--policy.path=lerobot/smolvla_base`).
+    - Source (quoted, LeRobot SmolVLA docs): "Use `smolvla_base`, our pretrained 450M model, and fine-tune it on
+      your data".
+    - Measured: S8 loaded 500/500 tensors and the frozen VLM was bit-equal; the download is owner-approved
+      (906,712,520-byte weights).
+    - Steps and batch size are taken from the LeRobot SmolVLA docs' fine-tuning example and fixed in the runbook
+      (to verify during execution: the round-1 plan quoted the LIBERO page's `--steps=100000 --batch_size=64`).
+      They are identical across seeds and arms.
+  - **Divergence, recorded in the docstring, the runbook and the report.** Round 1 specified
+    `--policy.type=smolvla --policy.load_vlm_weights=true` (quoted, LeRobot LIBERO docs example), which
+    initializes from the 2.03 GB SmolVLM2 backbone.
+    - The owner did not approve that download (brief, owner answers 2026-10-02: approved "the SmolVLA base
+      model").
+    - PoC §2.3 p. 4 only says "SmolVLA via LeRobot" (quoted), so no PoC page requires the backbone recipe.
+    - Both are documented LeRobot recipes.
 - **Acceptance criteria:**
   - [ ] AC8.1 `aggregate_stats` over all 1000 v0 episodes reproduces `meta/stats.json` for state and action to ≤ 1e-9 (planning: ≤ 2.4e-10) [P23]
   - [ ] AC8.2 Local 2-step SmolVLA run on MPS over a small subset (e.g. `v0/reference`, 40 episodes, about 280 MB cache measured in R1 of the data+lineage plan): the checkpoint's normalizer and unnormalizer state/action mean and std equal the subset stats to ≤ 1e-6 and differ from the full `stats.json`. If the SmolVLA base download blocks locally, an ACT 2-step run proves the hook and the SmolVLA check moves to pending server (recorded) [owner decision 3]
   - [ ] AC8.3 Two subsets differing by k episodes yield different stats digests, and `diff` reports the normalization difference as a data difference, not a config one [owner decision 3; PoC §2.1 item 1 p. 3 "what changed between the good run and the bad run?"]
   - [ ] AC8.4 Grounding docstring cites p. 1, PoC §2.3 p. 4 and owner decision 3 (brief) [vla-build]
-  - [ ] AC8.5 (pending server) SmolVLA trained on `v0/candidate` (960 episodes) with per-subset stats, 2–3 seeds, fixed config and steps. Checkpoints are registered as train runs and feed AC5.8 [PoC §2.3 p. 4, §10 p. 20]
+  - [ ] AC8.5 **(r2 restated, F-P4; pending server)** SmolVLA **fine-tuned from `lerobot/smolvla_base@d9f33c94`** on `v0/candidate` (960 episodes):
+    - per-subset normalization stats;
+    - 2–3 training seeds;
+    - fixed config, steps and batch size (from the runbook, identical across seeds);
+    - render and train at 128².
+    - The train run params record `policy.path=lerobot/smolvla_base`, the revision, and `load_vlm_weights`
+      not used.
+    - Checkpoints are registered as train runs, are not tagged `smoke`, and feed AC5.8.
+    - Sources: [PoC §2.3 p. 4, §10 p. 20; brief owner answers; LeRobot SmolVLA docs]
 - **Verify by:** `.venv/bin/python -m vlapoc.subset_stats --check v0`; `scripts/...` 2-step run plus the normalizer
   safetensors comparison.
 - **Demo value:** normalization becomes a function of the training data, which keeps data the only variable;
@@ -703,8 +982,13 @@ LIBERO's own predicates. Custom code only where nothing exists:**
     - AC7.5 (first LIBERO counterfactual gate);
     - AC8.5 (SmolVLA training).
 - **Acceptance criteria:**
-  - [ ] AC9.1 One command runs the local chain. `trace(<verdict run>)` reaches v0's raw-file sha256s through eval → train → subset → version. No stage is `stand_in=true` except attribution [PoC §2.1 item 1 p. 3, §9.1 p. 18–19]
-  - [ ] AC9.2 The runbook lists every pending-server AC (5.8, 6.7, 7.5, 8.5) with its command, inputs (version/subset ids), outputs, and disk estimate. The disk estimate is inferred: about 37 KB per stored frame (7.36 GB / 200,340 frames, measured-derived) × expected frames [brief constraints]
+  - [ ] AC9.1 One command runs the local chain. `trace(<verdict run>)` reaches v0's raw-file sha256s through eval → train → subset → version. No stage is `stand_in=true` except attribution. **(r2, E1)** The chain's eval and verify runs are tagged smoke (`eval.attribution_grade=false`, `verify.attribution_grade=false`, labels contain "smoke"), and the S9 log line and `s9_summary.json` say so [PoC §2.1 item 1 p. 3, §9.1 p. 18–19; analysis-r1 E1]
+  - [ ] AC9.2 The runbook lists every pending-server AC (5.8, 6.7, 7.5, 8.5) with its command, inputs (version/subset ids), outputs, and disk estimate. The disk estimate is inferred: about 37 KB per stored frame (7.36 GB / 200,340 frames, measured-derived) × expected frames. **(r2)** The runbook includes:
+    - the fixed batch plan (AC5.8) in every eval command;
+    - `attribution_grade=True` asserted only in the AC5.8 / AC7.5 commands;
+    - the `smolvla_base@d9f33c94` fine-tuning command (AC8.5);
+    - family W as the declared verdict.
+    - Sources: [brief constraints; analysis-r1 F-P4, F-P5, E1]
   - [ ] AC9.3 The index spec-coverage rows for §3.2, §3.4, §3.5 A/B, §4.3, §9.1 Step 2 and §10 Evaluation layer are proposed to the summarizer, with built / pending server / not transferable [vla-build step 5]
 - **Verify by:** `.venv/bin/python scripts/lineage_dry_run.py --eval-smoke`; then `python -m vlapoc.lineage trace
   <run>`.
@@ -736,25 +1020,26 @@ LIBERO's own predicates. Custom code only where nothing exists:**
   is a possible later refinement (inferred).
 - **Dashboard** (§2.7): figures only.
 - **libero_object / libero_goal, SimplerEnv:** §10 asks for one or two suites.
+- **(r2) Enforcing the v1 fence at method entry points.** No method under test exists yet. The screening and
+  attribution features must call `lineage.assert_blind` on their input version (analysis-r1, judged
+  acceptable for this feature).
+- **(r2) Per-rollout policy RNG independent of the batch plan.** That would need patching LeRobot policy
+  internals (noise sampling). The fixed batch plan (AC5.8, AC7.8) is the declared control instead, following
+  LeRobot's own paired-comparison guidance.
+- **(r2) The data+lineage regression re-run** (full `lineage_dry_run.py` without `--eval-smoke`, and
+  `verify_runs_s5.py`, now under per-subset normalization and the real eval stage). This belongs to the
+  refactorer, against a scratch lineage copy (analysis-r1 Non-blocking). It is not a planner AC.
 
 ## Open questions
 
-- **BLOCKING Q1: what to do with v1's positional leak** (P2; the brief's accepted fix covered only the column).
-  - **(A, default, recommended):** fix `derive_version` to preserve parent order and add `check_blind`. v1 keeps
-    its physical copy and version id, and is fenced from method use. The injection feature derives the real
-    corrupted versions with the fixed code. Cheap; leaves the data+lineage S6 evidence intact.
-  - **(B):** also re-derive v1 now in parent order. The `dataset_version_id` stays the same, because it is
-    order-independent (P3; inferred, to confirm by `version recompute`). But the physical copy and `files.json`
-    change. The `episode_index` lists inside the four S6 smoke checkpoints' `train_config.json` would then point
-    at different episodes, so that feature's AC6.x evidence would need re-running. Cost about 5 min plus about
-    7 GB transient (inferred from the data+lineage R1).
-  - Execution of everything else is not blocked; S0 proceeds with A unless the owner picks B.
-- **For the owner, not blocking:** CLAUDE.md and vla-build cite "reward == 1 ... the goal predicate verified
-  true" as the evidence that there are no failed demos. The reward is hard-coded by LIBERO's `create_dataset.py`
-  (P6). The conclusion stands on P8 instead. The planner does not edit CLAUDE.md; S3 records the correction in
-  the data+lineage changelog.
-- **Non-blocking: τ_episode = 60 s for both suites** (inferred, reasoning under Spec grounding). The owner may
-  prefer LeRobot's 14 s / 26 s caps, which would make F(30 s) unmeasurable.
+- **Resolved, BLOCKING Q1 (v1's positional leak):** the owner chose A, "Fix code, fence v1 (Recommended)"
+  (brief, 2026-10-02). Executed in S0: `check_blind(v1) = ['episode_index']`, fenced (analysis-r1, measured).
+- **Resolved, CLAUDE.md reward wording:** the owner said "Yes, correct it"; the orchestrator edits it. The
+  current CLAUDE.md already carries the corrected text.
+- **Resolved, defaults stand:** T in seconds of simulated time; τ_episode = 60 s; ghost events out of scope;
+  S8 in this feature; HRT anchor = v0 originals (brief, owner answers).
+- **(r2) No new blocking question.** F-P2's choice of family is a planner decision, declared above. F-P4
+  follows the owner's approved downloads.
 - **Non-blocking: the external SmolVLA checkpoint** (`HuggingFaceVLA/smolvla_libero`) is used only to validate
   the harness on a real policy locally. Its training data is unknown (card: `datasets: unknown`), so its
   numbers are never attribution evidence.
@@ -792,4 +1077,12 @@ LIBERO's own predicates. Custom code only where nothing exists:**
 - **R11. HRT CI method** (P19) is unknown until AC2.5.
 - **R12. UPH definition** has three forms in PhAIL (Prior art). The adopted one is disclosed.
 - **R13. Compute at τ_episode 60 s** (inferred about 2–4× steps on failures only). Measure in AC5.4 and revisit
-  if the server budget is tight.
+  if the server budget is tight. Round 1 measured that on the 20 SmolVLA rollouts no success came after
+  LeRobot's 280/520 budgets (analysis-r1).
+- **R14 (r2). Batch 50 on the server GPU** (AC5.8) is untested. The fallback is one smaller divisor used for
+  every arm and seed.
+- **R15 (r2). Ties on the 20 Hz grid.** Family-W AUC counts ties as ½, while PhAIL's validation AUC drops
+  them. The two are not comparable across the PhAIL and LIBERO reports without saying so. The registry records
+  both rules.
+- **R16 (r2). `rmst60_op_cap` is pessimistic** relative to the descriptive operation KM whenever an operation
+  is censored before 60 s. It is labelled `_cap`, and attribution claims on family O must carry that label.
