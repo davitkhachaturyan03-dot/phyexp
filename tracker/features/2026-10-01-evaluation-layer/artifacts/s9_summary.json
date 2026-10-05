@@ -1,0 +1,142 @@
+{
+ "chain": "eval-smoke-k5-s0-20261005T033607Z",
+ "run_ids": {
+  "build": "bc8f7d09a7bf47adb59132d874b1236f",
+  "split": "30411f67f697488791db58d8f3b7198c",
+  "select": "9cbda0afd4044a8d9e89e7eb27de11bc",
+  "train_a": "8e61cf2e894b493e8da5e1c39df86ae9",
+  "train_b": "4e0c4115e88d4b288c9c8227915cf539",
+  "eval_a": "12bd894080414a52b0034acd0c71c324",
+  "eval_b": "c03b9928c20a47b2862c4e9599dfc2ba",
+  "returns_a": "266da622b0a94a10a4cd91bc4d9051d6",
+  "returns_b": "7755bdfa32d6405cbbd9d34e552b0929",
+  "verify": "7080353a020d4751a4b49e1f6900f6b1"
+ },
+ "runs": [
+  {
+   "step": "build",
+   "run_id": "bc8f7d09a7bf47adb59132d874b1236f",
+   "name": "build-v0",
+   "stage": "build",
+   "stand_in": "false",
+   "status": "FINISHED",
+   "chain": "(earlier command)"
+  },
+  {
+   "step": "split",
+   "run_id": "30411f67f697488791db58d8f3b7198c",
+   "name": "split-v0",
+   "stage": "split",
+   "stand_in": "false",
+   "status": "FINISHED",
+   "chain": "(earlier command)"
+  },
+  {
+   "step": "select",
+   "run_id": "9cbda0afd4044a8d9e89e7eb27de11bc",
+   "name": "select-drop-random-5-s0 [eval-smoke]",
+   "stage": "select",
+   "stand_in": "false",
+   "status": "FINISHED",
+   "chain": "eval-smoke-k5-s0-20261005T033607Z"
+  },
+  {
+   "step": "train_a",
+   "run_id": "8e61cf2e894b493e8da5e1c39df86ae9",
+   "name": "train-ref [eval-smoke]",
+   "stage": "train",
+   "stand_in": "false",
+   "status": "FINISHED",
+   "chain": "eval-smoke-k5-s0-20261005T033607Z"
+  },
+  {
+   "step": "train_b",
+   "run_id": "4e0c4115e88d4b288c9c8227915cf539",
+   "name": "train-ref-drop-random-5 [eval-smoke]",
+   "stage": "train",
+   "stand_in": "false",
+   "status": "FINISHED",
+   "chain": "eval-smoke-k5-s0-20261005T033607Z"
+  },
+  {
+   "step": "eval_a",
+   "run_id": "12bd894080414a52b0034acd0c71c324",
+   "name": "eval-train-ref [eval-smoke]",
+   "stage": "eval",
+   "stand_in": "false",
+   "status": "FINISHED",
+   "chain": "eval-smoke-k5-s0-20261005T033607Z"
+  },
+  {
+   "step": "eval_b",
+   "run_id": "c03b9928c20a47b2862c4e9599dfc2ba",
+   "name": "eval-train-ref-drop-random-5 [eval-smoke]",
+   "stage": "eval",
+   "stand_in": "false",
+   "status": "FINISHED",
+   "chain": "eval-smoke-k5-s0-20261005T033607Z"
+  },
+  {
+   "step": "returns_a",
+   "run_id": "266da622b0a94a10a4cd91bc4d9051d6",
+   "name": "returns-train-ref [eval-smoke]",
+   "stage": "returns",
+   "stand_in": "false",
+   "status": "FINISHED",
+   "chain": "eval-smoke-k5-s0-20261005T033607Z"
+  },
+  {
+   "step": "returns_b",
+   "run_id": "7755bdfa32d6405cbbd9d34e552b0929",
+   "name": "returns-train-ref-drop-random-5 [eval-smoke]",
+   "stage": "returns",
+   "stand_in": "false",
+   "status": "FINISHED",
+   "chain": "eval-smoke-k5-s0-20261005T033607Z"
+  },
+  {
+   "step": "verify",
+   "run_id": "7080353a020d4751a4b49e1f6900f6b1",
+   "name": "verify-ref-vs-drop-random-5 [eval-smoke]",
+   "stage": "verify",
+   "stand_in": "false",
+   "status": "FINISHED",
+   "chain": "eval-smoke-k5-s0-20261005T033607Z"
+  }
+ ],
+ "verdict": {
+  "outcome": "iii",
+  "direction": null,
+  "gate": {
+   "test": "macro-KS (pooled-resample episode-clustered bootstrap)",
+   "D": 0.0,
+   "p": 1.0,
+   "D_cells": {
+    "libero_spatial/0": 0.0
+   },
+   "n_boot": 2000,
+   "fires": false
+  },
+  "label": "attribution-grade counterfactual verdict"
+ },
+ "trace": {
+  "n_runs": 10,
+  "stages": [
+   "build",
+   "eval",
+   "select",
+   "split",
+   "train",
+   "verify"
+  ],
+  "consumed_kinds": [
+   "checkpoint",
+   "rollouts",
+   "subset"
+  ],
+  "dead_ends": [],
+  "stand_in_runs": [],
+  "raw_files": 20
+ },
+ "seconds": 122.6
+}

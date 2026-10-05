@@ -1350,3 +1350,109 @@ normalizer/unnormalizer overrides at l. 376-377), `datasets/factory.py` (ImageNe
   smoke runs (`train-full-s0` etc.) were trained with full stats; their MLflow params say so and are unchanged.
 - **Quantile stats** (q01…q99) are aggregated by LeRobot as count-weighted means of per-episode quantiles, which is
   an approximation. Neither ACT nor SmolVLA uses them (MEAN_STD); a QUANTILES-normalized policy (pi05) would.
+
+### S9: End-to-end evaluation chain locally, and the server runbook (AC9.1–AC9.3 ✅)
+
+Re-read: PoC §9.1 Steps 2–4 pp. 18–19, §2.1 item 1 p. 3, §10 p. 20; the brief's constraint "mark every
+server-dependent AC explicitly as 'pending server', with exactly what will be run there".
+
+**Files:**
+- `scripts/lineage_dry_run.py`: new `--eval-smoke` mode (`eval_smoke()`). It writes this feature's `artifacts/s9_*`,
+  never the data+lineage feature's S6 files. The chain:
+  - `build(v0)` and `split(v0)`, reused;
+  - `select` drop-random-5 of `v0/reference`;
+  - `train` ×2 (ACT, 2 steps, MPS, per-subset stats from S8);
+  - `eval` ×2 (real LIBERO rollouts: libero_spatial:0, 2 init states, τ 1200 steps, CPU, batch 2);
+  - `returns` ×2 (S6, now a tracked stage);
+  - `verify` (S7);
+  - then `trace(verify)`.
+- `vlapoc/returns.py`: `returns_run()` and `--track`. This is a **`returns` stage** MLflow run whose input is the eval
+  run's rollouts entity and whose outputs are `returns.parquet`, `operation_returns.parquet`, `returns_meta.json` and
+  `metrics_registry.json` by sha256. `vlapoc/runs.py` `STAGES` gains `returns`.
+- `artifacts/server-runbook.md` (new).
+
+**Acceptance criteria:**
+- ✅ AC9.1 **one command runs the local chain:** `.venv/bin/python scripts/lineage_dry_run.py --eval-smoke` → exit 0
+  in **122.6 s**, chain `eval-smoke-k5-s0-20261005T033607Z`, git `b59c3d59`, `dirty=False`
+  (`artifacts/s9_eval_smoke_stdout.txt`, `s9_chain_runs.csv`, `s9_summary.json`).
+  - 10 runs, all `FINISHED`, **`stand_in false` for every one**:
+    - build-v0 and split-v0 (reused);
+    - `select-drop-random-5-s0` (child `e470d671…`, 35 of 40);
+    - `train-ref` `8e61cf2e` (40 episodes) and `train-ref-drop-random-5` `4e0c4115` (35);
+    - `eval` `12bd8940` (0/2 succeeded) and `c03b9928` (0/2);
+    - two `returns` runs;
+    - `verify` `7080353a`: macro-KS D̄ 0.0000, p 1.0000 → **(iii)**, labelled smoke.
+  - `trace(verify 7080353a)` (`artifacts/s9_trace_verify.json`): `10 runs, stages ['build', 'eval', 'select',
+    'split', 'train', 'verify']; consumed kinds ['checkpoint', 'rollouts', 'subset']; dead ends []; stand-in runs in
+    the trace: []; raw files reached: 20` (first `KITCHEN_SCENE3_…`, sha256 `6b30906a52a5741e`).
+  - The path: verify ← rollouts ← eval ← checkpoint ← train ← subset (`v0/reference` ← split-v0 ← build-v0, and
+    `e470d671` ← select ← `v0/reference`) ← v0 ← raw files.
+  - The returns runs sit beside the verdict (both consume the same rollouts entities). They appear in the chain
+    graph `artifacts/s9_lineage_graph.mmd`, not on the verdict's upstream path. The verdict needs operation-level
+    (T, E) pairs, which are in the rollouts.
+  - **New measured fact from the trace: ACT training on MPS is bit-reproducible** (`artifacts/s9_train_determinism.txt`).
+    The chain's `train-ref` and S8's `train-act-2step-persubset-v0ref` (same subset, seed 0, 2 steps, separate
+    processes, different commits) have the same weights sha256 `cdee42fbf84f56ec…` and normalizer `084a3540…`.
+    The drop-5 pair is also identical (`fac999b0…`). `trace` therefore lists both runs as producers of each
+    checkpoint, which is correct for content-addressed entities.
+- ✅ AC9.2 the runbook (`artifacts/server-runbook.md`) covers AC8.5, AC5.8, AC6.7 and AC7.5, in dependency order. For
+  each it gives:
+  - the exact commands (the existing CLIs: `eval_smoke.py --track`, `vlapoc.returns --track`,
+    `vlapoc.verdict --eval-runs`; plus `train_run`/`select_run` one-liners, since there is no train CLI);
+  - the inputs by id: v0 `3c4dca68…`, `v0/candidate` `8ee096b7…` with 960 episodes / 192,425 frames (measured);
+  - outputs, checks, and disk estimates labelled measured or inferred:
+    - 37 KB per stored frame at 128² (6.9 GiB / 200,340 frames, measured);
+    - 108 KB per frame at 256² (measured on the AC5.4 trajectories);
+    - 1.2 GB per SmolVLA checkpoint (measured: 1,197,789,224 B);
+    - 11–18 KB per rollout row (measured);
+    - ≈ 11–22 GB of trajectories per seed (inferred);
+    - total ≈ 60–95 GB plus 20 GiB headroom (inferred).
+  - It also records the batch-2 operational rules: fixed batch size; one env per rollout; a job runner; closing
+    interrupted MLflow runs; a throughput probe first; a GPU determinism probe; a clean git tree.
+  - It names the open initialization choice for AC8.5 (VLM backbone vs smolvla_base).
+- ✅ AC9.3 **proposed spec-coverage rows for the summarizer** (`tracker/index.html` is the summarizer's to edit):
+
+| PoC § | Status | Where / why |
+|---|---|---|
+| §3.2 primitives (T, ghost events, right-censoring, KM CDF, Success@τ, median, RMST, UPH, completion, MTBF/A, HRT, clustered bootstrap, macro-KS, P-P) | **built** (S1), validated on PhAIL's real data (S2) | Ghost events are built and validated on PhAIL. For LIBERO they are **not transferable**: LIBERO defines no unrecoverable-state rule (P13, owner decision 6) |
+| §3.4 PhAIL fit (verification gate, richer targets, declared targets, strata, operation-level returns, failure taxonomy, fair comparisons) | **built** (S6 returns, S7 gate), except: ghost-event-type taxonomy **not transferable**; blinded scheduling **replaced** by fixed init states + seeds | `vlapoc/returns.py`, `vlapoc/verdict.py` |
+| §3.5 A (LIBERO methodology: T per episode / per sub-task, censoring, human reference from demos) | **built** (S3, S4, S5) | Approximate by design: demos and rollouts do not share initial states, and the demo-XML vs BDDL scenes differ (R4, S3) |
+| §3.5 B (PhAIL data and license) | **answered** (S2: CC BY 4.0, public bucket, 449-episode fine-tuning set, 13.95 GB, not downloaded) | real-robot stage out of scope |
+| §4.3 (one return per metric) | **built** (S6), **pending server** at scale (AC6.7) | `ret_hrt60_lin` is a first-order form; the attribution feature should confirm it (R10) |
+| §9.1 Step 2 (rollouts with fixed init states, goal check, T) | **built** and validated on a real policy locally (S5, AC5.4), **pending server** at full scale (AC5.8) | |
+| §9.1 Step 4 (the gate on a counterfactual pair) | **built** (S7), **pending server** (AC7.5) | AC7.1 expectation for ACT vs OpenPI is disputed (S7 premise) |
+| §10 Evaluation layer (KM CDFs with ghost and censoring rules, HRT vs LIBERO demos, clustered bootstrap, macro-KS, P-P) | **built** locally; attribution-grade policy training and the 1000-rollout evals **pending server** (AC8.5, AC5.8) | |
+
+### Findings for the analyzer (batch 3: S7–S9)
+- **S7, false premise in AC7.1 (for the planner).** The plan expects ACT vs OpenPI → (ii) because "KS rejects".
+  - PhAIL's own released macro-KS for that pair is p = 0.103, "WEAK" under its `KS_HOLDS = 0.05`
+    (`dashboard_per_obj_macro.json`). Re-running PhAIL's function gives 0.123 (S2). Our gate gives 0.111, i.e. (iii),
+    in 5/5 seeds.
+  - The (ii) trade-off is real and reproduced on **GR00T vs ACT** (gate p 0.013; RMST favours GR00T, AUC favours
+    ACT, both significant after Holm; 5/5 seeds).
+  - Restate AC7.1, or record the paper-vs-JSON disagreement. I did not change the gate, since macro-KS is the PoC's
+    gate and logrank is only the sanity line.
+- **S7, a fourth verdict state, `gate_only`:** the gate fires but no metric is significant after Holm. It is reported
+  rather than forced into (i)/(ii). Not seen on PhAIL's pairs.
+- **S7, the human anchor is held fixed** in the difference bootstrap (inferred: removes common-mode noise). S2's
+  single-policy HRT CI resamples it, to match PhAIL's Table 2.
+- **S8, open choice for AC8.5 (planner/owner).** One option initializes from the SmolVLM2 backbone, as the plan and
+  LeRobot docs do (needs a 2.03 GB unapproved download). The other fine-tunes from `lerobot/smolvla_base`, which is
+  approved and verified locally. The hook is identical either way.
+- **S8, default changed.** `train_run` now normalizes per subset (owner decision 3). Older runs used full stats, and
+  their params say so.
+- **S8, external facts measured:**
+  - `HuggingFaceTB/SmolVLM2-500M-Instruct` is a redirect to `…-Video-Instruct` (same sha `7b375e1b`), so batch 2's
+    files were already correct.
+  - `refs/main` must exist in a repo-local HF cache for offline hub-id resolution (the first SmolVLA attempt FAILED
+    on it).
+- **S9, determinism:** ACT 2-step training on MPS reproduced bit-identical weights across separate runs.
+  `trace` lists both runs as producers of the one checkpoint entity. That is the right semantics, but a reader of the
+  graph should expect it.
+- **Not re-run in batch 3:** the data+lineage feature's full dry run (`lineage_dry_run.py` without `--eval-smoke`) and
+  `verify_runs_s5.py`. Both now exercise the real eval stage and per-subset normalization by default, but they train
+  four ACT runs on 960-episode subsets (≈ 7 GB of HF cache per new subset). Their regression run is left to the
+  refactorer or analyzer. The eval-smoke chain covers the same stage code at smaller scale.
+- **Downloads in batch 3:**
+  - `lerobot/smolvla_base@d9f33c94` (906,712,520-byte weights + config/processor files, 865M on disk; approved);
+  - the 4.7 MB VLM config/tokenizer cache (same files as batch 2's copy, a repo-local cache at `data/hf_home`).

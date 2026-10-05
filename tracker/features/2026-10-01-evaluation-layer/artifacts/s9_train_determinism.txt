@@ -1,0 +1,4 @@
+train-act-2step-persubset-v0ref a8647af8 weights cdee42fbf84f56ec normalizer 084a3540f05f829d stats e9e51a0cf12a git a17ae619
+train-ref [eval-smoke] 8e61cf2e weights cdee42fbf84f56ec normalizer 084a3540f05f829d stats e9e51a0cf12a git b59c3d59
+train-act-2step-persubset-v0ref-drop5 fea7ac62 weights fac999b023adfb32 normalizer 7f5c495d71a09359 stats ac940b921e6e git a17ae619
+train-ref-drop-random-5 [eval-smoke] 4e0c4115 weights fac999b023adfb32 normalizer 7f5c495d71a09359 stats ac940b921e6e git b59c3d59

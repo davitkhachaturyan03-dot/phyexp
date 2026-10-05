@@ -1,0 +1,11 @@
+step,run_id,name,stage,stand_in,status,chain
+build,bc8f7d09a7bf47adb59132d874b1236f,build-v0,build,false,FINISHED,(earlier command)
+split,30411f67f697488791db58d8f3b7198c,split-v0,split,false,FINISHED,(earlier command)
+select,9cbda0afd4044a8d9e89e7eb27de11bc,select-drop-random-5-s0 [eval-smoke],select,false,FINISHED,eval-smoke-k5-s0-20261005T033607Z
+train_a,8e61cf2e894b493e8da5e1c39df86ae9,train-ref [eval-smoke],train,false,FINISHED,eval-smoke-k5-s0-20261005T033607Z
+train_b,4e0c4115e88d4b288c9c8227915cf539,train-ref-drop-random-5 [eval-smoke],train,false,FINISHED,eval-smoke-k5-s0-20261005T033607Z
+eval_a,12bd894080414a52b0034acd0c71c324,eval-train-ref [eval-smoke],eval,false,FINISHED,eval-smoke-k5-s0-20261005T033607Z
+eval_b,c03b9928c20a47b2862c4e9599dfc2ba,eval-train-ref-drop-random-5 [eval-smoke],eval,false,FINISHED,eval-smoke-k5-s0-20261005T033607Z
+returns_a,266da622b0a94a10a4cd91bc4d9051d6,returns-train-ref [eval-smoke],returns,false,FINISHED,eval-smoke-k5-s0-20261005T033607Z
+returns_b,7755bdfa32d6405cbbd9d34e552b0929,returns-train-ref-drop-random-5 [eval-smoke],returns,false,FINISHED,eval-smoke-k5-s0-20261005T033607Z
+verify,7080353a020d4751a4b49e1f6900f6b1,verify-ref-vs-drop-random-5 [eval-smoke],verify,false,FINISHED,eval-smoke-k5-s0-20261005T033607Z
