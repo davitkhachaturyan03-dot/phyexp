@@ -1456,3 +1456,71 @@ server-dependent AC explicitly as 'pending server', with exactly what will be ru
 - **Downloads in batch 3:**
   - `lerobot/smolvla_base@d9f33c94` (906,712,520-byte weights + config/processor files, 865M on disk; approved);
   - the 4.7 MB VLM config/tokenizer cache (same files as batch 2's copy, a repo-local cache at `data/hf_home`).
+
+## Round 2: 2026-10-05
+
+Inputs: `analysis-r1.md` (REWORK, planner+executor: E1–E5, F-P1–F-P5) and `plan.md` r2 ("Changes in this
+revision (r2)", "Declared functionals (r2)", and every AC marked (r2)). Scope: exactly the (r2) ACs. No rebuttals:
+every analyzer item routed to the executor is accepted.
+
+**Lineage stores used.**
+- MLflow-writing tests go to a scratch copy of the lineage store, with the copy's experiment `artifact_location`
+  repointed (the copied `mlflow.db` stores the real `file:///…/data/lineage/mlartifacts`, measured with sqlite).
+- The real store is used only for the corrected `--eval-smoke` chain (AC9.1/AC7.9). Each AC says which it used.
+
+### AC2.9 (r2, E3): deterministic PhAIL cohort export ✅
+
+- **Premise checked (quoted, the clone):** `build/markup/loader.py:316-317` reads
+  `candidate_urls = all_candidate_urls | _walk_dataset_inference_urls()` / `for url in candidate_urls:`. It iterates
+  a Python set, so episode order follows hash randomization.
+- **Change:** `scripts/phail_export_cohort.py` now sorts the loaded episodes by `s3_url`
+  (`eps = sorted(loader.load(cohort="mixed"), key=lambda e: e.s3_url)`) before writing the parquet *and* before
+  computing PhAIL's reference numbers. So both sides of the AC2.1 equivalence see the same order.
+- **Byte identity (measured, `artifacts/s2_ac2_9_export_determinism.txt`):** three exports in fresh processes, with
+  `PYTHONHASHSEED=0`, `=1` and unset (`env -u`), all `exit 0`:
+  - `cohort_mixed.parquet` sha256 `35b7181bc92c42c5a7175cb36e1acb9b93f2167c71388418506cc5c9754418ad`, identical ×3;
+  - `s2_phail_reference.json` sha256 `22549627c8b4bc170b3351b96bf27a5b7e0b5870678f1c7d24c221474438b707`, identical ×3;
+  - 990 rows, `s3_url` monotonic increasing and unique.
+- **S2 regenerated on the sorted export** (`scripts/phail_validate.py`, exit 0; `artifacts/s2_phail_validate_stdout.txt`,
+  `phail_validation.json`, `s2_phail_reference.json`, `s2_fig_km_pp_ACT_Batteries.png`):
+  - AC2.1 still holds: max |ours − PhAIL| ≤ 3.553e-15; `macro-KS D and p identical for all 6 pairs (same RNG): True`.
+  - **Updated p-values** (PhAIL's function and ours, dashboard H1 order, rng 42, n_boot 2000):
+
+    | Pair | p (round 1) | p (sorted export) | D (unchanged) |
+    |---|---|---|---|
+    | OpenPI–GR00T | 0.117941 | **0.125437** | 0.123916 |
+    | OpenPI–ACT | 0.122939 | **0.110445** | 0.141798 |
+    | GR00T–ACT | 0.010495 | **0.008996** | 0.175409 |
+    | OpenPI–SmolVLA, GR00T–SmolVLA, ACT–SmolVLA | 0.000500 | 0.000500 | 0.465455 / 0.434398 / 0.360733 |
+
+  - Every D, point estimate and conclusion is unchanged:
+    - AC2.3 23/26 within tolerance; the same 3 pooled-RMST misses, caused by the 5 private episodes;
+    - AC2.4 winners GR00T / OpenPI / GR00T / ACT, 3 distinct;
+    - AC2.5 human-resampled still closer (0.628 vs 0.808 pp).
+  - The CIs move slightly (e.g. OpenPI HRT [12.402, 15.684]) because the bootstrap draws follow episode order.
+- **Disclosure, for the report:**
+  - Bootstrap p-values and CI endpoints are Monte-Carlo draws, conditional on episode order and seed.
+  - D and the point estimates do not depend on order.
+  - The fetch's reproduction route is pos3 (`pos3.download(..., profile=PUBLIC)`, the phail-paper README recipe),
+    installed in `.venv-phail`.
+- The S7 artifacts are regenerated from this export under AC7.6 (below).
+
+### AC6.8 (r2, E2): one metric registry ⏳ in progress (not yet verified)
+
+- `vlapoc/metrics_registry.py` (new) is a data-only module: `ENTRIES` (29), `VERDICT_FAMILIES`, `FAMILY_TAU_S`,
+  `entry`, `return_columns`, `verdict_metrics`, `to_json`. Each entry has the fields the plan lists: `key`, `metric`,
+  `family` (W / O / O-descriptive / PhAIL / scoring-only / primitive / procedure / protocol / not-transferable), `T`,
+  `tau`, `censoring`, `functional`, `functions`, `return_columns`, `verdict`, `identity`, `transfer_status`, `reason`,
+  `source`.
+  - UPH is declared as `3600 / RMST(τ_episode)`. Table 1's form and common.py's form are recorded as notes.
+  - `rmst60_op` and `hrt60_op` are labelled `O-descriptive` (S4 AC4.4 r2 note).
+- `vlapoc/evaluation.py`: the local `METRICS` table is removed. `metric_registry()` now reads the registry. New
+  functions: `auc_ties_half`, `macro_auc_ties_half`, `rmst_capped`, and `libero_arm` / `libero_human_arm` (families
+  W and O, moved here from `verdict.py` per S1 r2).
+- `vlapoc/returns.py`: `REGISTRY` removed; `metrics_registry()` = `to_json()`; `RETURN_COLUMNS` =
+  `return_columns("W")`. Also changed (verified under AC6.1/6.11/6.9):
+  - `ret_auc_sampled` counts ties ½;
+  - `operation_returns` gives `ret_rmst60_op_cap` (−60 for the unfinished attempt);
+  - `load_eval_rollouts` uses a `TemporaryDirectory`.
+- **Pending:** `vlapoc/verdict.py` still has its `METRICS` table (grep: `verdict.py:71`). It moves to the registry
+  with the family-W/O verdict rework, after which the AC6.8 checks run.

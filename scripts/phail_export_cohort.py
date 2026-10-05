@@ -11,7 +11,7 @@ on GitHub"); PhAIL §3 pp. 4-6. ``.venv-phail`` = Python 3.12 + the versions pin
 scipy 1.17.1, matplotlib 3.10.8, pyarrow 23.0.1); ``positronic`` is not needed (only named in
 comments/strings of ``common.py``/``loader.py``; grep).
 
-Writes ``data/phail/cohort_mixed.parquet`` (one row per episode: what ``episode_to_T_pairs`` consumes,
+Writes ``data/phail/cohort_mixed.parquet`` (one row per episode, sorted by ``s3_url``: what ``episode_to_T_pairs`` consumes,
 plus model/object/cohort source) and ``artifacts/s2_phail_reference.json``: per model and per (model,
 object) cell, PhAIL's functions' values for F(20/30/60 s), median, RMST(240 s), %-of-human, KS distances,
 censored AUC (``explore_pp_plot._auc_censored`` / ``_macro_auc``), the macro-KS p exactly as
@@ -57,7 +57,11 @@ def by_obj(eps):
 
 
 def main() -> int:
-    eps = loader.load(cohort="mixed")
+    # PhAIL's loader iterates a Python set of candidate URLs (``build/markup/loader.py``: ``for url in
+    # candidate_urls:``), so its episode order depends on hash randomization, and every bootstrap draw follows
+    # episode order. Sorting by ``s3_url`` makes the export and every p-value below deterministic (evaluation
+    # layer AC2.9, analysis-r1 E3); D and the point estimates do not depend on order.
+    eps = sorted(loader.load(cohort="mixed"), key=lambda e: e.s3_url)
     rows = [{"s3_url": e.s3_url, "cohort_source": e.cohort_source, "place_ts": [float(t) for t in e.place_ts],
              "duration_s": float(e.duration_s), "total_items": int(e.total_items), "n_inf_events": int(e.n_inf_events),
              "n_drops_outside": int(e.n_drops_outside), "had_safety_stop": bool(e.had_safety_stop),

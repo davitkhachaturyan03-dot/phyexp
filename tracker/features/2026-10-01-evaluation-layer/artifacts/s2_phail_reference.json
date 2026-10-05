@@ -3,25 +3,13 @@
  "tau": 240.0,
  "n_episodes": 990,
  "counts": {
-  "Teleop": 396,
-  "ACT": 151,
   "GR00T": 164,
   "SmolVLA": 116,
-  "OpenPI": 163
+  "OpenPI": 163,
+  "ACT": 151,
+  "Teleop": 396
  },
  "counts_by_object": {
-  "Teleop": {
-   "Batteries": 69,
-   "Scissors": 79,
-   "Towels": 110,
-   "Wooden spoons": 138
-  },
-  "ACT": {
-   "Batteries": 36,
-   "Scissors": 37,
-   "Towels": 46,
-   "Wooden spoons": 32
-  },
   "GR00T": {
    "Batteries": 45,
    "Scissors": 34,
@@ -39,6 +27,18 @@
    "Scissors": 35,
    "Towels": 42,
    "Wooden spoons": 43
+  },
+  "ACT": {
+   "Batteries": 36,
+   "Scissors": 37,
+   "Towels": 46,
+   "Wooden spoons": 32
+  },
+  "Teleop": {
+   "Batteries": 69,
+   "Scissors": 79,
+   "Towels": 110,
+   "Wooden spoons": 138
   }
  },
  "rmst_human_pooled": 10.51626839228629,
@@ -353,11 +353,11 @@
  "macro_ks_dashboard_h1": {
   "OpenPI-GR00T": {
    "D": 0.12391553589925894,
-   "p": 0.11794102948525736
+   "p": 0.12543728135932034
   },
   "OpenPI-ACT": {
    "D": 0.14179755022503066,
-   "p": 0.12293853073463268
+   "p": 0.11044477761119441
   },
   "OpenPI-SmolVLA": {
    "D": 0.4654550298864024,
@@ -365,7 +365,7 @@
   },
   "GR00T-ACT": {
    "D": 0.17540928625103427,
-   "p": 0.010494752623688156
+   "p": 0.008995502248875561
   },
   "GR00T-SmolVLA": {
    "D": 0.4343981522594673,

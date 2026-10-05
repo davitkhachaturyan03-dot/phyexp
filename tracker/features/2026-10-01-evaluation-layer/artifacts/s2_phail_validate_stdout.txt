@@ -1,10 +1,7 @@
-/Users/davit_khachaturyan/Projects/personal/vlaExp/scripts/phail_validate.py:59: RuntimeWarning: invalid value encountered in subtract
-  return float(np.max(np.where(both_inf, 0.0, np.abs(a - b)))) if a.size else 0.0
-Matplotlib is building the font cache; this may take a moment.
-AC2.1 macro-KS OpenPI-GR00T: ours D=0.123916 p=0.117941 | PhAIL D=0.123916 p=0.117941
-AC2.1 macro-KS OpenPI-ACT: ours D=0.141798 p=0.122939 | PhAIL D=0.141798 p=0.122939
+AC2.1 macro-KS OpenPI-GR00T: ours D=0.123916 p=0.125437 | PhAIL D=0.123916 p=0.125437
+AC2.1 macro-KS OpenPI-ACT: ours D=0.141798 p=0.110445 | PhAIL D=0.141798 p=0.110445
 AC2.1 macro-KS OpenPI-SmolVLA: ours D=0.465455 p=0.000500 | PhAIL D=0.465455 p=0.000500
-AC2.1 macro-KS GR00T-ACT: ours D=0.175409 p=0.010495 | PhAIL D=0.175409 p=0.010495
+AC2.1 macro-KS GR00T-ACT: ours D=0.175409 p=0.008996 | PhAIL D=0.175409 p=0.008996
 AC2.1 macro-KS GR00T-SmolVLA: ours D=0.434398 p=0.000500 | PhAIL D=0.434398 p=0.000500
 AC2.1 macro-KS ACT-SmolVLA: ours D=0.360733 p=0.000500 | PhAIL D=0.360733 p=0.000500
 AC2.1 max |ours - PhAIL| pooled_per_model (rmst240, median, F20/30/60, pct_of_human): 0.000e+00
@@ -19,32 +16,32 @@ AC2.1 max |ours - PhAIL| pooled logrank chi2/p (one stratum): 4.868e-17
 AC2.1 macro-KS D and p identical for all 6 pairs (same RNG): True
 AC2.2 cohort counts (exported mixed cohort vs Table 2): OpenPI 163/165, GR00T 164/165, ACT 151/151, SmolVLA 116/118, Teleop 396/396
 AC2.2 private-bucket references: 0 s3://inference/ episode dirs in candidates.jsonl, 42 annotation JSONs under annotations/inference/ (['phail_act_groot', 'spoons_ablation'])
-AC2.2 by cohort source: {'OpenPI': {'manual': 109, 'auto_validated': 54}, 'GR00T': {'manual': 104, 'auto_validated': 60}, 'ACT': {'manual': 55, 'auto_validated': 96}, 'SmolVLA': {'manual': 53, 'auto_validated': 63}, 'Teleop': {'manual': 96, 'auto_validated': 300}}
-AC2.3 OpenPI   RMST ours 77.572 [69.10, 87.07] vs pub 77.693 [69.21, 86.95] (Δ -0.1209 s, CI width +1.3%)
-         HRT  ours 13.755% [12.34, 15.67] (human resampled; width -5.0%) / [12.29, 15.83] (human fixed; width +0.9%) vs pub 13.755% [12.23, 15.73] (Δ +0.0000 pp)
-         macro-AUC ours 0.1004 [0.084, 0.117] vs pub 0.100 [0.084, 0.116] (pp_summary 0.100406; Δ +0.00e+00; CI width vs pp_summary +0.2%)
-         F(30 s) ours 0.4741 [0.425, 0.519] vs tab_leaderboard 0.4718 / paper 0.47
-AC2.3 GR00T    RMST ours 77.313 [69.17, 86.19] vs pub 77.205 [68.98, 86.39] (Δ +0.1071 s, CI width -2.2%)
-         HRT  ours 13.349% [12.00, 15.07] (human resampled; width -4.5%) / [12.03, 15.10] (human fixed; width -4.6%) vs pub 13.349% [12.01, 15.23] (Δ +0.0000 pp)
-         macro-AUC ours 0.0949 [0.079, 0.111] vs pub 0.095 [0.080, 0.110] (pp_summary 0.094925; Δ +0.00e+00; CI width vs pp_summary +3.6%)
-         F(30 s) ours 0.5091 [0.471, 0.547] vs tab_leaderboard 0.5091 / paper 0.51
-AC2.3 ACT      RMST ours 100.929 [85.89, 117.82] vs pub 100.929 [85.78, 117.61] (Δ +0.0000 s, CI width +0.3%)
-         HRT  ours 10.487% [9.32, 13.14] (human resampled; width -3.7%) / [9.18, 13.04] (human fixed; width -2.6%) vs pub 10.487% [9.19, 13.15] (Δ +0.0000 pp)
-         macro-AUC ours 0.1338 [0.111, 0.162] vs pub 0.134 [0.108, 0.162] (pp_summary 0.133751; Δ +0.00e+00; CI width vs pp_summary -3.7%)
-         F(30 s) ours 0.4409 [0.387, 0.491] vs tab_leaderboard 0.4409 / paper 0.44
-AC2.3 SmolVLA  RMST ours 166.373 [148.46, 185.12] vs pub 165.776 [146.98, 185.55] (Δ +0.5968 s, CI width -5.0%)
-         HRT  ours 6.445% [5.81, 7.44] (human resampled; width -5.2%) / [5.84, 7.32] (human fixed; width -13.6%) vs pub 6.445% [5.73, 7.45] (Δ +0.0000 pp)
-         macro-AUC ours 0.0268 [0.017, 0.037] vs pub 0.027 [0.016, 0.036] (pp_summary 0.026808; Δ +0.00e+00; CI width vs pp_summary +0.4%)
-         F(30 s) ours 0.1828 [0.123, 0.251] vs tab_leaderboard 0.1810
-AC2.3 Teleop   RMST ours 10.516 [10.28, 10.74] vs pub 10.516 [10.29, 10.76] (Δ +0.0000 s, CI width -0.3%)
-AC2.3 macro-KS OpenPI-GR00T: ours D=0.123916 p=0.117941 vs dashboard_per_obj_macro.json D=0.123916 p=0.119440 / paper p = 0.12
+AC2.2 by cohort source: {'OpenPI': {'manual': 109, 'auto_validated': 54}, 'GR00T': {'manual': 104, 'auto_validated': 60}, 'ACT': {'auto_validated': 96, 'manual': 55}, 'SmolVLA': {'auto_validated': 63, 'manual': 53}, 'Teleop': {'manual': 96, 'auto_validated': 300}}
+AC2.3 OpenPI   RMST ours 77.572 [69.51, 86.18] vs pub 77.693 [69.21, 86.95] (Δ -0.1209 s, CI width -6.1%)
+         HRT  ours 13.755% [12.40, 15.68] (human resampled; width -6.4%) / [12.37, 15.60] (human fixed; width -8.0%) vs pub 13.755% [12.23, 15.73] (Δ +0.0000 pp)
+         macro-AUC ours 0.1004 [0.086, 0.117] vs pub 0.100 [0.084, 0.116] (pp_summary 0.100406; Δ +0.00e+00; CI width vs pp_summary -3.0%)
+         F(30 s) ours 0.4741 [0.430, 0.517] vs tab_leaderboard 0.4718 / paper 0.47
+AC2.3 GR00T    RMST ours 77.313 [69.14, 85.81] vs pub 77.205 [68.98, 86.39] (Δ +0.1071 s, CI width -4.2%)
+         HRT  ours 13.349% [12.02, 15.03] (human resampled; width -6.2%) / [12.07, 15.15] (human fixed; width -4.3%) vs pub 13.349% [12.01, 15.23] (Δ +0.0000 pp)
+         macro-AUC ours 0.0949 [0.080, 0.110] vs pub 0.095 [0.080, 0.110] (pp_summary 0.094925; Δ +0.00e+00; CI width vs pp_summary -0.4%)
+         F(30 s) ours 0.5091 [0.471, 0.545] vs tab_leaderboard 0.5091 / paper 0.51
+AC2.3 ACT      RMST ours 100.929 [86.04, 119.12] vs pub 100.929 [85.78, 117.61] (Δ +0.0000 s, CI width +3.9%)
+         HRT  ours 10.487% [9.23, 13.08] (human resampled; width -3.0%) / [9.17, 13.06] (human fixed; width -2.2%) vs pub 10.487% [9.19, 13.15] (Δ +0.0000 pp)
+         macro-AUC ours 0.1338 [0.108, 0.160] vs pub 0.134 [0.108, 0.162] (pp_summary 0.133751; Δ +0.00e+00; CI width vs pp_summary -3.6%)
+         F(30 s) ours 0.4409 [0.385, 0.493] vs tab_leaderboard 0.4409 / paper 0.44
+AC2.3 SmolVLA  RMST ours 166.373 [149.01, 184.43] vs pub 165.776 [146.98, 185.55] (Δ +0.5968 s, CI width -8.2%)
+         HRT  ours 6.445% [5.74, 7.37] (human resampled; width -5.0%) / [5.83, 7.28] (human fixed; width -16.2%) vs pub 6.445% [5.73, 7.45] (Δ +0.0000 pp)
+         macro-AUC ours 0.0268 [0.016, 0.037] vs pub 0.027 [0.016, 0.036] (pp_summary 0.026808; Δ +0.00e+00; CI width vs pp_summary +1.7%)
+         F(30 s) ours 0.1828 [0.125, 0.241] vs tab_leaderboard 0.1810
+AC2.3 Teleop   RMST ours 10.516 [10.28, 10.73] vs pub 10.516 [10.29, 10.76] (Δ +0.0000 s, CI width -2.4%)
+AC2.3 macro-KS OpenPI-GR00T: ours D=0.123916 p=0.125437 vs dashboard_per_obj_macro.json D=0.123916 p=0.119440 / paper p = 0.12
 AC2.3 tolerance checks: 23/26 within; failing: ['OpenPI RMST point ±0.1 s', 'GR00T RMST point ±0.1 s', 'SmolVLA RMST point ±0.1 s']
-AC2.4 F(30 s)                  OpenPI 0.474 [0.425, 0.519]  GR00T 0.509 [0.471, 0.547]  ACT 0.441 [0.387, 0.491]  SmolVLA 0.183 [0.123, 0.251]  -> winner GR00T
-AC2.4 HRT macro (%)            OpenPI 13.755 [12.344, 15.674]  GR00T 13.349 [11.999, 15.068]  ACT 10.487 [9.318, 13.138]  SmolVLA 6.445 [5.813, 7.443]  -> winner OpenPI
-AC2.4 global RMST(240 s) (s)   OpenPI 77.572 [69.097, 87.066]  GR00T 77.313 [69.171, 86.190]  ACT 100.929 [85.895, 117.819]  SmolVLA 166.373 [148.459, 185.116]  -> winner GR00T
-AC2.4 AUC vs human (macro)     OpenPI 0.100 [0.084, 0.117]  GR00T 0.095 [0.079, 0.111]  ACT 0.134 [0.111, 0.162]  SmolVLA 0.027 [0.017, 0.037]  -> winner ACT
+AC2.4 F(30 s)                  OpenPI 0.474 [0.430, 0.517]  GR00T 0.509 [0.471, 0.545]  ACT 0.441 [0.385, 0.493]  SmolVLA 0.183 [0.125, 0.241]  -> winner GR00T
+AC2.4 HRT macro (%)            OpenPI 13.755 [12.402, 15.684]  GR00T 13.349 [12.018, 15.031]  ACT 10.487 [9.231, 13.079]  SmolVLA 6.445 [5.741, 7.374]  -> winner OpenPI
+AC2.4 global RMST(240 s) (s)   OpenPI 77.572 [69.515, 86.183]  GR00T 77.313 [69.136, 85.807]  ACT 100.929 [86.045, 119.122]  SmolVLA 166.373 [149.007, 184.427]  -> winner GR00T
+AC2.4 AUC vs human (macro)     OpenPI 0.100 [0.086, 0.117]  GR00T 0.095 [0.080, 0.110]  ACT 0.134 [0.108, 0.160]  SmolVLA 0.027 [0.016, 0.037]  -> winner ACT
 AC2.4 winners {'F(30 s)': 'GR00T', 'HRT macro (%)': 'OpenPI', 'global RMST(240 s) (s)': 'GR00T', 'AUC vs human (macro)': 'ACT'}; published GR00T/OpenPI/GR00T/ACT reproduced: True; distinct top-1: 3
-AC2.5 HRT CI endpoint error vs tab_headline_ci.json, summed over 4 models (pp): {'human_resampled': 0.5820308446889442, 'human_fixed': 0.6665586945176996}; closer variant: human_resampled
+AC2.5 HRT CI endpoint error vs tab_headline_ci.json, summed over 4 models (pp): {'human_resampled': 0.6275677408637819, 'human_fixed': 0.8083132901405232}; closer variant: human_resampled
 AC2.6 evaluation rollouts (phail/v1.0/dataset/rollouts/): episodes=594 GB=26.64 access=public, anonymous HTTPS
 AC2.6 teleoperation = fine-tuning set (phail/v1.0/dataset/teleoperation/): episodes=449 GB=13.95 access=public, anonymous HTTPS (not downloaded: not approved)
 AC2.6 same set at datasets/phail/v1.0/training/: episodes=449 GB=13.95 access=public
