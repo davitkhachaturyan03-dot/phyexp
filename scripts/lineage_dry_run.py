@@ -14,6 +14,7 @@ attribution scores are a hash of the key. No outcome numbers are invented.
 
     .venv/bin/python scripts/lineage_dry_run.py --k 20 --seed 0      # full chain: records runs in data/lineage
     .venv/bin/python scripts/lineage_dry_run.py --tamper-only        # AC6.5 only; records no run
+    .venv/bin/python scripts/lineage_dry_run.py --eval-smoke         # evaluation-layer S9 chain (see ``eval_smoke``)
 
 The full chain writes real runs (and ~2.3 GB of checkpoints under ``data/runs/``), refuses to start
 with uncommitted changes under ``vlapoc/`` or ``scripts/``, and overwrites the S6 files in the
@@ -172,6 +173,87 @@ def mermaid(g: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+EVAL_FEATURE_ART = REPO_ROOT / "tracker" / "features" / "2026-10-01-evaluation-layer" / "artifacts"
+
+
+def eval_smoke(subset: str = "v0/reference", k: int = 5, seed: int = 0, steps: int = 2, batch_size: int = 2,
+               eval_n: int = 2, eval_tau: int = 1200, n_boot: int = 1000) -> dict:
+    """Evaluation-layer S9: the evaluation chain end to end at smoke scale, as MLflow runs of one chain.
+
+    Grounding: PoC §9.1 Steps 2-4 pp. 18-19 (rollouts tied to the checkpoint; one return per metric per rollout;
+    the two-step verdict on a counterfactual pair), §2.1 item 1 p. 3 (every rollout tied back to its checkpoint
+    and data), §10 p. 20 (Evaluation layer). The pair has the shape of the PoC's random-k control (§9.1 Step 4):
+
+        build(v0) [reuse] -> split(v0) [reuse] -> select drop-random-k of ``subset``
+        -> train on ``subset`` and on its child (ACT, ``steps`` steps, per-subset normalization, S8)
+        -> eval each (real LIBERO rollouts, libero_spatial task 0, ``eval_n`` init states, τ ``eval_tau`` steps, S5)
+        -> returns of each (S6) -> verify (macro-KS gate + per-metric CIs, S7) -> trace(verify)
+
+    Smoke scale: 2-step policies on 2 rollouts each exercise every stage's code and the lineage, not a PoC
+    claim. Writes ``artifacts/s9_*`` of the evaluation-layer feature (not the data+lineage feature's files).
+    """
+    from vlapoc import verdict
+    from vlapoc.returns import returns_run
+
+    chain = f"eval-smoke-k{k}-s{seed}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
+    out = REPO_ROOT / "data" / "runs" / chain
+    t0 = time.time()
+    log(f"chain {chain}; git HEAD {runs.git_state()['sha'][:12]} dirty={runs.git_state()['dirty']}")
+    R: dict[str, str] = {}
+    v0 = resolve_version("v0")
+    R["build"] = reuse_or(v0["dataset_version_id"], lambda: runs.build_run("v0", chain=chain), "build(v0)")
+    R["split"] = reuse_or(Subset.load("v0/candidate").subset_id, lambda: runs.split_run("v0", 2, 0, chain=chain)[0], "split(v0)")
+    parent = Subset.load(subset)
+    R["select"], child = runs.select_run(parent.subset_id, f"select-drop-random-{k}-s{seed} [eval-smoke]", "drop_random_k", k,
+                                         seed=seed, chain=chain)
+    log(f"[run] select drop-random-{k}: child {child.subset_id[:12]} ({len(child.episode_ids)} of {len(parent.episode_ids)} episodes)")
+    ta = runs.train_run(subset, "train-ref [eval-smoke]", seed=0, steps=steps, batch_size=batch_size, chain=chain)
+    tb = runs.train_run(child.subset_id, f"train-ref-drop-random-{k} [eval-smoke]", seed=0, steps=steps, batch_size=batch_size, chain=chain)
+    R["train_a"], R["train_b"] = ta["run_id"], tb["run_id"]
+    log(f"[run] train: {ta['run_id'][:12]} ({ta['n_episodes']} eps), {tb['run_id'][:12]} ({tb['n_episodes']} eps)")
+    ea = runs.eval_run(f"train:{ta['run_id']}", EVAL_TASKS, eval_n, "eval-train-ref [eval-smoke]", out / "eval-a",
+                       tau_episode_steps=eval_tau, batch_size=eval_n, device="cpu", chain=chain)
+    eb = runs.eval_run(f"train:{tb['run_id']}", EVAL_TASKS, eval_n, f"eval-train-ref-drop-random-{k} [eval-smoke]", out / "eval-b",
+                       tau_episode_steps=eval_tau, batch_size=eval_n, device="cpu", chain=chain)
+    R["eval_a"], R["eval_b"] = ea["run_id"], eb["run_id"]
+    log(f"[run] eval: {ea['run_id'][:12]} ({ea['n_success']}/{ea['n_rollouts']} success), {eb['run_id'][:12]} ({eb['n_success']}/{eb['n_rollouts']})")
+    R["returns_a"] = returns_run(ea["run_id"], "returns-train-ref [eval-smoke]", chain=chain)["run_id"]
+    R["returns_b"] = returns_run(eb["run_id"], f"returns-train-ref-drop-random-{k} [eval-smoke]", chain=chain)["run_id"]
+    v = verdict.verify_run(ea["run_id"], eb["run_id"], f"verify-ref-vs-drop-random-{k} [eval-smoke]", n_boot=n_boot,
+                           out_dir=out / "verify", chain=chain)
+    R["verify"] = v["run_id"]
+    log("[run] verify: " + verdict.describe(v).splitlines()[0])
+    c = runs.client()
+    rows = []
+    for key, rid in R.items():
+        run = c.get_run(rid)
+        rows.append({"step": key, "run_id": rid, "name": run.info.run_name, "stage": run.data.tags["stage"],
+                     "stand_in": run.data.tags.get("vlapoc.stand_in"), "status": run.info.status,
+                     "chain": run.data.tags.get("vlapoc.chain", "(earlier command)")})
+    table = pd.DataFrame(rows)
+    log("AC9.1 chain runs:\n" + table.drop(columns=["run_id"]).to_string(index=False))
+    tr = runs.trace(R["verify"])
+    stages = sorted({n["stage"] for n in tr["runs"].values()})
+    stand_ins = [n["name"] for n in tr["runs"].values() if n.get("stand_in")]
+    kinds = sorted({e["consumes"].split(":")[0] for e in tr["edges"]})
+    dead = [e["consumes"] for e in tr["edges"] if not e["produced_by"]]
+    raw = tr["raw_files"] or []
+    log(f"AC9.1 trace(verify {R['verify'][:12]}): {len(tr['runs'])} runs, stages {stages}; consumed kinds {kinds}; "
+        f"dead ends {dead}; stand-in runs in the trace: {stand_ins}; raw files reached: {len(raw)}"
+        + (f" (first {raw[0]['source_file'].split('/')[-1][:48]}… sha256 {raw[0]['sha256'][:16]})" if raw else ""))
+    summary = {"chain": chain, "run_ids": R, "runs": rows, "verdict": {k_: v[k_] for k_ in ("outcome", "direction", "gate", "label")},
+               "trace": {"n_runs": len(tr["runs"]), "stages": stages, "consumed_kinds": kinds, "dead_ends": dead,
+                         "stand_in_runs": stand_ins, "raw_files": len(raw)},
+               "seconds": round(time.time() - t0, 1)}
+    table.to_csv(EVAL_FEATURE_ART / "s9_chain_runs.csv", index=False)
+    (EVAL_FEATURE_ART / "s9_trace_verify.json").write_text(json.dumps(tr, indent=1, default=str))
+    (EVAL_FEATURE_ART / "s9_summary.json").write_text(json.dumps(summary, indent=1, default=str))
+    g = graph([R["verify"], R["returns_a"], R["returns_b"]])
+    (EVAL_FEATURE_ART / "s9_lineage_graph.mmd").write_text(mermaid(g))
+    log(f"done in {summary['seconds']}s -> tracker/features/2026-10-01-evaluation-layer/artifacts/s9_summary.json")
+    return summary
+
+
 def main() -> int:
     """Record the chain (usage in the module docstring), then check AC6.1-AC6.7 and write the artifacts."""
     ap = argparse.ArgumentParser()
@@ -181,9 +263,13 @@ def main() -> int:
     ap.add_argument("--batch-size", type=int, default=4)
     ap.add_argument("--eval-n", type=int, default=1, help="init states per eval task (real LIBERO rollouts, smoke scale)")
     ap.add_argument("--eval-tau", type=int, default=60, help="eval episode budget in steps (smoke scale)")
+    ap.add_argument("--eval-smoke", action="store_true", help="evaluation-layer S9 chain (train -> eval -> returns -> verify)")
     ap.add_argument("--tamper-only", action="store_true",
                     help="run only the AC6.5 tamper refusal against the existing v1 (records no run)")
     a = ap.parse_args()
+    if a.eval_smoke:
+        eval_smoke(k=5 if a.k == 20 else a.k, seed=a.seed, steps=2 if a.steps == 5 else a.steps)
+        return 0
     if a.tamper_only:
         res = tamper_check(resolve_version("v1"), steps=a.steps)
         (ART / "s6_tamper_only.json").write_text(json.dumps(res, indent=2))

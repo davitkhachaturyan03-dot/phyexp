@@ -96,7 +96,7 @@ from vlapoc.lineage import (  # noqa: E402
     version_episodes,
 )
 
-STAGES = ("build", "split", "derive", "screen", "select", "train", "eval", "verify", "attribute")  # verify: S7 gate
+STAGES = ("build", "split", "derive", "screen", "select", "train", "eval", "returns", "verify", "attribute")  # returns: S6; verify: S7 gate
 EXPERIMENT = "vlapoc-lineage"
 SOURCE_DIRS = ("vlapoc", "scripts")
 DIGEST_LEN = 32  # MLflow MAX_DATASET_DIGEST_SIZE = 36

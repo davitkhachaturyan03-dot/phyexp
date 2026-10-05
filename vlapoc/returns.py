@@ -24,7 +24,8 @@ Keys (lineage contract): every row carries ``eval_run_id`` and ``rollout_id`` (t
 
 Usage::
 
-    .venv/bin/python -m vlapoc.returns --eval-run <eval_run_id>      # writes returns.parquet etc. next to the rollouts
+    .venv/bin/python -m vlapoc.returns --eval-run <eval_run_id>          # writes returns.parquet etc. (data/eval/returns-<id>/)
+    .venv/bin/python -m vlapoc.returns --eval-run <eval_run_id> --track  # the same, recorded as a 'returns' stage run
 """
 
 from __future__ import annotations
@@ -238,11 +239,45 @@ def load_eval_rollouts(eval_run_id: str, lineage_root: Path | None = None) -> tu
     return pd.read_parquet(path), out_dir
 
 
+def returns_run(eval_run_id: str, name: str, seed: int = 0, lineage_root: Path | None = None, chain: str | None = None) -> dict:
+    """Stage ``returns`` (PoC §9.1 Step 3 p. 19, "Define one 'return' per metric for each rollout"): the per-rollout
+    and per-operation return tables of one eval run, recorded as an MLflow run whose input is that eval run's
+    ``rollouts`` entity and whose outputs are ``returns.parquet`` / ``operation_returns.parquet`` (by sha256), so
+    the attribution feature's runs can consume returns by digest and ``trace`` back to the checkpoint and data."""
+    from vlapoc.runs import client, stage_run
+
+    ev_run = client(lineage_root).get_run(eval_run_id)
+    ro, out_dir = load_eval_rollouts(eval_run_id, lineage_root)
+    ret, meta = rollout_returns(ro, seed=seed)
+    ops = operation_returns(ro)
+    paths = {"returns": out_dir / "returns.parquet", "operation_returns": out_dir / "operation_returns.parquet",
+             "returns_meta": out_dir / "returns_meta.json", "metrics_registry": out_dir / "metrics_registry.json"}
+    ret.to_parquet(paths["returns"], index=False)
+    ops.to_parquet(paths["operation_returns"], index=False)
+    paths["returns_meta"].write_text(json.dumps(meta, indent=1))
+    paths["metrics_registry"].write_text(json.dumps(metrics_registry(), indent=1, ensure_ascii=False))
+    with stage_run("returns", name, lineage_root, chain=chain) as r:
+        r.input_entity("rollouts", ev_run.data.tags["output.rollouts.sha256"], "rollouts")
+        r.params({"eval_run_id": eval_run_id, "auc_sample_seed": seed, "tau_s": TAU_S, "f_tau_s": F_TAU_S,
+                  "return_columns": RETURN_COLUMNS, "human_reference": meta["human_reference"]})
+        for kind, path in paths.items():
+            r.output_file(kind, path, kind=kind)
+        r.tags({"returns.rows": len(ret), "returns.operation_rows": len(ops),
+                "returns.hrt_macro_at_policy": f"{meta['hrt_macro_at_policy']:.6g}"})
+        return {"run_id": r.run_id, "returns": str(paths["returns"].relative_to(REPO_ROOT)), "rows": len(ret),
+                "operation_rows": len(ops), "hrt_macro_at_policy": meta["hrt_macro_at_policy"]}
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="python -m vlapoc.returns")
     p.add_argument("--eval-run", required=True)
     p.add_argument("--seed", type=int, default=0, help="seed for ret_auc_sampled")
+    p.add_argument("--track", action="store_true", help="record as a 'returns' stage MLflow run (needs a clean git tree)")
+    p.add_argument("--name", default="returns")
     a = p.parse_args(argv)
+    if a.track:
+        print(json.dumps(returns_run(a.eval_run, a.name, a.seed), indent=1))
+        return 0
     ro, out_dir = load_eval_rollouts(a.eval_run)
     ret, meta = rollout_returns(ro, seed=a.seed)
     ops = operation_returns(ro)
