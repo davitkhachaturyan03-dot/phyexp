@@ -62,9 +62,10 @@ def test_ks_sign_cycles_but_verdict_direction_comes_from_rmst():
     signs = {pair: sup_sign(arms[pair[0]], arms[pair[1]]) for pair in (("A", "B"), ("B", "C"), ("C", "A"))}
     winners = {pair: pair[0] if s == "first" else pair[1] for pair, (_, s) in signs.items()}
     assert winners == {("A", "B"): "A", ("B", "C"): "B", ("C", "A"): "C"}  # A ≻ B ≻ C ≻ A: a cycle
-    rmst = {k: ev.rmst(arms[k]["x"], 70.0) for k in arms}
-    assert rmst["B"] < rmst["C"] < rmst["A"]  # the scalar is transitive
-    v = vd.compare_policies(arms["A"], arms["B"], None, 70.0, metrics=("RMST",), n_boot=400, n_boot_ks=400, seed=0, names=("A", "B"))
+    rmst = {k: ev.rmst(arms[k]["x"], 60.0) for k in arms}
+    assert rmst["B"] < rmst["A"] and rmst["B"] < rmst["C"]  # the scalar ranks B first (transitive by construction)
+    # family O's only verdict metric is the capped RMST(60), which on all-event data equals RMST(60) (registry rmst60_op_cap)
+    v = vd.compare_policies(arms["A"], arms["B"], None, "O", n_boot=400, n_boot_ks=400, seed=0, names=("A", "B"))
     assert set(v["gate"]) == {"test", "D", "p", "D_cells", "n_boot", "fires"} and v["gate"]["D"] >= 0  # unsigned KS
     assert v["gate"]["fires"] and v["direction"] == "B"  # KS sup-sign says A; the verdict's direction is RMST's
     return signs, rmst, v
@@ -79,11 +80,12 @@ def main() -> int:
     print("AC7.3 SYNTHETIC App. I CDFs: KS sup-sign winners " + "; ".join(f"{a} vs {b}: sup {d:.2f} -> {a if s == 'first' else b}"
                                                                      for (a, b), (d, s) in signs.items())
           + " (a cycle A≻B≻C≻A)")
-    print(f"AC7.3 RMST(70 s): A {rmst['A']:.2f}, B {rmst['B']:.2f}, C {rmst['C']:.2f} (transitive: B < C < A)")
-    print(f"AC7.3 verdict A vs B: gate D̄ {v['gate']['D']:.2f} (unsigned) p {v['gate']['p']:.4f} -> outcome ({v['outcome']}), direction "
-          f"{v['direction']} from RMST Δ {v['metrics']['RMST']['diff']:+.2f} s [{v['metrics']['RMST']['ci95'][0]:+.2f}, "
-          f"{v['metrics']['RMST']['ci95'][1]:+.2f}], while the KS sup-sign favours A")
-    json.dump({"sup_signs": {f"{a}-{b}": s for (a, b), s in signs.items()}, "rmst70": rmst, "verdict_A_B": v},
+    m = v["metrics"]["rmst60_op_cap"]
+    print(f"AC7.3 RMST(60 s): A {rmst['A']:.2f}, B {rmst['B']:.2f}, C {rmst['C']:.2f} (a scalar: B ranks first, no cycle)")
+    print(f"AC7.3 verdict A vs B [{v['label']}]: gate D̄ {v['gate']['D']:.2f} (unsigned) p {v['gate']['p']:.4f} -> outcome ({v['outcome']}), "
+          f"direction {v['direction']} from capped RMST(60) Δ {m['diff']:+.2f} s [{m['ci95'][0]:+.2f}, {m['ci95'][1]:+.2f}], "
+          f"while the KS sup-sign favours A")
+    json.dump({"sup_signs": {f"{a}-{b}": s for (a, b), s in signs.items()}, "rmst60": rmst, "verdict_A_B": v},
               open(ART / "s7_ac7_3_intransitive.json", "w"), indent=1, default=str)
     return 0
 

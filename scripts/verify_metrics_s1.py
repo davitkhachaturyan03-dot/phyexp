@@ -139,7 +139,7 @@ def ac1_5() -> None:
 
 def ac1_6() -> None:
     reg = ev.metric_registry()
-    required = ["F(τ) / Success@τ", "median", "RMST(τ)", "UPH", "completion", "MTBF/A", "HRT", "AUC vs reference",
+    required = ["F(30 s) / Success@τ", "median", "RMST(τ)", "UPH", "completion", "MTBF/A", "HRT", "AUC vs reference",
                 "KS / macro-KS", "P-P plot", "ghost-event rate", "censored rate"]
     names = [m["name"] for m in reg]
     lines = ["| metric | function | functional of F | τ | source |", "|---|---|---|---|---|"]

@@ -368,7 +368,7 @@ def train_run(subset_ref: str, name: str, seed: int = 0, steps: int = 5, batch_s
               policy_type: str = "act", policy_overrides: dict | None = None, device: str = "mps",
               dataset_root: Path | None = None, runs_root: Path | None = None, lineage_root: Path | None = None,
               chain: str | None = None, allow_dirty: bool = False, normalization: str = "per_subset",
-              pretrained_path: Path | None = None) -> dict:
+              pretrained_path: Path | None = None, smoke: bool | None = None) -> dict:
     """Verify the dataset copy, then run LeRobot training on exactly ``subset`` and record every §2.1 field.
 
     Refuses to launch (raises ``VersionIntegrityError``, no MLflow run is created) if any file of the
@@ -388,6 +388,8 @@ def train_run(subset_ref: str, name: str, seed: int = 0, steps: int = 5, batch_s
             (how the data+lineage feature's smoke runs were trained).
         pretrained_path: a LeRobot checkpoint dir to fine-tune from (e.g. ``data/hf_models/smolvla_base``);
             its weights sha256 is recorded as tag ``train.pretrained.weights.sha256``.
+        smoke: tag ``vlapoc.smoke`` (``true`` requires "smoke" in ``name``; ``None`` records ``unspecified``). Only a
+            train run tagged ``vlapoc.smoke=false`` can feed an attribution-grade eval (plan r2 AC5.9).
 
     Returns:
         ``{"run_id", "checkpoint", "weights_sha256", "normalizer_sha256", "episodes_match",
@@ -403,6 +405,8 @@ def train_run(subset_ref: str, name: str, seed: int = 0, steps: int = 5, batch_s
     for a 960-episode subset of this dataset). Subsets are selections in the lineage store, but each new
     subset trained on costs a cache copy; point ``HF_DATASETS_CACHE`` at a scratch location and clear it.
     """
+    if smoke and "smoke" not in name:
+        raise ValueError(f"a smoke train run's name must contain 'smoke' (got {name!r})")
     subset = Subset.load(subset_ref, lineage_root)
     v = resolve_version(subset.dataset_version_id, lineage_root)
     vid = v["dataset_version_id"]
@@ -443,7 +447,8 @@ def train_run(subset_ref: str, name: str, seed: int = 0, steps: int = 5, batch_s
                   "augmentation": "none (dataset.image_transforms.enable=false)",
                   "normalization_stats": norm_param, "pretrained_path": spec.get("policy_pretrained_path", "none")})
         r.tags({"dataset_version_id": vid, "subset_id": subset.subset_id, "seed": seed,
-                "dataset.stats_json.sha256": sha256_file(stats_path), "train.normalization": normalization})
+                "dataset.stats_json.sha256": sha256_file(stats_path), "train.normalization": normalization,
+                "vlapoc.smoke": "unspecified" if smoke is None else str(bool(smoke)).lower()})
         out_dir.mkdir(parents=True, exist_ok=True)  # LeRobot writes into out_dir/lerobot, which must not exist yet
         if sub_stats is not None:
             (out_dir / "subset_stats.json").write_text(json.dumps(to_json(sub_stats), indent=1))
@@ -536,11 +541,98 @@ def screen_standin(candidate: str, reference: str, name: str, out_dir: Path, lin
         return r.run_id, path
 
 
+CANONICAL_TASKS = [("libero_spatial", t) for t in range(10)] + [("libero_10", t) for t in range(10)]  # AC5.8 order
+
+
+def batch_plan(tasks: list, n_init: int, init_offset: int, seed_base: int, batch_size: int) -> dict:
+    """The eval batch plan (plan r2 AC5.8/AC7.8): which rollouts share a batch, in which order, with which seeds.
+    ``run_rollouts`` batches within one task (``batch_size`` consecutive init states), tasks in the given order, so
+    this dict determines every rollout's batch companions, which a stochastic policy's outcome depends on."""
+    return {"batch_size": int(batch_size), "tasks": [[str(s), int(t)] for s, t in tasks], "n_init": int(n_init),
+            "init_offset": int(init_offset), "eval_seed_base": int(seed_base),
+            "batching": "one task per batch; init states in order; rollout j: init init_offset+j, seed seed_base+init_offset+j"}
+
+
+def batch_plan_of(run) -> dict | None:
+    """An eval run's batch plan: its ``eval.batch_plan`` param, or (round-1 runs, recorded before that param
+    existed) the same dict rebuilt from its ``tasks``/``n_init``/``init_offset``/``seed_base``/``batch_size`` params,
+    marked ``provenance: reconstructed`` (ignored when plans are compared). None if neither is available."""
+    p = run.data.params
+    if "eval.batch_plan" in p:
+        return json.loads(p["eval.batch_plan"])
+    try:
+        bp = batch_plan([tuple(t) for t in json.loads(p["tasks"])], int(p["n_init"]), int(p.get("init_offset", 0)),
+                        int(p.get("seed_base", 0)), int(p["batch_size"]))
+    except (KeyError, ValueError):
+        return None
+    return {**bp, "provenance": "reconstructed from round-1 params"}
+
+
+def attribution_protocol_errors(policy: str, tasks: list, n_init: int, init_offset: int, seed_base: int,
+                                tau_episode_steps: int, batch_size: int, smoke: bool | None = None,
+                                lineage_root: Path | None = None) -> list[str]:
+    """Why an eval cannot be asserted attribution-grade (plan r2 AC5.9); empty if it can. The protocol is AC5.8's."""
+    errs = []
+    if not policy.startswith("train:"):
+        errs.append("policy is not a recorded train run")
+    else:
+        tags = client(lineage_root).get_run(policy.split(":", 1)[1]).data.tags
+        if tags.get("vlapoc.smoke") != "false":
+            errs.append(f"train run is not tagged vlapoc.smoke=false (got {tags.get('vlapoc.smoke', 'absent')!r})")
+    if smoke:
+        errs.append("the eval is declared smoke")
+    if [tuple(t) for t in tasks] != CANONICAL_TASKS:
+        errs.append("tasks are not all 20 (libero_spatial 0-9 then libero_10 0-9)")
+    if n_init != 50 or init_offset != 0:
+        errs.append(f"init states are not 0-49 (n_init {n_init}, offset {init_offset})")
+    if seed_base != 0:
+        errs.append(f"eval seed_base {seed_base} != 0")
+    if tau_episode_steps != 1200:
+        errs.append(f"tau_episode_steps {tau_episode_steps} != 1200")
+    if batch_size < 1 or 50 % batch_size:
+        errs.append(f"batch_size {batch_size} does not divide 50")
+    return errs
+
+
+def scratch_lineage_copy(dest: Path, src: Path | None = None) -> Path:
+    """A scratch copy of a lineage store for tests that write MLflow runs: every manifest dir, ``names.json`` and
+    ``mlflow.db`` are copied, and on the copy only the experiment's ``artifact_location`` (stored as an absolute URI
+    in the DB) is repointed to ``dest/mlartifacts``, so new runs cannot write into the real store. Old runs keep
+    reading their artifacts from the real store (read-only)."""
+    import shutil
+    import sqlite3
+
+    src = _root(src)
+    dest = Path(dest)
+    if dest.exists():
+        raise FileExistsError(dest)
+    dest.mkdir(parents=True)
+    for d in sorted(x for x in src.iterdir() if x.is_dir() and x.name != "mlartifacts"):
+        shutil.copytree(d, dest / d.name)
+    for f in ("names.json", "mlflow.db"):
+        shutil.copy(src / f, dest / f)
+    (dest / "mlartifacts").mkdir()
+    con = sqlite3.connect(dest / "mlflow.db")
+    con.execute("UPDATE experiments SET artifact_location = ? WHERE name = ?", ((dest / "mlartifacts").resolve().as_uri(), EXPERIMENT))
+    con.commit()
+    con.close()
+    return dest
+
+
 def eval_run(policy: str, tasks: list[tuple[str, int]], n_init: int, name: str, out_dir: Path | None = None,
              seed_base: int = 0, init_offset: int = 0, tau_episode_steps: int = 1200, render_hw: int = 128,
              batch_size: int = 1, device: str = "cpu", record_trajectories: bool = False,
-             lineage_root: Path | None = None, chain: str | None = None, allow_dirty: bool = False) -> dict:
+             lineage_root: Path | None = None, chain: str | None = None, allow_dirty: bool = False,
+             attribution_grade: bool = False, smoke: bool | None = None) -> dict:
     """Stage ``eval`` (PoC §9.1 Step 2 p. 18): closed-loop LIBERO rollouts recorded as one MLflow run.
+
+    Attribution grade is asserted by the caller and checked (plan r2 AC5.9; analysis-r1 E1): with
+    ``attribution_grade=True`` the run is refused (``LineageError``, before any run or rollout) unless
+    ``attribution_protocol_errors`` is empty: a ``train:`` policy whose train run is tagged ``vlapoc.smoke=false``,
+    all 20 tasks (libero_spatial 0-9 then libero_10 0-9), 50 init states from 0, eval seed 0, τ_episode 1200 steps,
+    and a batch size dividing 50 (the fixed batch plan of AC5.8). Every run records ``eval.batch_plan`` (param) and
+    its digest, ``eval.attribution_grade`` and, only for a passed assertion, ``eval.attribution_grade.asserted=true``.
+    ``smoke=True`` tags ``vlapoc.smoke=true`` and requires "smoke" in ``name``.
 
     Grounding: PoC §2.1 item 1 (p. 3) "Every eval rollout should be tied back to that checkpoint" (the run's
     input is the checkpoint's sha256, which ``trace`` follows to its train run and on to the dataset version);
@@ -559,6 +651,13 @@ def eval_run(policy: str, tasks: list[tuple[str, int]], n_init: int, name: str, 
     from vlapoc.lineage import file_digests
 
     c = client(lineage_root)
+    if smoke and "smoke" not in name:
+        raise ValueError(f"a smoke eval run's name must contain 'smoke' (got {name!r})")
+    if attribution_grade:
+        errs = attribution_protocol_errors(policy, tasks, n_init, init_offset, seed_base, tau_episode_steps, batch_size,
+                                           smoke, lineage_root)
+        if errs:
+            raise LineageError(f"attribution_grade=True refused: {errs}")
     train_run_id, external = "", ""
     if policy == "noop":
         spec = ro.noop_policy()
@@ -590,8 +689,12 @@ def eval_run(policy: str, tasks: list[tuple[str, int]], n_init: int, name: str, 
                   "tau_episode_steps": tau_episode_steps, "render_hw": render_hw, "batch_size": batch_size,
                   "control_mode": "relative", "device": device, "record_trajectories": record_trajectories,
                   "sim_env": lg.env_versions()})
+        bp = batch_plan(tasks, n_init, init_offset, seed_base, batch_size)
+        r.params({"eval.batch_plan": bp})
         r.tags({"eval.assets_revision": lg.ASSETS_REVISION, "eval.external_checkpoint": external or "none",
-                "eval.attribution_grade": str(bool(train_run_id)).lower()})
+                "eval.attribution_grade": str(bool(attribution_grade)).lower(),
+                "eval.batch_plan.sha256": sha256_json(bp), "vlapoc.smoke": "unspecified" if smoke is None else str(bool(smoke)).lower(),
+                **({"eval.attribution_grade.asserted": "true"} if attribution_grade else {})})
         df, traj = ro.run_rollouts(spec, plan, tau_episode_steps, render_hw, batch_size, record_trajectories=record_trajectories,
                                    traj_root=out_dir / "trajectories", eval_run_id=r.run_id)
         errs = ro.validate_record(df)

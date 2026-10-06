@@ -13,9 +13,9 @@
    "first"
   ]
  },
- "rmst70": {
-  "A": 35.5,
-  "B": 21.099999999999998,
+ "rmst60": {
+  "A": 30.5,
+  "B": 19.1,
   "C": 35.3
  },
  "verdict_A_B": {
@@ -23,6 +23,8 @@
    "A",
    "B"
   ],
+  "family": "O",
+  "label": "family O",
   "cells": [
    "x"
   ],
@@ -30,10 +32,10 @@
    "A": 200,
    "B": 200
   },
-  "tau_s": 70.0,
+  "tau_s": 60.0,
   "alpha": 0.05,
   "gate": {
-   "test": "macro-KS (pooled-resample episode-clustered bootstrap)",
+   "test": "macro-KS (pooled-resample episode-clustered bootstrap), family O pairs",
    "D": 0.4,
    "p": 0.0024937655860349127,
    "D_cells": {
@@ -43,29 +45,38 @@
    "fires": true
   },
   "metrics": {
-   "RMST": {
-    "label": "RMST(\u03c4) s, pooled (global)",
-    "tau_s": 70.0,
-    "A": 35.5,
-    "B": 21.099999999999998,
-    "diff": 14.400000000000002,
+   "rmst60_op_cap": {
+    "label": "operation RMST, capped [family O, \u03c4 60 s]",
+    "family": "O",
+    "tau": "60 s",
+    "aggregate": "pooled",
+    "A": 30.5,
+    "B": 19.1,
+    "diff": 11.399999999999999,
     "ci95": [
-     9.025124999999994,
-     19.835249999999995
+     6.854874999999996,
+     16.053499999999993
     ],
     "p": 0.004987531172069825,
     "higher_is_better": false,
-    "diff_better": -14.400000000000002,
+    "diff_better": -11.399999999999999,
     "favours": "B",
+    "cells": {
+     "x": {
+      "A": 30.5,
+      "B": 19.1
+     }
+    },
     "p_holm": 0.004987531172069825,
     "significant": true
    }
   },
   "holm_family": [
-   "RMST"
+   "rmst60_op_cap"
   ],
   "outcome": "i",
   "direction": "B",
+  "batch_plan_match": null,
   "logrank_sanity": {
    "chi2": 2.6894977168949774,
    "p": 0.10101165099494101

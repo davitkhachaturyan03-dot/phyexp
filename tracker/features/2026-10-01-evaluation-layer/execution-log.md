@@ -1524,3 +1524,26 @@ every analyzer item routed to the executor is accepted.
   - `load_eval_rollouts` uses a `TemporaryDirectory`.
 - **Pending:** `vlapoc/verdict.py` still has its `METRICS` table (grep: `verdict.py:71`). It moves to the registry
   with the family-W/O verdict rework, after which the AC6.8 checks run.
+
+### Round-2 code checkpoint (WIP commit; the per-AC evidence follows in later sections)
+
+Code is written for AC5.9, AC5.10, AC6.8–AC6.11 and AC7.6–AC7.9. **Only these quick checks have been run so far:**
+- **Imports:** all six modules import. The registry has **28 entries** (the AC6.8 note above said 29; 28 is the
+  measured count). S1's view of it: 23 entries that name `vlapoc.evaluation` functions.
+  - `RETURN_COLUMNS` = `['ret_f30', 'ret_rmst60', 'ret_auc_expected', 'ret_auc_sampled', 'ret_hrt60_lin', 'ret_censored60']`.
+  - Verdict families: W 5 metrics, O 1, PhAIL 4.
+  - The record schema has 33 columns, including `t0_model_sha256`.
+- **One-registry grep:** no `METRICS =` or `REGISTRY =` in `evaluation.py`, `returns.py` or `verdict.py`, and all
+  three import `metrics_registry`.
+- **`scripts/verify_metrics_s1.py`:** `AC1.6 registry: 23 entries, every named function exists with a docstring;
+  required missing: []`.
+  - Its required name `F(τ) / Success@τ` became `F(30 s) / Success@τ`, the registry's display name.
+  - `s1_metric_registry.md` and `s1_verify_metrics.json` were regenerated.
+- **`scripts/verify_operations_s4.py`:** AC4.2 synthetic cases pass, unchanged.
+- **`scripts/verify_verdict_s7.py`**, script and pytest (`3 passed`):
+  - Holm and the outcome rule pass.
+  - The App. I test now runs through the registry's family O, whose only metric is capped RMST(60). On all-event
+    data that equals RMST(60).
+  - KS sup-signs still cycle A≻B≻C≻A. RMST(60) is A 30.50, B 19.10, C 35.30.
+  - The verdict for A vs B is `[family O]` (i), direction **B**, Δ +11.40 s [+6.85, +16.05], while the KS sup-sign
+    favours A. `s7_ac7_3_intransitive.json` was regenerated.

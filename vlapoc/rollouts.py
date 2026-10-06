@@ -44,7 +44,8 @@ What is LeRobot's and what is added (plan: reuse the eval loop, add only the pro
   ``flat_stove_1_main`` moves up to 7.2 mm per reset; ``set_init_state`` cannot undo it, because a fixture's
   position is in the model, not in the flattened state). The first seeded reset of a fresh env is reproducible.
   ``run_rollouts`` builds a fresh env per rollout and keeps only its first episode (``first_trace``); never
-  reuse an env object across rollouts. ``t0_state_sha256`` does not cover fixture placement.
+  reuse an env object across rollouts. ``t0_state_sha256`` does not cover fixture placement; ``t0_model_sha256``
+  (``model_placement_sha256``) does, so a violation is visible in the record (plan r2 AC5.10).
 
 T convention: index 0 of a trace is the post-settle state, so ``T_steps`` = number of policy actions until
 LIBERO's goal check first holds, ``T_s = T_steps / 20``. A rollout that has not succeeded after
@@ -79,7 +80,7 @@ RECORD_COLUMNS = {
     "control_mode": "string", "T_steps": "float64", "T_s": "float64", "event": "int64", "censored": "bool",
     "n_ops": "int64", "n_ops_done": "int64", "ops": "string", "pairs": "string", "conjuncts": "string",
     "conjunct_trace_rle": "string", "success_trace_rle": "string", "arm_action_norm": "object", "obj_pos": "string",
-    "t0_state_sha256": "string", "sim_steps": "int64", "wall_seconds": "float64", "batch_size": "int64",
+    "t0_state_sha256": "string", "t0_model_sha256": "string", "sim_steps": "int64", "wall_seconds": "float64", "batch_size": "int64",
     "traj_episode_index": "float64",
 }
 
@@ -111,6 +112,17 @@ def validate_record(df: pd.DataFrame) -> list[str]:
 # ---------------------------------------------------------------------------------------------
 
 
+def model_placement_sha256(model) -> str:
+    """sha256 of the MuJoCo model's placement after reset (plan r2 AC5.10): ``body_pos`` then ``site_pos``, each as
+    C-contiguous float64 bytes, concatenated. ``t0_state_sha256`` hashes the flattened sim state, which cannot see a
+    fixture's position (a fixture has no free joint: its position is in the model); LIBERO re-places fixtures on a
+    re-reset of the same env object (module docstring), and this hash is what makes that visible per rollout."""
+    h = hashlib.sha256()
+    for arr in (model.body_pos, model.site_pos):
+        h.update(np.ascontiguousarray(np.asarray(arr, dtype=np.float64)).tobytes())
+    return h.hexdigest()
+
+
 def _probed_env_class():
     """``ProbedLiberoEnv`` (defined lazily: LIBERO must be configured by ``setup_libero`` before import)."""
     from vlapoc import libero_goals as lg
@@ -132,6 +144,7 @@ def _probed_env_class():
             self.trace: list[dict] = []
             self.finished: list[list[dict]] = []  # traces of episodes ended before an autoreset
             self.t0_state_sha256: list[str] = []
+            self.t0_model_sha256: list[str] = []
 
         def _ensure_env(self) -> None:
             super()._ensure_env()
@@ -150,6 +163,7 @@ def _probed_env_class():
                 self.finished.append(self.trace)
             obs, info = super().reset(seed=seed, **kwargs)
             self.t0_state_sha256.append(hashlib.sha256(np.asarray(self._env.get_sim_state(), dtype=np.float64).tobytes()).hexdigest())
+            self.t0_model_sha256.append(model_placement_sha256(self._env.env.sim.model))
             self.trace = [self.probe()]
             return obs, info
 
@@ -372,7 +386,7 @@ def run_rollouts(spec: PolicySpec, rollouts: list[RolloutSpec], tau_episode_step
                     "success_trace_rle": json.dumps(rle(succ)),
                     "arm_action_norm": [round(float(x), 6) for x in np.linalg.norm(a[:, :6], axis=1)],
                     "obj_pos": json.dumps({n: [p["obj_pos"][n] for p in tr] for n in tr[0]["obj_pos"]}),
-                    "t0_state_sha256": e.t0_state_sha256[0], "sim_steps": n_steps, "wall_seconds": round(wall / len(batch), 3),
+                    "t0_state_sha256": e.t0_state_sha256[0], "t0_model_sha256": e.t0_model_sha256[0], "sim_steps": n_steps, "wall_seconds": round(wall / len(batch), 3),
                     "batch_size": len(batch), "traj_episode_index": None,
                 }
                 lerobot_success = bool(ret["success"][i, :n_steps].any())
@@ -398,5 +412,5 @@ def run_rollouts(spec: PolicySpec, rollouts: list[RolloutSpec], tau_episode_step
     return df, traj
 
 
-__all__ = ["TAU_EPISODE_STEPS", "RECORD_COLUMNS", "validate_record", "PolicySpec", "noop_policy", "checkpoint_policy",
+__all__ = ["TAU_EPISODE_STEPS", "RECORD_COLUMNS", "validate_record", "model_placement_sha256", "PolicySpec", "noop_policy", "checkpoint_policy",
            "RolloutSpec", "plan_rollouts", "run_rollouts", "write_trajectories"]

@@ -39,12 +39,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from vlapoc import metrics_registry as _mr
 from vlapoc.libero_convert import REPO_ROOT
 
 TAU_S = 60.0        # RMST cap = τ_episode (plan: 60 s)
 F_TAU_S = 30.0      # PoC §4.1 F(30 s)
 HUMAN_REF = REPO_ROOT / "data" / "eval" / "human_reference" / "human_reference.parquet"
-RETURN_COLUMNS = ["ret_f30", "ret_rmst60", "ret_auc_sampled", "ret_auc_expected", "ret_hrt60_lin", "ret_censored60"]
+RETURN_COLUMNS = _mr.return_columns("W")  # family W per-rollout returns, from the single registry (plan r2 AC6.8)
 
 
 def human_times(path: Path = HUMAN_REF) -> dict[tuple[str, int], np.ndarray]:
@@ -87,8 +88,9 @@ def rollout_returns(rollouts: pd.DataFrame, human: dict | None = None, seed: int
 
     - ``ret_f30`` = 1[success ∧ T ≤ 30 s]; mean over a cell = F(30 s) (KM with censoring only at τ ≥ 30 s).
     - ``ret_rmst60`` = −min(T, 60 s), a censored rollout −60; mean = −RMST(60 s).
-    - ``ret_auc_sampled`` = 1[T < T_h*], T_h* drawn uniformly from the task's human times with
-      ``SeedSequence([seed, sha256(rollout_id)])``: the PoC's literal "win indicator against a sampled human time".
+    - ``ret_auc_sampled`` = 1[T < T_h*] + ½·1[T = T_h*], T_h* drawn uniformly from the task's human times with
+      ``SeedSequence([seed, sha256(rollout_id)])``: the PoC's literal "win indicator against a sampled human time"
+      (ties ½: model and human times share the 20 Hz grid; plan r2).
     - ``ret_auc_expected`` = E[``ret_auc_sampled``] (``auc_expected``): the same target without sampling noise
       (a divergence: deterministic expectation of the PoC's sampled indicator).
     - ``ret_hrt60_lin`` = −w_o · min(T, 60 s), w_o = (1/J) · RMST_h,o(60) / RMST_m,o(60)² evaluated at this eval's
@@ -99,7 +101,10 @@ def rollout_returns(rollouts: pd.DataFrame, human: dict | None = None, seed: int
     - ``ret_censored60`` = 1[timed out] (§3.4 "the censored tail"); mean = ``evaluation.censored_rate``.
     - ``failure_type`` (``failure_type``).
 
-    T here is whole-task time-to-success in seconds (simulated, 20 Hz). The human anchor is fixed (S3).
+    Family W (plan r2 "Declared functionals"; registry ``vlapoc.metrics_registry``): T is whole-task time-to-success in
+    seconds (simulated, 20 Hz) and the human anchor is the whole-task reference of all 1000 v0 originals (S3), fixed.
+    Censoring happens only at τ_episode = 60 s, so every cell mean is exactly the declared functional, and
+    ``vlapoc.verdict`` (family W) verifies the same functional (AC6.10).
     """
     human = human if human is not None else human_times()
     df = rollouts.copy()
@@ -113,8 +118,8 @@ def rollout_returns(rollouts: pd.DataFrame, human: dict | None = None, seed: int
     out["ret_f30"] = ((df["event"] == 1) & (T <= F_TAU_S)).astype(float)
     out["ret_rmst60"] = -capped
     h_of = [human[(s, int(t))] for s, t in zip(df["suite"], df["libero_task_id"])]
-    out["ret_auc_sampled"] = [float(t < h[_sample_rng(seed, rid).integers(0, len(h))]) if not np.isnan(t) else 0.0
-                              for t, h, rid in zip(T, h_of, df["rollout_id"])]
+    hs = [h[_sample_rng(seed, rid).integers(0, len(h))] for h, rid in zip(h_of, df["rollout_id"])]
+    out["ret_auc_sampled"] = [(float(t < x) + 0.5 * float(t == x)) if not np.isnan(t) else 0.0 for t, x in zip(T, hs)]
     out["ret_auc_expected"] = [auc_expected(None if np.isnan(t) else t, c / 20.0, h)
                                for t, h, c in zip(T, h_of, df["tau_episode_steps"])]
     # HRT linearization weights per cell at this policy
@@ -135,9 +140,12 @@ def rollout_returns(rollouts: pd.DataFrame, human: dict | None = None, seed: int
 
 
 def operation_returns(rollouts: pd.DataFrame) -> pd.DataFrame:
-    """Per-operation rows (PoC §3.4 "Operation-level (T, event) pairs"): ``rollout_id``, ``op_k`` (k-th pair,
-    the last one possibly the censored tail), ``t_start_steps``/``t_end_steps`` (the segment whose (s', a') the
-    operation's return can be credited to), ``T_op_s``, ``event`` and ``ret_rmst60_op`` = −min(T_op, 60 s)."""
+    """Family O returns, one row per operation sample (PhAIL pairs: completed operations plus the one unfinished
+    attempt per incomplete rollout; PoC §3.4 "Operation-level (T, event) pairs"): ``rollout_id``, ``op_k``,
+    ``t_start_steps``/``t_end_steps`` (the segment whose (s', a') the operation's return can be credited to),
+    ``T_op_s``, ``event`` and ``ret_rmst60_op_cap`` = −min(T_op, 60 s) for a completed operation and **−60 for the
+    unfinished attempt** (plan r2, registry ``rmst60_op_cap``; analysis-r1 F-P3: an unfinished operation can never
+    outrank a completed one). Cell mean over samples = −``evaluation.rmst_capped`` of the family-O arm."""
     rows = []
     for r in rollouts.itertuples():
         pairs = json.loads(r.pairs)
@@ -147,67 +155,16 @@ def operation_returns(rollouts: pd.DataFrame) -> pd.DataFrame:
             rows.append({"eval_run_id": r.eval_run_id, "rollout_id": r.rollout_id, "train_run_id": r.train_run_id,
                          "checkpoint_sha256": r.checkpoint_sha256, "suite": r.suite, "libero_task_id": int(r.libero_task_id),
                          "op_k": k, "n_ops": int(r.n_ops), "t_start_steps": t, "t_end_steps": t + steps, "T_op_s": float(T_op),
-                         "event": int(e), "ret_rmst60_op": -min(float(T_op), TAU_S)})
+                         "event": int(e), "ret_rmst60_op_cap": -min(float(T_op), TAU_S) if int(e) else -TAU_S})
             t += steps
     return pd.DataFrame(rows)
 
 
-# ---------------------------------------------------------------------------------------------
-# metric registry: every PoC metric, its return (or why none), and its transfer status to LIBERO
-# ---------------------------------------------------------------------------------------------
-
-REGISTRY = [
-    # name, functional, tau, return column, transfer status, reason, source
-    ("time-to-success T", "the random variable every functional below is taken of", "censored at τ_episode = 60 s", None,
-     "built (adapted)", "per rollout (T_s in the rollout record) and per operation for libero_10 (T_op_s, S4); simulated "
-     "seconds at 20 Hz, not wall clock (see 'wall-clock T')", "PoC §3.2 p.6, §3.5 A p.7"),
-    ("Kaplan–Meier CDF F(t)", "F(t) = P(T <= t), estimated with censoring", "up to τ_episode = 60 s", None,
-     "built (vlapoc.evaluation.km / F_curve)", "the curve itself has no per-rollout return; each return here is the "
-     "per-rollout term of one functional of F", "PoC §3.2 p.6"),
-    ("F(30 s) / Success@τ", "F(τ) = P(T <= τ)", "30 s", "ret_f30", "built",
-     "transfers literally: τ_episode = 60 s keeps 30 s an interior point of the CDF", "PoC §4.1 p.9, §4.3 p.10"),
-    ("RMST(τ)", "∫_0^τ (1 - F)", "60 s = τ_episode", "ret_rmst60", "built", "negative capped time", "PoC §4.3 p.10"),
-    ("AUC vs human", "P(T_model < T_human)", "none (human T < 60 s)", "ret_auc_sampled, ret_auc_expected", "built",
-     "sampled indicator (PoC literal) and its expectation", "PoC §4.3 p.10, §9.1 Step 3 p.19"),
-    ("HRT", "mean_o RMST_h,o / RMST_m,o", "60 s", "ret_hrt60_lin", "built (linearized)",
-     "a ratio: first-order (delta-method) per-rollout return, weights at the evaluated policy", "PoC §4.3 p.10"),
-    ("right-censoring / censored tail", "share of rollouts timed out", "60 s = τ_episode", "ret_censored60", "built",
-     "timeouts are censored, not failed", "PoC §3.2 p.6, §3.4 p.7"),
-    ("ghost-event rate", "KM mass at T = inf", "none", None, "not available",
-     "LIBERO defines no unrecoverable-state rule (plan P13; owner decision 6): no ghost events exist", "PoC §3.2 p.6, §3.4 p.7"),
-    ("median T", "inf{t: F(t) >= 0.5}", "none", None, "scoring only",
-     "no per-rollout return in the PoC; computed per cell by vlapoc.evaluation", "PhAIL Table 1 p.5"),
-    ("UPH", "3600 / E[T | T < τ_episode] (Table 1 literal; ∝ 1 / RMST(τ_episode))", "60 s", None, "projection only",
-     "production UPH also needs reset and recovery time (PhAIL p.5); sim time excludes inference latency", "PhAIL Table 1 p.5"),
-    ("completion", "F(τ_episode)", "60 s", None, "scoring only (= mean ret_censored60 complement)",
-     "no separate return: 1 - censored rate when no ghosts", "PhAIL Table 1 p.5"),
-    ("MTBF/A", "RMST(τ_episode) / (1 - F(τ_episode))", "60 s", None, "adapted, scoring only",
-     "'failures/assists' become non-completions; no operator in simulation", "PhAIL Table 1 p.5"),
-    ("KS / macro-KS", "sup |F_a - F_b|, mean over cells", "none", None, "significance gate (S7)",
-     "a two-sample test, not a per-rollout quantity", "PoC §3.2 p.6, §3.4 p.7"),
-    ("P-P plot", "(F_human(t), F_model(t))", "plot range", None, "visualization", "not a scalar", "PoC §3.2 p.6"),
-    ("clustered bootstrap CIs", "episode resampling", "as the scalar", None, "built (vlapoc.evaluation)",
-     "a CI procedure, not a metric", "PoC §3.2 p.6"),
-    ("operation-level RMST", "−min(T_op, 60 s) per operation", "60 s", "ret_rmst60_op (operation_returns.parquet)", "built",
-     "libero_10 per-sub-task T (S4)", "PoC §3.4 p.7, §3.5 A p.7"),
-    ("intervention / safety-stop rate", "share of rollouts with an operator stop", "none", None, "not transferable",
-     "no operator in simulation", "PoC §3.3 p.7"),
-    ("wall-clock T", "time per operation", "none", None, "adapted",
-     "simulated time at 20 Hz; excludes policy inference latency (PhAIL's wall clock includes it)", "PoC §3.2 p.6"),
-    ("blind randomized scheduling", "protocol", "none", None, "replaced",
-     "fixed init states + seeds give scene-level pairing PhAIL cannot have ('initial physical configurations are not replayed')",
-     "PoC §3.4 p.7; PhAIL §3.3 p.6"),
-    ("failure types: missed grasp, wrong object, ignored instruction, idle", "rules over simulator state", "none", None,
-     "not built", "LIBERO defines no such rule (P13); the catalog's exact-zero idle rule does not transfer to policy actions; "
-     "raw signals are recorded so rules can be added without new rollouts", "PoC §2.1 item 3 p.3, §9.1 Step 2 p.18"),
-    ("failure types: success / timeout_no_progress / timeout_partial_k_of_n", "operation rule (S4)", "τ_episode", "failure_type",
-     "built", "from goal-conjunct traces", "PoC §9.1 Step 2-3 pp.18-19"),
-]
-
-
 def metrics_registry() -> list[dict]:
-    keys = ("metric", "functional", "tau", "return_column", "transfer_status", "reason", "source")
-    return [dict(zip(keys, r)) for r in REGISTRY]
+    """The single registry (``vlapoc.metrics_registry``), serialized as ``metrics_registry.json`` with every returns run."""
+    from vlapoc import metrics_registry as mr
+
+    return mr.to_json()
 
 
 def attribution_frame(train_run_id: str, lineage_root: Path | None = None) -> pd.DataFrame:
@@ -223,20 +180,28 @@ def attribution_frame(train_run_id: str, lineage_root: Path | None = None) -> pd
     return keys
 
 
-def load_eval_rollouts(eval_run_id: str, lineage_root: Path | None = None) -> tuple[pd.DataFrame, Path]:
-    """The rollouts parquet an eval run logged (MLflow artifact), and a dir to write returns next to it."""
+def load_eval_rollouts(eval_run_id: str, lineage_root: Path | None = None, make_out_dir: bool = True) -> tuple[pd.DataFrame, Path | None]:
+    """The rollouts parquet an eval run logged (MLflow artifact, checked against the run's recorded sha256), and a
+    dir to write returns next to it. The download goes to a ``TemporaryDirectory`` that is removed after reading
+    (AC6.9: no ``data/scratch/returns_*`` leaks)."""
     import tempfile
 
+    from vlapoc.catalog import sha256_file
     from vlapoc.runs import client
 
     c = client(lineage_root)
     run = c.get_run(eval_run_id)
     name = run.data.tags.get("output.rollouts.artifact", "rollouts.parquet")
-    tmp = Path(tempfile.mkdtemp(prefix="returns_", dir=REPO_ROOT / "data" / "scratch"))
-    path = Path(c.download_artifacts(eval_run_id, name, str(tmp)))
+    with tempfile.TemporaryDirectory(prefix="returns_", dir=REPO_ROOT / "data" / "scratch") as tmp:
+        path = Path(c.download_artifacts(eval_run_id, name, tmp))
+        if "output.rollouts.sha256" in run.data.tags and sha256_file(path) != run.data.tags["output.rollouts.sha256"]:
+            raise ValueError(f"eval run {eval_run_id}: rollouts artifact differs from its recorded sha256")
+        df = pd.read_parquet(path)
+    if not make_out_dir:
+        return df, None
     out_dir = REPO_ROOT / "data" / "eval" / f"returns-{eval_run_id[:12]}"
     out_dir.mkdir(parents=True, exist_ok=True)
-    return pd.read_parquet(path), out_dir
+    return df, out_dir
 
 
 def returns_run(eval_run_id: str, name: str, seed: int = 0, lineage_root: Path | None = None, chain: str | None = None) -> dict:

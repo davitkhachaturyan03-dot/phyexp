@@ -284,6 +284,85 @@ def macro_auc(model: Arm, ref: Arm) -> float:
     return float(np.mean(vals)) if vals else 0.5
 
 
+def auc_ties_half(model_eps: Iterable[Episode], ref_eps: Iterable[Episode]) -> float:
+    """AUC vs reference with ties counted ½ (Mann-Whitney): P(T_a < T_b) + ½ P(T_a = T_b) over comparable pairs.
+
+    The LIBERO family-W declaration (plan r2 "Declared functionals", registry ``auc_h``): model and human times share
+    the 20 Hz grid, so ties are real and count ½ for each side. A pair counts as ``a < b`` if a is an event and
+    a < b, ``a > b`` if b is an event and a > b, and a tie between two events counts ½ to each; other pairs
+    (unorderable) leave the denominator, as in PhAIL's ``_auc_censored``. On family W every human time is an event
+    below τ_episode and a rollout is censored only at τ_episode, so every pair is comparable and the value equals the
+    mean over rollouts of P(T_h > T) + ½ P(T_h = T) (S6 ``ret_auc_expected``). PhAIL validation keeps
+    ``auc`` (ties dropped)."""
+    T_a, E_a = collect_TE(model_eps)
+    T_b, E_b = collect_TE(ref_eps)
+    if len(T_a) == 0 or len(T_b) == 0:
+        return 0.5
+    ea, eb = E_a[:, None].astype(bool), E_b[None, :].astype(bool)
+    ties = ((T_a[:, None] == T_b[None, :]) & ea & eb).sum()
+    a_wins = ((T_a[:, None] < T_b[None, :]) & ea).sum() + 0.5 * ties
+    b_wins = ((T_a[:, None] > T_b[None, :]) & eb).sum() + 0.5 * ties
+    return float(a_wins / (a_wins + b_wins)) if a_wins + b_wins else 0.5
+
+
+def macro_auc_ties_half(model: Arm, ref: Arm) -> float:
+    """Equal-weight mean over cells of ``auc_ties_half`` (cells with episodes in both arms)."""
+    vals = [auc_ties_half(model[c], ref[c]) for c in sorted(set(model) & set(ref)) if model[c] and ref[c]]
+    return float(np.mean(vals)) if vals else float("nan")
+
+
+def rmst_capped(eps: Iterable[Episode], tau: float) -> float:
+    """``rmst60_op_cap`` (registry, family O): RMST(τ) with every right-censored pair counted as reaching the cap,
+    i.e. KM over pairs where (T, 0) becomes (inf, 1). With no censoring left, KM is the empirical distribution and
+    this equals the mean of min(T, τ) over the pairs, an unfinished attempt contributing τ (plan r2, analysis-r1
+    F-P3: an unfinished operation can never score better than a completed one). Declared pessimistic: it equals the
+    descriptive operation RMST only when no pair is censored before τ."""
+    capped = [Episode(ep.key, tuple((t, 1) if e else (float("inf"), 1) for t, e in ep.pairs)) for ep in eps]
+    return rmst(capped, tau)
+
+
+def libero_arm(rollouts, family: str = "W") -> Arm:
+    """``{suite/task: [Episode]}`` from a rollout record (S5) in a declared family (``vlapoc.metrics_registry``):
+    ``"W"`` one whole-task pair per rollout, (T_s, 1) on success else (τ_episode_s, 0); ``"O"`` the rollout's
+    operation pairs (S4 rule, stored in ``pairs``)."""
+    import json
+
+    arm: dict = {}
+    for r in rollouts.itertuples():
+        if family == "W":
+            pairs = ((float(r.T_s), 1),) if int(r.event) else ((float(r.tau_episode_steps) / 20.0, 0),)
+        elif family == "O":
+            pairs = tuple((float(t), int(e)) for t, e in json.loads(r.pairs))
+        else:
+            raise ValueError("LIBERO family must be 'W' or 'O'")
+        arm.setdefault(f"{r.suite}/{int(r.libero_task_id)}", []).append(Episode(r.rollout_id, pairs))
+    return arm
+
+
+def libero_human_arm(family: str = "W", cells: Iterable[str] | None = None) -> Arm:
+    """The fixed human anchor per task (all 1000 v0 originals): family W = whole-task ``T_success_s`` from S3's
+    ``human_reference.parquet``; family O = operation pairs from S4's ``human_operations.parquet``."""
+    import pandas as pd
+
+    from vlapoc.libero_convert import REPO_ROOT
+
+    base = REPO_ROOT / "data" / "eval" / "human_reference"
+    arm: dict = {}
+    if family == "W":
+        h = pd.read_parquet(base / "human_reference.parquet")
+        h = h[h["success_any"].astype(bool)]
+        for r in h.sort_values("episode_id").itertuples():
+            arm.setdefault(f"{r.suite}/{int(r.libero_task_id)}", []).append(Episode(r.episode_id, ((float(r.T_success_s), 1),)))
+    elif family == "O":
+        h = pd.read_parquet(base / "human_operations.parquet")
+        for (s_, t, e), g in h.sort_values(["episode_id", "op_k"]).groupby(["suite", "libero_task_id", "episode_id"]):
+            arm.setdefault(f"{s_}/{int(t)}", []).append(Episode(e, tuple((float(x), int(y)) for x, y in zip(g["T_op_s"], g["event"]))))
+    else:
+        raise ValueError("LIBERO family must be 'W' or 'O'")
+    keep = None if cells is None else set(cells)
+    return {c: v for c, v in sorted(arm.items()) if keep is None or c in keep}
+
+
 def pp_curve(model_eps: Iterable[Episode], ref_eps: Iterable[Episode], tau: float, n: int = 200) -> tuple[np.ndarray, np.ndarray]:
     """P-P curve (F_ref(t), F_model(t)) for t on ``linspace(0, τ, n)`` (PhAIL ``_pp_curve``; PoC §3.2 p. 6
     "F_human(t) vs F_model(t)"). x = reference, y = model; below the diagonal = slower than reference."""
@@ -476,48 +555,23 @@ def uph_mtbf_sweep(arm: Arm, taus: np.ndarray) -> dict:
 # metric registry (AC1.6): every PoC §3.2 primitive and PhAIL Table 1 scalar, with its functional and τ
 # ---------------------------------------------------------------------------------------------
 
-METRICS = [
-    {"name": "F(τ) / Success@τ", "function": "F_at", "functional": "F(τ) = P(T <= τ)", "tau": "any τ (PoC §4.1: 30 s)",
-     "source": "PhAIL Table 1 p.5; PoC §3.2 p.6, §4.1 p.9"},
-    {"name": "median", "function": "median_T", "functional": "inf{t : F(t) >= 0.5}", "tau": "none",
-     "source": "PhAIL Table 1 p.5"},
-    {"name": "RMST(τ)", "function": "rmst", "functional": "∫_0^τ (1 - F(t)) dt, ghosts -> τ", "tau": "integration cap τ",
-     "source": "PhAIL Table 1 p.5, §3.1 p.4"},
-    {"name": "UPH", "function": "uph", "functional": "3600 / RMST(τ_episode)  (Table 1: 3600/E[T|T<τ_episode] ∝ 1/RMST)",
-     "tau": "τ_episode", "source": "PhAIL Table 1 p.5; build/fig_qq_tradeoff.py"},
-    {"name": "completion", "function": "completion", "functional": "F(τ_episode)", "tau": "τ_episode",
-     "source": "PhAIL Table 1 p.5"},
-    {"name": "MTBF/A", "function": "mtbfa", "functional": "RMST(τ_episode) / (1 - F(τ_episode))", "tau": "τ_episode",
-     "source": "PhAIL Table 1 p.5"},
-    {"name": "HRT", "function": "hrt", "functional": "mean_o RMST_human,o(τ) / RMST_model,o(τ)", "tau": "integration cap τ",
-     "source": "PoC §3.2 p.6; PhAIL §3.2 p.5"},
-    {"name": "AUC vs reference", "function": "auc / macro_auc", "functional": "P(T_model < T_ref) = area under P-P",
-     "tau": "none (censoring-aware pairs)", "source": "PoC §3.2 p.6, §4.1 p.9; PhAIL §3.2 p.5"},
-    {"name": "KS / macro-KS", "function": "ks / macro_ks", "functional": "sup_t |F_a - F_b|; mean over cells; pooled-resample p",
-     "tau": "none", "source": "PoC §3.2 p.6; PhAIL §3.3 p.6"},
-    {"name": "P-P plot", "function": "pp_curve / macro_pp_curve", "functional": "(F_ref(t), F_model(t)), t in [0, τ]",
-     "tau": "plot range τ", "source": "PoC §3.2 p.6; PhAIL §3.2 p.5"},
-    {"name": "ghost-event rate", "function": "ghost_event_rate", "functional": "KM mass at T = inf = 1 - F(t -> inf)",
-     "tau": "none", "source": "PoC §3.2 p.6; PhAIL §3.1 p.4"},
-    {"name": "censored rate", "function": "censored_rate", "functional": "share of episodes ending in a censored pair",
-     "tau": "τ_episode (protocol)", "source": "PoC §3.2 p.6, §3.4 p.7; PhAIL §3.1 p.4"},
-    {"name": "clustered bootstrap CI", "function": "cluster_bootstrap / hrt_ci / F_band", "functional": "percentile CI, episodes resampled within cells",
-     "tau": "as the scalar", "source": "PoC §3.2 p.6; PhAIL §3.2 p.5"},
-    {"name": "stratified logrank (sanity)", "function": "logrank_stratified", "functional": "Mantel-Haenszel over cells",
-     "tau": "none", "source": "PhAIL §3.3 p.6"},
-]
-
-
 def metric_registry() -> list[dict]:
-    """``METRICS`` with each function's first docstring line, checked to exist in this module."""
+    """The entries of the single registry (``vlapoc.metrics_registry``) that name functions of this module, each
+    with the function's first docstring line; raises if a named function does not exist here."""
+    from vlapoc import metrics_registry as mr
+
     g = globals()
     out = []
-    for m in METRICS:
-        fns = [f.strip() for f in m["function"].split("/")]
+    for m in mr.ENTRIES:
+        fns = m["functions"]
+        if not fns:
+            continue
         missing = [f for f in fns if f not in g]
         if missing:
-            raise KeyError(f"registry names missing functions {missing}")
-        out.append({**m, "doc": " | ".join((g[f].__doc__ or "").strip().splitlines()[0] for f in fns)})
+            raise KeyError(f"registry entry {m['key']} names missing functions {missing}")
+        out.append({"key": m["key"], "name": m["metric"], "family": m["family"], "function": " / ".join(fns),
+                    "functional": m["functional"], "tau": m["tau"], "source": m["source"],
+                    "doc": " | ".join((g[f].__doc__ or "").strip().splitlines()[0] for f in fns)})
     return out
 
 
@@ -553,5 +607,6 @@ def plot_pp(ax, model_eps: list[Episode], ref_eps: list[Episode], tau: float, co
 __all__ = ["Episode", "episode_from_ops", "libero_episode", "phail_cohort_arms", "collect_TE", "km", "F_curve", "F_at", "median_T", "rmst",
            "completion", "uph", "uph_conditional", "mtbfa", "ghost_event_rate", "ghost_fraction", "censored_rate",
            "macro", "pooled", "hrt_cells", "hrt", "auc_censored", "auc", "macro_auc", "pp_curve", "macro_pp_curve", "ks",
-           "macro_ks", "logrank_stratified", "cluster_bootstrap", "hrt_ci", "F_band", "uph_mtbf_sweep", "METRICS",
+           "macro_ks", "logrank_stratified", "cluster_bootstrap", "hrt_ci", "F_band", "uph_mtbf_sweep",
+           "auc_ties_half", "macro_auc_ties_half", "rmst_capped", "libero_arm", "libero_human_arm",
            "metric_registry", "plot_km", "plot_pp"]

@@ -9,22 +9,30 @@ Grounding
   Bonferroni or Holm across metrics) before labeling an episode as a trade-off." "Label every claim with its
   metric and time cap τ".
 - PoC §3.2 (p. 6): scoring and significance are separate jobs; "KS cannot rank on its own". §3.4 (p. 7):
-  "Macro-KS is the significance gate; the HRT or RMST confidence interval gives the direction". §2.6 (p. 5)
-  and §9.1 Step 4 (p. 19): the counterfactual check this gate decides.
+  "Macro-KS is the significance gate; the HRT or RMST confidence interval gives the direction"; "Declared targets.
+  Every attribution result states which functional it explains". §2.6 (p. 5) and §9.1 Step 4 (p. 19): the
+  counterfactual check this gate decides.
 - PhAIL §3.3 (p. 6), the outcomes: "(i) A is uniformly better", "(ii) A and B are different but neither is
   uniformly better (CDFs cross – reasonable scalars give opposite signs ...)", "(iii) A and B are
   indistinguishable at the available N"; the gate is "regimes (i)+(ii) vs (iii)"; "Direction (outcome (i)
   vs (ii)) comes from a scalar"; stratified pooled logrank "as a sanity-check". App. I (p. 18): pairwise
   KS sup-signs can cycle, so the KS sign is never used here. App. J (p. 18-19): null calibration.
 
+Families (plan r2 "Declared functionals"; ``vlapoc.metrics_registry``): a verdict is computed in one declared family
+and every label says which. ``"W"`` (LIBERO default): whole-task (T, E) per rollout, a whole-task macro-KS gate per
+task, the metrics f30, auc_h (ties ½), rmst60, hrt60, censored60, the whole-task human anchor. ``"O"``: operation
+pairs, an operation-level gate, ``rmst60_op_cap``, the operation human anchor. ``"PhAIL"``: PhAIL's own semantics
+(operation pairs with ghosts, τ 240 s, AUC ties dropped) for reproducing PhAIL (S2/S7). Family W is the declared
+attribution verdict: its per-arm, per-cell point estimates equal the cell means of the S6 returns (AC6.10/AC7.7).
+
 What is reused (S1, ``vlapoc.evaluation``): ``macro_ks`` (PhAIL's pooled-resample episode-clustered bootstrap,
-equal to PhAIL's ``per_obj_macro_bootstrap_ks`` on PhAIL's data, S2 AC2.1), ``logrank_stratified``, and the
-scalar metrics ``F_at``, ``rmst``, ``hrt``, ``macro_auc`` (each reproduced on PhAIL's data in S2). New here:
-the joint episode-clustered bootstrap of the metric *differences* (same resampling scheme as
-``evaluation.cluster_bootstrap``: whole episodes within each cell, arms resampled independently, the human
-anchor held fixed, because it is the common yardstick of both arms; plan: the HRT anchor is fixed across arms),
-the percentile-bootstrap two-sided p, Holm's step-down adjustment (``holm``; statsmodels is not installed and
-scipy has no Holm, so a small tested function), and the outcome rule.
+equal to PhAIL's ``per_obj_macro_bootstrap_ks`` on PhAIL's data, S2 AC2.1), ``logrank_stratified``, the scalar
+metrics and the LIBERO arm builders. New here: the joint episode-clustered bootstrap of the metric *differences*
+(whole episodes within each cell, arms resampled independently, the human anchor held fixed because it is the
+common yardstick of both arms; S2's single-policy HRT CI resamples it instead, to match PhAIL Table 2), the
+percentile-bootstrap two-sided p, Holm's step-down adjustment (``holm``; statsmodels is not installed and scipy has
+no Holm), the outcome rule, and the batch-plan guard (the eval batch plan must match between arms: LeRobot's
+paired-comparison guidance, and the measured batch effect on SmolVLA, plan r2 AC7.8).
 
 Outcome rule (``outcome``), at level α (default 0.05):
 - gate does not fire (macro-KS p >= α) -> ``"iii"`` (indistinguishable at this N);
@@ -32,8 +40,8 @@ Outcome rule (``outcome``), at level α (default 0.05):
   with that arm as ``direction``;
 - gate fires, significant metrics favour different arms -> ``"ii"`` (CDFs cross: a trade-off);
 - gate fires, no metric significant after Holm -> ``"gate_only"``: the distributions differ but no declared
-  scalar resolves a direction at this N. PhAIL's three-way taxonomy does not name this case; it is reported
-  rather than forced into (i) or (ii) (a recorded divergence).
+  scalar resolves a direction at this N (accepted divergence, plan r2: PoC §4.4 "each metric's bootstrap CI gives
+  the direction", and no CI excludes 0).
 """
 
 from __future__ import annotations
@@ -41,39 +49,15 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 import numpy as np
 
 from vlapoc import evaluation as ev
+from vlapoc import metrics_registry as mr
 from vlapoc.libero_convert import REPO_ROOT
 
 Arm = dict
-
-
-@dataclass(frozen=True)
-class Metric:
-    """A declared scoring scalar: ``fn(arm, human, tau) -> float``; ``higher_is_better`` fixes the sign."""
-
-    name: str
-    label: str
-    fn: Callable[[Arm, Arm | None, float], float]
-    higher_is_better: bool
-
-
-def _f(t_s: float) -> Callable:
-    return lambda arm, human, tau: ev.F_at(ev.pooled(arm), t_s)
-
-
-# The PoC §4.1 four yardsticks (p. 9): F(30 s), HRT (per-cell macro), global RMST, AUC vs human (macro)
-METRICS = {
-    "F30": Metric("F30", "F(30 s), pooled", _f(30.0), True),
-    "HRT": Metric("HRT", "HRT(τ), per-cell macro vs the human anchor", lambda a, h, tau: ev.hrt(a, h, tau), True),
-    "RMST": Metric("RMST", "RMST(τ) s, pooled (global)", lambda a, h, tau: ev.rmst(ev.pooled(a), tau), False),
-    "AUC": Metric("AUC", "AUC vs human, per-cell macro", lambda a, h, tau: ev.macro_auc(a, h), True),
-}
 
 
 def holm(pvals: list[float]) -> list[float]:
@@ -86,6 +70,28 @@ def holm(pvals: list[float]) -> list[float]:
     out = np.empty(m)
     out[order] = adj_sorted
     return out.tolist()
+
+
+def metric_value(entry: dict, arm: Arm, human: Arm | None) -> float:
+    """A registry verdict metric (``entry["verdict"]``) on an arm: ``pooled`` metrics pool the arm's cells, ``macro``
+    metrics average cells with equal weights. Applied to a one-cell arm this is the cell's value."""
+    v = entry["verdict"]
+    a, kind = v["args"], v["compute"]
+    if kind == "F_at":
+        return ev.F_at(ev.pooled(arm), a["t"])
+    if kind == "one_minus_F":
+        return 1.0 - ev.F_at(ev.pooled(arm), a["t"])
+    if kind == "rmst":
+        return ev.rmst(ev.pooled(arm), a["tau"])
+    if kind == "rmst_capped":
+        return ev.rmst_capped(ev.pooled(arm), a["tau"])
+    if kind == "hrt":
+        return ev.hrt(arm, human, a["tau"])
+    if kind == "auc_ties_half":
+        return ev.macro_auc_ties_half(arm, human)
+    if kind == "auc_ties_dropped":
+        return ev.macro_auc(arm, human)
+    raise ValueError(f"unknown verdict compute {kind!r} in registry entry {entry['key']}")
 
 
 def _resample(arm: Arm, rng: np.random.Generator) -> Arm:
@@ -106,94 +112,86 @@ def outcome(gate_p: float, metrics: dict, alpha: float = 0.05) -> tuple[str, str
     return "ii", None
 
 
-def compare_policies(arm_a: Arm, arm_b: Arm, human: Arm | None, tau: float, metrics: tuple[str, ...] = ("F30", "HRT", "RMST", "AUC"),
-                     n_boot: int = 1000, n_boot_ks: int = 2000, seed: int = 0, alpha: float = 0.05,
-                     names: tuple[str, str] = ("A", "B")) -> dict:
-    """Two-step verdict between two arms (``{cell: [Episode]}``) over their common cells.
+def _plan_key(plan: dict | None):
+    return None if plan is None else json.dumps({k: v for k, v in plan.items() if k != "provenance"}, sort_keys=True)
 
-    Step 1, significance: ``evaluation.macro_ks`` (D̄ and pooled-resample p, ``n_boot_ks``, rng ``seed``).
-    Step 2, direction: for each metric, Δ = m(A) − m(B) with a joint episode-clustered bootstrap (``n_boot``,
-    rng ``seed + 1``; both arms resampled within cells, ``human`` fixed), its 95% percentile CI, the two-sided
-    percentile-bootstrap p = min(1, 2 · min(#(Δ* ≤ 0) + 1, #(Δ* ≥ 0) + 1) / (n_boot + 1)), and Holm's
-    adjustment across the metrics. ``diff_better`` is Δ signed so that > 0 means A is better.
-    Sanity line: ``evaluation.logrank_stratified``. The KS statistic is reported unsigned: it is never a ranker
-    (PhAIL App. I). Returns a JSON-able dict.
+
+def compare_policies(arm_a: Arm, arm_b: Arm, human: Arm | None, family: str = "W", n_boot: int = 1000,
+                     n_boot_ks: int = 2000, seed: int = 0, alpha: float = 0.05, names: tuple[str, str] = ("A", "B"),
+                     batch_plans: tuple[dict | None, dict | None] | None = None, allow_plan_mismatch: bool = False) -> dict:
+    """Two-step verdict between two arms (``{cell: [Episode]}``) over their common cells, in a declared family.
+
+    Step 1, significance: ``evaluation.macro_ks`` on the family's pairs (D̄ and pooled-resample p, ``n_boot_ks``,
+    rng ``seed``). Step 2, direction: for each verdict metric of the family (``metrics_registry.VERDICT_FAMILIES``),
+    Δ = m(A) − m(B) with a joint episode-clustered bootstrap (``n_boot``, rng ``seed + 1``; both arms resampled
+    within cells, ``human`` fixed), its 95% percentile CI, the two-sided percentile-bootstrap
+    p = min(1, 2 · min(#(Δ* ≤ 0) + 1, #(Δ* ≥ 0) + 1) / (n_boot + 1)), and Holm's adjustment across the family's
+    metrics. ``diff_better`` > 0 means A is better. Each metric also reports its per-cell point estimates for both
+    arms (``cells``), the values the S6 return identities are checked against.
+
+    ``batch_plans``: the two arms' eval batch plans (``vlapoc.runs.batch_plan_of``). If both are known and differ,
+    raise unless ``allow_plan_mismatch``, which labels the verdict "unpaired plan" (plan r2 AC7.8).
     """
+    if family not in mr.VERDICT_FAMILIES:
+        raise ValueError(f"family must be one of {list(mr.VERDICT_FAMILIES)}")
+    plan_match = None
+    if batch_plans is not None and batch_plans[0] is not None and batch_plans[1] is not None:
+        plan_match = _plan_key(batch_plans[0]) == _plan_key(batch_plans[1])
+        if not plan_match and not allow_plan_mismatch:
+            raise ValueError(f"eval batch plans differ between {names[0]} and {names[1]} (a stochastic policy's outcome depends "
+                             f"on the batch plan); pass allow_plan_mismatch=True to compute an 'unpaired plan' verdict")
     cells = [c for c in sorted(set(arm_a) & set(arm_b)) if arm_a[c] and arm_b[c] and (human is None or human.get(c))]
     a = {c: arm_a[c] for c in cells}
     b = {c: arm_b[c] for c in cells}
     h = {c: human[c] for c in cells} if human is not None else None
     gate = ev.macro_ks(a, b, n_boot_ks, np.random.default_rng(seed))
-    ms = [METRICS[m] for m in metrics]
-    point_a = [m.fn(a, h, tau) for m in ms]
-    point_b = [m.fn(b, h, tau) for m in ms]
+    entries = mr.verdict_metrics(family)
+    point_a = [metric_value(e, a, h) for e in entries]
+    point_b = [metric_value(e, b, h) for e in entries]
     rng = np.random.default_rng(seed + 1)
-    boot = np.empty((n_boot, len(ms)))
+    boot = np.empty((n_boot, len(entries)))
     for i in range(n_boot):
         ra, rb = _resample(a, rng), _resample(b, rng)
-        boot[i] = [m.fn(ra, h, tau) - m.fn(rb, h, tau) for m in ms]
-    res = {}
-    raw_p = []
-    for j, m in enumerate(ms):
+        boot[i] = [metric_value(e, ra, h) - metric_value(e, rb, h) for e in entries]
+    res, raw_p = {}, []
+    for j, e in enumerate(entries):
         d = point_a[j] - point_b[j]
         bj = boot[:, j]
         p = min(1.0, 2.0 * min((np.sum(bj <= 0) + 1) / (n_boot + 1), (np.sum(bj >= 0) + 1) / (n_boot + 1)))
         raw_p.append(p)
-        sgn = 1.0 if m.higher_is_better else -1.0
-        res[m.name] = {"label": m.label, "tau_s": tau if m.name in ("HRT", "RMST") else (30.0 if m.name == "F30" else None),
-                       "A": point_a[j], "B": point_b[j], "diff": d, "ci95": [float(np.quantile(bj, 0.025)), float(np.quantile(bj, 0.975))],
-                       "p": p, "higher_is_better": m.higher_is_better, "diff_better": sgn * d,
-                       "favours": names[0] if sgn * d > 0 else (names[1] if sgn * d < 0 else None)}
-    for m, pa in zip(res, holm(raw_p)):
-        res[m]["p_holm"] = pa
-        res[m]["significant"] = pa < alpha
+        sgn = 1.0 if e["verdict"]["higher_is_better"] else -1.0
+        per_cell = {c: {"A": metric_value(e, {c: a[c]}, {c: h[c]} if h else None),
+                        "B": metric_value(e, {c: b[c]}, {c: h[c]} if h else None)} for c in cells}
+        res[e["key"]] = {"label": f"{e['metric']} [family {family}, τ {e['tau']}]", "family": family, "tau": e["tau"],
+                         "aggregate": e["verdict"]["aggregate"], "A": point_a[j], "B": point_b[j], "diff": d,
+                         "ci95": [float(np.quantile(bj, 0.025)), float(np.quantile(bj, 0.975))], "p": p,
+                         "higher_is_better": e["verdict"]["higher_is_better"], "diff_better": sgn * d,
+                         "favours": names[0] if sgn * d > 0 else (names[1] if sgn * d < 0 else None), "cells": per_cell}
+    for k, pa in zip(res, holm(raw_p)):
+        res[k]["p_holm"] = pa
+        res[k]["significant"] = pa < alpha
     out, direction = outcome(gate["p"], res, alpha)
     lr = ev.logrank_stratified(a, b)
-    return {"arms": list(names), "cells": cells, "n_episodes": {names[0]: sum(len(v) for v in a.values()),
-                                                                  names[1]: sum(len(v) for v in b.values())},
-            "tau_s": tau, "alpha": alpha, "gate": {"test": "macro-KS (pooled-resample episode-clustered bootstrap)",
-                                                   "D": gate["D"], "p": gate["p"], "D_cells": gate["D_cells"],
-                                                   "n_boot": n_boot_ks, "fires": gate["p"] < alpha},
+    label = f"family {family}" + ("" if plan_match is not False else ", unpaired plan")
+    return {"arms": list(names), "family": family, "label": label, "cells": cells,
+            "n_episodes": {names[0]: sum(len(v) for v in a.values()), names[1]: sum(len(v) for v in b.values())},
+            "tau_s": mr.FAMILY_TAU_S[family], "alpha": alpha,
+            "gate": {"test": f"macro-KS (pooled-resample episode-clustered bootstrap), family {family} pairs",
+                     "D": gate["D"], "p": gate["p"], "D_cells": gate["D_cells"], "n_boot": n_boot_ks, "fires": gate["p"] < alpha},
             "metrics": res, "holm_family": list(res), "outcome": out,
             "direction": {"A": names[0], "B": names[1]}.get(direction) if direction else None,
-            "logrank_sanity": {"chi2": lr["chi2"], "p": lr["p"]}, "n_boot": n_boot, "seed": seed}
+            "batch_plan_match": plan_match, "logrank_sanity": {"chi2": lr["chi2"], "p": lr["p"]}, "n_boot": n_boot, "seed": seed}
 
 
 def describe(v: dict) -> str:
     a, b = v["arms"]
-    head = (f"{a} vs {b} ({len(v['cells'])} cells, n {v['n_episodes'][a]}/{v['n_episodes'][b]} episodes, τ {v['tau_s']:g} s): "
+    head = (f"[{v['label']}] {a} vs {b} ({len(v['cells'])} cells, n {v['n_episodes'][a]}/{v['n_episodes'][b]} episodes): "
             f"macro-KS D̄ {v['gate']['D']:.4f} p {v['gate']['p']:.4f} ({'fires' if v['gate']['fires'] else 'does not fire'}) -> "
             f"outcome ({v['outcome']})" + (f", direction {v['direction']}" if v["direction"] else ""))
-    rows = [f"    {k:4s} {m['label']:44s} {a} {m['A']:.4f} | {b} {m['B']:.4f} | Δ {m['diff']:+.4f} [{m['ci95'][0]:+.4f}, "
+    rows = [f"    {k:13s} {m['label']:58s} {a} {m['A']:.4f} | {b} {m['B']:.4f} | Δ {m['diff']:+.4f} [{m['ci95'][0]:+.4f}, "
             f"{m['ci95'][1]:+.4f}] p {m['p']:.4f} Holm {m['p_holm']:.4f} -> favours {m['favours']}{' *' if m['significant'] else ''}"
             for k, m in v["metrics"].items()]
     return "\n".join([head, *rows, f"    sanity: stratified logrank chi2 {v['logrank_sanity']['chi2']:.2f} p {v['logrank_sanity']['p']:.3g}"])
-
-
-# ---------------------------------------------------------------------------------------------
-# LIBERO arms from rollout records (S5) and the human reference (S3/S4)
-# ---------------------------------------------------------------------------------------------
-
-
-def libero_arm(rollouts) -> Arm:
-    """``{suite/task: [Episode]}`` from a rollout record: each rollout's operation-level pairs (S4 rule, stored in
-    ``pairs``), so libero_10 contributes per-sub-task T as in S1/S4."""
-    arm: dict = {}
-    for r in rollouts.itertuples():
-        arm.setdefault(f"{r.suite}/{int(r.libero_task_id)}", []).append(
-            ev.Episode(r.rollout_id, tuple((float(t), int(e)) for t, e in json.loads(r.pairs))))
-    return arm
-
-
-def libero_human_arm(cells: list[str] | None = None) -> Arm:
-    """The human anchor per task: all 1000 v0 originals' operation-level pairs (S4 ``human_operations.parquet``)."""
-    import pandas as pd
-
-    h = pd.read_parquet(REPO_ROOT / "data" / "eval" / "human_reference" / "human_operations.parquet")
-    arm: dict = {}
-    for (s, t, e), g in h.sort_values(["episode_id", "op_k"]).groupby(["suite", "libero_task_id", "episode_id"]):
-        arm.setdefault(f"{s}/{int(t)}", []).append(ev.Episode(e, tuple((float(x), int(y)) for x, y in zip(g["T_op_s"], g["event"]))))
-    return {c: v for c, v in arm.items() if cells is None or c in cells}
 
 
 def null_calibration(arm: Arm, trials: int = 200, n_boot: int = 500, seed: int = 0, alpha: float = 0.05) -> dict:
@@ -216,59 +214,61 @@ def null_calibration(arm: Arm, trials: int = 200, n_boot: int = 500, seed: int =
 
 
 # ---------------------------------------------------------------------------------------------
-# CLI
+# eval runs -> arms, and the recorded verify stage
 # ---------------------------------------------------------------------------------------------
 
 
-def _eval_rollouts(run_id: str):
-    """The rollouts parquet an eval run logged (its MLflow artifact), checked against the run's recorded sha256."""
-    import tempfile
+def eval_rollouts(run_id: str, lineage_root: Path | None = None):
+    """The rollouts parquet an eval run logged, checked against its recorded sha256 (``returns.load_eval_rollouts``:
+    a ``TemporaryDirectory`` download, so nothing is left under ``data/scratch``)."""
+    from vlapoc.returns import load_eval_rollouts
 
-    import pandas as pd
-
-    from vlapoc.catalog import sha256_file
-    from vlapoc.runs import client
-
-    c = client()
-    run = c.get_run(run_id)
-    tmp = Path(tempfile.mkdtemp(prefix="verdict_", dir=REPO_ROOT / "data" / "scratch"))
-    path = Path(c.download_artifacts(run_id, run.data.tags.get("output.rollouts.artifact", "rollouts.parquet"), str(tmp)))
-    if sha256_file(path) != run.data.tags["output.rollouts.sha256"]:
-        raise ValueError(f"eval run {run_id}: rollouts artifact differs from its recorded sha256")
-    return pd.read_parquet(path)
+    return load_eval_rollouts(run_id, lineage_root, make_out_dir=False)[0]
 
 
-def verify_run(eval_a: str, eval_b: str, name: str, n_boot: int = 1000, n_boot_ks: int = 2000, seed: int = 0,
-               tau: float = 60.0, out_dir: Path | None = None, chain: str | None = None) -> dict:
-    """Stage ``verify`` (PoC §9.1 Step 4 p. 19): the two-step verdict between two eval runs' rollouts, as one MLflow
-    run whose inputs are both eval runs' ``rollouts`` entities (so ``trace`` reaches each policy's checkpoint and,
-    for trained policies, the dataset version and raw files). Writes ``verdict.json``."""
-    from vlapoc.runs import client, stage_run
+def verify_run(eval_a: str, eval_b: str, name: str, family: str = "W", n_boot: int = 1000, n_boot_ks: int = 2000,
+               seed: int = 0, tau: float | None = None, out_dir: Path | None = None, chain: str | None = None,
+               lineage_root: Path | None = None, allow_plan_mismatch: bool = False) -> dict:
+    """Stage ``verify`` (PoC §9.1 Step 4 p. 19): the two-step verdict between two eval runs' rollouts in a declared
+    family, as one MLflow run whose inputs are both eval runs' ``rollouts`` entities (so ``trace`` reaches each
+    policy's checkpoint and, for trained policies, the dataset version and raw files). Writes ``verdict.json``.
 
-    c = client()
+    ``verify.attribution_grade`` is true only when both eval runs carry an *asserted* attribution grade
+    (``eval.attribution_grade.asserted=true``, set by ``vlapoc.runs.eval_run`` only after its protocol check, plan r2
+    AC5.9/AC7.9); every other verdict is labelled "smoke (not attribution-grade)". Round-1 runs tagged
+    ``eval.attribution_grade=true`` without the asserted tag meant only "has a train run" and do not count.
+    """
+    from vlapoc.runs import batch_plan_of, client, stage_run
+
+    del tau  # the family fixes τ (metrics_registry.FAMILY_TAU_S)
+    c = client(lineage_root)
     ra, rb = c.get_run(eval_a), c.get_run(eval_b)
-    da, db = _eval_rollouts(eval_a), _eval_rollouts(eval_b)
-    arm_a, arm_b = libero_arm(da), libero_arm(db)
-    human = libero_human_arm(sorted(set(arm_a) | set(arm_b)))
+    da, db = eval_rollouts(eval_a, lineage_root), eval_rollouts(eval_b, lineage_root)
+    arm_a, arm_b = ev.libero_arm(da, family), ev.libero_arm(db, family)
+    human = ev.libero_human_arm(family, sorted(set(arm_a) | set(arm_b)))
     names = (ra.info.run_name, rb.info.run_name)
-    v = compare_policies(arm_a, arm_b, human, tau, n_boot=n_boot, n_boot_ks=n_boot_ks, seed=seed, names=names)
-    grade = all(r.data.tags.get("eval.attribution_grade") == "true" for r in (ra, rb))
-    v.update({"eval_runs": [eval_a, eval_b], "attribution_grade": grade,
-              "label": "attribution-grade counterfactual verdict" if grade else
-              "smoke: at least one arm is not attribution-grade (external checkpoint or untrained policy); exercises the code only"})
-    out_dir = Path(out_dir) if out_dir else REPO_ROOT / "data" / "eval" / f"verdict-{eval_a[:8]}-{eval_b[:8]}"
+    plans = (batch_plan_of(ra), batch_plan_of(rb))
+    v = compare_policies(arm_a, arm_b, human, family, n_boot=n_boot, n_boot_ks=n_boot_ks, seed=seed, names=names,
+                         batch_plans=plans, allow_plan_mismatch=allow_plan_mismatch)
+    grade = all(r.data.tags.get("eval.attribution_grade.asserted") == "true" for r in (ra, rb))
+    v["label"] = ("attribution-grade counterfactual verdict" if grade else "smoke (not attribution-grade)") + ", " + v["label"]
+    v.update({"eval_runs": [eval_a, eval_b], "attribution_grade": grade, "batch_plans": list(plans)})
+    out_dir = Path(out_dir) if out_dir else REPO_ROOT / "data" / "eval" / f"verdict-{family}-{eval_a[:8]}-{eval_b[:8]}"
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / "verdict.json"
     path.write_text(json.dumps(v, indent=1, default=str))
-    with stage_run("verify", name, chain=chain) as r:
+    with stage_run("verify", name, lineage_root, chain=chain) as r:
         for role, run in (("rollouts_a", ra), ("rollouts_b", rb)):
             r.input_entity("rollouts", run.data.tags["output.rollouts.sha256"], role)
-        r.params({"eval_a": eval_a, "eval_b": eval_b, "tau_s": tau, "n_boot": n_boot, "n_boot_ks": n_boot_ks, "seed": seed,
-                  "alpha": v["alpha"], "metrics": list(v["metrics"]), "multiplicity": "holm",
-                  "human_anchor": "data/eval/human_reference/human_operations.parquet (all 1000 v0 originals, fixed)"})
+        r.params({"eval_a": eval_a, "eval_b": eval_b, "family": family, "tau_s": mr.FAMILY_TAU_S[family], "n_boot": n_boot,
+                  "n_boot_ks": n_boot_ks, "seed": seed, "alpha": v["alpha"], "metrics": list(v["metrics"]), "multiplicity": "holm",
+                  "allow_plan_mismatch": allow_plan_mismatch,
+                  "human_anchor": f"data/eval/human_reference/{'human_reference' if family == 'W' else 'human_operations'}.parquet "
+                                  "(all 1000 v0 originals, fixed)"})
         r.output_file("verdict", path, kind="verdict")
-        r.tags({"verify.outcome": v["outcome"], "verify.direction": v["direction"] or "none",
-                "verify.gate_p": f"{v['gate']['p']:.6g}", "verify.attribution_grade": str(grade).lower()})
+        r.tags({"verify.outcome": v["outcome"], "verify.direction": v["direction"] or "none", "verify.family": family,
+                "verify.gate_p": f"{v['gate']['p']:.6g}", "verify.attribution_grade": str(grade).lower(),
+                "verify.batch_plan_match": str(v["batch_plan_match"]).lower(), "verify.label": v["label"]})
         v["run_id"] = r.run_id
     return v
 
@@ -280,6 +280,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--null-calibration", metavar="MODEL", help="PhAIL App. J (i) same-model split for one model")
     p.add_argument("--trials", type=int, default=200)
     p.add_argument("--eval-runs", nargs=2, metavar=("A", "B"), help="two eval run ids: recorded as a verify stage run")
+    p.add_argument("--family", default="W", choices=["W", "O"], help="LIBERO verdict family (registry); W is declared")
+    p.add_argument("--allow-plan-mismatch", action="store_true")
+    p.add_argument("--lineage-root", type=Path, default=None, help="a scratch lineage store (tests)")
     p.add_argument("--name", default="verify")
     p.add_argument("--n-boot", type=int, default=1000)
     p.add_argument("--n-boot-ks", type=int, default=2000)
@@ -293,7 +296,7 @@ def main(argv: list[str] | None = None) -> int:
         arms = ev.phail_cohort_arms()
         pairs = list(combinations(("OpenPI", "GR00T", "ACT", "SmolVLA"), 2)) if a.phail_all else [tuple(a.phail)]
         for x, y in pairs:
-            v = compare_policies(arms[x], arms[y], arms["Teleop"], 240.0, n_boot=a.n_boot, n_boot_ks=a.n_boot_ks,
+            v = compare_policies(arms[x], arms[y], arms["Teleop"], "PhAIL", n_boot=a.n_boot, n_boot_ks=a.n_boot_ks,
                                  seed=a.seed, names=(x, y))
             print(describe(v), flush=True)
             results.append(v)
@@ -305,7 +308,8 @@ def main(argv: list[str] | None = None) -> int:
               f"± {1.96 * r['reject_rate_se']:.3f} (1.96 SE)")
         results.append({"null_calibration": a.null_calibration, **r})
     if a.eval_runs:
-        v = verify_run(*a.eval_runs, a.name, a.n_boot, a.n_boot_ks, a.seed)
+        v = verify_run(*a.eval_runs, a.name, a.family, a.n_boot, a.n_boot_ks, a.seed, lineage_root=a.lineage_root,
+                       allow_plan_mismatch=a.allow_plan_mismatch)
         print(describe(v))
         print(f"verify run {v['run_id']} ({v['label']})")
         results.append(v)
