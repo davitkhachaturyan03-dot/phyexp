@@ -1,0 +1,3 @@
+AC5.3 r2 eval run f8f3b153 (scratch store): stage eval | vlapoc.stand_in false | eval.attribution_grade false | asserted absent | vlapoc.smoke true | input checkpoint:6f49bdae15dba157a9a
+AC5.3 r2 trace runs: [('eval', 'eval-act-train-full-s0-smoke-r2', False), ('train', 'train-full-s0', False), ('derive', 'derive-v1', False), ('build', 'build-v0', False), ('split', 'split-v0', False)] | raw files 20
+AC5.3 round-1 run 3392bb4d: CLI trace JSON-equal to s5_ac5_3_trace.json: True | byte-equal: False

@@ -4,6 +4,8 @@
    "OpenPI",
    "GR00T"
   ],
+  "family": "PhAIL",
+  "label": "family PhAIL",
   "cells": [
    "Batteries",
    "Scissors",
@@ -17,9 +19,9 @@
   "tau_s": 240.0,
   "alpha": 0.05,
   "gate": {
-   "test": "macro-KS (pooled-resample episode-clustered bootstrap)",
+   "test": "macro-KS (pooled-resample episode-clustered bootstrap), family PhAIL pairs",
    "D": 0.12391553589925894,
-   "p": 0.10994502748625687,
+   "p": 0.11294352823588207,
    "D_cells": {
     "Batteries": 0.11811222855619219,
     "Scissors": 0.16279309909331807,
@@ -30,83 +32,164 @@
    "fires": false
   },
   "metrics": {
-   "F30": {
-    "label": "F(30 s), pooled",
-    "tau_s": 30.0,
+   "phail_f30": {
+    "label": "F(30 s), PhAIL semantics [family PhAIL, \u03c4 30 s]",
+    "family": "PhAIL",
+    "tau": "30 s",
+    "aggregate": "pooled",
     "A": 0.4740718018499158,
     "B": 0.5091013807969105,
     "diff": -0.035029578946994655,
     "ci95": [
-     -0.09354172261625093,
-     0.01927656837756163
+     -0.09246403641354069,
+     0.023620900222941797
     ],
-    "p": 0.24175824175824176,
+    "p": 0.23576423576423577,
     "higher_is_better": true,
     "diff_better": -0.035029578946994655,
     "favours": "GR00T",
-    "p_holm": 0.967032967032967,
+    "cells": {
+     "Batteries": {
+      "A": 0.36666478224234644,
+      "B": 0.45554792943529854
+     },
+     "Scissors": {
+      "A": 0.3018736462597277,
+      "B": 0.22104875007854374
+     },
+     "Towels": {
+      "A": 0.44840185200857485,
+      "B": 0.5520067036521505
+     },
+     "Wooden spoons": {
+      "A": 0.659836972540802,
+      "B": 0.6158741716781555
+     }
+    },
+    "p_holm": 0.9430569430569431,
     "significant": false
    },
-   "HRT": {
-    "label": "HRT(\u03c4), per-cell macro vs the human anchor",
-    "tau_s": 240.0,
+   "phail_hrt240": {
+    "label": "HRT(240 s), PhAIL semantics [family PhAIL, \u03c4 240 s]",
+    "family": "PhAIL",
+    "tau": "240 s",
+    "aggregate": "macro",
     "A": 0.13754838767437327,
     "B": 0.13349183206648715,
     "diff": 0.00405655560788612,
     "ci95": [
-     -0.017130608827004505,
-     0.02677115618314722
+     -0.018629542400857985,
+     0.02794554423388726
     ],
-    "p": 0.6833166833166833,
+    "p": 0.7572427572427572,
     "higher_is_better": true,
     "diff_better": 0.00405655560788612,
     "favours": "OpenPI",
+    "cells": {
+     "Batteries": {
+      "A": 0.11651577340794698,
+      "B": 0.12780019801344578
+     },
+     "Scissors": {
+      "A": 0.1213503484108703,
+      "B": 0.09476400318440065
+     },
+     "Towels": {
+      "A": 0.125965916114836,
+      "B": 0.13897009273701544
+     },
+     "Wooden spoons": {
+      "A": 0.18636151276383978,
+      "B": 0.17243303433108678
+     }
+    },
     "p_holm": 1.0,
     "significant": false
    },
-   "RMST": {
-    "label": "RMST(\u03c4) s, pooled (global)",
-    "tau_s": 240.0,
+   "phail_rmst240": {
+    "label": "global RMST(240 s), PhAIL semantics [family PhAIL, \u03c4 240 s]",
+    "family": "PhAIL",
+    "tau": "240 s",
+    "aggregate": "pooled",
     "A": 77.57178262020449,
     "B": 77.31253986498288,
     "diff": 0.25924275522160656,
     "ci95": [
-     -12.243897822433459,
-     11.55191096776133
+     -11.658985439009893,
+     12.452697451058235
     ],
-    "p": 0.957042957042957,
+    "p": 0.9250749250749251,
     "higher_is_better": false,
     "diff_better": -0.25924275522160656,
     "favours": "GR00T",
+    "cells": {
+     "Batteries": {
+      "A": 97.2015776412308,
+      "B": 88.61893151487186
+     },
+     "Scissors": {
+      "A": 93.77386206532968,
+      "B": 120.08242002311125
+     },
+     "Towels": {
+      "A": 78.62131869739329,
+      "B": 71.26430040321728
+     },
+     "Wooden spoons": {
+      "A": 54.749710990985804,
+      "B": 59.17218242574107
+     }
+    },
     "p_holm": 1.0,
     "significant": false
    },
-   "AUC": {
-    "label": "AUC vs human, per-cell macro",
-    "tau_s": null,
+   "phail_auc": {
+    "label": "AUC vs human, PhAIL semantics [family PhAIL, \u03c4 none]",
+    "family": "PhAIL",
+    "tau": "none",
+    "aggregate": "macro",
     "A": 0.10040590187884432,
     "B": 0.09492460393298947,
     "diff": 0.005481297945854849,
     "ci95": [
-     -0.01620210841114907,
-     0.028187911674389592
+     -0.017404301791059364,
+     0.026634113658511205
     ],
-    "p": 0.6713286713286714,
+    "p": 0.6533466533466533,
     "higher_is_better": true,
     "diff_better": 0.005481297945854849,
     "favours": "OpenPI",
+    "cells": {
+     "Batteries": {
+      "A": 0.11028575930490371,
+      "B": 0.10214855626600822
+     },
+     "Scissors": {
+      "A": 0.06164081816138458,
+      "B": 0.07224268184398608
+     },
+     "Towels": {
+      "A": 0.07176042800565116,
+      "B": 0.08739191331258964
+     },
+     "Wooden spoons": {
+      "A": 0.15793660204343787,
+      "B": 0.117915264309374
+     }
+    },
     "p_holm": 1.0,
     "significant": false
    }
   },
   "holm_family": [
-   "F30",
-   "HRT",
-   "RMST",
-   "AUC"
+   "phail_f30",
+   "phail_hrt240",
+   "phail_rmst240",
+   "phail_auc"
   ],
   "outcome": "iii",
   "direction": null,
+  "batch_plan_match": null,
   "logrank_sanity": {
    "chi2": 0.06203469058393998,
    "p": 0.8033084583379125
@@ -119,6 +202,8 @@
    "OpenPI",
    "ACT"
   ],
+  "family": "PhAIL",
+  "label": "family PhAIL",
   "cells": [
    "Batteries",
    "Scissors",
@@ -132,9 +217,9 @@
   "tau_s": 240.0,
   "alpha": 0.05,
   "gate": {
-   "test": "macro-KS (pooled-resample episode-clustered bootstrap)",
+   "test": "macro-KS (pooled-resample episode-clustered bootstrap), family PhAIL pairs",
    "D": 0.14179755022503066,
-   "p": 0.11094452773613193,
+   "p": 0.10744627686156921,
    "D_cells": {
     "Batteries": 0.12460864527098381,
     "Scissors": 0.10928515460544141,
@@ -145,83 +230,164 @@
    "fires": false
   },
   "metrics": {
-   "F30": {
-    "label": "F(30 s), pooled",
-    "tau_s": 30.0,
+   "phail_f30": {
+    "label": "F(30 s), PhAIL semantics [family PhAIL, \u03c4 30 s]",
+    "family": "PhAIL",
+    "tau": "30 s",
+    "aggregate": "pooled",
     "A": 0.4740718018499158,
     "B": 0.4408681287160765,
     "diff": 0.03320367313383932,
     "ci95": [
-     -0.03474249126371358,
-     0.09738663967606459
+     -0.034328903064920174,
+     0.09783722974051066
     ],
-    "p": 0.37362637362637363,
+    "p": 0.36163836163836166,
     "higher_is_better": true,
     "diff_better": 0.03320367313383932,
     "favours": "OpenPI",
-    "p_holm": 0.37362637362637363,
+    "cells": {
+     "Batteries": {
+      "A": 0.36666478224234644,
+      "B": 0.41253309796999127
+     },
+     "Scissors": {
+      "A": 0.3018736462597277,
+      "B": 0.3622994850256769
+     },
+     "Towels": {
+      "A": 0.44840185200857485,
+      "B": 0.3635412508498833
+     },
+     "Wooden spoons": {
+      "A": 0.659836972540802,
+      "B": 0.5636256257590562
+     }
+    },
+    "p_holm": 0.36163836163836166,
     "significant": false
    },
-   "HRT": {
-    "label": "HRT(\u03c4), per-cell macro vs the human anchor",
-    "tau_s": 240.0,
+   "phail_hrt240": {
+    "label": "HRT(240 s), PhAIL semantics [family PhAIL, \u03c4 240 s]",
+    "family": "PhAIL",
+    "tau": "240 s",
+    "aggregate": "macro",
     "A": 0.13754838767437327,
     "B": 0.10486851554435657,
     "diff": 0.032679872130016704,
     "ci95": [
-     0.0031023165358313298,
-     0.05535492735051421
+     0.003616833575997803,
+     0.05462313626844116
     ],
     "p": 0.029970029970029972,
     "higher_is_better": true,
     "diff_better": 0.032679872130016704,
     "favours": "OpenPI",
+    "cells": {
+     "Batteries": {
+      "A": 0.11651577340794698,
+      "B": 0.1015942286597328
+     },
+     "Scissors": {
+      "A": 0.1213503484108703,
+      "B": 0.10822839630532367
+     },
+     "Towels": {
+      "A": 0.125965916114836,
+      "B": 0.08923803860590801
+     },
+     "Wooden spoons": {
+      "A": 0.18636151276383978,
+      "B": 0.12041339860646176
+     }
+    },
     "p_holm": 0.08991008991008992,
     "significant": false
    },
-   "RMST": {
-    "label": "RMST(\u03c4) s, pooled (global)",
-    "tau_s": 240.0,
+   "phail_rmst240": {
+    "label": "global RMST(240 s), PhAIL semantics [family PhAIL, \u03c4 240 s]",
+    "family": "PhAIL",
+    "tau": "240 s",
+    "aggregate": "pooled",
     "A": 77.57178262020449,
     "B": 100.92871455121983,
     "diff": -23.35693193101534,
     "ci95": [
-     -42.6898249436936,
-     -5.412142520013567
+     -41.51051550820418,
+     -5.785030009407335
     ],
-    "p": 0.00999000999000999,
+    "p": 0.007992007992007992,
     "higher_is_better": false,
     "diff_better": 23.35693193101534,
     "favours": "OpenPI",
-    "p_holm": 0.03996003996003996,
+    "cells": {
+     "Batteries": {
+      "A": 97.2015776412308,
+      "B": 111.47795642282895
+     },
+     "Scissors": {
+      "A": 93.77386206532968,
+      "B": 105.14330085200478
+     },
+     "Towels": {
+      "A": 78.62131869739329,
+      "B": 110.97965162154475
+     },
+     "Wooden spoons": {
+      "A": 54.749710990985804,
+      "B": 84.73507999728197
+     }
+    },
+    "p_holm": 0.03196803196803197,
     "significant": true
    },
-   "AUC": {
-    "label": "AUC vs human, per-cell macro",
-    "tau_s": null,
+   "phail_auc": {
+    "label": "AUC vs human, PhAIL semantics [family PhAIL, \u03c4 none]",
+    "family": "PhAIL",
+    "tau": "none",
+    "aggregate": "macro",
     "A": 0.10040590187884432,
     "B": 0.13375095761701644,
     "diff": -0.03334505573817212,
     "ci95": [
-     -0.062250315536597475,
-     -0.002752910797783078
+     -0.06601820208150704,
+     -0.0046817790392479405
     ],
-    "p": 0.03596403596403597,
+    "p": 0.03196803196803197,
     "higher_is_better": true,
     "diff_better": -0.03334505573817212,
     "favours": "ACT",
+    "cells": {
+     "Batteries": {
+      "A": 0.11028575930490371,
+      "B": 0.1575445770210484
+     },
+     "Scissors": {
+      "A": 0.06164081816138458,
+      "B": 0.09940713673142175
+     },
+     "Towels": {
+      "A": 0.07176042800565116,
+      "B": 0.08993174691016417
+     },
+     "Wooden spoons": {
+      "A": 0.15793660204343787,
+      "B": 0.18812036980543148
+     }
+    },
     "p_holm": 0.08991008991008992,
     "significant": false
    }
   },
   "holm_family": [
-   "F30",
-   "HRT",
-   "RMST",
-   "AUC"
+   "phail_f30",
+   "phail_hrt240",
+   "phail_rmst240",
+   "phail_auc"
   ],
   "outcome": "iii",
   "direction": null,
+  "batch_plan_match": null,
   "logrank_sanity": {
    "chi2": 11.644915604419216,
    "p": 0.0006437825475783762
@@ -234,6 +400,8 @@
    "OpenPI",
    "SmolVLA"
   ],
+  "family": "PhAIL",
+  "label": "family PhAIL",
   "cells": [
    "Batteries",
    "Scissors",
@@ -247,7 +415,7 @@
   "tau_s": 240.0,
   "alpha": 0.05,
   "gate": {
-   "test": "macro-KS (pooled-resample episode-clustered bootstrap)",
+   "test": "macro-KS (pooled-resample episode-clustered bootstrap), family PhAIL pairs",
    "D": 0.4654550298864024,
    "p": 0.0004997501249375312,
    "D_cells": {
@@ -260,83 +428,164 @@
    "fires": true
   },
   "metrics": {
-   "F30": {
-    "label": "F(30 s), pooled",
-    "tau_s": 30.0,
+   "phail_f30": {
+    "label": "F(30 s), PhAIL semantics [family PhAIL, \u03c4 30 s]",
+    "family": "PhAIL",
+    "tau": "30 s",
+    "aggregate": "pooled",
     "A": 0.4740718018499158,
     "B": 0.18284682527746743,
     "diff": 0.2912249765724484,
     "ci95": [
-     0.21672531666526593,
-     0.36532100611608526
+     0.21573880241645135,
+     0.3622380861743594
     ],
     "p": 0.001998001998001998,
     "higher_is_better": true,
     "diff_better": 0.2912249765724484,
     "favours": "OpenPI",
+    "cells": {
+     "Batteries": {
+      "A": 0.36666478224234644,
+      "B": 0.07230769230769207
+     },
+     "Scissors": {
+      "A": 0.3018736462597277,
+      "B": 0.08125000000000004
+     },
+     "Towels": {
+      "A": 0.44840185200857485,
+      "B": 0.16653333333333353
+     },
+     "Wooden spoons": {
+      "A": 0.659836972540802,
+      "B": 0.33212338226503346
+     }
+    },
     "p_holm": 0.007992007992007992,
     "significant": true
    },
-   "HRT": {
-    "label": "HRT(\u03c4), per-cell macro vs the human anchor",
-    "tau_s": 240.0,
+   "phail_hrt240": {
+    "label": "HRT(240 s), PhAIL semantics [family PhAIL, \u03c4 240 s]",
+    "family": "PhAIL",
+    "tau": "240 s",
+    "aggregate": "macro",
     "A": 0.13754838767437327,
     "B": 0.0644478636659622,
     "diff": 0.07310052400841108,
     "ci95": [
-     0.056341129425432825,
-     0.0919960181196753
+     0.05570788432851442,
+     0.09234965705669226
     ],
     "p": 0.001998001998001998,
     "higher_is_better": true,
     "diff_better": 0.07310052400841108,
     "favours": "OpenPI",
+    "cells": {
+     "Batteries": {
+      "A": 0.11651577340794698,
+      "B": 0.05594758420437743
+     },
+     "Scissors": {
+      "A": 0.1213503484108703,
+      "B": 0.06625009248509917
+     },
+     "Towels": {
+      "A": 0.125965916114836,
+      "B": 0.05504978764110874
+     },
+     "Wooden spoons": {
+      "A": 0.18636151276383978,
+      "B": 0.08054399033326344
+     }
+    },
     "p_holm": 0.007992007992007992,
     "significant": true
    },
-   "RMST": {
-    "label": "RMST(\u03c4) s, pooled (global)",
-    "tau_s": 240.0,
+   "phail_rmst240": {
+    "label": "global RMST(240 s), PhAIL semantics [family PhAIL, \u03c4 240 s]",
+    "family": "PhAIL",
+    "tau": "240 s",
+    "aggregate": "pooled",
     "A": 77.57178262020449,
     "B": 166.37265360894958,
     "diff": -88.80087098874509,
     "ci95": [
-     -109.04422860381483,
-     -69.46489848246503
+     -108.40642443382453,
+     -68.16997790748161
     ],
     "p": 0.001998001998001998,
     "higher_is_better": false,
     "diff_better": 88.80087098874509,
     "favours": "OpenPI",
+    "cells": {
+     "Batteries": {
+      "A": 97.2015776412308,
+      "B": 202.43084945309374
+     },
+     "Scissors": {
+      "A": 93.77386206532968,
+      "B": 171.76565958787305
+     },
+     "Towels": {
+      "A": 78.62131869739329,
+      "B": 179.90271825277776
+     },
+     "Wooden spoons": {
+      "A": 54.749710990985804,
+      "B": 126.67908457782674
+     }
+    },
     "p_holm": 0.007992007992007992,
     "significant": true
    },
-   "AUC": {
-    "label": "AUC vs human, per-cell macro",
-    "tau_s": null,
+   "phail_auc": {
+    "label": "AUC vs human, PhAIL semantics [family PhAIL, \u03c4 none]",
+    "family": "PhAIL",
+    "tau": "none",
+    "aggregate": "macro",
     "A": 0.10040590187884432,
     "B": 0.026807801809722892,
     "diff": 0.07359810006912143,
     "ci95": [
-     0.05617724881603083,
-     0.09203249726486165
+     0.056226382144608844,
+     0.09169506378845206
     ],
     "p": 0.001998001998001998,
     "higher_is_better": true,
     "diff_better": 0.07359810006912143,
     "favours": "OpenPI",
+    "cells": {
+     "Batteries": {
+      "A": 0.11028575930490371,
+      "B": 0.011008412088482708
+     },
+     "Scissors": {
+      "A": 0.06164081816138458,
+      "B": 0.014685487865279841
+     },
+     "Towels": {
+      "A": 0.07176042800565116,
+      "B": 0.02554888643184331
+     },
+     "Wooden spoons": {
+      "A": 0.15793660204343787,
+      "B": 0.05598842085328572
+     }
+    },
     "p_holm": 0.007992007992007992,
     "significant": true
    }
   },
   "holm_family": [
-   "F30",
-   "HRT",
-   "RMST",
-   "AUC"
+   "phail_f30",
+   "phail_hrt240",
+   "phail_rmst240",
+   "phail_auc"
   ],
   "outcome": "i",
   "direction": "OpenPI",
+  "batch_plan_match": null,
   "logrank_sanity": {
    "chi2": 123.05996650989066,
    "p": 1.3529735730558333e-28
@@ -349,6 +598,8 @@
    "GR00T",
    "ACT"
   ],
+  "family": "PhAIL",
+  "label": "family PhAIL",
   "cells": [
    "Batteries",
    "Scissors",
@@ -362,9 +613,9 @@
   "tau_s": 240.0,
   "alpha": 0.05,
   "gate": {
-   "test": "macro-KS (pooled-resample episode-clustered bootstrap)",
+   "test": "macro-KS (pooled-resample episode-clustered bootstrap), family PhAIL pairs",
    "D": 0.17540928625103427,
-   "p": 0.012993503248375811,
+   "p": 0.0069965017491254375,
    "D_cells": {
     "Batteries": 0.1667998840046575,
     "Scissors": 0.15480739798809673,
@@ -375,83 +626,164 @@
    "fires": true
   },
   "metrics": {
-   "F30": {
-    "label": "F(30 s), pooled",
-    "tau_s": 30.0,
+   "phail_f30": {
+    "label": "F(30 s), PhAIL semantics [family PhAIL, \u03c4 30 s]",
+    "family": "PhAIL",
+    "tau": "30 s",
+    "aggregate": "pooled",
     "A": 0.5091013807969105,
     "B": 0.4408681287160765,
     "diff": 0.06823325208083397,
     "ci95": [
-     0.005087480067920419,
-     0.13629818658610143
+     0.003880570702644005,
+     0.12724233084092668
     ],
-    "p": 0.03396603396603397,
+    "p": 0.03796203796203796,
     "higher_is_better": true,
     "diff_better": 0.06823325208083397,
     "favours": "GR00T",
-    "p_holm": 0.06793206793206794,
+    "cells": {
+     "Batteries": {
+      "A": 0.45554792943529854,
+      "B": 0.41253309796999127
+     },
+     "Scissors": {
+      "A": 0.22104875007854374,
+      "B": 0.3622994850256769
+     },
+     "Towels": {
+      "A": 0.5520067036521505,
+      "B": 0.3635412508498833
+     },
+     "Wooden spoons": {
+      "A": 0.6158741716781555,
+      "B": 0.5636256257590562
+     }
+    },
+    "p_holm": 0.07592407592407592,
     "significant": false
    },
-   "HRT": {
-    "label": "HRT(\u03c4), per-cell macro vs the human anchor",
-    "tau_s": 240.0,
+   "phail_hrt240": {
+    "label": "HRT(240 s), PhAIL semantics [family PhAIL, \u03c4 240 s]",
+    "family": "PhAIL",
+    "tau": "240 s",
+    "aggregate": "macro",
     "A": 0.13349183206648715,
     "B": 0.10486851554435657,
     "diff": 0.028623316522130585,
     "ci95": [
-     0.0004057053585570253,
-     0.050130790924801
+     0.0005947776619766231,
+     0.04956573833119946
     ],
     "p": 0.04995004995004995,
     "higher_is_better": true,
     "diff_better": 0.028623316522130585,
     "favours": "GR00T",
-    "p_holm": 0.06793206793206794,
+    "cells": {
+     "Batteries": {
+      "A": 0.12780019801344578,
+      "B": 0.1015942286597328
+     },
+     "Scissors": {
+      "A": 0.09476400318440065,
+      "B": 0.10822839630532367
+     },
+     "Towels": {
+      "A": 0.13897009273701544,
+      "B": 0.08923803860590801
+     },
+     "Wooden spoons": {
+      "A": 0.17243303433108678,
+      "B": 0.12041339860646176
+     }
+    },
+    "p_holm": 0.07592407592407592,
     "significant": false
    },
-   "RMST": {
-    "label": "RMST(\u03c4) s, pooled (global)",
-    "tau_s": 240.0,
+   "phail_rmst240": {
+    "label": "global RMST(240 s), PhAIL semantics [family PhAIL, \u03c4 240 s]",
+    "family": "PhAIL",
+    "tau": "240 s",
+    "aggregate": "pooled",
     "A": 77.31253986498288,
     "B": 100.92871455121983,
     "diff": -23.616174686236945,
     "ci95": [
-     -42.85260678631192,
-     -6.401265599961076
+     -40.94264778153625,
+     -7.130486668893006
     ],
     "p": 0.005994005994005994,
     "higher_is_better": false,
     "diff_better": 23.616174686236945,
     "favours": "GR00T",
+    "cells": {
+     "Batteries": {
+      "A": 88.61893151487186,
+      "B": 111.47795642282895
+     },
+     "Scissors": {
+      "A": 120.08242002311125,
+      "B": 105.14330085200478
+     },
+     "Towels": {
+      "A": 71.26430040321728,
+      "B": 110.97965162154475
+     },
+     "Wooden spoons": {
+      "A": 59.17218242574107,
+      "B": 84.73507999728197
+     }
+    },
     "p_holm": 0.023976023976023976,
     "significant": true
    },
-   "AUC": {
-    "label": "AUC vs human, per-cell macro",
-    "tau_s": null,
+   "phail_auc": {
+    "label": "AUC vs human, PhAIL semantics [family PhAIL, \u03c4 none]",
+    "family": "PhAIL",
+    "tau": "none",
+    "aggregate": "macro",
     "A": 0.09492460393298947,
     "B": 0.13375095761701644,
     "diff": -0.03882635368402697,
     "ci95": [
-     -0.06940798789100298,
-     -0.008472751527613691
+     -0.07056571769803834,
+     -0.011864135853665227
     ],
-    "p": 0.013986013986013986,
+    "p": 0.00999000999000999,
     "higher_is_better": true,
     "diff_better": -0.03882635368402697,
     "favours": "ACT",
-    "p_holm": 0.04195804195804196,
+    "cells": {
+     "Batteries": {
+      "A": 0.10214855626600822,
+      "B": 0.1575445770210484
+     },
+     "Scissors": {
+      "A": 0.07224268184398608,
+      "B": 0.09940713673142175
+     },
+     "Towels": {
+      "A": 0.08739191331258964,
+      "B": 0.08993174691016417
+     },
+     "Wooden spoons": {
+      "A": 0.117915264309374,
+      "B": 0.18812036980543148
+     }
+    },
+    "p_holm": 0.02997002997002997,
     "significant": true
    }
   },
   "holm_family": [
-   "F30",
-   "HRT",
-   "RMST",
-   "AUC"
+   "phail_f30",
+   "phail_hrt240",
+   "phail_rmst240",
+   "phail_auc"
   ],
   "outcome": "ii",
   "direction": null,
+  "batch_plan_match": null,
   "logrank_sanity": {
    "chi2": 11.75585620885426,
    "p": 0.000606521042077285
@@ -464,6 +796,8 @@
    "GR00T",
    "SmolVLA"
   ],
+  "family": "PhAIL",
+  "label": "family PhAIL",
   "cells": [
    "Batteries",
    "Scissors",
@@ -477,7 +811,7 @@
   "tau_s": 240.0,
   "alpha": 0.05,
   "gate": {
-   "test": "macro-KS (pooled-resample episode-clustered bootstrap)",
+   "test": "macro-KS (pooled-resample episode-clustered bootstrap), family PhAIL pairs",
    "D": 0.4343981522594673,
    "p": 0.0004997501249375312,
    "D_cells": {
@@ -490,83 +824,164 @@
    "fires": true
   },
   "metrics": {
-   "F30": {
-    "label": "F(30 s), pooled",
-    "tau_s": 30.0,
+   "phail_f30": {
+    "label": "F(30 s), PhAIL semantics [family PhAIL, \u03c4 30 s]",
+    "family": "PhAIL",
+    "tau": "30 s",
+    "aggregate": "pooled",
     "A": 0.5091013807969105,
     "B": 0.18284682527746743,
     "diff": 0.32625455551944305,
     "ci95": [
-     0.25561761725036075,
-     0.4013100008285538
+     0.2543872085672874,
+     0.4027212673184501
     ],
     "p": 0.001998001998001998,
     "higher_is_better": true,
     "diff_better": 0.32625455551944305,
     "favours": "GR00T",
+    "cells": {
+     "Batteries": {
+      "A": 0.45554792943529854,
+      "B": 0.07230769230769207
+     },
+     "Scissors": {
+      "A": 0.22104875007854374,
+      "B": 0.08125000000000004
+     },
+     "Towels": {
+      "A": 0.5520067036521505,
+      "B": 0.16653333333333353
+     },
+     "Wooden spoons": {
+      "A": 0.6158741716781555,
+      "B": 0.33212338226503346
+     }
+    },
     "p_holm": 0.007992007992007992,
     "significant": true
    },
-   "HRT": {
-    "label": "HRT(\u03c4), per-cell macro vs the human anchor",
-    "tau_s": 240.0,
+   "phail_hrt240": {
+    "label": "HRT(240 s), PhAIL semantics [family PhAIL, \u03c4 240 s]",
+    "family": "PhAIL",
+    "tau": "240 s",
+    "aggregate": "macro",
     "A": 0.13349183206648715,
     "B": 0.0644478636659622,
     "diff": 0.06904396840052496,
     "ci95": [
-     0.05312329701588902,
-     0.08846168058983478
+     0.05331724674307238,
+     0.08791368379597855
     ],
     "p": 0.001998001998001998,
     "higher_is_better": true,
     "diff_better": 0.06904396840052496,
     "favours": "GR00T",
+    "cells": {
+     "Batteries": {
+      "A": 0.12780019801344578,
+      "B": 0.05594758420437743
+     },
+     "Scissors": {
+      "A": 0.09476400318440065,
+      "B": 0.06625009248509917
+     },
+     "Towels": {
+      "A": 0.13897009273701544,
+      "B": 0.05504978764110874
+     },
+     "Wooden spoons": {
+      "A": 0.17243303433108678,
+      "B": 0.08054399033326344
+     }
+    },
     "p_holm": 0.007992007992007992,
     "significant": true
    },
-   "RMST": {
-    "label": "RMST(\u03c4) s, pooled (global)",
-    "tau_s": 240.0,
+   "phail_rmst240": {
+    "label": "global RMST(240 s), PhAIL semantics [family PhAIL, \u03c4 240 s]",
+    "family": "PhAIL",
+    "tau": "240 s",
+    "aggregate": "pooled",
     "A": 77.31253986498288,
     "B": 166.37265360894958,
     "diff": -89.0601137439667,
     "ci95": [
-     -110.4914767910628,
-     -69.66726831232555
+     -111.63300890937406,
+     -69.20449648283129
     ],
     "p": 0.001998001998001998,
     "higher_is_better": false,
     "diff_better": 89.0601137439667,
     "favours": "GR00T",
+    "cells": {
+     "Batteries": {
+      "A": 88.61893151487186,
+      "B": 202.43084945309374
+     },
+     "Scissors": {
+      "A": 120.08242002311125,
+      "B": 171.76565958787305
+     },
+     "Towels": {
+      "A": 71.26430040321728,
+      "B": 179.90271825277776
+     },
+     "Wooden spoons": {
+      "A": 59.17218242574107,
+      "B": 126.67908457782674
+     }
+    },
     "p_holm": 0.007992007992007992,
     "significant": true
    },
-   "AUC": {
-    "label": "AUC vs human, per-cell macro",
-    "tau_s": null,
+   "phail_auc": {
+    "label": "AUC vs human, PhAIL semantics [family PhAIL, \u03c4 none]",
+    "family": "PhAIL",
+    "tau": "none",
+    "aggregate": "macro",
     "A": 0.09492460393298947,
     "B": 0.026807801809722892,
     "diff": 0.06811680212326658,
     "ci95": [
-     0.05102422803752872,
-     0.08681342700674202
+     0.050206629200070824,
+     0.0860613881156377
     ],
     "p": 0.001998001998001998,
     "higher_is_better": true,
     "diff_better": 0.06811680212326658,
     "favours": "GR00T",
+    "cells": {
+     "Batteries": {
+      "A": 0.10214855626600822,
+      "B": 0.011008412088482708
+     },
+     "Scissors": {
+      "A": 0.07224268184398608,
+      "B": 0.014685487865279841
+     },
+     "Towels": {
+      "A": 0.08739191331258964,
+      "B": 0.02554888643184331
+     },
+     "Wooden spoons": {
+      "A": 0.117915264309374,
+      "B": 0.05598842085328572
+     }
+    },
     "p_holm": 0.007992007992007992,
     "significant": true
    }
   },
   "holm_family": [
-   "F30",
-   "HRT",
-   "RMST",
-   "AUC"
+   "phail_f30",
+   "phail_hrt240",
+   "phail_rmst240",
+   "phail_auc"
   ],
   "outcome": "i",
   "direction": "GR00T",
+  "batch_plan_match": null,
   "logrank_sanity": {
    "chi2": 122.47703298869929,
    "p": 1.815041820821175e-28
@@ -579,6 +994,8 @@
    "ACT",
    "SmolVLA"
   ],
+  "family": "PhAIL",
+  "label": "family PhAIL",
   "cells": [
    "Batteries",
    "Scissors",
@@ -592,7 +1009,7 @@
   "tau_s": 240.0,
   "alpha": 0.05,
   "gate": {
-   "test": "macro-KS (pooled-resample episode-clustered bootstrap)",
+   "test": "macro-KS (pooled-resample episode-clustered bootstrap), family PhAIL pairs",
    "D": 0.3607332691290364,
    "p": 0.0004997501249375312,
    "D_cells": {
@@ -605,83 +1022,164 @@
    "fires": true
   },
   "metrics": {
-   "F30": {
-    "label": "F(30 s), pooled",
-    "tau_s": 30.0,
+   "phail_f30": {
+    "label": "F(30 s), PhAIL semantics [family PhAIL, \u03c4 30 s]",
+    "family": "PhAIL",
+    "tau": "30 s",
+    "aggregate": "pooled",
     "A": 0.4408681287160765,
     "B": 0.18284682527746743,
     "diff": 0.2580213034386091,
     "ci95": [
-     0.17809094694629432,
-     0.343307828732641
+     0.1786843545119891,
+     0.33911768446211654
     ],
     "p": 0.001998001998001998,
     "higher_is_better": true,
     "diff_better": 0.2580213034386091,
     "favours": "ACT",
+    "cells": {
+     "Batteries": {
+      "A": 0.41253309796999127,
+      "B": 0.07230769230769207
+     },
+     "Scissors": {
+      "A": 0.3622994850256769,
+      "B": 0.08125000000000004
+     },
+     "Towels": {
+      "A": 0.3635412508498833,
+      "B": 0.16653333333333353
+     },
+     "Wooden spoons": {
+      "A": 0.5636256257590562,
+      "B": 0.33212338226503346
+     }
+    },
     "p_holm": 0.007992007992007992,
     "significant": true
    },
-   "HRT": {
-    "label": "HRT(\u03c4), per-cell macro vs the human anchor",
-    "tau_s": 240.0,
+   "phail_hrt240": {
+    "label": "HRT(240 s), PhAIL semantics [family PhAIL, \u03c4 240 s]",
+    "family": "PhAIL",
+    "tau": "240 s",
+    "aggregate": "macro",
     "A": 0.10486851554435657,
     "B": 0.0644478636659622,
     "diff": 0.04042065187839437,
     "ci95": [
-     0.02380398089188661,
-     0.06919157907656982
+     0.026222133932158644,
+     0.06702140342949539
     ],
     "p": 0.001998001998001998,
     "higher_is_better": true,
     "diff_better": 0.04042065187839437,
     "favours": "ACT",
+    "cells": {
+     "Batteries": {
+      "A": 0.1015942286597328,
+      "B": 0.05594758420437743
+     },
+     "Scissors": {
+      "A": 0.10822839630532367,
+      "B": 0.06625009248509917
+     },
+     "Towels": {
+      "A": 0.08923803860590801,
+      "B": 0.05504978764110874
+     },
+     "Wooden spoons": {
+      "A": 0.12041339860646176,
+      "B": 0.08054399033326344
+     }
+    },
     "p_holm": 0.007992007992007992,
     "significant": true
    },
-   "RMST": {
-    "label": "RMST(\u03c4) s, pooled (global)",
-    "tau_s": 240.0,
+   "phail_rmst240": {
+    "label": "global RMST(240 s), PhAIL semantics [family PhAIL, \u03c4 240 s]",
+    "family": "PhAIL",
+    "tau": "240 s",
+    "aggregate": "pooled",
     "A": 100.92871455121983,
     "B": 166.37265360894958,
     "diff": -65.44393905772975,
     "ci95": [
-     -91.25521420621308,
-     -40.4194726712131
+     -91.64612591477359,
+     -42.20839839392604
     ],
     "p": 0.001998001998001998,
     "higher_is_better": false,
     "diff_better": 65.44393905772975,
     "favours": "ACT",
+    "cells": {
+     "Batteries": {
+      "A": 111.47795642282895,
+      "B": 202.43084945309374
+     },
+     "Scissors": {
+      "A": 105.14330085200478,
+      "B": 171.76565958787305
+     },
+     "Towels": {
+      "A": 110.97965162154475,
+      "B": 179.90271825277776
+     },
+     "Wooden spoons": {
+      "A": 84.73507999728197,
+      "B": 126.67908457782674
+     }
+    },
     "p_holm": 0.007992007992007992,
     "significant": true
    },
-   "AUC": {
-    "label": "AUC vs human, per-cell macro",
-    "tau_s": null,
+   "phail_auc": {
+    "label": "AUC vs human, PhAIL semantics [family PhAIL, \u03c4 none]",
+    "family": "PhAIL",
+    "tau": "none",
+    "aggregate": "macro",
     "A": 0.13375095761701644,
     "B": 0.026807801809722892,
     "diff": 0.10694315580729355,
     "ci95": [
-     0.08068376769777828,
-     0.13684049953530333
+     0.08019601444096781,
+     0.13878065065607828
     ],
     "p": 0.001998001998001998,
     "higher_is_better": true,
     "diff_better": 0.10694315580729355,
     "favours": "ACT",
+    "cells": {
+     "Batteries": {
+      "A": 0.1575445770210484,
+      "B": 0.011008412088482708
+     },
+     "Scissors": {
+      "A": 0.09940713673142175,
+      "B": 0.014685487865279841
+     },
+     "Towels": {
+      "A": 0.08993174691016417,
+      "B": 0.02554888643184331
+     },
+     "Wooden spoons": {
+      "A": 0.18812036980543148,
+      "B": 0.05598842085328572
+     }
+    },
     "p_holm": 0.007992007992007992,
     "significant": true
    }
   },
   "holm_family": [
-   "F30",
-   "HRT",
-   "RMST",
-   "AUC"
+   "phail_f30",
+   "phail_hrt240",
+   "phail_rmst240",
+   "phail_auc"
   ],
   "outcome": "i",
   "direction": "ACT",
+  "batch_plan_match": null,
   "logrank_sanity": {
    "chi2": 63.74572842882211,
    "p": 1.4156017620509848e-15

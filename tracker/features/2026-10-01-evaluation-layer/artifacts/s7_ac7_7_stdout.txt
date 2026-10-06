@@ -1,0 +1,13 @@
+AC7.7 eval-smolvla-harness-spatial0-20261004T150110Z [family W] f30: verdict A 0.600000 vs S6 0.600000 (|diff| 0.0e+00)
+AC7.7 eval-smolvla-harness-spatial0-20261004T150110Z [family W] auc_h: verdict A 0.480000 vs S6 0.480000 (|diff| 0.0e+00)
+AC7.7 eval-smolvla-harness-spatial0-20261004T150110Z [family W] rmst60: verdict A 26.185000 vs S6 26.185000 (|diff| 0.0e+00)
+AC7.7 eval-smolvla-harness-spatial0-20261004T150110Z [family W] hrt60: verdict A 0.157686 vs S6 0.157686 (|diff| 2.8e-17)
+AC7.7 eval-smolvla-harness-spatial0-20261004T150110Z [family W] censored60: verdict A 0.400000 vs S6 0.400000 (|diff| 0.0e+00)
+AC7.7 eval-smolvla-harness-spatial0-20261004T150110Z [family O] rmst60_op_cap: verdict A 26.185000 vs S6 26.185000 (|diff| 0.0e+00)
+AC7.7 eval-smolvla-harness-l10t8-20261004T153306Z [family W] f30: verdict A 0.300000 vs S6 0.300000 (|diff| 5.6e-17)
+AC7.7 eval-smolvla-harness-l10t8-20261004T153306Z [family W] auc_h: verdict A 0.085000 vs S6 0.085000 (|diff| 0.0e+00)
+AC7.7 eval-smolvla-harness-l10t8-20261004T153306Z [family W] rmst60: verdict A 48.400000 vs S6 48.400000 (|diff| 7.1e-15)
+AC7.7 eval-smolvla-harness-l10t8-20261004T153306Z [family W] hrt60: verdict A 0.416095 vs S6 0.416095 (|diff| 0.0e+00)
+AC7.7 eval-smolvla-harness-l10t8-20261004T153306Z [family W] censored60: verdict A 0.700000 vs S6 0.700000 (|diff| 0.0e+00)
+AC7.7 eval-smolvla-harness-l10t8-20261004T153306Z [family O] rmst60_op_cap: verdict A 38.146667 vs S6 38.146667 (|diff| 0.0e+00)
+AC7.7 max |verdict - S6| = 7.11e-15; labels carry their family: True; pass: True

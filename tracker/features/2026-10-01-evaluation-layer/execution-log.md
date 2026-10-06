@@ -1609,3 +1609,134 @@ defect, now fixed with an assertion that all humans are < 60 s.
     −3.85): `ranking correct: True` on both runs.
   - Synthetic: tails of 1.0, 58.0 and 60.0 s all score −60.0, worst completed −59.0, `max unfinished <= min
     completed: True`.
+
+### S5 round 2: AC5.3 (reworded), AC5.9, AC5.10 ✅; and AC6.9 ✅
+
+**Store:** every MLflow write in this section went to the scratch store `data/lineage_scratch/r2`, made by the new
+`vlapoc.runs.scratch_lineage_copy`. Its experiment `artifact_location` is
+`file:///…/data/lineage_scratch/r2/mlartifacts` (sqlite, measured). The real `data/lineage/mlflow.db` sha256 was
+`02890131ade98a57…` before and after every scratch run, the same value the analyzer recorded.
+
+**Files:**
+- `vlapoc/runs.py`:
+  - `eval_run(..., attribution_grade=False, smoke=None)` with `attribution_protocol_errors`. The check runs before any
+    run or rollout.
+  - `CANONICAL_TASKS`; `batch_plan`; `batch_plan_of`, which rebuilds round-1 plans from their params and marks them
+    `provenance: reconstructed`.
+  - Param `eval.batch_plan` plus tag `eval.batch_plan.sha256`. Tags `eval.attribution_grade`,
+    `eval.attribution_grade.asserted` (only after a passed assertion) and `vlapoc.smoke`.
+  - `train_run(..., smoke=None, pretrained_ref=None)`, which tags `vlapoc.smoke` and records param `policy.path`.
+  - `scratch_lineage_copy`.
+- `vlapoc/rollouts.py`: `model_placement_sha256` and the `t0_model_sha256` record column, required by
+  `validate_record` through `RECORD_COLUMNS`.
+- `scripts/eval_smoke.py`: `--attribution-grade`, `--smoke`, `--lineage-root`.
+- `scripts/verify_rollouts_s5.py`: `--grade-tests`, `--t0-model [--compare]`.
+
+**Acceptance criteria:**
+- ✅ AC5.9 **attribution grade is asserted and checked** (`artifacts/s5_ac5_9_stdout.txt`, `s5_ac5_9_grade_tests.json`):
+  - (a) `attribution_grade=True` on 2 init states → refused with three reasons: `["train run is not tagged
+    vlapoc.smoke=false (got 'absent')", 'tasks are not all 20 …', 'init states are not 0-49 …']`.
+  - Also refused: the **full protocol** (20 tasks × 50, τ 1200, batch 10) on the 5-step smoke checkpoint
+    `train-full-s0`, with only the smoke-tag reason. The protocol check alone is not enough.
+  - Runs in the store before/after the refusals: **38/38**, so no run was created.
+  - (b) A default eval (noop, `[smoke]` in the name, run `0ceeaaee`): `eval.attribution_grade=false`,
+    `eval.attribution_grade.asserted=absent`, `vlapoc.smoke=true`, and `eval.batch_plan` recorded (digest `1852ef67…`).
+  - **How to read the round-1 mis-tagged runs.** The real store is append-only; these are not rewritten:
+    - `eval-act-train-full-s0-a` (`3392bb4d`) and `eval-act-train-full-s0-spatial0-n10` (`fe507fa3`) carry
+      `eval.attribution_grade=true`. Read that as "has a train run". They lack `eval.attribution_grade.asserted`, so
+      `verify_run` never counts them.
+    - `verify-ref-vs-drop-random-5 [eval-smoke]` (`7080353a`) carries `verify.attribution_grade=true`. It is a smoke
+      verdict; the corrected chain re-run is under AC9.1 below.
+- ✅ AC5.3 (r2 wording):
+  - The round-1 run `3392bb4d`: its CLI `python -m vlapoc.lineage trace` output is **JSON-equal** to
+    `s5_ac5_3_trace.json` (`True`) but not byte-equal (`False`, formatting).
+  - Re-run with the r2 code as a smoke run (scratch store): `eval-act-train-full-s0-smoke-r2` (`f8f3b153`), on
+    libero_spatial:0 and libero_10:0 × 2 init states, all 4 censored at 1200.
+    - Its input is `checkpoint:6f49bdae…`. `vlapoc.stand_in=false`, **`eval.attribution_grade=false`**, asserted
+      absent, `vlapoc.smoke=true`.
+    - Its trace visits eval → train-full-s0 → derive-v1 → build-v0, split-v0, with **20 raw files**
+      (`artifacts/s5_ac5_3_trace_r2.json`, `s5_ac5_3_r2_stdout.txt`).
+- ✅ AC5.10 **`t0_model_sha256`** (`artifacts/s5_ac5_10_stdout.txt`, `s5_ac5_10_t0_model.json`):
+  - Bytes hashed: `body_pos` then `site_pos`, each as C-contiguous float64, concatenated (`model_placement_sha256`).
+  - libero_10:8 and libero_spatial:0 × init 0–1, noop: identical at batch 1 and batch 2 (`True`), identical in a
+    repeated run (`True`), and distinct across (task, init) (`True`).
+  - Equal to the records of another eval run in another process (`eval-act-train-full-s0-smoke-r2`, on the shared
+    libero_spatial:0 init 0/1): `True`.
+  - **Negative test:** one env reset(seed=0) ×3 on libero_10:8 gives `t0_model_sha256` `['e62c4829473e',
+    '873c350ba3a4', '04f422206485']` (distinct). `t0_state_sha256` stays `['54f7df61644e'] ×3`: blind to the drift,
+    as measured in round 1. The first hash equals the harness's libero_10:8 init 0 hash, i.e. the first seeded reset.
+  - `validate_record` without the column → `["missing columns ['t0_model_sha256']"]`.
+- ✅ AC6.9 **no temp-dir leaks** (`artifacts/s6_ac6_9_tempdirs.txt`):
+  - The round-1 leftovers counted **9** (5 `returns_*`, 4 `verdict_*`), not the analyzer's 11. All were removed;
+    after removal the count is 0. The list is in `data/scratch/logs/r2_ac6_9_leaked_dirs.txt`.
+  - One `python -m vlapoc.returns --eval-run e92604a8…` plus one `python -m vlapoc.verdict --eval-runs … --lineage-root
+    data/lineage_scratch/r2`: temp dirs before **0**, after **0**.
+
+### S7 round 2: AC7.1 ❌ (29/30), AC7.2, AC7.4, AC7.6, AC7.7, AC7.8 ✅
+
+**Files:**
+- `vlapoc/verdict.py`:
+  - families W, O and PhAIL, with metrics from the registry;
+  - per-cell points;
+  - `batch_plans` / `allow_plan_mismatch` (raises on a mismatch; the override labels "unpaired plan");
+  - labels carry the family;
+  - `verify_run(..., family, lineage_root, allow_plan_mismatch)` sets `verify.attribution_grade=true` only when both
+    evals carry `eval.attribution_grade.asserted=true`. Otherwise the label starts "smoke (not attribution-grade)".
+- `scripts/verify_verdict_s7.py`: `--phail-seeds`, `--family-consistency`, `--plan-guard`, and a synthetic plan-guard
+  test (pytest `4 passed`).
+
+**Acceptance criteria:**
+- ❌ AC7.1 (r2 restated), family PhAIL on the sorted export, n_boot 1000, n_boot_ks 2000, seeds 0–4
+  (`artifacts/s7_ac7_1_seed_sweep_stdout.txt`, `s7_ac7_1_seed_sweep.json`): **29 of 30 (pair, seed) outcomes match;
+  one does not.**
+  - OpenPI–GR00T → (iii) in 5/5 (gate p 0.1129–0.1174).
+  - OpenPI–ACT → (iii) in 5/5 (gate p 0.0960–0.1079). PhAIL's released JSON gives 0.103 `WEAK`.
+  - Each model vs SmolVLA → (i) in 5/5 (gate p 0.0005).
+  - **GR00T–ACT → (ii) in 4/5 seeds (0, 2, 3, 4), but (i) GR00T in seed 1.** The gate fires in every seed (p
+    0.0065–0.0100). RMST favours GR00T in every seed (Holm 0.008–0.040). The AUC's Holm p is **0.054** in seed 1 (ACT
+    side), vs 0.024–0.040 in the others. So in seed 1 only RMST is significant, and the rule gives (i).
+  - In round 1 (the unsorted export) all 5 seeds gave (ii), with AUC Holm 0.016–0.042.
+  - **Reading (inferred):** the AUC direction for GR00T–ACT sits at the α = 0.05 boundary after Holm, so whether
+    the trade-off is detected at this N depends on the Monte-Carlo draw. The (ii) label for this pair is not robust
+    to the bootstrap seed. I did not change n_boot or the rule to make it pass. For the planner/analyzer: restate as
+    "(ii) in ≥ 4/5 seeds, AUC Holm p ≈ 0.05", or accept it as recorded.
+- ✅ AC7.6 **artifacts regenerated** from the sorted export (`s7_phail_verdicts_stdout.txt`, `s7_phail_verdicts.json`):
+
+  | Pair | Seed-0 gate p, round 1 | Seed-0 gate p, r2 sorted export | Outcome r2 |
+  |---|---|---|---|
+  | OpenPI–GR00T | 0.1099 | **0.1129** | (iii) |
+  | OpenPI–ACT | 0.1109 | **0.1074** | (iii) |
+  | GR00T–ACT | 0.0130 | **0.0070** | (ii): RMST → GR00T (Holm 0.024), AUC → ACT (Holm 0.030) |
+  | OpenPI–SmolVLA, GR00T–SmolVLA, ACT–SmolVLA | 0.0005 | 0.0005 | (i), direction the non-SmolVLA model |
+
+  - **Disclosure:** every bootstrap p is a Monte-Carlo draw conditional on episode order and seed. D̄ and the point
+    estimates do not depend on either; D̄ is identical across rounds: 0.1239 / 0.1418 / 0.1754 / 0.4655 / 0.4344 /
+    0.3607.
+  - The LIBERO artifact AC7.4 is regenerated in family W, below.
+- ✅ AC7.2 null calibration, regenerated on the sorted export (`s7_ac7_2_null_calibration_stdout.txt`), 200 trials ×
+  500, rejection rate at α 0.05:
+  - OpenPI 0.050 ± 0.030 (mean p 0.427);
+  - GR00T 0.035 ± 0.025 (0.442);
+  - ACT 0.065 ± 0.034 (0.379);
+  - SmolVLA 0.075 ± 0.037 (0.372);
+  - Teleop 0.045 ± 0.029 (0.496).
+  - All are inside [0.02, 0.10].
+- ✅ AC7.4 (regenerated, family W, scratch store) verify run `b5afceb9`:
+  `[smoke (not attribution-grade), family W]` ACT (0/10) vs SmolVLA (6/10) on libero_spatial:0 init 0–9.
+  - Gate D̄ 0.6000, p 0.0090 → (i) SmolVLA.
+  - All five family-W metrics are Holm-significant (each 0.0100): f30 0 vs 0.6, auc_h 0 vs **0.4800** (ties ½;
+    round 1's ties-dropped value was 0.4795), rmst60 60 vs 26.185, hrt60 0.0688 vs 0.1577, censored60 1.0 vs 0.4.
+  - The batch plans match (reconstructed from round-1 params: batch 5, 10 init states).
+  - (`artifacts/s7_ac7_4_libero_smoke_stdout.txt`, `s7_ac7_4_libero_smoke_verdict.json`.)
+- ✅ AC7.7 **family consistency from the verdict side** (`artifacts/s7_ac7_7_stdout.txt`, `s7_ac7_7_family_consistency.json`):
+  - On both AC5.4 runs, the verdict's per-arm family-W metrics equal the S6 cell means. libero_10:8: f30 0.3, auc_h
+    0.085, rmst60 48.400, hrt60 0.416095, censored60 0.7.
+  - The op-family `rmst60_op_cap` equals the operation-sample mean of `ret_rmst60_op_cap`: 38.146667 (libero_10:8)
+    and 26.185 (spatial:0).
+  - **Max |diff| 7.11e-15**; every label carries its family: `True`.
+- ✅ AC7.8 **batch-plan guard** (scratch store; `artifacts/s7_ac7_8_stdout.txt`, `s7_ac7_8_plan_guard.json`):
+  - `3392bb4d` (batch 2, two tasks × 2) vs `e138fec9` (batch 5, spatial:0 × 10) **raises** without the override.
+  - With the override, run `bec7cadc` is labelled `'smoke (not attribution-grade), family W, unpaired plan'`.
+  - `fe507fa3` vs `e138fec9` (the same plan) passes: run `a50d9360`, `batch_plan_match True`, no "unpaired" in the
+    label.
+  - The synthetic test passes too, including a reconstructed plan comparing equal to an explicit one.

@@ -1,0 +1,7 @@
+{
+ "refused": "eval batch plans differ between eval-act-train-full-s0-a and eval-smolvla-harness-spatial0 (a stochastic policy's outcome depends on the bat",
+ "override_label": "smoke (not attribution-grade), family W, unpaired plan",
+ "same_plan_match": true,
+ "same_plan_label": "smoke (not attribution-grade), family W",
+ "pass": true
+}

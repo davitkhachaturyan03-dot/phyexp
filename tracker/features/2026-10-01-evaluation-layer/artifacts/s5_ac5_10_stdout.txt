@@ -1,0 +1,5 @@
+AC5.10 t0_model_sha256 per (task, init) at batch 1: {'libero_10/8/init0': 'e62c4829473e', 'libero_10/8/init1': 'd869758d1191', 'libero_spatial/0/init0': 'c86d251cb4c2', 'libero_spatial/0/init1': '72c916db40f1'}
+AC5.10 equal at batch 2: True; equal in a repeated run (batch 2): True; distinct across (task, init): True
+AC5.10 vs the records of eval-act-train-full-s0-smoke-r2 (another eval run, another process) on ['libero_spatial/0/init0', 'libero_spatial/0/init1']: equal: True
+AC5.10 negative test, one env reset(seed=0) x3 on libero_10:8: t0_model_sha256 ['e62c4829473e', '873c350ba3a4', '04f422206485'] (distinct: True); t0_state_sha256 ['54f7df61644e', '54f7df61644e', '54f7df61644e'] (blind to it: True)
+AC5.10 validate_record without the column: ["missing columns ['t0_model_sha256']"]

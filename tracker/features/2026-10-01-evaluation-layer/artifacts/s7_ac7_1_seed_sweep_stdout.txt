@@ -1,10 +1,31 @@
-GR00T vs ACT seed 0: gate p 0.0130 -> (ii); Holm p F30 0.068->GR00T, HRT 0.068->GR00T, RMST 0.024->GR00T, AUC 0.042->ACT
-GR00T vs ACT seed 1: gate p 0.0115 -> (ii); Holm p F30 0.092->GR00T, HRT 0.092->GR00T, RMST 0.032->GR00T, AUC 0.042->ACT
-GR00T vs ACT seed 2: gate p 0.0095 -> (ii); Holm p F30 0.100->GR00T, HRT 0.100->GR00T, RMST 0.030->GR00T, AUC 0.024->ACT
-GR00T vs ACT seed 3: gate p 0.0120 -> (ii); Holm p F30 0.084->GR00T, HRT 0.084->GR00T, RMST 0.008->GR00T, AUC 0.030->ACT
-GR00T vs ACT seed 4: gate p 0.0085 -> (ii); Holm p F30 0.100->GR00T, HRT 0.100->GR00T, RMST 0.018->GR00T, AUC 0.016->ACT
-OpenPI vs ACT seed 0: gate p 0.1109 -> (iii); Holm p F30 0.374->OpenPI, HRT 0.090->OpenPI, RMST 0.040->OpenPI, AUC 0.090->ACT
-OpenPI vs ACT seed 1: gate p 0.1104 -> (iii); Holm p F30 0.328->OpenPI, HRT 0.090->OpenPI, RMST 0.024->OpenPI, AUC 0.090->ACT
-OpenPI vs ACT seed 2: gate p 0.1084 -> (iii); Holm p F30 0.392->OpenPI, HRT 0.102->OpenPI, RMST 0.064->OpenPI, AUC 0.102->ACT
-OpenPI vs ACT seed 3: gate p 0.1199 -> (iii); Holm p F30 0.384->OpenPI, HRT 0.078->OpenPI, RMST 0.040->OpenPI, AUC 0.078->ACT
-OpenPI vs ACT seed 4: gate p 0.1089 -> (iii); Holm p F30 0.384->OpenPI, HRT 0.088->OpenPI, RMST 0.048->OpenPI, AUC 0.066->ACT
+AC7.1 OpenPI vs GR00T seed 0: gate D̄ 0.1239 p 0.1129 -> (iii) expected (iii) OK; Holm p phail_f30 0.943->GR00T, phail_hrt240 1.000->OpenPI, phail_rmst240 1.000->GR00T, phail_auc 1.000->OpenPI
+AC7.1 OpenPI vs GR00T seed 1: gate D̄ 0.1239 p 0.1159 -> (iii) expected (iii) OK; Holm p phail_f30 1.000->GR00T, phail_hrt240 1.000->OpenPI, phail_rmst240 1.000->GR00T, phail_auc 1.000->OpenPI
+AC7.1 OpenPI vs GR00T seed 2: gate D̄ 0.1239 p 0.1174 -> (iii) expected (iii) OK; Holm p phail_f30 0.927->GR00T, phail_hrt240 1.000->OpenPI, phail_rmst240 1.000->GR00T, phail_auc 1.000->OpenPI
+AC7.1 OpenPI vs GR00T seed 3: gate D̄ 0.1239 p 0.1149 -> (iii) expected (iii) OK; Holm p phail_f30 0.975->GR00T, phail_hrt240 1.000->OpenPI, phail_rmst240 1.000->GR00T, phail_auc 1.000->OpenPI
+AC7.1 OpenPI vs GR00T seed 4: gate D̄ 0.1239 p 0.1134 -> (iii) expected (iii) OK; Holm p phail_f30 0.935->GR00T, phail_hrt240 1.000->OpenPI, phail_rmst240 1.000->GR00T, phail_auc 1.000->OpenPI
+AC7.1 OpenPI vs ACT seed 0: gate D̄ 0.1418 p 0.1074 -> (iii) expected (iii) OK; Holm p phail_f30 0.362->OpenPI, phail_hrt240 0.090->OpenPI, phail_rmst240 0.032->OpenPI, phail_auc 0.090->ACT
+AC7.1 OpenPI vs ACT seed 1: gate D̄ 0.1418 p 0.1024 -> (iii) expected (iii) OK; Holm p phail_f30 0.362->OpenPI, phail_hrt240 0.108->OpenPI, phail_rmst240 0.032->OpenPI, phail_auc 0.108->ACT
+AC7.1 OpenPI vs ACT seed 2: gate D̄ 0.1418 p 0.1024 -> (iii) expected (iii) OK; Holm p phail_f30 0.374->OpenPI, phail_hrt240 0.066->OpenPI, phail_rmst240 0.016->OpenPI, phail_auc 0.066->ACT
+AC7.1 OpenPI vs ACT seed 3: gate D̄ 0.1418 p 0.1079 -> (iii) expected (iii) OK; Holm p phail_f30 0.348->OpenPI, phail_hrt240 0.066->OpenPI, phail_rmst240 0.048->OpenPI, phail_auc 0.066->ACT
+AC7.1 OpenPI vs ACT seed 4: gate D̄ 0.1418 p 0.0960 -> (iii) expected (iii) OK; Holm p phail_f30 0.394->OpenPI, phail_hrt240 0.104->OpenPI, phail_rmst240 0.064->OpenPI, phail_auc 0.064->ACT
+AC7.1 GR00T vs ACT seed 0: gate D̄ 0.1754 p 0.0070 -> (ii) expected (ii) OK; Holm p phail_f30 0.076->GR00T, phail_hrt240 0.076->GR00T, phail_rmst240 0.024->GR00T, phail_auc 0.030->ACT
+AC7.1 GR00T vs ACT seed 1: gate D̄ 0.1754 p 0.0065 -> (i) expected (ii) MISMATCH; Holm p phail_f30 0.076->GR00T, phail_hrt240 0.076->GR00T, phail_rmst240 0.008->GR00T, phail_auc 0.054->ACT
+AC7.1 GR00T vs ACT seed 2: gate D̄ 0.1754 p 0.0100 -> (ii) expected (ii) OK; Holm p phail_f30 0.104->GR00T, phail_hrt240 0.104->GR00T, phail_rmst240 0.040->GR00T, phail_auc 0.040->ACT
+AC7.1 GR00T vs ACT seed 3: gate D̄ 0.1754 p 0.0085 -> (ii) expected (ii) OK; Holm p phail_f30 0.104->GR00T, phail_hrt240 0.104->GR00T, phail_rmst240 0.032->GR00T, phail_auc 0.032->ACT
+AC7.1 GR00T vs ACT seed 4: gate D̄ 0.1754 p 0.0085 -> (ii) expected (ii) OK; Holm p phail_f30 0.092->GR00T, phail_hrt240 0.092->GR00T, phail_rmst240 0.030->GR00T, phail_auc 0.024->ACT
+AC7.1 OpenPI vs SmolVLA seed 0: gate D̄ 0.4655 p 0.0005 -> (i) expected (i) OK; Holm p phail_f30 0.008->OpenPI, phail_hrt240 0.008->OpenPI, phail_rmst240 0.008->OpenPI, phail_auc 0.008->OpenPI
+AC7.1 OpenPI vs SmolVLA seed 1: gate D̄ 0.4655 p 0.0005 -> (i) expected (i) OK; Holm p phail_f30 0.008->OpenPI, phail_hrt240 0.008->OpenPI, phail_rmst240 0.008->OpenPI, phail_auc 0.008->OpenPI
+AC7.1 OpenPI vs SmolVLA seed 2: gate D̄ 0.4655 p 0.0005 -> (i) expected (i) OK; Holm p phail_f30 0.008->OpenPI, phail_hrt240 0.008->OpenPI, phail_rmst240 0.008->OpenPI, phail_auc 0.008->OpenPI
+AC7.1 OpenPI vs SmolVLA seed 3: gate D̄ 0.4655 p 0.0005 -> (i) expected (i) OK; Holm p phail_f30 0.008->OpenPI, phail_hrt240 0.008->OpenPI, phail_rmst240 0.008->OpenPI, phail_auc 0.008->OpenPI
+AC7.1 OpenPI vs SmolVLA seed 4: gate D̄ 0.4655 p 0.0005 -> (i) expected (i) OK; Holm p phail_f30 0.008->OpenPI, phail_hrt240 0.008->OpenPI, phail_rmst240 0.008->OpenPI, phail_auc 0.008->OpenPI
+AC7.1 GR00T vs SmolVLA seed 0: gate D̄ 0.4344 p 0.0005 -> (i) expected (i) OK; Holm p phail_f30 0.008->GR00T, phail_hrt240 0.008->GR00T, phail_rmst240 0.008->GR00T, phail_auc 0.008->GR00T
+AC7.1 GR00T vs SmolVLA seed 1: gate D̄ 0.4344 p 0.0005 -> (i) expected (i) OK; Holm p phail_f30 0.008->GR00T, phail_hrt240 0.008->GR00T, phail_rmst240 0.008->GR00T, phail_auc 0.008->GR00T
+AC7.1 GR00T vs SmolVLA seed 2: gate D̄ 0.4344 p 0.0005 -> (i) expected (i) OK; Holm p phail_f30 0.008->GR00T, phail_hrt240 0.008->GR00T, phail_rmst240 0.008->GR00T, phail_auc 0.008->GR00T
+AC7.1 GR00T vs SmolVLA seed 3: gate D̄ 0.4344 p 0.0005 -> (i) expected (i) OK; Holm p phail_f30 0.008->GR00T, phail_hrt240 0.008->GR00T, phail_rmst240 0.008->GR00T, phail_auc 0.008->GR00T
+AC7.1 GR00T vs SmolVLA seed 4: gate D̄ 0.4344 p 0.0005 -> (i) expected (i) OK; Holm p phail_f30 0.008->GR00T, phail_hrt240 0.008->GR00T, phail_rmst240 0.008->GR00T, phail_auc 0.008->GR00T
+AC7.1 ACT vs SmolVLA seed 0: gate D̄ 0.3607 p 0.0005 -> (i) expected (i) OK; Holm p phail_f30 0.008->ACT, phail_hrt240 0.008->ACT, phail_rmst240 0.008->ACT, phail_auc 0.008->ACT
+AC7.1 ACT vs SmolVLA seed 1: gate D̄ 0.3607 p 0.0005 -> (i) expected (i) OK; Holm p phail_f30 0.008->ACT, phail_hrt240 0.008->ACT, phail_rmst240 0.008->ACT, phail_auc 0.008->ACT
+AC7.1 ACT vs SmolVLA seed 2: gate D̄ 0.3607 p 0.0005 -> (i) expected (i) OK; Holm p phail_f30 0.008->ACT, phail_hrt240 0.008->ACT, phail_rmst240 0.008->ACT, phail_auc 0.008->ACT
+AC7.1 ACT vs SmolVLA seed 3: gate D̄ 0.3607 p 0.0005 -> (i) expected (i) OK; Holm p phail_f30 0.008->ACT, phail_hrt240 0.008->ACT, phail_rmst240 0.008->ACT, phail_auc 0.008->ACT
+AC7.1 ACT vs SmolVLA seed 4: gate D̄ 0.3607 p 0.0005 -> (i) expected (i) OK; Holm p phail_f30 0.008->ACT, phail_hrt240 0.008->ACT, phail_rmst240 0.008->ACT, phail_auc 0.008->ACT
+AC7.1 all 30 (pair, seed) outcomes match the r2 restatement: False

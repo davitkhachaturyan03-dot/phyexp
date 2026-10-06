@@ -1,162 +1,582 @@
 {
- "GR00T-ACT-seed0": {
-  "gate_p": 0.012993503248375811,
-  "outcome": "ii",
-  "p_holm": {
-   "F30": 0.06793206793206794,
-   "HRT": 0.06793206793206794,
-   "RMST": 0.023976023976023976,
-   "AUC": 0.04195804195804196
+ "seeds": [
+  0,
+  1,
+  2,
+  3,
+  4
+ ],
+ "results": {
+  "OpenPI-GR00T-seed0": {
+   "gate_p": 0.11294352823588207,
+   "D": 0.12391553589925894,
+   "outcome": "iii",
+   "expected": "iii",
+   "direction": null,
+   "p_holm": {
+    "phail_f30": 0.9430569430569431,
+    "phail_hrt240": 1.0,
+    "phail_rmst240": 1.0,
+    "phail_auc": 1.0
+   },
+   "favours": {
+    "phail_f30": "GR00T",
+    "phail_hrt240": "OpenPI",
+    "phail_rmst240": "GR00T",
+    "phail_auc": "OpenPI"
+   }
   },
-  "favours": {
-   "F30": "GR00T",
-   "HRT": "GR00T",
-   "RMST": "GR00T",
-   "AUC": "ACT"
+  "OpenPI-GR00T-seed1": {
+   "gate_p": 0.11594202898550725,
+   "D": 0.12391553589925894,
+   "outcome": "iii",
+   "expected": "iii",
+   "direction": null,
+   "p_holm": {
+    "phail_f30": 1.0,
+    "phail_hrt240": 1.0,
+    "phail_rmst240": 1.0,
+    "phail_auc": 1.0
+   },
+   "favours": {
+    "phail_f30": "GR00T",
+    "phail_hrt240": "OpenPI",
+    "phail_rmst240": "GR00T",
+    "phail_auc": "OpenPI"
+   }
+  },
+  "OpenPI-GR00T-seed2": {
+   "gate_p": 0.11744127936031984,
+   "D": 0.12391553589925894,
+   "outcome": "iii",
+   "expected": "iii",
+   "direction": null,
+   "p_holm": {
+    "phail_f30": 0.9270729270729271,
+    "phail_hrt240": 1.0,
+    "phail_rmst240": 1.0,
+    "phail_auc": 1.0
+   },
+   "favours": {
+    "phail_f30": "GR00T",
+    "phail_hrt240": "OpenPI",
+    "phail_rmst240": "GR00T",
+    "phail_auc": "OpenPI"
+   }
+  },
+  "OpenPI-GR00T-seed3": {
+   "gate_p": 0.11494252873563218,
+   "D": 0.12391553589925894,
+   "outcome": "iii",
+   "expected": "iii",
+   "direction": null,
+   "p_holm": {
+    "phail_f30": 0.975024975024975,
+    "phail_hrt240": 1.0,
+    "phail_rmst240": 1.0,
+    "phail_auc": 1.0
+   },
+   "favours": {
+    "phail_f30": "GR00T",
+    "phail_hrt240": "OpenPI",
+    "phail_rmst240": "GR00T",
+    "phail_auc": "OpenPI"
+   }
+  },
+  "OpenPI-GR00T-seed4": {
+   "gate_p": 0.11344327836081959,
+   "D": 0.12391553589925894,
+   "outcome": "iii",
+   "expected": "iii",
+   "direction": null,
+   "p_holm": {
+    "phail_f30": 0.935064935064935,
+    "phail_hrt240": 1.0,
+    "phail_rmst240": 1.0,
+    "phail_auc": 1.0
+   },
+   "favours": {
+    "phail_f30": "GR00T",
+    "phail_hrt240": "OpenPI",
+    "phail_rmst240": "GR00T",
+    "phail_auc": "OpenPI"
+   }
+  },
+  "OpenPI-ACT-seed0": {
+   "gate_p": 0.10744627686156921,
+   "D": 0.14179755022503066,
+   "outcome": "iii",
+   "expected": "iii",
+   "direction": null,
+   "p_holm": {
+    "phail_f30": 0.36163836163836166,
+    "phail_hrt240": 0.08991008991008992,
+    "phail_rmst240": 0.03196803196803197,
+    "phail_auc": 0.08991008991008992
+   },
+   "favours": {
+    "phail_f30": "OpenPI",
+    "phail_hrt240": "OpenPI",
+    "phail_rmst240": "OpenPI",
+    "phail_auc": "ACT"
+   }
+  },
+  "OpenPI-ACT-seed1": {
+   "gate_p": 0.1024487756121939,
+   "D": 0.14179755022503066,
+   "outcome": "iii",
+   "expected": "iii",
+   "direction": null,
+   "p_holm": {
+    "phail_f30": 0.36163836163836166,
+    "phail_hrt240": 0.1078921078921079,
+    "phail_rmst240": 0.03196803196803197,
+    "phail_auc": 0.1078921078921079
+   },
+   "favours": {
+    "phail_f30": "OpenPI",
+    "phail_hrt240": "OpenPI",
+    "phail_rmst240": "OpenPI",
+    "phail_auc": "ACT"
+   }
+  },
+  "OpenPI-ACT-seed2": {
+   "gate_p": 0.1024487756121939,
+   "D": 0.14179755022503066,
+   "outcome": "iii",
+   "expected": "iii",
+   "direction": null,
+   "p_holm": {
+    "phail_f30": 0.37362637362637363,
+    "phail_hrt240": 0.06593406593406594,
+    "phail_rmst240": 0.015984015984015984,
+    "phail_auc": 0.06593406593406594
+   },
+   "favours": {
+    "phail_f30": "OpenPI",
+    "phail_hrt240": "OpenPI",
+    "phail_rmst240": "OpenPI",
+    "phail_auc": "ACT"
+   }
+  },
+  "OpenPI-ACT-seed3": {
+   "gate_p": 0.10794602698650675,
+   "D": 0.14179755022503066,
+   "outcome": "iii",
+   "expected": "iii",
+   "direction": null,
+   "p_holm": {
+    "phail_f30": 0.34765234765234765,
+    "phail_hrt240": 0.06593406593406594,
+    "phail_rmst240": 0.04795204795204795,
+    "phail_auc": 0.06593406593406594
+   },
+   "favours": {
+    "phail_f30": "OpenPI",
+    "phail_hrt240": "OpenPI",
+    "phail_rmst240": "OpenPI",
+    "phail_auc": "ACT"
+   }
+  },
+  "OpenPI-ACT-seed4": {
+   "gate_p": 0.095952023988006,
+   "D": 0.14179755022503066,
+   "outcome": "iii",
+   "expected": "iii",
+   "direction": null,
+   "p_holm": {
+    "phail_f30": 0.3936063936063936,
+    "phail_hrt240": 0.1038961038961039,
+    "phail_rmst240": 0.06393606393606394,
+    "phail_auc": 0.06393606393606394
+   },
+   "favours": {
+    "phail_f30": "OpenPI",
+    "phail_hrt240": "OpenPI",
+    "phail_rmst240": "OpenPI",
+    "phail_auc": "ACT"
+   }
+  },
+  "GR00T-ACT-seed0": {
+   "gate_p": 0.0069965017491254375,
+   "D": 0.17540928625103427,
+   "outcome": "ii",
+   "expected": "ii",
+   "direction": null,
+   "p_holm": {
+    "phail_f30": 0.07592407592407592,
+    "phail_hrt240": 0.07592407592407592,
+    "phail_rmst240": 0.023976023976023976,
+    "phail_auc": 0.02997002997002997
+   },
+   "favours": {
+    "phail_f30": "GR00T",
+    "phail_hrt240": "GR00T",
+    "phail_rmst240": "GR00T",
+    "phail_auc": "ACT"
+   }
+  },
+  "GR00T-ACT-seed1": {
+   "gate_p": 0.006496751624187906,
+   "D": 0.17540928625103427,
+   "outcome": "i",
+   "expected": "ii",
+   "direction": "GR00T",
+   "p_holm": {
+    "phail_f30": 0.07592407592407592,
+    "phail_hrt240": 0.07592407592407592,
+    "phail_rmst240": 0.007992007992007992,
+    "phail_auc": 0.05394605394605395
+   },
+   "favours": {
+    "phail_f30": "GR00T",
+    "phail_hrt240": "GR00T",
+    "phail_rmst240": "GR00T",
+    "phail_auc": "ACT"
+   }
+  },
+  "GR00T-ACT-seed2": {
+   "gate_p": 0.009995002498750625,
+   "D": 0.17540928625103427,
+   "outcome": "ii",
+   "expected": "ii",
+   "direction": null,
+   "p_holm": {
+    "phail_f30": 0.1038961038961039,
+    "phail_hrt240": 0.1038961038961039,
+    "phail_rmst240": 0.03996003996003996,
+    "phail_auc": 0.03996003996003996
+   },
+   "favours": {
+    "phail_f30": "GR00T",
+    "phail_hrt240": "GR00T",
+    "phail_rmst240": "GR00T",
+    "phail_auc": "ACT"
+   }
+  },
+  "GR00T-ACT-seed3": {
+   "gate_p": 0.00849575212393803,
+   "D": 0.17540928625103427,
+   "outcome": "ii",
+   "expected": "ii",
+   "direction": null,
+   "p_holm": {
+    "phail_f30": 0.1038961038961039,
+    "phail_hrt240": 0.1038961038961039,
+    "phail_rmst240": 0.03196803196803197,
+    "phail_auc": 0.03196803196803197
+   },
+   "favours": {
+    "phail_f30": "GR00T",
+    "phail_hrt240": "GR00T",
+    "phail_rmst240": "GR00T",
+    "phail_auc": "ACT"
+   }
+  },
+  "GR00T-ACT-seed4": {
+   "gate_p": 0.00849575212393803,
+   "D": 0.17540928625103427,
+   "outcome": "ii",
+   "expected": "ii",
+   "direction": null,
+   "p_holm": {
+    "phail_f30": 0.0919080919080919,
+    "phail_hrt240": 0.0919080919080919,
+    "phail_rmst240": 0.02997002997002997,
+    "phail_auc": 0.023976023976023976
+   },
+   "favours": {
+    "phail_f30": "GR00T",
+    "phail_hrt240": "GR00T",
+    "phail_rmst240": "GR00T",
+    "phail_auc": "ACT"
+   }
+  },
+  "OpenPI-SmolVLA-seed0": {
+   "gate_p": 0.0004997501249375312,
+   "D": 0.4654550298864024,
+   "outcome": "i",
+   "expected": "i",
+   "direction": "OpenPI",
+   "p_holm": {
+    "phail_f30": 0.007992007992007992,
+    "phail_hrt240": 0.007992007992007992,
+    "phail_rmst240": 0.007992007992007992,
+    "phail_auc": 0.007992007992007992
+   },
+   "favours": {
+    "phail_f30": "OpenPI",
+    "phail_hrt240": "OpenPI",
+    "phail_rmst240": "OpenPI",
+    "phail_auc": "OpenPI"
+   }
+  },
+  "OpenPI-SmolVLA-seed1": {
+   "gate_p": 0.0004997501249375312,
+   "D": 0.4654550298864024,
+   "outcome": "i",
+   "expected": "i",
+   "direction": "OpenPI",
+   "p_holm": {
+    "phail_f30": 0.007992007992007992,
+    "phail_hrt240": 0.007992007992007992,
+    "phail_rmst240": 0.007992007992007992,
+    "phail_auc": 0.007992007992007992
+   },
+   "favours": {
+    "phail_f30": "OpenPI",
+    "phail_hrt240": "OpenPI",
+    "phail_rmst240": "OpenPI",
+    "phail_auc": "OpenPI"
+   }
+  },
+  "OpenPI-SmolVLA-seed2": {
+   "gate_p": 0.0004997501249375312,
+   "D": 0.4654550298864024,
+   "outcome": "i",
+   "expected": "i",
+   "direction": "OpenPI",
+   "p_holm": {
+    "phail_f30": 0.007992007992007992,
+    "phail_hrt240": 0.007992007992007992,
+    "phail_rmst240": 0.007992007992007992,
+    "phail_auc": 0.007992007992007992
+   },
+   "favours": {
+    "phail_f30": "OpenPI",
+    "phail_hrt240": "OpenPI",
+    "phail_rmst240": "OpenPI",
+    "phail_auc": "OpenPI"
+   }
+  },
+  "OpenPI-SmolVLA-seed3": {
+   "gate_p": 0.0004997501249375312,
+   "D": 0.4654550298864024,
+   "outcome": "i",
+   "expected": "i",
+   "direction": "OpenPI",
+   "p_holm": {
+    "phail_f30": 0.007992007992007992,
+    "phail_hrt240": 0.007992007992007992,
+    "phail_rmst240": 0.007992007992007992,
+    "phail_auc": 0.007992007992007992
+   },
+   "favours": {
+    "phail_f30": "OpenPI",
+    "phail_hrt240": "OpenPI",
+    "phail_rmst240": "OpenPI",
+    "phail_auc": "OpenPI"
+   }
+  },
+  "OpenPI-SmolVLA-seed4": {
+   "gate_p": 0.0004997501249375312,
+   "D": 0.4654550298864024,
+   "outcome": "i",
+   "expected": "i",
+   "direction": "OpenPI",
+   "p_holm": {
+    "phail_f30": 0.007992007992007992,
+    "phail_hrt240": 0.007992007992007992,
+    "phail_rmst240": 0.007992007992007992,
+    "phail_auc": 0.007992007992007992
+   },
+   "favours": {
+    "phail_f30": "OpenPI",
+    "phail_hrt240": "OpenPI",
+    "phail_rmst240": "OpenPI",
+    "phail_auc": "OpenPI"
+   }
+  },
+  "GR00T-SmolVLA-seed0": {
+   "gate_p": 0.0004997501249375312,
+   "D": 0.4343981522594673,
+   "outcome": "i",
+   "expected": "i",
+   "direction": "GR00T",
+   "p_holm": {
+    "phail_f30": 0.007992007992007992,
+    "phail_hrt240": 0.007992007992007992,
+    "phail_rmst240": 0.007992007992007992,
+    "phail_auc": 0.007992007992007992
+   },
+   "favours": {
+    "phail_f30": "GR00T",
+    "phail_hrt240": "GR00T",
+    "phail_rmst240": "GR00T",
+    "phail_auc": "GR00T"
+   }
+  },
+  "GR00T-SmolVLA-seed1": {
+   "gate_p": 0.0004997501249375312,
+   "D": 0.4343981522594673,
+   "outcome": "i",
+   "expected": "i",
+   "direction": "GR00T",
+   "p_holm": {
+    "phail_f30": 0.007992007992007992,
+    "phail_hrt240": 0.007992007992007992,
+    "phail_rmst240": 0.007992007992007992,
+    "phail_auc": 0.007992007992007992
+   },
+   "favours": {
+    "phail_f30": "GR00T",
+    "phail_hrt240": "GR00T",
+    "phail_rmst240": "GR00T",
+    "phail_auc": "GR00T"
+   }
+  },
+  "GR00T-SmolVLA-seed2": {
+   "gate_p": 0.0004997501249375312,
+   "D": 0.4343981522594673,
+   "outcome": "i",
+   "expected": "i",
+   "direction": "GR00T",
+   "p_holm": {
+    "phail_f30": 0.007992007992007992,
+    "phail_hrt240": 0.007992007992007992,
+    "phail_rmst240": 0.007992007992007992,
+    "phail_auc": 0.007992007992007992
+   },
+   "favours": {
+    "phail_f30": "GR00T",
+    "phail_hrt240": "GR00T",
+    "phail_rmst240": "GR00T",
+    "phail_auc": "GR00T"
+   }
+  },
+  "GR00T-SmolVLA-seed3": {
+   "gate_p": 0.0004997501249375312,
+   "D": 0.4343981522594673,
+   "outcome": "i",
+   "expected": "i",
+   "direction": "GR00T",
+   "p_holm": {
+    "phail_f30": 0.007992007992007992,
+    "phail_hrt240": 0.007992007992007992,
+    "phail_rmst240": 0.007992007992007992,
+    "phail_auc": 0.007992007992007992
+   },
+   "favours": {
+    "phail_f30": "GR00T",
+    "phail_hrt240": "GR00T",
+    "phail_rmst240": "GR00T",
+    "phail_auc": "GR00T"
+   }
+  },
+  "GR00T-SmolVLA-seed4": {
+   "gate_p": 0.0004997501249375312,
+   "D": 0.4343981522594673,
+   "outcome": "i",
+   "expected": "i",
+   "direction": "GR00T",
+   "p_holm": {
+    "phail_f30": 0.007992007992007992,
+    "phail_hrt240": 0.007992007992007992,
+    "phail_rmst240": 0.007992007992007992,
+    "phail_auc": 0.007992007992007992
+   },
+   "favours": {
+    "phail_f30": "GR00T",
+    "phail_hrt240": "GR00T",
+    "phail_rmst240": "GR00T",
+    "phail_auc": "GR00T"
+   }
+  },
+  "ACT-SmolVLA-seed0": {
+   "gate_p": 0.0004997501249375312,
+   "D": 0.3607332691290364,
+   "outcome": "i",
+   "expected": "i",
+   "direction": "ACT",
+   "p_holm": {
+    "phail_f30": 0.007992007992007992,
+    "phail_hrt240": 0.007992007992007992,
+    "phail_rmst240": 0.007992007992007992,
+    "phail_auc": 0.007992007992007992
+   },
+   "favours": {
+    "phail_f30": "ACT",
+    "phail_hrt240": "ACT",
+    "phail_rmst240": "ACT",
+    "phail_auc": "ACT"
+   }
+  },
+  "ACT-SmolVLA-seed1": {
+   "gate_p": 0.0004997501249375312,
+   "D": 0.3607332691290364,
+   "outcome": "i",
+   "expected": "i",
+   "direction": "ACT",
+   "p_holm": {
+    "phail_f30": 0.007992007992007992,
+    "phail_hrt240": 0.007992007992007992,
+    "phail_rmst240": 0.007992007992007992,
+    "phail_auc": 0.007992007992007992
+   },
+   "favours": {
+    "phail_f30": "ACT",
+    "phail_hrt240": "ACT",
+    "phail_rmst240": "ACT",
+    "phail_auc": "ACT"
+   }
+  },
+  "ACT-SmolVLA-seed2": {
+   "gate_p": 0.0004997501249375312,
+   "D": 0.3607332691290364,
+   "outcome": "i",
+   "expected": "i",
+   "direction": "ACT",
+   "p_holm": {
+    "phail_f30": 0.007992007992007992,
+    "phail_hrt240": 0.007992007992007992,
+    "phail_rmst240": 0.007992007992007992,
+    "phail_auc": 0.007992007992007992
+   },
+   "favours": {
+    "phail_f30": "ACT",
+    "phail_hrt240": "ACT",
+    "phail_rmst240": "ACT",
+    "phail_auc": "ACT"
+   }
+  },
+  "ACT-SmolVLA-seed3": {
+   "gate_p": 0.0004997501249375312,
+   "D": 0.3607332691290364,
+   "outcome": "i",
+   "expected": "i",
+   "direction": "ACT",
+   "p_holm": {
+    "phail_f30": 0.007992007992007992,
+    "phail_hrt240": 0.007992007992007992,
+    "phail_rmst240": 0.007992007992007992,
+    "phail_auc": 0.007992007992007992
+   },
+   "favours": {
+    "phail_f30": "ACT",
+    "phail_hrt240": "ACT",
+    "phail_rmst240": "ACT",
+    "phail_auc": "ACT"
+   }
+  },
+  "ACT-SmolVLA-seed4": {
+   "gate_p": 0.0004997501249375312,
+   "D": 0.3607332691290364,
+   "outcome": "i",
+   "expected": "i",
+   "direction": "ACT",
+   "p_holm": {
+    "phail_f30": 0.007992007992007992,
+    "phail_hrt240": 0.007992007992007992,
+    "phail_rmst240": 0.007992007992007992,
+    "phail_auc": 0.007992007992007992
+   },
+   "favours": {
+    "phail_f30": "ACT",
+    "phail_hrt240": "ACT",
+    "phail_rmst240": "ACT",
+    "phail_auc": "ACT"
+   }
   }
  },
- "GR00T-ACT-seed1": {
-  "gate_p": 0.011494252873563218,
-  "outcome": "ii",
-  "p_holm": {
-   "F30": 0.0919080919080919,
-   "HRT": 0.0919080919080919,
-   "RMST": 0.03196803196803197,
-   "AUC": 0.04195804195804196
-  },
-  "favours": {
-   "F30": "GR00T",
-   "HRT": "GR00T",
-   "RMST": "GR00T",
-   "AUC": "ACT"
-  }
- },
- "GR00T-ACT-seed2": {
-  "gate_p": 0.009495252373813094,
-  "outcome": "ii",
-  "p_holm": {
-   "F30": 0.0999000999000999,
-   "HRT": 0.0999000999000999,
-   "RMST": 0.02997002997002997,
-   "AUC": 0.023976023976023976
-  },
-  "favours": {
-   "F30": "GR00T",
-   "HRT": "GR00T",
-   "RMST": "GR00T",
-   "AUC": "ACT"
-  }
- },
- "GR00T-ACT-seed3": {
-  "gate_p": 0.01199400299850075,
-  "outcome": "ii",
-  "p_holm": {
-   "F30": 0.08391608391608392,
-   "HRT": 0.08391608391608392,
-   "RMST": 0.007992007992007992,
-   "AUC": 0.02997002997002997
-  },
-  "favours": {
-   "F30": "GR00T",
-   "HRT": "GR00T",
-   "RMST": "GR00T",
-   "AUC": "ACT"
-  }
- },
- "GR00T-ACT-seed4": {
-  "gate_p": 0.00849575212393803,
-  "outcome": "ii",
-  "p_holm": {
-   "F30": 0.0999000999000999,
-   "HRT": 0.0999000999000999,
-   "RMST": 0.017982017982017984,
-   "AUC": 0.015984015984015984
-  },
-  "favours": {
-   "F30": "GR00T",
-   "HRT": "GR00T",
-   "RMST": "GR00T",
-   "AUC": "ACT"
-  }
- },
- "OpenPI-ACT-seed0": {
-  "gate_p": 0.11094452773613193,
-  "outcome": "iii",
-  "p_holm": {
-   "F30": 0.37362637362637363,
-   "HRT": 0.08991008991008992,
-   "RMST": 0.03996003996003996,
-   "AUC": 0.08991008991008992
-  },
-  "favours": {
-   "F30": "OpenPI",
-   "HRT": "OpenPI",
-   "RMST": "OpenPI",
-   "AUC": "ACT"
-  }
- },
- "OpenPI-ACT-seed1": {
-  "gate_p": 0.11044477761119441,
-  "outcome": "iii",
-  "p_holm": {
-   "F30": 0.3276723276723277,
-   "HRT": 0.08991008991008992,
-   "RMST": 0.023976023976023976,
-   "AUC": 0.08991008991008992
-  },
-  "favours": {
-   "F30": "OpenPI",
-   "HRT": "OpenPI",
-   "RMST": "OpenPI",
-   "AUC": "ACT"
-  }
- },
- "OpenPI-ACT-seed2": {
-  "gate_p": 0.10844577711144428,
-  "outcome": "iii",
-  "p_holm": {
-   "F30": 0.3916083916083916,
-   "HRT": 0.1018981018981019,
-   "RMST": 0.06393606393606394,
-   "AUC": 0.1018981018981019
-  },
-  "favours": {
-   "F30": "OpenPI",
-   "HRT": "OpenPI",
-   "RMST": "OpenPI",
-   "AUC": "ACT"
-  }
- },
- "OpenPI-ACT-seed3": {
-  "gate_p": 0.1199400299850075,
-  "outcome": "iii",
-  "p_holm": {
-   "F30": 0.3836163836163836,
-   "HRT": 0.07792207792207792,
-   "RMST": 0.03996003996003996,
-   "AUC": 0.07792207792207792
-  },
-  "favours": {
-   "F30": "OpenPI",
-   "HRT": "OpenPI",
-   "RMST": "OpenPI",
-   "AUC": "ACT"
-  }
- },
- "OpenPI-ACT-seed4": {
-  "gate_p": 0.1089455272363818,
-  "outcome": "iii",
-  "p_holm": {
-   "F30": 0.3836163836163836,
-   "HRT": 0.08791208791208792,
-   "RMST": 0.04795204795204795,
-   "AUC": 0.06593406593406594
-  },
-  "favours": {
-   "F30": "OpenPI",
-   "HRT": "OpenPI",
-   "RMST": "OpenPI",
-   "AUC": "ACT"
-  }
- }
+ "pass": false
 }

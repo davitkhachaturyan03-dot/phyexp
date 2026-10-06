@@ -1,0 +1,4 @@
+AC5.9 (a) attribution_grade=True, 2 init states: refused: True -> attribution_grade=True refused: ["train run is not tagged vlapoc.smoke=false (got 'absent')", 'tasks are not all 20 (libero_spatial 0-9 then libero_10 0-9)', 'init states are not 0-49 (n_init 2, offset 0)']
+AC5.9 (a) attribution_grade=True, full protocol, smoke checkpoint: refused: True -> attribution_grade=True refused: ["train run is not tagged vlapoc.smoke=false (got 'absent')"]
+AC5.9 runs in the store before/after the refusals: 38/38 (no run created)
+AC5.9 (b) default eval run 0ceeaaee: eval.attribution_grade=false, eval.attribution_grade.asserted=absent, vlapoc.smoke=true, eval.batch_plan={"batch_size": 1, "batching": "one task per batch; init states in order; rollout j: init init_offset+j, seed seed_base+init_offset+j", "eval_seed_base": 0, "init_offset": 0, "n_init": 1, "tasks": [["libero_spatial", 0]]}, eval.batch_plan.sha256=1852ef679a90

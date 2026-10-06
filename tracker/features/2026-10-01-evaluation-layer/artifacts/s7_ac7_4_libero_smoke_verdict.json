@@ -3,6 +3,8 @@
   "eval-act-train-full-s0-spatial0-n10",
   "eval-smolvla-harness-spatial0"
  ],
+ "family": "W",
+ "label": "smoke (not attribution-grade), family W",
  "cells": [
   "libero_spatial/0"
  ],
@@ -13,7 +15,7 @@
  "tau_s": 60.0,
  "alpha": 0.05,
  "gate": {
-  "test": "macro-KS (pooled-resample episode-clustered bootstrap)",
+  "test": "macro-KS (pooled-resample episode-clustered bootstrap), family W pairs",
   "D": 0.6,
   "p": 0.008995502248875561,
   "D_cells": {
@@ -23,9 +25,11 @@
   "fires": true
  },
  "metrics": {
-  "F30": {
-   "label": "F(30 s), pooled",
-   "tau_s": 30.0,
+  "f30": {
+   "label": "F(30 s) / Success@\u03c4 [family W, \u03c4 30 s]",
+   "family": "W",
+   "tau": "30 s",
+   "aggregate": "pooled",
    "A": 0.0,
    "B": 0.6,
    "diff": -0.6,
@@ -37,29 +41,45 @@
    "higher_is_better": true,
    "diff_better": -0.6,
    "favours": "eval-smolvla-harness-spatial0",
-   "p_holm": 0.007992007992007992,
+   "cells": {
+    "libero_spatial/0": {
+     "A": 0.0,
+     "B": 0.6
+    }
+   },
+   "p_holm": 0.00999000999000999,
    "significant": true
   },
-  "HRT": {
-   "label": "HRT(\u03c4), per-cell macro vs the human anchor",
-   "tau_s": 60.0,
-   "A": 0.06881666666666666,
-   "B": 0.1576856979186557,
-   "diff": -0.08886903125198903,
+  "auc_h": {
+   "label": "AUC vs reference [family W, \u03c4 none (humans all < 60 s)]",
+   "family": "W",
+   "tau": "none (humans all < 60 s)",
+   "aggregate": "macro",
+   "A": 0.0,
+   "B": 0.48,
+   "diff": -0.48,
    "ci95": [
-    -0.3768390268033819,
-    -0.026950467741311976
+    -0.732,
+    -0.225
    ],
    "p": 0.001998001998001998,
    "higher_is_better": true,
-   "diff_better": -0.08886903125198903,
+   "diff_better": -0.48,
    "favours": "eval-smolvla-harness-spatial0",
-   "p_holm": 0.007992007992007992,
+   "cells": {
+    "libero_spatial/0": {
+     "A": 0.0,
+     "B": 0.48
+    }
+   },
+   "p_holm": 0.00999000999000999,
    "significant": true
   },
-  "RMST": {
-   "label": "RMST(\u03c4) s, pooled (global)",
-   "tau_s": 60.0,
+  "rmst60": {
+   "label": "RMST(\u03c4) [family W, \u03c4 60 s = \u03c4_episode]",
+   "family": "W",
+   "tau": "60 s = \u03c4_episode",
+   "aggregate": "pooled",
    "A": 60.0,
    "B": 26.185000000000002,
    "diff": 33.815,
@@ -71,35 +91,76 @@
    "higher_is_better": false,
    "diff_better": -33.815,
    "favours": "eval-smolvla-harness-spatial0",
-   "p_holm": 0.007992007992007992,
+   "cells": {
+    "libero_spatial/0": {
+     "A": 60.0,
+     "B": 26.185000000000002
+    }
+   },
+   "p_holm": 0.00999000999000999,
    "significant": true
   },
-  "AUC": {
-   "label": "AUC vs human, per-cell macro",
-   "tau_s": null,
-   "A": 0.0,
-   "B": 0.47950819672131145,
-   "diff": -0.47950819672131145,
+  "hrt60": {
+   "label": "HRT [family W, \u03c4 60 s]",
+   "family": "W",
+   "tau": "60 s",
+   "aggregate": "macro",
+   "A": 0.06881666666666666,
+   "B": 0.1576856979186557,
+   "diff": -0.08886903125198903,
    "ci95": [
-    -0.7427033156358778,
-    -0.2221656483367278
+    -0.3768390268033819,
+    -0.026950467741311976
    ],
    "p": 0.001998001998001998,
    "higher_is_better": true,
-   "diff_better": -0.47950819672131145,
+   "diff_better": -0.08886903125198903,
    "favours": "eval-smolvla-harness-spatial0",
-   "p_holm": 0.007992007992007992,
+   "cells": {
+    "libero_spatial/0": {
+     "A": 0.06881666666666666,
+     "B": 0.1576856979186557
+    }
+   },
+   "p_holm": 0.00999000999000999,
+   "significant": true
+  },
+  "censored60": {
+   "label": "censored rate [family W, \u03c4 60 s = \u03c4_episode]",
+   "family": "W",
+   "tau": "60 s = \u03c4_episode",
+   "aggregate": "pooled",
+   "A": 1.0,
+   "B": 0.4,
+   "diff": 0.6,
+   "ci95": [
+    0.29999999999999993,
+    0.9
+   ],
+   "p": 0.001998001998001998,
+   "higher_is_better": false,
+   "diff_better": -0.6,
+   "favours": "eval-smolvla-harness-spatial0",
+   "cells": {
+    "libero_spatial/0": {
+     "A": 1.0,
+     "B": 0.4
+    }
+   },
+   "p_holm": 0.00999000999000999,
    "significant": true
   }
  },
  "holm_family": [
-  "F30",
-  "HRT",
-  "RMST",
-  "AUC"
+  "f30",
+  "auc_h",
+  "rmst60",
+  "hrt60",
+  "censored60"
  ],
  "outcome": "i",
  "direction": "eval-smolvla-harness-spatial0",
+ "batch_plan_match": true,
  "logrank_sanity": {
   "chi2": 8.293150370046646,
   "p": 0.003979489152086398
@@ -111,6 +172,35 @@
   "e138fec973614c01af870d91ea8c7ad5"
  ],
  "attribution_grade": false,
- "label": "smoke: at least one arm is not attribution-grade (external checkpoint or untrained policy); exercises the code only",
- "run_id": "5bb1615b2a3c4536b29e49a7bc3a2d4f"
+ "batch_plans": [
+  {
+   "batch_size": 5,
+   "tasks": [
+    [
+     "libero_spatial",
+     0
+    ]
+   ],
+   "n_init": 10,
+   "init_offset": 0,
+   "eval_seed_base": 0,
+   "batching": "one task per batch; init states in order; rollout j: init init_offset+j, seed seed_base+init_offset+j",
+   "provenance": "reconstructed from round-1 params"
+  },
+  {
+   "batch_size": 5,
+   "tasks": [
+    [
+     "libero_spatial",
+     0
+    ]
+   ],
+   "n_init": 10,
+   "init_offset": 0,
+   "eval_seed_base": 0,
+   "batching": "one task per batch; init states in order; rollout j: init init_offset+j, seed seed_base+init_offset+j",
+   "provenance": "reconstructed from round-1 params"
+  }
+ ],
+ "run_id": "b5afceb9659340b88fce3e581f37714b"
 }

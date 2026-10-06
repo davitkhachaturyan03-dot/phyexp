@@ -1,0 +1,4 @@
+AC6.9 leaked round-1 dirs: before 9, after removal 0
+scratch store data/lineage_scratch/r2
+vlapoc-lineage|file:///Users/davit_khachaturyan/Projects/personal/vlaExp/data/lineage_scratch/r2/mlartifacts
+AC6.9 temp dirs before one returns run + one verdict --eval-runs run: 0; after: 0

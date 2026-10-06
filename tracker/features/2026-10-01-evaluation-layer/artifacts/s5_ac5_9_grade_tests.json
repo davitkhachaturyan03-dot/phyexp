@@ -1,0 +1,18 @@
+{
+ "refusals": {
+  "2 init states": "attribution_grade=True refused: [\"train run is not tagged vlapoc.smoke=false (got 'absent')\", 'tasks are not all 20 (libero_spatial 0-9 then libero_10 0-9)', 'init states are not 0-49 (n_init 2, offset 0)']",
+  "full protocol, smoke checkpoint": "attribution_grade=True refused: [\"train run is not tagged vlapoc.smoke=false (got 'absent')\"]"
+ },
+ "runs_before_after": [
+  38,
+  38
+ ],
+ "default_run": "0ceeaaee1a3e4e7c986e51e1cced7c73",
+ "default_tags": {
+  "eval.attribution_grade": "false",
+  "eval.attribution_grade.asserted": null,
+  "vlapoc.smoke": "true",
+  "eval.batch_plan.sha256": "1852ef679a904170eef113fa5d812a3b5298ed5c219d645c8314f0b2af361b7d"
+ },
+ "pass": true
+}
