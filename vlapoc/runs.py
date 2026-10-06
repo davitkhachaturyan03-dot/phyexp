@@ -368,7 +368,7 @@ def train_run(subset_ref: str, name: str, seed: int = 0, steps: int = 5, batch_s
               policy_type: str = "act", policy_overrides: dict | None = None, device: str = "mps",
               dataset_root: Path | None = None, runs_root: Path | None = None, lineage_root: Path | None = None,
               chain: str | None = None, allow_dirty: bool = False, normalization: str = "per_subset",
-              pretrained_path: Path | None = None, smoke: bool | None = None) -> dict:
+              pretrained_path: Path | None = None, smoke: bool | None = None, pretrained_ref: str | None = None) -> dict:
     """Verify the dataset copy, then run LeRobot training on exactly ``subset`` and record every §2.1 field.
 
     Refuses to launch (raises ``VersionIntegrityError``, no MLflow run is created) if any file of the
@@ -388,6 +388,8 @@ def train_run(subset_ref: str, name: str, seed: int = 0, steps: int = 5, batch_s
             (how the data+lineage feature's smoke runs were trained).
         pretrained_path: a LeRobot checkpoint dir to fine-tune from (e.g. ``data/hf_models/smolvla_base``);
             its weights sha256 is recorded as tag ``train.pretrained.weights.sha256``.
+        pretrained_ref: the hub id@revision of ``pretrained_path`` (e.g. ``lerobot/smolvla_base@d9f33c94…``), recorded as
+            param ``policy.path`` (plan r2 AC8.5).
         smoke: tag ``vlapoc.smoke`` (``true`` requires "smoke" in ``name``; ``None`` records ``unspecified``). Only a
             train run tagged ``vlapoc.smoke=false`` can feed an attribution-grade eval (plan r2 AC5.9).
 
@@ -445,7 +447,8 @@ def train_run(subset_ref: str, name: str, seed: int = 0, steps: int = 5, batch_s
                   "policy_overrides": overrides, "output_dir": rel(out_dir),
                   "mixture_weights": "uniform over the subset's frames (LeRobot default sampler; sample_weighting=None)",
                   "augmentation": "none (dataset.image_transforms.enable=false)",
-                  "normalization_stats": norm_param, "pretrained_path": spec.get("policy_pretrained_path", "none")})
+                  "normalization_stats": norm_param, "pretrained_path": spec.get("policy_pretrained_path", "none"),
+                  **({"policy.path": pretrained_ref} if pretrained_ref else {})})
         r.tags({"dataset_version_id": vid, "subset_id": subset.subset_id, "seed": seed,
                 "dataset.stats_json.sha256": sha256_file(stats_path), "train.normalization": normalization,
                 "vlapoc.smoke": "unspecified" if smoke is None else str(bool(smoke)).lower()})
