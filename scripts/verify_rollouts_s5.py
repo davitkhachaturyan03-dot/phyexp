@@ -205,6 +205,80 @@ def summary(paths: list[Path]) -> None:
     json.dump(out, open(ART / "s5_ac5_4_summary.json", "w"), indent=1, default=str)
 
 
+def grade_tests(lineage_root: Path) -> None:
+    """AC5.9 (r2): attribution grade is asserted by the caller and protocol-checked, in a scratch lineage store."""
+    from vlapoc import runs
+    from vlapoc.lineage import LineageError
+
+    c = runs.client(lineage_root)
+    exp = runs.experiment_id(lineage_root)
+    n0 = len(c.search_runs([exp], max_results=5000))
+    refusals = {}
+    for label, args in (("2 init states", dict(tasks=[("libero_spatial", 0)], n_init=2)),
+                        ("full protocol, smoke checkpoint", dict(tasks=runs.CANONICAL_TASKS, n_init=50))):
+        try:
+            runs.eval_run("train:ff64512b40974587a9d711cd8e4f8b04", name=f"eval-grade-refused [smoke]", tau_episode_steps=1200,
+                          batch_size=10, attribution_grade=True, lineage_root=lineage_root, **args)
+            refusals[label] = None
+        except LineageError as e:
+            refusals[label] = str(e)
+    n1 = len(c.search_runs([exp], max_results=5000))
+    out = runs.eval_run("noop", [("libero_spatial", 0)], 1, "eval-grade-default [smoke]", tau_episode_steps=20, smoke=True,
+                        lineage_root=lineage_root)
+    tags = c.get_run(out["run_id"]).data.tags
+    params = c.get_run(out["run_id"]).data.params
+    for k, v in refusals.items():
+        print(f"AC5.9 (a) attribution_grade=True, {k}: refused: {v is not None} -> {v}")
+    print(f"AC5.9 runs in the store before/after the refusals: {n0}/{n1} (no run created)")
+    print(f"AC5.9 (b) default eval run {out['run_id'][:8]}: eval.attribution_grade={tags.get('eval.attribution_grade')}, "
+          f"eval.attribution_grade.asserted={tags.get('eval.attribution_grade.asserted', 'absent')}, vlapoc.smoke={tags.get('vlapoc.smoke')}, "
+          f"eval.batch_plan={params.get('eval.batch_plan')}, eval.batch_plan.sha256={tags.get('eval.batch_plan.sha256', '')[:12]}")
+    json.dump({"refusals": refusals, "runs_before_after": [n0, n1], "default_run": out["run_id"],
+               "default_tags": {k: tags.get(k) for k in ("eval.attribution_grade", "eval.attribution_grade.asserted", "vlapoc.smoke", "eval.batch_plan.sha256")},
+               "pass": all(v is not None for v in refusals.values()) and n0 == n1 and tags.get("eval.attribution_grade") == "false"
+               and "eval.attribution_grade.asserted" not in tags}, open(ART / "s5_ac5_9_grade_tests.json", "w"), indent=1)
+
+
+def t0_model(compare_dir: Path | None) -> None:
+    """AC5.10 (r2): t0_model_sha256 is a function of (task, init state): equal across batch sizes and repeated runs,
+    and (optionally) equal to another eval run's record; a reused env object re-reset changes it (negative test)."""
+    from vlapoc import rollouts as ro
+
+    plan = ro.plan_rollouts([("libero_10", 8), ("libero_spatial", 0)], 2)
+    dfs = {b: ro.run_rollouts(ro.noop_policy(), plan, 20, 128, batch_size=b, log=lambda m: None)[0] for b in (1, 2)}
+    rep = ro.run_rollouts(ro.noop_policy(), plan, 20, 128, batch_size=2, log=lambda m: None)[0]
+    key = lambda d: dict(zip(d["suite"] + "/" + d["libero_task_id"].astype(str) + "/init" + d["init_state_index"].astype(str), d["t0_model_sha256"]))  # noqa: E731
+    k1, k2, k3 = key(dfs[1]), key(dfs[2]), key(rep)
+    same_batch = k1 == k2
+    same_rep = k2 == k3
+    distinct_inits = len(set(k1.values())) == len(k1)
+    print(f"AC5.10 t0_model_sha256 per (task, init) at batch 1: { {k: v[:12] for k, v in k1.items()} }")
+    print(f"AC5.10 equal at batch 2: {same_batch}; equal in a repeated run (batch 2): {same_rep}; distinct across (task, init): {distinct_inits}")
+    cross = None
+    if compare_dir is not None:
+        other = key(pd.read_parquet(compare_dir / "rollouts.parquet"))
+        common = sorted(set(other) & set(k1))
+        cross = all(other[k] == k1[k] for k in common) if common else None
+        print(f"AC5.10 vs the records of {compare_dir.name} (another eval run, another process) on {common}: equal: {cross}")
+    Env = ro._probed_env_class()
+    from libero.libero import benchmark
+
+    env = Env(benchmark.get_benchmark_dict()["libero_10"](), 8, "libero_10", 0, 1200, 128)
+    for _ in range(3):
+        env.reset(seed=0)
+    env.close()
+    reused = [h[:12] for h in env.t0_model_sha256]
+    st = [h[:12] for h in env.t0_state_sha256]
+    print(f"AC5.10 negative test, one env reset(seed=0) x3 on libero_10:8: t0_model_sha256 {reused} (distinct: {len(set(reused)) == 3}); "
+          f"t0_state_sha256 {st} (blind to it: {len(set(st)) == 1})")
+    errs = ro.validate_record(dfs[1].drop(columns=["t0_model_sha256"]))
+    print(f"AC5.10 validate_record without the column: {errs}")
+    json.dump({"batch1": k1, "batch2": k2, "repeat": k3, "cross_run_equal": cross, "reused_env_model": reused, "reused_env_state": st,
+               "validate_without_column": errs,
+               "pass": same_batch and same_rep and distinct_inits and cross is not False and len(set(reused)) == 3 and bool(errs)},
+              open(ART / "s5_ac5_10_t0_model.json", "w"), indent=1)
+
+
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--rerun", type=Path)
@@ -213,6 +287,9 @@ def main() -> int:
     p.add_argument("--pairing", action="store_true")
     p.add_argument("--trajectories", type=Path, nargs="+")
     p.add_argument("--summary", type=Path, nargs="+", help="AC5.4: eval output dirs (external checkpoint)")
+    p.add_argument("--grade-tests", type=Path, help="AC5.9 (r2): a scratch lineage store")
+    p.add_argument("--t0-model", action="store_true", help="AC5.10 (r2)")
+    p.add_argument("--compare", type=Path, help="with --t0-model: another eval output dir to compare t0_model_sha256 with")
     a = p.parse_args()
     if a.rerun:
         rerun(a.rerun)
@@ -227,6 +304,10 @@ def main() -> int:
             trajectories((REPO_ROOT / t).resolve())
     if a.summary:
         summary([(REPO_ROOT / x).resolve() for x in a.summary])
+    if a.grade_tests:
+        grade_tests((REPO_ROOT / a.grade_tests).resolve())
+    if a.t0_model:
+        t0_model((REPO_ROOT / a.compare).resolve() if a.compare else None)
     return 0
 
 

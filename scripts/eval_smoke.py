@@ -43,6 +43,10 @@ def main() -> int:
     p.add_argument("--track", action="store_true", help="record as an MLflow eval stage run")
     p.add_argument("--name", default="eval-smoke")
     p.add_argument("--out", type=Path, default=None)
+    p.add_argument("--attribution-grade", action="store_true",
+                   help="assert attribution grade (refused unless the AC5.8 protocol holds; plan r2 AC5.9)")
+    p.add_argument("--smoke", action="store_true", help="tag vlapoc.smoke=true (the run name must contain 'smoke')")
+    p.add_argument("--lineage-root", type=Path, default=None, help="a scratch lineage store (tests)")
     a = p.parse_args()
     tasks = [(t.split(":")[0], int(t.split(":")[1])) for t in a.tasks.split(",")]
     if a.track:
@@ -50,7 +54,8 @@ def main() -> int:
 
         out = eval_run(a.policy, tasks, a.n, a.name, out_dir=a.out, seed_base=a.seed_base, init_offset=a.init_offset,
                        tau_episode_steps=a.tau, render_hw=a.render, batch_size=a.batch_size, device=a.device,
-                       record_trajectories=a.record_trajectories)
+                       record_trajectories=a.record_trajectories, attribution_grade=a.attribution_grade,
+                       smoke=True if a.smoke else None, lineage_root=a.lineage_root)
     else:
         from vlapoc import rollouts as ro
 
