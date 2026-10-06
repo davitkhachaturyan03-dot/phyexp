@@ -1,0 +1,55 @@
+AC6.1 SYNTHETIC (censoring only at tau_episode (10%), 3 cells x 60 rollouts), family W vs whole-task KM: max |mean(ret_rmst60) + RMST60| = 1.07e-14; max |mean(ret_f30) - F30| = 1.11e-16; max |mean(ret_censored60) - (1 - F60)| = 2.78e-17; max |mean(ret_auc_expected) - AUC_h (ties 1/2)| = 1.39e-17
+AC6.1 SYNTHETIC (no censoring, 3 cells x 60 rollouts), family W vs whole-task KM: max |mean(ret_rmst60) + RMST60| = 7.11e-15; max |mean(ret_f30) - F30| = 1.11e-16; max |mean(ret_censored60) - (1 - F60)| = 5.20e-17; max |mean(ret_auc_expected) - AUC_h (ties 1/2)| = 2.78e-17
+AC6.1 SYNTHETIC WITH TIES (shared 20 Hz grid, 16 tied model-human pairs, 10% censored at τ): max |mean(ret_auc_expected) - AUC_h (ties 1/2)| = 2.78e-17; rmst60 1.07e-14; f30 1.11e-16; censored60 2.78e-17
+AC6.11 SYNTHETIC: unfinished attempts (tails 1.0 s, 58.0 s, 60.0 s) score [-60.0, -60.0, -60.0]; worst completed operation -59.0; max unfinished <= min completed: True
+AC6.2 SYNTHETIC HRT = 0.3796 (3 cells); sum_cells mean(ret_hrt60_lin) = -0.3796 (= -HRT at the expansion point)
+AC6.2   uniform  delta -0.10: dHRT/HRT +0.1026, exact +0.03894, linearized +0.03530, rel. error 9.36%
+AC6.2   one cell delta -0.10: dHRT/HRT +0.0355, exact +0.01347, linearized +0.01219, rel. error 9.51%
+AC6.2   uniform  delta -0.06: dHRT/HRT +0.0591, exact +0.02244, linearized +0.02118, rel. error 5.61%
+AC6.2   one cell delta -0.06: dHRT/HRT +0.0204, exact +0.00776, linearized +0.00732, rel. error 5.71%
+AC6.2   uniform  delta -0.03: dHRT/HRT +0.0287, exact +0.01089, linearized +0.01059, rel. error 2.81%
+AC6.2   one cell delta -0.03: dHRT/HRT +0.0099, exact +0.00377, linearized +0.00366, rel. error 2.85%
+AC6.2   uniform  delta -0.01: dHRT/HRT +0.0094, exact +0.00356, linearized +0.00353, rel. error 0.94%
+AC6.2   one cell delta -0.01: dHRT/HRT +0.0032, exact +0.00123, linearized +0.00122, rel. error 0.95%
+AC6.2   uniform  delta +0.01: dHRT/HRT -0.0092, exact -0.00350, linearized -0.00353, rel. error 0.93%
+AC6.2   one cell delta +0.01: dHRT/HRT -0.0032, exact -0.00121, linearized -0.00122, rel. error 0.95%
+AC6.2   uniform  delta +0.03: dHRT/HRT -0.0271, exact -0.01030, linearized -0.01059, rel. error 2.80%
+AC6.2   one cell delta +0.03: dHRT/HRT -0.0094, exact -0.00356, linearized -0.00366, rel. error 2.85%
+AC6.2   uniform  delta +0.06: dHRT/HRT -0.0528, exact -0.02005, linearized -0.02118, rel. error 5.61%
+AC6.2   one cell delta +0.06: dHRT/HRT -0.0182, exact -0.00692, linearized -0.00732, rel. error 5.71%
+AC6.2   uniform  delta +0.10: dHRT/HRT -0.0841, exact -0.03194, linearized -0.03489, rel. error 9.25%
+AC6.2   one cell delta +0.10: dHRT/HRT -0.0288, exact -0.01095, linearized -0.01197, rel. error 9.34%
+AC6.2 worst relative error over perturbations with |dHRT|/HRT <= 5%: 9.51% (12 cases; criterion <= 10%)
+AC6.4 registry: 28 entries; required (§3.2 primitives, Table 1, §4/§10 targets) missing: []; entries without status/reason: []
+AC6.4   F(30 s) / Success@τ                                            [W               ] -> built                                    returns: ['ret_f30']
+AC6.4   RMST(τ)                                                        [W               ] -> built                                    returns: ['ret_rmst60']
+AC6.4   AUC vs reference                                               [W               ] -> built                                    returns: ['ret_auc_expected', 'ret_auc_sampled']
+AC6.4   HRT                                                            [W               ] -> built (linearized)                       returns: ['ret_hrt60_lin']
+AC6.4   censored rate                                                  [W               ] -> built                                    returns: ['ret_censored60']
+AC6.4   operation RMST, capped                                         [O               ] -> built                                    returns: ['ret_rmst60_op_cap']
+AC6.4   operation RMST (descriptive)                                   [O-descriptive   ] -> built (descriptive)                      returns: []
+AC6.4   operation HRT (descriptive)                                    [O-descriptive   ] -> built (descriptive)                      returns: []
+AC6.4   F(30 s), PhAIL semantics                                       [PhAIL           ] -> PhAIL validation                         returns: []
+AC6.4   HRT(240 s), PhAIL semantics                                    [PhAIL           ] -> PhAIL validation                         returns: []
+AC6.4   global RMST(240 s), PhAIL semantics                            [PhAIL           ] -> PhAIL validation                         returns: []
+AC6.4   AUC vs human, PhAIL semantics                                  [PhAIL           ] -> PhAIL validation                         returns: []
+AC6.4   median                                                         [scoring-only    ] -> scoring only                             returns: []
+AC6.4   UPH                                                            [scoring-only    ] -> projection only                          returns: []
+AC6.4   completion                                                     [scoring-only    ] -> scoring only                             returns: []
+AC6.4   MTBF/A                                                         [scoring-only    ] -> adapted, scoring only                    returns: []
+AC6.4   time-to-success T                                              [primitive       ] -> built (adapted)                          returns: []
+AC6.4   Kaplan–Meier CDF F(t)                                          [primitive       ] -> built                                    returns: []
+AC6.4   ghost-event rate                                               [not-transferable] -> not available on LIBERO (built and valid returns: []
+AC6.4   KS / macro-KS                                                  [procedure       ] -> significance gate (S7)                   returns: []
+AC6.4   P-P plot                                                       [procedure       ] -> visualization                            returns: []
+AC6.4   clustered bootstrap CI                                         [procedure       ] -> built                                    returns: []
+AC6.4   stratified logrank (sanity)                                    [procedure       ] -> built (sanity line)                      returns: []
+AC6.4   intervention / safety-stop rate                                [not-transferable] -> not transferable                         returns: []
+AC6.4   wall-clock T                                                   [protocol        ] -> adapted                                  returns: []
+AC6.4   blind randomized scheduling                                    [protocol        ] -> replaced                                 returns: []
+AC6.4   failure types: missed grasp, wrong object, ignored instruction, idle [not-transferable] -> not built                                returns: []
+AC6.4   failure types: success / timeout_no_progress / timeout_partial_k_of_n [W               ] -> built                                    returns: ['failure_type']
+AC6.6 return columns vs their registry τ: {'ret_f30': {'tau_s': '30', 'ok': True}, 'ret_rmst60': {'tau_s': '60', 'ok': True}, 'ret_auc_expected': {'tau_s': None, 'ok': True}, 'ret_auc_sampled': {'tau_s': None, 'ok': True}, 'ret_hrt60_lin': {'tau_s': '60', 'ok': True}, 'ret_censored60': {'tau_s': '60', 'ok': True}, 'ret_rmst60_op_cap': {'tau_s': '60', 'ok': True}}; family-W registry columns == returns.RETURN_COLUMNS: True
+AC6.8 metric tables (METRICS = / REGISTRY =) in evaluation/returns/verdict: {'evaluation.py': False, 'returns.py': False, 'verdict.py': False}; import metrics_registry: {'evaluation.py': True, 'returns.py': True, 'verdict.py': True}
+AC6.8 registry UPH functional starts: '3600 / RMST(τ_episode) (adopted, as eval'; entries with a return or verdict metric that have family and T: 11/11; declared families as in plan r2: {'f30': True, 'rmst60': True, 'auc_h': True, 'hrt60': True, 'censored60': True, 'rmst60_op_cap': True}
+AC6.8 uph() vs 3600 / rmst(τ_episode = 240 s) on the S2 cohort (5 arms, pooled): max |diff| = 0.00e+00

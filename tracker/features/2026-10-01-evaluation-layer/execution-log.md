@@ -1547,3 +1547,65 @@ Code is written for AC5.9, AC5.10, AC6.8–AC6.11 and AC7.6–AC7.9. **Only thes
   - KS sup-signs still cycle A≻B≻C≻A. RMST(60) is A 30.50, B 19.10, C 35.30.
   - The verdict for A vs B is `[family O]` (i), direction **B**, Δ +11.40 s [+6.85, +16.05], while the KS sup-sign
     favours A. `s7_ac7_3_intransitive.json` was regenerated.
+
+### S6 round 2: AC6.1 (restated), AC6.8, AC6.10, AC6.11 ✅
+
+**Files:**
+- `vlapoc/metrics_registry.py` (new, the single registry).
+- `vlapoc/returns.py`:
+  - family W throughout;
+  - `ret_auc_sampled` counts ties ½;
+  - `operation_returns` gives `ret_rmst60_op_cap` (−60 for the unfinished attempt);
+  - the registry comes from the module;
+  - `load_eval_rollouts` checks the rollouts sha256 and downloads into a `TemporaryDirectory`.
+- `vlapoc/evaluation.py`: `auc_ties_half`, `macro_auc_ties_half`, `rmst_capped`, and `libero_arm` /
+  `libero_human_arm` in families W and O.
+- `vlapoc/verdict.py`: verdict metrics come from the registry by family, and every metric reports per-cell points
+  for both arms.
+- `scripts/verify_returns_s6.py`: `w_identities`, a ties case, `against_verdict` (AC6.10/AC6.11), and the AC6.8 checks.
+
+**Premise checked (family W's AUC identity):** every human whole-task time is below τ_episode, so a censored rollout
+is comparable to every human time. Measured on `human_reference.parquet`: max `T_success_s` = **24.75 s** over
+1000/1000 demos. My first synthetic ties case broke the premise: humans above 60 s gave 3.10e-03. That was a test
+defect, now fixed with an assertion that all humans are < 60 s.
+
+**Acceptance criteria** (`artifacts/s6_r2_synthetic_stdout.txt`, `s6_r2_real_against_verdict_stdout.txt`,
+`s6_verify_returns.json`):
+- ✅ AC6.1 (r2) **family-W identities vs the whole-task KM**, max |diff| per cell:
+
+  | Data | ret_rmst60 + RMST60 | ret_f30 − F30 | ret_censored60 − (1−F60) | ret_auc_expected − AUC_h (ties ½) |
+  |---|---|---|---|---|
+  | synthetic, 10% censored at τ (LABELLED SYNTHETIC) | 1.07e-14 | 1.11e-16 | 2.78e-17 | 1.39e-17 |
+  | synthetic, no censoring | 7.11e-15 | 1.11e-16 | 5.20e-17 | 2.78e-17 |
+  | synthetic **with ties** (shared 20 Hz grid, 16 tied model–human pairs) | 1.07e-14 | 1.11e-16 | 2.78e-17 | 2.78e-17 |
+  | real libero_spatial:0 (`e138fec9`) | 0.00e+00 | 0.00e+00 | 0.00e+00 | 0.00e+00 |
+  | real libero_10:8 (`e92604a8`) | 7.11e-15 | 5.55e-17 | 0.00e+00 | 0.00e+00 |
+
+  - Real libero_10:8 now gives the whole-task values the analyzer named: **RMST(60) 48.400 s, F(30) 0.300**,
+    1−F(60) 0.700. Spatial:0 gives 26.185 s / 0.600 / 0.400.
+  - AC6.2 is unchanged (same draws): worst 9.51%. AC6.5 subsets are unchanged.
+- ✅ AC6.8 **one registry:**
+  - No `METRICS =`/`REGISTRY =` in `evaluation.py`, `returns.py` or `verdict.py` (all `False`), and all three
+    import `metrics_registry` (all `True`).
+  - The registry has 28 entries. `required ... missing: []`; `entries without status/reason: []`.
+  - The UPH functional reads `3600 / RMST(τ_episode) (adopted, …)`.
+  - 11/11 entries with a return or verdict metric have `family` and `T`. f30, rmst60, auc_h, hrt60 and censored60
+    are W, and rmst60_op_cap is O, all as plan r2 declares.
+  - `uph()` vs `3600 / rmst(τ_episode = 240 s)` on the S2 cohort (5 arms, pooled): max |diff| **0.00e+00**.
+  - `s6_metrics_registry.json` was regenerated; it is the same object every returns run writes.
+- ✅ AC6.10 **returns == the verdict's declared functional** (`artifacts/s6_ac6_10_returns_vs_verdict.csv`; this
+  replaces the analyzer's 48.4-vs-37.0 mismatch table):
+  - Both AC5.4 eval runs, every family-W metric per cell: f30, auc_h, rmst60 and censored60 as cell means. hrt60 is
+    checked as −Σ_cells mean(`ret_hrt60_lin`) vs HRT(60).
+  - Family O: −mean(`ret_rmst60_op_cap`) vs `rmst60_op_cap`.
+  - **Max |diff| 7.11e-15.** Every verdict label and metric label carries its family (`True`).
+  - libero_10:8 sides agree: RMST(60) 48.4 / 48.4, F(30) 0.3 / 0.3, AUC_h 0.085 / 0.085, HRT(60) 0.416095 /
+    0.416095, and family-O `rmst60_op_cap` 38.1467 / 38.1467.
+  - The descriptive operation KM RMST is 36.986 s. `_cap` is pessimistic by declaration (plan R16).
+- ✅ AC6.11 **the operation return ranks correctly.** On libero_10:8, op 2 rows:
+  - `init005` (event 0) now scores **−60.00**, below `init003` −15.50 and `init006` −12.10. `init001` op 2
+    (event 0) is also −60.00.
+  - Per cell, unfinished attempts are all −60, and the max unfinished (−60) ≤ the min completed (−48.4; spatial
+    −3.85): `ranking correct: True` on both runs.
+  - Synthetic: tails of 1.0, 58.0 and 60.0 s all score −60.0, worst completed −59.0, `max unfinished <= min
+    completed: True`.

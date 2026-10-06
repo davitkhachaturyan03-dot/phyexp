@@ -1,14 +1,23 @@
 {
  "AC6.1_synthetic": {
   "censoring only at tau_episode (10%)": {
-   "rmst": 1.0658141036401503e-14,
    "f30": 1.1102230246251565e-16,
-   "auc": null
+   "rmst60": 1.0658141036401503e-14,
+   "censored60": 2.7755575615628914e-17,
+   "auc_h": 1.3877787807814457e-17
   },
   "no censoring": {
-   "rmst": 7.105427357601002e-15,
    "f30": 1.1102230246251565e-16,
-   "auc": 2.7755575615628914e-17
+   "rmst60": 7.105427357601002e-15,
+   "censored60": 5.204170427930421e-17,
+   "auc_h": 2.7755575615628914e-17
+  },
+  "with ties": {
+   "f30": 1.1102230246251565e-16,
+   "rmst60": 1.0658141036401503e-14,
+   "censored60": 2.7755575615628914e-17,
+   "auc_h": 2.7755575615628914e-17,
+   "n_tied_pairs": 16
   }
  },
  "AC6.2": {
@@ -147,7 +156,7 @@
   "pass": true
  },
  "AC6.4": {
-  "n": 21,
+  "n": 28,
   "missing": [],
   "no_status": [],
   "pass": true
@@ -162,11 +171,11 @@
     "tau_s": "60",
     "ok": true
    },
-   "ret_auc_sampled": {
+   "ret_auc_expected": {
     "tau_s": null,
     "ok": true
    },
-   "ret_auc_expected": {
+   "ret_auc_sampled": {
     "tau_s": null,
     "ok": true
    },
@@ -178,7 +187,7 @@
     "tau_s": "60",
     "ok": true
    },
-   "ret_rmst60_op": {
+   "ret_rmst60_op_cap": {
     "tau_s": "60",
     "ok": true
    }
@@ -211,9 +220,10 @@
   "stale_rejected": true
  },
  "AC6.1_real_eval-smolvla-harness-spatial0-20261004T150110Z": {
-  "rmst": 0.0,
   "f30": 0.0,
-  "censored": 0.0
+  "rmst60": 0.0,
+  "censored60": 0.0,
+  "auc_h": 0.0
  },
  "AC6.5_eval-smolvla-harness-spatial0-20261004T150110Z": {
   "success": {
@@ -224,9 +234,10 @@
   }
  },
  "AC6.1_real_eval-smolvla-harness-l10t8-20261004T153306Z": {
-  "rmst": 7.105427357601002e-15,
   "f30": 5.551115123125783e-17,
-  "censored": 0.0
+  "rmst60": 7.105427357601002e-15,
+  "censored60": 0.0,
+  "auc_h": 0.0
  },
  "AC6.5_eval-smolvla-harness-l10t8-20261004T153306Z": {
   "success": {
@@ -237,6 +248,69 @@
   },
   "timeout_partial_1_of_2": {
    "libero_10/8": 2
+  }
+ },
+ "AC6.11_synthetic": {
+  "unfinished": [
+   -60.0,
+   -60.0,
+   -60.0
+  ],
+  "worst_completed": -59.0,
+  "pass": true
+ },
+ "AC6.8": {
+  "tables": {
+   "evaluation.py": false,
+   "returns.py": false,
+   "verdict.py": false
+  },
+  "imports": {
+   "evaluation.py": true,
+   "returns.py": true,
+   "verdict.py": true
+  },
+  "uph": "3600 / RMST(\u03c4_episode) (adopted, as evaluation.uph and PhAIL build/fig_qq_tradeoff.py). Notes: Table 1's literal 3600 / E[T | T < \u03c4_episode] (evaluation.uph_conditional) and common.py's per-episode 3600\u00b7S/T differ by up to 3\u00d7 (S2 AC2.8)",
+  "family_T": {
+   "f30": true,
+   "rmst60": true,
+   "auc_h": true,
+   "hrt60": true,
+   "censored60": true,
+   "rmst60_op_cap": true,
+   "phail_f30": true,
+   "phail_hrt240": true,
+   "phail_rmst240": true,
+   "phail_auc": true,
+   "failure_type": true
+  },
+  "declared": {
+   "f30": true,
+   "rmst60": true,
+   "auc_h": true,
+   "hrt60": true,
+   "censored60": true,
+   "rmst60_op_cap": true
+  },
+  "uph_max_diff": 0.0,
+  "pass": true
+ },
+ "AC6.10": {
+  "max_abs_diff": 7.105427357601002e-15,
+  "pass": true
+ },
+ "AC6.11_real": {
+  "eval-smolvla-harness-spatial0-20261004T150110Z|libero_spatial/0": {
+   "unfinished_all_minus_60": true,
+   "max_unfinished": -60.0,
+   "min_completed": -3.85,
+   "pass": true
+  },
+  "eval-smolvla-harness-l10t8-20261004T153306Z|libero_10/8": {
+   "unfinished_all_minus_60": true,
+   "max_unfinished": -60.0,
+   "min_completed": -48.4,
+   "pass": true
   }
  }
 }

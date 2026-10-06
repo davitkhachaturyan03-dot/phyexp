@@ -1,0 +1,13 @@
+run,family,metric,cell,relation,returns_side,verdict_side,abs_diff
+eval-smolvla-harness-spatial0-20261004T150110Z,W,f30,libero_spatial/0,mean(ret_f30) vs f30,0.6,0.6,0.0
+eval-smolvla-harness-spatial0-20261004T150110Z,W,auc_h,libero_spatial/0,mean(ret_auc_expected) vs auc_h,0.48,0.48,0.0
+eval-smolvla-harness-spatial0-20261004T150110Z,W,rmst60,libero_spatial/0,-mean(ret_rmst60) vs rmst60,26.185000000000002,26.185000000000002,0.0
+eval-smolvla-harness-spatial0-20261004T150110Z,W,censored60,libero_spatial/0,mean(ret_censored60) vs censored60,0.4,0.4,0.0
+eval-smolvla-harness-spatial0-20261004T150110Z,W,hrt60,macro,-Σ_cells mean(ret_hrt60_lin) vs HRT(60),0.15768569791865572,0.1576856979186557,2.7755575615628914e-17
+eval-smolvla-harness-spatial0-20261004T150110Z,O,rmst60_op_cap,libero_spatial/0,-mean(ret_rmst60_op_cap) vs rmst60_op_cap,26.185000000000002,26.185000000000002,0.0
+eval-smolvla-harness-l10t8-20261004T153306Z,W,f30,libero_10/8,mean(ret_f30) vs f30,0.3,0.30000000000000004,5.551115123125783e-17
+eval-smolvla-harness-l10t8-20261004T153306Z,W,auc_h,libero_10/8,mean(ret_auc_expected) vs auc_h,0.085,0.085,0.0
+eval-smolvla-harness-l10t8-20261004T153306Z,W,rmst60,libero_10/8,-mean(ret_rmst60) vs rmst60,48.4,48.39999999999999,7.105427357601002e-15
+eval-smolvla-harness-l10t8-20261004T153306Z,W,censored60,libero_10/8,mean(ret_censored60) vs censored60,0.7,0.7,0.0
+eval-smolvla-harness-l10t8-20261004T153306Z,W,hrt60,macro,-Σ_cells mean(ret_hrt60_lin) vs HRT(60),0.41609504132231406,0.41609504132231406,0.0
+eval-smolvla-harness-l10t8-20261004T153306Z,O,rmst60_op_cap,libero_10/8,-mean(ret_rmst60_op_cap) vs rmst60_op_cap,38.14666666666667,38.14666666666667,0.0

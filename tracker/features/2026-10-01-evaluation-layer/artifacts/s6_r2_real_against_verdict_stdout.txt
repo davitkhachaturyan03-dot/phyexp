@@ -1,0 +1,40 @@
+AC6.1 REAL (eval-smolvla-harness-spatial0-20261004T150110Z, 10 rollouts, 1 cells), family W vs whole-task KM: max |mean(ret_rmst60) + RMST60| = 0.00e+00; max |mean(ret_f30) - F30| = 0.00e+00; max |mean(ret_censored60) - (1 - F60)| = 0.00e+00; max |mean(ret_auc_expected) - AUC_h| = 0.00e+00
+AC6.1 REAL eval-smolvla-harness-spatial0-20261004T150110Z libero_spatial/0 whole-task values: RMST(60) 26.185 s, F(30) 0.600, 1-F(60) 0.400
+AC6.5 rollouts per cell x failure_type:
+failure_type      success  timeout_no_progress
+cell                                          
+libero_spatial/0        6                    4
+AC6.5 subset failure_type=success: n 6, F(30 s) 1.000, RMST(60) 3.64 s, mean ret_auc_expected 0.800
+AC6.5 subset failure_type=timeout_no_progress: n 4, F(30 s) 0.000, RMST(60) 60.00 s, mean ret_auc_expected 0.000
+AC6.1 REAL (eval-smolvla-harness-l10t8-20261004T153306Z, 10 rollouts, 1 cells), family W vs whole-task KM: max |mean(ret_rmst60) + RMST60| = 7.11e-15; max |mean(ret_f30) - F30| = 5.55e-17; max |mean(ret_censored60) - (1 - F60)| = 0.00e+00; max |mean(ret_auc_expected) - AUC_h| = 0.00e+00
+AC6.1 REAL eval-smolvla-harness-l10t8-20261004T153306Z libero_10/8 whole-task values: RMST(60) 48.400 s, F(30) 0.300, 1-F(60) 0.700
+AC6.5 rollouts per cell x failure_type:
+failure_type  success  timeout_no_progress  timeout_partial_1_of_2
+cell                                                              
+libero_10/8         3                    5                       2
+AC6.5 subset failure_type=success: n 3, F(30 s) 1.000, RMST(60) 21.33 s, mean ret_auc_expected 0.283
+AC6.5 subset failure_type=timeout_no_progress: n 5, F(30 s) 0.000, RMST(60) 60.00 s, mean ret_auc_expected 0.000
+AC6.5 subset failure_type=timeout_partial_1_of_2: n 2, F(30 s) 0.000, RMST(60) 60.00 s, mean ret_auc_expected 0.000
+AC6.10 returns vs verdict (family W per cell; HRT as the documented macro identity; family O per cell):
+                                           run family        metric             cell                                  relation  returns_side  verdict_side    abs_diff
+eval-smolvla-harness-spatial0-20261004T150110Z      W           f30 libero_spatial/0                      mean(ret_f30) vs f30           0.6           0.6           0
+eval-smolvla-harness-spatial0-20261004T150110Z      W         auc_h libero_spatial/0           mean(ret_auc_expected) vs auc_h          0.48          0.48           0
+eval-smolvla-harness-spatial0-20261004T150110Z      W        rmst60 libero_spatial/0               -mean(ret_rmst60) vs rmst60        26.185        26.185           0
+eval-smolvla-harness-spatial0-20261004T150110Z      W    censored60 libero_spatial/0        mean(ret_censored60) vs censored60           0.4           0.4           0
+eval-smolvla-harness-spatial0-20261004T150110Z      W         hrt60            macro   -Σ_cells mean(ret_hrt60_lin) vs HRT(60)      0.157686      0.157686 2.77556e-17
+eval-smolvla-harness-spatial0-20261004T150110Z      O rmst60_op_cap libero_spatial/0 -mean(ret_rmst60_op_cap) vs rmst60_op_cap        26.185        26.185           0
+   eval-smolvla-harness-l10t8-20261004T153306Z      W           f30      libero_10/8                      mean(ret_f30) vs f30           0.3           0.3 5.55112e-17
+   eval-smolvla-harness-l10t8-20261004T153306Z      W         auc_h      libero_10/8           mean(ret_auc_expected) vs auc_h         0.085         0.085           0
+   eval-smolvla-harness-l10t8-20261004T153306Z      W        rmst60      libero_10/8               -mean(ret_rmst60) vs rmst60          48.4          48.4 7.10543e-15
+   eval-smolvla-harness-l10t8-20261004T153306Z      W    censored60      libero_10/8        mean(ret_censored60) vs censored60           0.7           0.7           0
+   eval-smolvla-harness-l10t8-20261004T153306Z      W         hrt60            macro   -Σ_cells mean(ret_hrt60_lin) vs HRT(60)      0.416095      0.416095           0
+   eval-smolvla-harness-l10t8-20261004T153306Z      O rmst60_op_cap      libero_10/8 -mean(ret_rmst60_op_cap) vs rmst60_op_cap       38.1467       38.1467           0
+AC6.10 max |diff| = 7.11e-15; all <= 1e-9 and every verdict label carries its family: True
+AC6.11 REAL eval-smolvla-harness-spatial0-20261004T150110Z|libero_spatial/0: unfinished attempts all -60: True; max unfinished -60.0, min completed -3.85; ranking correct: True
+AC6.11 REAL eval-smolvla-harness-l10t8-20261004T153306Z|libero_10/8: unfinished attempts all -60: True; max unfinished -60.0, min completed -48.4; ranking correct: True
+               rollout_id  op_k  T_op_s  event  ret_rmst60_op_cap
+libero_10/8/init001/seed1     2   20.20      0             -60.00
+libero_10/8/init003/seed3     2   15.50      1             -15.50
+libero_10/8/init005/seed5     2   11.60      0             -60.00
+libero_10/8/init006/seed6     2   12.10      1             -12.10
+libero_10/8/init007/seed7     2   10.25      1             -10.25
