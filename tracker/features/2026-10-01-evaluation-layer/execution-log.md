@@ -1740,3 +1740,107 @@ defect, now fixed with an assertion that all humans are < 60 s.
   - `fe507fa3` vs `e138fec9` (the same plan) passes: run `a50d9360`, `batch_plan_match True`, no "unpaired" in the
     label.
   - The synthetic test passes too, including a reconstructed plan comparing equal to an explicit one.
+
+### S9 round 2: AC9.1 (r2) ✅, AC9.2 (r2) ✅; AC8.5 restated (runbook only) ✅
+
+Commit `49cca48` held this section's code and runbook changes before they were logged. It is no longer WIP: the
+evidence is below.
+
+**Files:**
+- `scripts/lineage_dry_run.py --eval-smoke`: its train and eval runs pass `smoke=True`, and the verdict is family W.
+  The run table shows `smoke` and `attribution_grade`.
+- `vlapoc/runs.py`: `train_run(..., pretrained_ref=…)` records param `policy.path`.
+- `artifacts/server-runbook.md` (revised).
+
+- ✅ AC9.1 (r2) **the corrected chain, real lineage store** (as the coordinator allowed). `lineage_dry_run.py
+  --eval-smoke` → exit 0 in 122.2 s, chain `eval-smoke-k5-s0-20261006T180040Z`, git `49cca483`, `dirty=False`
+  (`artifacts/s9_eval_smoke_stdout.txt`, `s9_chain_runs.csv`, `s9_summary.json`, `s9_trace_verify.json`,
+  `s9_lineage_graph.mmd`, all regenerated):
+  - 10 runs FINISHED, `stand_in false` on all.
+  - Both train runs carry **`vlapoc.smoke=true`**.
+  - Both eval runs (`09da719d`, `5a8cd0b9`) carry **`vlapoc.smoke=true`, `eval.attribution_grade=false`**.
+  - The verify run `85f7d7d9` carries **`verify.attribution_grade=false`**,
+    `verify.label = 'smoke (not attribution-grade), family W'`, `verify.family=W`, `verify.batch_plan_match=true`.
+  - Its outcome is (iii): D̄ 0, both arms 0/2.
+  - `s9_summary.json` → `label: smoke (not attribution-grade), family W | attribution_grade False`.
+  - `trace(verify 85f7d7d9)`: `13 runs, stages ['build', 'eval', 'select', 'split', 'train', 'verify']; consumed kinds
+    ['checkpoint', 'rollouts', 'subset']; dead ends []; stand-in runs in the trace: []; raw files reached: 20`.
+  - The trace lists 13 runs because ACT 2-step MPS training is bit-reproducible: the new `train-ref` weights are
+    again `cdee42fb…`. Each checkpoint entity therefore has three producer runs: S8's, round 1's chain and this one.
+- ✅ AC9.2 (r2) and AC8.5 (r2 restated; runbook only). `artifacts/server-runbook.md` now matches plan r2 (grep):
+  - **AC8.5** fine-tunes from **`lerobot/smolvla_base@d9f33c94a60fb382c90dea2164c96845bd955e28`**:
+    `train_run('v0/candidate', …, steps=20000, batch_size=64, policy_type='smolvla', policy_overrides={'load_vlm_weights':
+    False}, pretrained_path='data/hf_models/smolvla_base', pretrained_ref='lerobot/smolvla_base@d9f33c94…', smoke=False)`.
+    - Steps and batch are quoted from the LeRobot SmolVLA docs' fine-tuning command (fetched 2026-10-06:
+      `--policy.path=lerobot/smolvla_base … --batch_size=64 --steps=20000`; "20k steps will roughly take ~4 hrs on a
+      single A100 GPU"), and are fixed across seeds and arms.
+    - The run records params `policy.path` (hub id@rev) and `pretrained_path`, with `load_vlm_weights=false` (not
+      used), plus tag `train.pretrained.weights.sha256`.
+    - The round-1 backbone recipe is recorded as a divergence.
+  - **AC5.8** uses the **fixed batch plan**: all 20 tasks in one eval run in canonical order, init states 0–49,
+    seed_base 0, τ 1200, 128², **`--batch-size 50`**. If GPU memory forbids 50, one smaller divisor is used for
+    every arm and seed.
+    - **`--attribution-grade` appears only in that command** (runbook l. 150), and AC7.5 reuses it ("IDENTICAL AC5.8
+      command", l. 219).
+    - The throughput probe (l. 93) does not assert it.
+  - Dry check against the code (`artifacts/s9_ac9_2_runbook_protocol_check.txt`): the AC5.8 arguments pass every
+    item of `attribution_protocol_errors` except the train-run tag. Shown with a smoke train run:
+    `["train run is not tagged vlapoc.smoke=false (got 'true')"]`. A server AC8.5 run is tagged `false`.
+  - **Family W** is the declared verdict (AC7.5 runs `--family W`; family O is reported alongside, labelled). Returns
+    are family W per rollout plus family O's capped operation return.
+  - AC7.5 notes the plan guard must pass without the override, and that `verify.attribution_grade=true` needs both
+    evals asserted.
+
+### AC7.1 (r2): what seed 1 produced, and a rebuttal
+
+**Seed 1, GR00T vs ACT, on the sorted export** (`artifacts/s7_ac7_1_groot_act_seed1.txt`; the same metric-bootstrap
+draws feed the CI and the p):
+- Gate: macro-KS D̄ 0.1754, p **0.0065**, so it fires.
+
+  | Metric (family PhAIL) | Δ = GR00T − ACT | 95% CI | p | Holm p | Favours |
+  |---|---|---|---|---|---|
+  | F(30 s) | +0.0682 | [+0.0040, +0.1378] | 0.038 | 0.0759 | GR00T |
+  | HRT(240 s) | +0.0286 | [+0.0002, +0.0497] | 0.050 | 0.0759 | GR00T |
+  | global RMST(240 s) | −23.62 s | [−41.54, −6.66] | 0.002 | **0.0080** | GR00T (significant) |
+  | AUC vs human | −0.0388 | [−0.0697, −0.0059] | 0.018 | **0.0539** | ACT (not significant after Holm) |
+
+- **Why (i) and not (ii).** The rule takes direction from the metrics that are significant *after Holm*.
+  - The AUC's unadjusted 95% CI excludes 0, but its Holm-adjusted p is 0.0539: rank 3 of 4, so 0.018 × 3.
+  - Only RMST survives, so all significant metrics favour GR00T: (i).
+  - In seed 0 the same metric has p 0.010 → Holm 0.030 → significant → (ii).
+  - D̄ and every point estimate are identical across seeds. Only the Monte-Carlo draws differ.
+- **Is the result or the AC wrong?** The result applies the declared rule correctly. The rule is the PoC's: §4.4
+  "correct for it (e.g. Bonferroni or Holm across metrics) before labeling an episode as a trade-off". I believe the
+  restated expectation "(ii) in 5/5 seeds" is too strong (rebuttal below).
+
+#### Rebuttals to analyzer
+
+| Item | My position | Checkable evidence |
+|---|---|---|
+| AC7.1 (r2, from analysis-r1 F-P1): "GR00T vs ACT → (ii) … both Holm-significant (executor measured, 5/5 seeds)" | The 5/5 came from the round-1, **unsorted** export. On the sorted export it is 4/5. The AUC direction sits at the Holm α = 0.05 boundary, so "(ii)" for this pair is a Monte-Carlo outcome, not a stable property. A guaranteed 5/5 cannot be promised for a boundary quantity. Proposed wording: "GR00T vs ACT → (ii) in ≥ 4/5 seeds; the gate fires in 5/5 and RMST favours GR00T in 5/5; the AUC direction (ACT) is at the Holm boundary (Holm p 0.024–0.054)". | `scripts/verify_verdict_s7.py --phail-seeds 0 1 2 3 4` → AUC Holm p by seed 0.030 / **0.054** / 0.040 / 0.032 / 0.024; RMST Holm 0.024 / 0.008 / 0.040 / 0.032 / 0.030; gate p 0.0070 / 0.0065 / 0.0100 / 0.0085 / 0.0085 (`artifacts/s7_ac7_1_seed_sweep_stdout.txt`). Round 1 (unsorted) AUC Holm was 0.016–0.042 (execution log, batch 3, S7). PhAIL's released JSON supports the gate (GR00T–ACT p 0.016 `HOLDS`); PhAIL never claims a Holm-corrected AUC significance for this pair (§5.3 text: "ACT is now highest … under integrated RMST/HRT it sits third"). |
+
+The other restated parts of AC7.1 hold in 5/5 seeds: OpenPI–GR00T (iii), OpenPI–ACT (iii), and each model vs
+SmolVLA (i). The PhAIL prose-vs-artifact discrepancy is recorded (S7 batch 3 and here). I have not changed the AC.
+
+### Findings for the analyzer (round 2)
+- **AC7.1 is 29/30.** GR00T–ACT seed 1 gives (i), because the AUC sits at the Holm boundary (rebuttal above). Every
+  other restated outcome holds in 5/5.
+- **The sorted export moved every PhAIL p-value, as E3 predicted.** OpenPI–ACT 0.1229 → 0.1104 (PhAIL's function,
+  rng 42) and GR00T–ACT 0.0105 → 0.0090. The export is now byte-identical across `PYTHONHASHSEED` 0/1/unset
+  (sha256 `35b7181b…`).
+- **The scratch-store hazard is real, and handled.** A copied `mlflow.db` keeps the real absolute
+  `artifact_location`, so new runs would write into `data/lineage/mlartifacts`.
+  - `vlapoc.runs.scratch_lineage_copy` repoints it on the copy.
+  - The real `mlflow.db` sha256 stayed `02890131…` through every scratch-store test.
+  - The three older scripts with their own copy logic (`verify_runs_s5`, `verify_lineage_s3`, `verify_derive_s4`) can
+    switch to it. That is a refactorer item.
+- **Real-store writes in round 2:** only the corrected `--eval-smoke` chain (10 runs, chain
+  `eval-smoke-k5-s0-20261006T180040Z`). Every other MLflow write went to `data/lineage_scratch/r2`.
+- **Family-W AUC premise:** every human whole-task time is below τ_episode (max 24.75 s, measured), which makes
+  mean(`ret_auc_expected`) the ties-½ AUC exactly. A future suite with humans ≥ 60 s would break the identity
+  (registry `auc_h`, "humans all < 60 s").
+- **Leaked dirs:** 9 found and removed, not 11.
+- **The registry's AC7.3 test now runs in family O** (capped RMST(60); App. I's CDFs have no censoring, so it equals
+  RMST(60)). Round 1's ad hoc `metrics=("RMST",)` path no longer exists, because metrics come only from the registry.
+- **Not done (out of scope per plan r2):** the data+lineage full dry run and `verify_runs_s5.py` (refactorer), and
+  enforcing the v1 fence at method entry points (later features).

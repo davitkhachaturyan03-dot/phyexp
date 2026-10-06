@@ -1,11 +1,11 @@
-step,run_id,name,stage,stand_in,status,chain
-build,bc8f7d09a7bf47adb59132d874b1236f,build-v0,build,false,FINISHED,(earlier command)
-split,30411f67f697488791db58d8f3b7198c,split-v0,split,false,FINISHED,(earlier command)
-select,9cbda0afd4044a8d9e89e7eb27de11bc,select-drop-random-5-s0 [eval-smoke],select,false,FINISHED,eval-smoke-k5-s0-20261005T033607Z
-train_a,8e61cf2e894b493e8da5e1c39df86ae9,train-ref [eval-smoke],train,false,FINISHED,eval-smoke-k5-s0-20261005T033607Z
-train_b,4e0c4115e88d4b288c9c8227915cf539,train-ref-drop-random-5 [eval-smoke],train,false,FINISHED,eval-smoke-k5-s0-20261005T033607Z
-eval_a,12bd894080414a52b0034acd0c71c324,eval-train-ref [eval-smoke],eval,false,FINISHED,eval-smoke-k5-s0-20261005T033607Z
-eval_b,c03b9928c20a47b2862c4e9599dfc2ba,eval-train-ref-drop-random-5 [eval-smoke],eval,false,FINISHED,eval-smoke-k5-s0-20261005T033607Z
-returns_a,266da622b0a94a10a4cd91bc4d9051d6,returns-train-ref [eval-smoke],returns,false,FINISHED,eval-smoke-k5-s0-20261005T033607Z
-returns_b,7755bdfa32d6405cbbd9d34e552b0929,returns-train-ref-drop-random-5 [eval-smoke],returns,false,FINISHED,eval-smoke-k5-s0-20261005T033607Z
-verify,7080353a020d4751a4b49e1f6900f6b1,verify-ref-vs-drop-random-5 [eval-smoke],verify,false,FINISHED,eval-smoke-k5-s0-20261005T033607Z
+step,run_id,name,stage,stand_in,status,smoke,attribution_grade,chain
+build,bc8f7d09a7bf47adb59132d874b1236f,build-v0,build,false,FINISHED,,,(earlier command)
+split,30411f67f697488791db58d8f3b7198c,split-v0,split,false,FINISHED,,,(earlier command)
+select,2bdd04714e0a48a48db4b96547e626e1,select-drop-random-5-s0 [eval-smoke],select,false,FINISHED,,,eval-smoke-k5-s0-20261006T180040Z
+train_a,e556036535f04c7396d5cd81f2964c90,train-ref [eval-smoke],train,false,FINISHED,true,,eval-smoke-k5-s0-20261006T180040Z
+train_b,bcd753d98da34a78874af6c68c7d00fd,train-ref-drop-random-5 [eval-smoke],train,false,FINISHED,true,,eval-smoke-k5-s0-20261006T180040Z
+eval_a,09da719d7dd549549fd1be20584798e7,eval-train-ref [eval-smoke],eval,false,FINISHED,true,false,eval-smoke-k5-s0-20261006T180040Z
+eval_b,5a8cd0b93e3d41d7a86247ced764fdc5,eval-train-ref-drop-random-5 [eval-smoke],eval,false,FINISHED,true,false,eval-smoke-k5-s0-20261006T180040Z
+returns_a,f589744c301545d9a30f85b2c683280d,returns-train-ref [eval-smoke],returns,false,FINISHED,,,eval-smoke-k5-s0-20261006T180040Z
+returns_b,0aed3e92c5344e7fb7e25b6dc598c4a2,returns-train-ref-drop-random-5 [eval-smoke],returns,false,FINISHED,,,eval-smoke-k5-s0-20261006T180040Z
+verify,85f7d7d95884483480996e97c3cccb19,verify-ref-vs-drop-random-5 [eval-smoke],verify,false,FINISHED,,false,eval-smoke-k5-s0-20261006T180040Z

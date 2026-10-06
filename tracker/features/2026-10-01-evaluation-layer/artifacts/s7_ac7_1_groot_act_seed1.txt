@@ -1,0 +1,12 @@
+seed 0: [family PhAIL] GR00T vs ACT (4 cells, n 164/151 episodes): macro-KS D̄ 0.1754 p 0.0070 (fires) -> outcome (ii)
+    phail_f30     F(30 s), PhAIL semantics [family PhAIL, τ 30 s]            GR00T 0.5091 | ACT 0.4409 | Δ +0.0682 [+0.0039, +0.1272] p 0.0380 Holm 0.0759 -> favours GR00T
+    phail_hrt240  HRT(240 s), PhAIL semantics [family PhAIL, τ 240 s]        GR00T 0.1335 | ACT 0.1049 | Δ +0.0286 [+0.0006, +0.0496] p 0.0500 Holm 0.0759 -> favours GR00T
+    phail_rmst240 global RMST(240 s), PhAIL semantics [family PhAIL, τ 240 s] GR00T 77.3125 | ACT 100.9287 | Δ -23.6162 [-40.9426, -7.1305] p 0.0060 Holm 0.0240 -> favours GR00T *
+    phail_auc     AUC vs human, PhAIL semantics [family PhAIL, τ none]       GR00T 0.0949 | ACT 0.1338 | Δ -0.0388 [-0.0706, -0.0119] p 0.0100 Holm 0.0300 -> favours ACT *
+    sanity: stratified logrank chi2 11.76 p 0.000607
+seed 1: [family PhAIL] GR00T vs ACT (4 cells, n 164/151 episodes): macro-KS D̄ 0.1754 p 0.0065 (fires) -> outcome (i), direction GR00T
+    phail_f30     F(30 s), PhAIL semantics [family PhAIL, τ 30 s]            GR00T 0.5091 | ACT 0.4409 | Δ +0.0682 [+0.0040, +0.1378] p 0.0380 Holm 0.0759 -> favours GR00T
+    phail_hrt240  HRT(240 s), PhAIL semantics [family PhAIL, τ 240 s]        GR00T 0.1335 | ACT 0.1049 | Δ +0.0286 [+0.0002, +0.0497] p 0.0500 Holm 0.0759 -> favours GR00T
+    phail_rmst240 global RMST(240 s), PhAIL semantics [family PhAIL, τ 240 s] GR00T 77.3125 | ACT 100.9287 | Δ -23.6162 [-41.5442, -6.6648] p 0.0020 Holm 0.0080 -> favours GR00T *
+    phail_auc     AUC vs human, PhAIL semantics [family PhAIL, τ none]       GR00T 0.0949 | ACT 0.1338 | Δ -0.0388 [-0.0697, -0.0059] p 0.0180 Holm 0.0539 -> favours ACT
+    sanity: stratified logrank chi2 11.76 p 0.000607

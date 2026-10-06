@@ -1,28 +1,28 @@
-chain eval-smoke-k5-s0-20261005T033607Z; git HEAD b59c3d59bf5b dirty=False
+chain eval-smoke-k5-s0-20261006T180040Z; git HEAD 49cca483fd3a dirty=False
 [reuse] build(v0): run bc8f7d09a7bf (build-v0) already produced 3c4dca68d6f1
 [reuse] split(v0): run 30411f67f697 (split-v0) already produced 8ee096b72b5a
 [run] select drop-random-5: child e470d6712d63 (35 of 40 episodes)
-[run] train: 8e61cf2e894b (40 eps), 4e0c4115e88d (35 eps)
+[run] train: e556036535f0 (40 eps), bcd753d98da3 (35 eps)
 [info] using task orders [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-[rollouts] libero_spatial/0/init000/seed0: censored at 1200 (0/1 ops), 23.9s
-[rollouts] libero_spatial/0/init001/seed1: censored at 1200 (0/1 ops), 23.9s
+[rollouts] libero_spatial/0/init000/seed0: censored at 1200 (0/1 ops), 24.4s
+[rollouts] libero_spatial/0/init001/seed1: censored at 1200 (0/1 ops), 24.4s
 [info] using task orders [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-[rollouts] libero_spatial/0/init000/seed0: censored at 1200 (0/1 ops), 24.9s
-[rollouts] libero_spatial/0/init001/seed1: censored at 1200 (0/1 ops), 24.9s
-[run] eval: 12bd89408041 (0/2 success), c03b9928c20a (0/2)
-[run] verify: eval-train-ref [eval-smoke] vs eval-train-ref-drop-random-5 [eval-smoke] (1 cells, n 2/2 episodes, τ 60 s): macro-KS D̄ 0.0000 p 1.0000 (does not fire) -> outcome (iii)
+[rollouts] libero_spatial/0/init000/seed0: censored at 1200 (0/1 ops), 24.1s
+[rollouts] libero_spatial/0/init001/seed1: censored at 1200 (0/1 ops), 24.1s
+[run] eval: 09da719d7dd5 (0/2 success), 5a8cd0b93e3d (0/2)
+[run] verify: [smoke (not attribution-grade), family W] eval-train-ref [eval-smoke] vs eval-train-ref-drop-random-5 [eval-smoke] (1 cells, n 2/2 episodes): macro-KS D̄ 0.0000 p 1.0000 (does not fire) -> outcome (iii)
 AC9.1 chain runs:
-     step                                         name   stage stand_in   status                             chain
-    build                                     build-v0   build    false FINISHED                 (earlier command)
-    split                                     split-v0   split    false FINISHED                 (earlier command)
-   select         select-drop-random-5-s0 [eval-smoke]  select    false FINISHED eval-smoke-k5-s0-20261005T033607Z
-  train_a                       train-ref [eval-smoke]   train    false FINISHED eval-smoke-k5-s0-20261005T033607Z
-  train_b         train-ref-drop-random-5 [eval-smoke]   train    false FINISHED eval-smoke-k5-s0-20261005T033607Z
-   eval_a                  eval-train-ref [eval-smoke]    eval    false FINISHED eval-smoke-k5-s0-20261005T033607Z
-   eval_b    eval-train-ref-drop-random-5 [eval-smoke]    eval    false FINISHED eval-smoke-k5-s0-20261005T033607Z
-returns_a               returns-train-ref [eval-smoke] returns    false FINISHED eval-smoke-k5-s0-20261005T033607Z
-returns_b returns-train-ref-drop-random-5 [eval-smoke] returns    false FINISHED eval-smoke-k5-s0-20261005T033607Z
-   verify     verify-ref-vs-drop-random-5 [eval-smoke]  verify    false FINISHED eval-smoke-k5-s0-20261005T033607Z
-AC9.1 trace(verify 7080353a020d): 10 runs, stages ['build', 'eval', 'select', 'split', 'train', 'verify']; consumed kinds ['checkpoint', 'rollouts', 'subset']; dead ends []; stand-in runs in the trace: []; raw files reached: 20 (first KITCHEN_SCENE3_turn_on_the_stove_and_put_the_mok… sha256 6b30906a52a5741e)
-done in 122.6s -> tracker/features/2026-10-01-evaluation-layer/artifacts/s9_summary.json
+     step                                         name   stage stand_in   status smoke attribution_grade                             chain
+    build                                     build-v0   build    false FINISHED                                         (earlier command)
+    split                                     split-v0   split    false FINISHED                                         (earlier command)
+   select         select-drop-random-5-s0 [eval-smoke]  select    false FINISHED                         eval-smoke-k5-s0-20261006T180040Z
+  train_a                       train-ref [eval-smoke]   train    false FINISHED  true                   eval-smoke-k5-s0-20261006T180040Z
+  train_b         train-ref-drop-random-5 [eval-smoke]   train    false FINISHED  true                   eval-smoke-k5-s0-20261006T180040Z
+   eval_a                  eval-train-ref [eval-smoke]    eval    false FINISHED  true             false eval-smoke-k5-s0-20261006T180040Z
+   eval_b    eval-train-ref-drop-random-5 [eval-smoke]    eval    false FINISHED  true             false eval-smoke-k5-s0-20261006T180040Z
+returns_a               returns-train-ref [eval-smoke] returns    false FINISHED                         eval-smoke-k5-s0-20261006T180040Z
+returns_b returns-train-ref-drop-random-5 [eval-smoke] returns    false FINISHED                         eval-smoke-k5-s0-20261006T180040Z
+   verify     verify-ref-vs-drop-random-5 [eval-smoke]  verify    false FINISHED                   false eval-smoke-k5-s0-20261006T180040Z
+AC9.1 trace(verify 85f7d7d95884): 13 runs, stages ['build', 'eval', 'select', 'split', 'train', 'verify']; consumed kinds ['checkpoint', 'rollouts', 'subset']; dead ends []; stand-in runs in the trace: []; raw files reached: 20 (first KITCHEN_SCENE3_turn_on_the_stove_and_put_the_mok… sha256 6b30906a52a5741e)
+done in 122.2s -> tracker/features/2026-10-01-evaluation-layer/artifacts/s9_summary.json
 exit 0

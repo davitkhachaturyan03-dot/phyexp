@@ -1,0 +1,2 @@
+runbook AC5.8 command args -> protocol errors (with a smoke-tagged train run): ["train run is not tagged vlapoc.smoke=false (got 'true')"]
+same args, batch 10: ['policy is not a recorded train run']

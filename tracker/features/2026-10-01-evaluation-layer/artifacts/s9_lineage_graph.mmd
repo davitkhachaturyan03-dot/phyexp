@@ -1,65 +1,74 @@
 flowchart LR
-  n522f635d3a["verify: verify-ref-vs-drop-random-5 [eval-smoke]"]
-  n2fe52877a9(["verdict  0e18943f"])
-  nb78aedf621["eval: eval-train-ref [eval-smoke]"]
-  naf8a661ed2(["rollouts  42d4680c"])
-  n59c670d931["eval: eval-train-ref-drop-random-5 [eval-smoke]"]
-  nf67f26e884(["rollouts  d88bf70e"])
-  nf91e568308["train: train-ref [eval-smoke]"]
+  nf409a1aecc["verify: verify-ref-vs-drop-random-5 [eval-smoke]"]
+  n5df1264137(["verdict  730cc2c1"])
+  n21e8411551["eval: eval-train-ref [eval-smoke]"]
+  n36e4dbacf6(["rollouts  4413ecad"])
+  n9b3f8fd8f1["eval: eval-train-ref-drop-random-5 [eval-smoke]"]
+  n295604b157(["rollouts  3249ff35"])
+  n534905d8e6["train: train-ref [eval-smoke]"]
   nb728af1197(["checkpoint  cdee42fb"])
+  nf91e568308["train: train-ref [eval-smoke]"]
   neac9e1d1e5["train: train-act-2step-persubset-v0ref"]
-  naeced0964e["train: train-ref-drop-random-5 [eval-smoke]"]
+  n1e9f984890["train: train-ref-drop-random-5 [eval-smoke]"]
   ndd0055ac35(["checkpoint  fac999b0"])
+  naeced0964e["train: train-ref-drop-random-5 [eval-smoke]"]
   n5071b45d5b["train: train-act-2step-persubset-v0ref-drop5"]
   nccea1031a6["split: split-v0"]
   n8b07c18032(["split  6c3c195f"])
   n60c3d601f8(["subset v0/reference b6a72d5e"])
   nbb9845e113(["subset v0/candidate 8ee096b7"])
-  nae0b3fd488["select: select-drop-random-5-s0 [eval-smoke]"]
+  n061cd0b768["select: select-drop-random-5-s0 [eval-smoke]"]
   n92c704a6d6(["subset  e470d671"])
+  nae0b3fd488["select: select-drop-random-5-s0 [eval-smoke]"]
   nafbcb21c33["build: build-v0"]
   n89b8c83f4a(["version v0 3c4dca68"])
   n8faa492802(["subset v0/all 58b3c415"])
-  n8b34eb67ad["returns: returns-train-ref [eval-smoke]"]
-  n4d16e2bf86(["returns  aca99685"])
-  ne7e61108f9(["operation_returns  ea1e1f49"])
+  na4252e18c4["returns: returns-train-ref [eval-smoke]"]
+  n69b65089ca(["returns  18fb45c6"])
+  n7a561b5d11(["operation_returns  86acf7fd"])
   nbeb276736c(["returns_meta  84e2d5ad"])
-  ned3414f911(["metrics_registry  5f09c16a"])
-  nd258f4af0a["returns: returns-train-ref-drop-random-5 [eval-smoke]"]
-  n6d8ceaf4ea(["returns  fb1194dd"])
-  na84f9d36f5(["operation_returns  ff7a244c"])
+  nd35bc0b2d9(["metrics_registry  9a0ad812"])
+  n2222934f15["returns: returns-train-ref-drop-random-5 [eval-smoke]"]
+  n265f6d8d87(["returns  d0209dea"])
+  n65e3a17fa9(["operation_returns  5f105e5b"])
   n1c312913cd[("raw LIBERO HDF5 x20")]
-  nb78aedf621 -->|produces| naf8a661ed2
-  n8b34eb67ad -->|produces| ned3414f911
-  n8b34eb67ad -->|produces| nbeb276736c
-  n8b34eb67ad -->|produces| n4d16e2bf86
-  n8b34eb67ad -->|produces| ne7e61108f9
+  n21e8411551 -->|produces| n36e4dbacf6
+  n2222934f15 -->|produces| n65e3a17fa9
+  n2222934f15 -->|produces| nbeb276736c
+  n2222934f15 -->|produces| nd35bc0b2d9
+  n2222934f15 -->|produces| n265f6d8d87
+  n061cd0b768 -->|produces| n92c704a6d6
   nccea1031a6 -->|produces| n8b07c18032
   nccea1031a6 -->|produces| nbb9845e113
   nccea1031a6 -->|produces| n60c3d601f8
-  naf8a661ed2 -->|rollouts| n8b34eb67ad
-  naf8a661ed2 -->|rollouts_a| n522f635d3a
+  n295604b157 -->|rollouts| n2222934f15
+  n295604b157 -->|rollouts_b| nf409a1aecc
+  n36e4dbacf6 -->|rollouts_a| nf409a1aecc
+  n36e4dbacf6 -->|rollouts| na4252e18c4
   naeced0964e -->|produces| ndd0055ac35
   n8faa492802 -->|population| nccea1031a6
-  n522f635d3a -->|produces| n2fe52877a9
-  nd258f4af0a -->|produces| ned3414f911
-  nd258f4af0a -->|produces| nbeb276736c
-  nd258f4af0a -->|produces| n6d8ceaf4ea
-  nd258f4af0a -->|produces| na84f9d36f5
+  n9b3f8fd8f1 -->|produces| n295604b157
+  nf409a1aecc -->|produces| n5df1264137
   nf91e568308 -->|produces| nb728af1197
   nae0b3fd488 -->|produces| n92c704a6d6
   neac9e1d1e5 -->|produces| nb728af1197
+  n60c3d601f8 -->|parent| n061cd0b768
   n60c3d601f8 -->|training| nf91e568308
   n60c3d601f8 -->|parent| nae0b3fd488
   n60c3d601f8 -->|training| neac9e1d1e5
+  n60c3d601f8 -->|training| n534905d8e6
   nafbcb21c33 -->|produces| n89b8c83f4a
   nafbcb21c33 -->|produces| n8faa492802
-  n59c670d931 -->|produces| nf67f26e884
-  nb728af1197 -->|checkpoint| nb78aedf621
-  nf67f26e884 -->|rollouts_b| n522f635d3a
-  nf67f26e884 -->|rollouts| nd258f4af0a
+  n1e9f984890 -->|produces| ndd0055ac35
+  nb728af1197 -->|checkpoint| n21e8411551
   n92c704a6d6 -->|training| naeced0964e
+  n92c704a6d6 -->|training| n1e9f984890
   n92c704a6d6 -->|training| n5071b45d5b
-  ndd0055ac35 -->|checkpoint| n59c670d931
+  n534905d8e6 -->|produces| nb728af1197
+  na4252e18c4 -->|produces| n69b65089ca
+  na4252e18c4 -->|produces| nbeb276736c
+  na4252e18c4 -->|produces| n7a561b5d11
+  na4252e18c4 -->|produces| nd35bc0b2d9
+  ndd0055ac35 -->|checkpoint| n9b3f8fd8f1
   n5071b45d5b -->|produces| ndd0055ac35
   n1c312913cd -->|source| nafbcb21c33
