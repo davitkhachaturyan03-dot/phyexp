@@ -105,6 +105,7 @@ def install_subset_stats(stats_json: Path) -> dict:
     original = lt.make_train_eval_datasets
 
     def with_subset_stats(cfg):
+        """LeRobot's ``make_train_eval_datasets``, then the subset stats copied over every non-camera feature."""
         dataset, eval_dataset = original(cfg)
         for ds in (dataset, eval_dataset):
             if ds is None:

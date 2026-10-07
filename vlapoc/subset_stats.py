@@ -29,6 +29,9 @@ the stats here, writes them next to the run, and records their digest (tag ``tra
 Camera features keep LeRobot's handling (ImageNet stats with ``use_imagenet_stats=true``; SmolVLA's VISUAL
 normalization is IDENTITY).
 
+Where it sits (docs/dataflow.md): inside the implicit training run between Steps 1 and 2 ("Training is never
+numbered"). It changes what a trained policy is a function of, so it is part of what the evaluation layer measures.
+
     .venv/bin/python -m vlapoc.subset_stats --check v0          # AC8.1: aggregate over all episodes == stats.json
     .venv/bin/python -m vlapoc.subset_stats --subset v0/reference   # stats + digest of one subset
 """
@@ -105,6 +108,7 @@ def check(version: str = "v0") -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI (usage in the module docstring): the AC8.1 check and one subset's stats digest."""
     p = argparse.ArgumentParser(prog="python -m vlapoc.subset_stats")
     p.add_argument("--check", metavar="VERSION")
     p.add_argument("--subset", metavar="SUBSET")

@@ -128,6 +128,18 @@ class EpisodeEdit:
 # ---------------------------------------------------------------------------------------------
 
 
+def _canonical_episode(frames: pd.DataFrame, task: str) -> dict:
+    """The canonical dict of one stored episode from its data-file rows, already sorted by ``frame_index``:
+    ``task``, ``action`` (T, 7) and ``state`` (T, 8) as float32, ``image``/``image2`` decoded from PNG to uint8."""
+    return {
+        "task": task,
+        "action": np.stack(frames["action"].to_numpy()).astype(np.float32),
+        "state": np.stack(frames["observation.state"].to_numpy()).astype(np.float32),
+        "image": np.stack([decode_png(c) for c in frames[IMAGE_KEYS[0]]]),
+        "image2": np.stack([decode_png(c) for c in frames[IMAGE_KEYS[1]]]),
+    }
+
+
 def read_stored_episode(root: Path, episode_index: int) -> dict:
     """Decode one episode of a stored LeRobot dataset into the canonical arrays used for hashing.
 
@@ -140,14 +152,7 @@ def read_stored_episode(root: Path, episode_index: int) -> dict:
     r = meta[meta["episode_index"] == episode_index].iloc[0]
     path = root / "data" / f"chunk-{int(r['data/chunk_index']):03d}" / f"file-{int(r['data/file_index']):03d}.parquet"
     t = pq.read_table(path, filters=[("episode_index", "=", int(episode_index))]).to_pandas()
-    g = t.sort_values("frame_index")
-    return {
-        "task": r["tasks"][0],
-        "action": np.stack(g["action"].to_numpy()).astype(np.float32),
-        "state": np.stack(g["observation.state"].to_numpy()).astype(np.float32),
-        "image": np.stack([decode_png(c) for c in g[IMAGE_KEYS[0]]]),
-        "image2": np.stack([decode_png(c) for c in g[IMAGE_KEYS[1]]]),
-    }
+    return _canonical_episode(t.sort_values("frame_index"), r["tasks"][0])
 
 
 def iter_stored_episodes(root: Path):
@@ -172,13 +177,7 @@ def iter_stored_episodes(root: Path):
             task_idx = g["task_index"].unique()
             if len(task_idx) != 1:
                 raise LineageError(f"episode {int(ep_idx)} has {len(task_idx)} tasks")
-            yield int(ep_idx), {
-                "task": tasks[int(task_idx[0])],
-                "action": np.stack(g["action"].to_numpy()).astype(np.float32),
-                "state": np.stack(g["observation.state"].to_numpy()).astype(np.float32),
-                "image": np.stack([decode_png(c) for c in g[IMAGE_KEYS[0]]]),
-                "image2": np.stack([decode_png(c) for c in g[IMAGE_KEYS[1]]]),
-            }
+            yield int(ep_idx), _canonical_episode(g, tasks[int(task_idx[0])])
 
 
 def _check_canonical(ep: dict, like: dict) -> None:

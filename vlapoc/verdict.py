@@ -42,6 +42,15 @@ Outcome rule (``outcome``), at level α (default 0.05):
 - gate fires, no metric significant after Holm -> ``"gate_only"``: the distributions differ but no declared
   scalar resolves a direction at this N (accepted divergence, plan r2: PoC §4.4 "each metric's bootstrap CI gives
   the direction", and no CI excludes 0).
+
+Where it sits (docs/dataflow.md): Step 4 (Verification), items 3-4, "macro-KS: did the distribution change at
+all?" then "if yes, per-metric CI -> direction". ``verify_run`` records the verdict as a ``verify`` stage run whose
+inputs are the two eval runs' rollouts, so ``vlapoc.runs.trace`` follows a verdict back to both checkpoints and,
+for trained policies, to the dataset version and the raw files. Reading order: ``compare_policies`` (the verdict)
+-> ``outcome`` (the (i)/(ii)/(iii) rule) -> ``verify_run`` (the recorded stage) -> ``null_calibration``.
+
+    .venv/bin/python -m vlapoc.verdict --phail-all                              # the six PhAIL pairs (family PhAIL)
+    .venv/bin/python -m vlapoc.verdict --eval-runs <eval_a> <eval_b> --name verify-x   # LIBERO, recorded (family W)
 """
 
 from __future__ import annotations
@@ -95,6 +104,8 @@ def metric_value(entry: dict, arm: Arm, human: Arm | None) -> float:
 
 
 def _resample(arm: Arm, rng: np.random.Generator) -> Arm:
+    """One episode-clustered bootstrap draw: within each cell (sorted), as many episodes as the cell has, with
+    replacement."""
     return {c: [arm[c][i] for i in rng.integers(0, len(arm[c]), size=len(arm[c]))] if arm[c] else [] for c in sorted(arm)}
 
 
@@ -113,7 +124,54 @@ def outcome(gate_p: float, metrics: dict, alpha: float = 0.05) -> tuple[str, str
 
 
 def _plan_key(plan: dict | None):
+    """A batch plan as canonical JSON for comparison; ``provenance`` (reconstructed vs recorded) is ignored."""
     return None if plan is None else json.dumps({k: v for k, v in plan.items() if k != "provenance"}, sort_keys=True)
+
+
+def _check_batch_plans(batch_plans: tuple[dict | None, dict | None] | None, allow_plan_mismatch: bool,
+                       names: tuple[str, str]) -> bool | None:
+    """Whether the two arms' eval batch plans match (``None`` if either is unknown). Raises on a mismatch unless
+    ``allow_plan_mismatch``: a stochastic policy's outcome depends on its batch companions (plan r2 AC7.8)."""
+    if batch_plans is None or batch_plans[0] is None or batch_plans[1] is None:
+        return None
+    plan_match = _plan_key(batch_plans[0]) == _plan_key(batch_plans[1])
+    if not plan_match and not allow_plan_mismatch:
+        raise ValueError(f"eval batch plans differ between {names[0]} and {names[1]} (a stochastic policy's outcome depends "
+                         f"on the batch plan); pass allow_plan_mismatch=True to compute an 'unpaired plan' verdict")
+    return plan_match
+
+
+def _bootstrap_differences(a: Arm, b: Arm, human: Arm | None, entries: list[dict], n_boot: int,
+                           rng: np.random.Generator) -> np.ndarray:
+    """(n_boot, n_metrics) bootstrap draws of m(A) − m(B), one column per registry entry. Each draw resamples A, then
+    B, within cells (``_resample``); the human anchor is held fixed, as the common yardstick of both arms."""
+    boot = np.empty((n_boot, len(entries)))
+    for i in range(n_boot):
+        ra, rb = _resample(a, rng), _resample(b, rng)
+        boot[i] = [metric_value(e, ra, human) - metric_value(e, rb, human) for e in entries]
+    return boot
+
+
+def _bootstrap_p(draws: np.ndarray, n_boot: int) -> float:
+    """Two-sided percentile-bootstrap p for Δ = 0: min(1, 2 · min(#(Δ* ≤ 0) + 1, #(Δ* ≥ 0) + 1) / (n_boot + 1)).
+    The +1 terms keep p ≥ 2 / (n_boot + 1); with n_boot 1000 that floor is ≈ 0.002 (0.008 after Holm × 4)."""
+    return min(1.0, 2.0 * min((np.sum(draws <= 0) + 1) / (n_boot + 1), (np.sum(draws >= 0) + 1) / (n_boot + 1)))
+
+
+def _metric_result(e: dict, family: str, value_a: float, value_b: float, draws: np.ndarray, p: float, a: Arm, b: Arm,
+                   human: Arm | None, names: tuple[str, str]) -> dict:
+    """One metric's row of the verdict: both arms' values, Δ = A − B with its 95% percentile CI and raw p, the
+    sign-corrected ``diff_better`` (> 0: A better, whatever the metric's direction), the arm it favours, and
+    per-cell values of both arms (what the S6 return identities are checked against)."""
+    d = value_a - value_b
+    sgn = 1.0 if e["verdict"]["higher_is_better"] else -1.0
+    per_cell = {c: {"A": metric_value(e, {c: a[c]}, {c: human[c]} if human else None),
+                    "B": metric_value(e, {c: b[c]}, {c: human[c]} if human else None)} for c in a}
+    return {"label": f"{e['metric']} [family {family}, τ {e['tau']}]", "family": family, "tau": e["tau"],
+            "aggregate": e["verdict"]["aggregate"], "A": value_a, "B": value_b, "diff": d,
+            "ci95": [float(np.quantile(draws, 0.025)), float(np.quantile(draws, 0.975))], "p": p,
+            "higher_is_better": e["verdict"]["higher_is_better"], "diff_better": sgn * d,
+            "favours": names[0] if sgn * d > 0 else (names[1] if sgn * d < 0 else None), "cells": per_cell}
 
 
 def compare_policies(arm_a: Arm, arm_b: Arm, human: Arm | None, family: str = "W", n_boot: int = 1000,
@@ -134,39 +192,22 @@ def compare_policies(arm_a: Arm, arm_b: Arm, human: Arm | None, family: str = "W
     """
     if family not in mr.VERDICT_FAMILIES:
         raise ValueError(f"family must be one of {list(mr.VERDICT_FAMILIES)}")
-    plan_match = None
-    if batch_plans is not None and batch_plans[0] is not None and batch_plans[1] is not None:
-        plan_match = _plan_key(batch_plans[0]) == _plan_key(batch_plans[1])
-        if not plan_match and not allow_plan_mismatch:
-            raise ValueError(f"eval batch plans differ between {names[0]} and {names[1]} (a stochastic policy's outcome depends "
-                             f"on the batch plan); pass allow_plan_mismatch=True to compute an 'unpaired plan' verdict")
+    plan_match = _check_batch_plans(batch_plans, allow_plan_mismatch, names)
     cells = [c for c in sorted(set(arm_a) & set(arm_b)) if arm_a[c] and arm_b[c] and (human is None or human.get(c))]
     a = {c: arm_a[c] for c in cells}
     b = {c: arm_b[c] for c in cells}
     h = {c: human[c] for c in cells} if human is not None else None
+    # step 1: significance (gate). Step 2 below uses its own generator (seed + 1), so the two never share draws.
     gate = ev.macro_ks(a, b, n_boot_ks, np.random.default_rng(seed))
     entries = mr.verdict_metrics(family)
     point_a = [metric_value(e, a, h) for e in entries]
     point_b = [metric_value(e, b, h) for e in entries]
-    rng = np.random.default_rng(seed + 1)
-    boot = np.empty((n_boot, len(entries)))
-    for i in range(n_boot):
-        ra, rb = _resample(a, rng), _resample(b, rng)
-        boot[i] = [metric_value(e, ra, h) - metric_value(e, rb, h) for e in entries]
+    boot = _bootstrap_differences(a, b, h, entries, n_boot, np.random.default_rng(seed + 1))
     res, raw_p = {}, []
     for j, e in enumerate(entries):
-        d = point_a[j] - point_b[j]
-        bj = boot[:, j]
-        p = min(1.0, 2.0 * min((np.sum(bj <= 0) + 1) / (n_boot + 1), (np.sum(bj >= 0) + 1) / (n_boot + 1)))
+        p = _bootstrap_p(boot[:, j], n_boot)
         raw_p.append(p)
-        sgn = 1.0 if e["verdict"]["higher_is_better"] else -1.0
-        per_cell = {c: {"A": metric_value(e, {c: a[c]}, {c: h[c]} if h else None),
-                        "B": metric_value(e, {c: b[c]}, {c: h[c]} if h else None)} for c in cells}
-        res[e["key"]] = {"label": f"{e['metric']} [family {family}, τ {e['tau']}]", "family": family, "tau": e["tau"],
-                         "aggregate": e["verdict"]["aggregate"], "A": point_a[j], "B": point_b[j], "diff": d,
-                         "ci95": [float(np.quantile(bj, 0.025)), float(np.quantile(bj, 0.975))], "p": p,
-                         "higher_is_better": e["verdict"]["higher_is_better"], "diff_better": sgn * d,
-                         "favours": names[0] if sgn * d > 0 else (names[1] if sgn * d < 0 else None), "cells": per_cell}
+        res[e["key"]] = _metric_result(e, family, point_a[j], point_b[j], boot[:, j], p, a, b, h, names)
     for k, pa in zip(res, holm(raw_p)):
         res[k]["p_holm"] = pa
         res[k]["significant"] = pa < alpha
@@ -184,6 +225,7 @@ def compare_policies(arm_a: Arm, arm_b: Arm, human: Arm | None, family: str = "W
 
 
 def describe(v: dict) -> str:
+    """A verdict as text: one head line (gate, outcome, direction), one line per metric, and the logrank sanity line."""
     a, b = v["arms"]
     head = (f"[{v['label']}] {a} vs {b} ({len(v['cells'])} cells, n {v['n_episodes'][a]}/{v['n_episodes'][b]} episodes): "
             f"macro-KS D̄ {v['gate']['D']:.4f} p {v['gate']['p']:.4f} ({'fires' if v['gate']['fires'] else 'does not fire'}) -> "
@@ -240,7 +282,7 @@ def verify_run(eval_a: str, eval_b: str, name: str, family: str = "W", n_boot: i
     """
     from vlapoc.runs import batch_plan_of, client, stage_run
 
-    del tau  # the family fixes τ (metrics_registry.FAMILY_TAU_S)
+    del tau  # kept in the signature for old callers; the family fixes τ (metrics_registry.FAMILY_TAU_S)
     c = client(lineage_root)
     ra, rb = c.get_run(eval_a), c.get_run(eval_b)
     da, db = eval_rollouts(eval_a, lineage_root), eval_rollouts(eval_b, lineage_root)
@@ -274,6 +316,7 @@ def verify_run(eval_a: str, eval_b: str, name: str, family: str = "W", n_boot: i
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI (usage in the module docstring): PhAIL pairs, a PhAIL null calibration, or a recorded LIBERO verdict."""
     p = argparse.ArgumentParser(prog="python -m vlapoc.verdict")
     p.add_argument("--phail", nargs=2, metavar=("A", "B"), help="two PhAIL models (OpenPI, GR00T, ACT, SmolVLA)")
     p.add_argument("--phail-all", action="store_true", help="all six PhAIL model pairs")

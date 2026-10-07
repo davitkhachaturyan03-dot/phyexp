@@ -22,6 +22,11 @@ Keys (lineage contract): every row carries ``eval_run_id`` and ``rollout_id`` (t
 (``episode_id``, ``content_hash``) episode versions the episode × metric matrix will have as rows
 (``attribution_frame``, checked with ``vlapoc.runs.check_scores``).
 
+Where it sits (docs/dataflow.md): Step 3 (Attribution), item 1, "one RETURN per metric per rollout". Step 2 stored
+rollout *behaviour* (``rollouts.parquet``, ``vlapoc.rollouts``); this module turns each rollout into returns,
+after the rollouts exist, as dataflow.md's third "easy to get wrong" point requires. Influence (Step 3, item 2) is a
+later feature: it reads ``returns.parquet`` and fills ``attribution_frame``.
+
 Usage::
 
     .venv/bin/python -m vlapoc.returns --eval-run <eval_run_id>          # writes returns.parquet etc. (data/eval/returns-<id>/)
@@ -44,6 +49,7 @@ from vlapoc.libero_convert import REPO_ROOT
 
 TAU_S = 60.0        # RMST cap = τ_episode (plan: 60 s)
 F_TAU_S = 30.0      # PoC §4.1 F(30 s)
+FPS = 20            # LIBERO control frequency: steps per simulated second
 HUMAN_REF = REPO_ROOT / "data" / "eval" / "human_reference" / "human_reference.parquet"
 RETURN_COLUMNS = _mr.return_columns("W")  # family W per-rollout returns, from the single registry (plan r2 AC6.8)
 
@@ -67,6 +73,8 @@ def failure_type(event: int, n_ops: int, n_ops_done: int) -> str:
 
 
 def _sample_rng(seed: int, rollout_id: str) -> np.random.Generator:
+    """Generator for one rollout's sampled human time: seeded by (seed, sha256(rollout_id)), so a rollout's draw does
+    not depend on which other rollouts are in the table or in what order."""
     return np.random.default_rng(np.random.SeedSequence([seed, int(hashlib.sha256(rollout_id.encode()).hexdigest()[:16], 16)]))
 
 
@@ -120,7 +128,7 @@ def rollout_returns(rollouts: pd.DataFrame, human: dict | None = None, seed: int
     h_of = [human[(s, int(t))] for s, t in zip(df["suite"], df["libero_task_id"])]
     hs = [h[_sample_rng(seed, rid).integers(0, len(h))] for h, rid in zip(h_of, df["rollout_id"])]
     out["ret_auc_sampled"] = [(float(t < x) + 0.5 * float(t == x)) if not np.isnan(t) else 0.0 for t, x in zip(T, hs)]
-    out["ret_auc_expected"] = [auc_expected(None if np.isnan(t) else t, c / 20.0, h)
+    out["ret_auc_expected"] = [auc_expected(None if np.isnan(t) else t, c / FPS, h)
                                for t, h, c in zip(T, h_of, df["tau_episode_steps"])]
     # HRT linearization weights per cell at this policy
     J = df["cell"].nunique()
@@ -151,7 +159,7 @@ def operation_returns(rollouts: pd.DataFrame) -> pd.DataFrame:
         pairs = json.loads(r.pairs)
         t = 0
         for k, (T_op, e) in enumerate(pairs, start=1):
-            steps = int(round(T_op * 20))
+            steps = int(round(T_op * FPS))
             rows.append({"eval_run_id": r.eval_run_id, "rollout_id": r.rollout_id, "train_run_id": r.train_run_id,
                          "checkpoint_sha256": r.checkpoint_sha256, "suite": r.suite, "libero_task_id": int(r.libero_task_id),
                          "op_k": k, "n_ops": int(r.n_ops), "t_start_steps": t, "t_end_steps": t + steps, "T_op_s": float(T_op),
@@ -162,9 +170,7 @@ def operation_returns(rollouts: pd.DataFrame) -> pd.DataFrame:
 
 def metrics_registry() -> list[dict]:
     """The single registry (``vlapoc.metrics_registry``), serialized as ``metrics_registry.json`` with every returns run."""
-    from vlapoc import metrics_registry as mr
-
-    return mr.to_json()
+    return _mr.to_json()
 
 
 def attribution_frame(train_run_id: str, lineage_root: Path | None = None) -> pd.DataFrame:
@@ -204,6 +210,22 @@ def load_eval_rollouts(eval_run_id: str, lineage_root: Path | None = None, make_
     return df, out_dir
 
 
+def write_returns(rollouts: pd.DataFrame, out_dir: Path, seed: int = 0) -> tuple[dict[str, Path], pd.DataFrame, pd.DataFrame, dict]:
+    """Compute both return tables of one eval run's rollouts and write the four output files into ``out_dir``:
+    ``returns.parquet`` (``rollout_returns``), ``operation_returns.parquet`` (``operation_returns``),
+    ``returns_meta.json`` (τ, the AUC sampling seed, the HRT weights) and ``metrics_registry.json``.
+    Returns ``(paths by kind, returns table, operation table, meta)``."""
+    ret, meta = rollout_returns(rollouts, seed=seed)
+    ops = operation_returns(rollouts)
+    paths = {"returns": out_dir / "returns.parquet", "operation_returns": out_dir / "operation_returns.parquet",
+             "returns_meta": out_dir / "returns_meta.json", "metrics_registry": out_dir / "metrics_registry.json"}
+    ret.to_parquet(paths["returns"], index=False)
+    ops.to_parquet(paths["operation_returns"], index=False)
+    paths["returns_meta"].write_text(json.dumps(meta, indent=1))
+    paths["metrics_registry"].write_text(json.dumps(metrics_registry(), indent=1, ensure_ascii=False))
+    return paths, ret, ops, meta
+
+
 def returns_run(eval_run_id: str, name: str, seed: int = 0, lineage_root: Path | None = None, chain: str | None = None) -> dict:
     """Stage ``returns`` (PoC §9.1 Step 3 p. 19, "Define one 'return' per metric for each rollout"): the per-rollout
     and per-operation return tables of one eval run, recorded as an MLflow run whose input is that eval run's
@@ -213,14 +235,7 @@ def returns_run(eval_run_id: str, name: str, seed: int = 0, lineage_root: Path |
 
     ev_run = client(lineage_root).get_run(eval_run_id)
     ro, out_dir = load_eval_rollouts(eval_run_id, lineage_root)
-    ret, meta = rollout_returns(ro, seed=seed)
-    ops = operation_returns(ro)
-    paths = {"returns": out_dir / "returns.parquet", "operation_returns": out_dir / "operation_returns.parquet",
-             "returns_meta": out_dir / "returns_meta.json", "metrics_registry": out_dir / "metrics_registry.json"}
-    ret.to_parquet(paths["returns"], index=False)
-    ops.to_parquet(paths["operation_returns"], index=False)
-    paths["returns_meta"].write_text(json.dumps(meta, indent=1))
-    paths["metrics_registry"].write_text(json.dumps(metrics_registry(), indent=1, ensure_ascii=False))
+    paths, ret, ops, meta = write_returns(ro, out_dir, seed)
     with stage_run("returns", name, lineage_root, chain=chain) as r:
         r.input_entity("rollouts", ev_run.data.tags["output.rollouts.sha256"], "rollouts")
         r.params({"eval_run_id": eval_run_id, "auc_sample_seed": seed, "tau_s": TAU_S, "f_tau_s": F_TAU_S,
@@ -234,6 +249,7 @@ def returns_run(eval_run_id: str, name: str, seed: int = 0, lineage_root: Path |
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI (usage in the module docstring): returns of one eval run, untracked or as a ``returns`` stage run."""
     p = argparse.ArgumentParser(prog="python -m vlapoc.returns")
     p.add_argument("--eval-run", required=True)
     p.add_argument("--seed", type=int, default=0, help="seed for ret_auc_sampled")
@@ -244,13 +260,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(returns_run(a.eval_run, a.name, a.seed), indent=1))
         return 0
     ro, out_dir = load_eval_rollouts(a.eval_run)
-    ret, meta = rollout_returns(ro, seed=a.seed)
-    ops = operation_returns(ro)
-    ret.to_parquet(out_dir / "returns.parquet", index=False)
-    ops.to_parquet(out_dir / "operation_returns.parquet", index=False)
-    (out_dir / "returns_meta.json").write_text(json.dumps(meta, indent=1))
-    (out_dir / "metrics_registry.json").write_text(json.dumps(metrics_registry(), indent=1, ensure_ascii=False))
-    print(json.dumps({"returns": str((out_dir / "returns.parquet").relative_to(REPO_ROOT)), "rows": len(ret),
+    paths, ret, ops, meta = write_returns(ro, out_dir, a.seed)
+    print(json.dumps({"returns": str(paths["returns"].relative_to(REPO_ROOT)), "rows": len(ret),
                       "operation_rows": len(ops), "columns": RETURN_COLUMNS + ["failure_type"],
                       "hrt_macro_at_policy": meta["hrt_macro_at_policy"]}, indent=1))
     return 0

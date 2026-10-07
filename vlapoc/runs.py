@@ -35,17 +35,20 @@ How lineage is encoded in MLflow (all verified against mlflow 3.16.1 source/beha
   code that ran (``allow_dirty=True`` overrides and is recorded as ``vlapoc.git_dirty=true``).
 - Only FINISHED runs count as producers or consumers; a run that fails part-way is kept (status
   FAILED) but never becomes a lineage edge.
-- Stand-in stages (no real screening or attribution yet; ``eval`` is real since evaluation-layer S5) carry ``vlapoc.stand_in=true``
-  and write only lineage keys plus clearly named placeholder payloads; no outcome numbers.
+- Stand-in stages (``screen`` and ``attribute``: no real screening or attribution yet) carry ``vlapoc.stand_in=true``
+  and write only lineage keys plus clearly named placeholder payloads; no outcome numbers. ``eval`` is real since
+  evaluation-layer S5.
 
 Where it sits
 -------------
 This module records the whole of docs/dataflow.md as runs. Stage tags map to the diagram as
 follows: ``build``/``split``/``derive`` are the data preparation before Step 1, ``screen`` is Step 1,
 ``train`` is the implicit training run between Steps 1 and 2 (dataflow.md, "Training is never
-numbered"), ``eval`` is Step 2, ``attribute`` is Step 3, and ``select`` plus the retraining is Step 4.
-``screen``, ``eval`` and ``attribute`` are stand-ins until their features exist. The queries
-(``trace``, ``consumers``, ``diff``, ``check_scores``) read the runs back.
+numbered"), ``eval`` is Step 2, ``returns`` (``vlapoc.returns``) is Step 3's input and ``attribute`` Step 3
+itself, and ``select`` plus the retraining is Step 4, whose gate is ``verify`` (``vlapoc.verdict``).
+``screen`` and ``attribute`` are stand-ins until their features exist; ``eval``, ``returns`` and ``verify``
+are real (evaluation layer). The queries (``trace``, ``consumers``, ``diff``, ``check_scores``) read the
+runs back.
 
 There is no CLI here; ``python -m vlapoc.lineage`` exposes ``build verify``, ``split make --track``,
 ``derive``, ``trace``, ``consumers``, ``diff`` and ``check-scores`` (see its module docstring), and
@@ -140,6 +143,41 @@ def git_state() -> dict:
     dirty = subprocess.run(["git", "status", "--porcelain", "--", *SOURCE_DIRS], cwd=REPO_ROOT,
                            capture_output=True, text=True, check=True).stdout.strip()
     return {"sha": sha, "dirty": bool(dirty), "dirty_files": dirty.splitlines()[:10]}
+
+
+def scratch_lineage_copy(dest: Path, src: Path | None = None, dirs: tuple[str, ...] | None = None,
+                         mlflow_db: bool = True) -> Path:
+    """A scratch copy of a lineage store, for tests that must not touch the real one; returns ``dest``.
+
+    ``dirs`` are the store-relative directories to copy (default: every directory except ``mlartifacts``; a nested
+    path such as ``versions/<id>`` copies just that version); ``names.json`` is always copied. With ``mlflow_db``
+    (default) ``mlflow.db`` is copied too, and on the copy only the experiment's ``artifact_location`` (stored in
+    the DB as an absolute URI) is repointed to ``dest/mlartifacts``, so new runs cannot write into the real store;
+    old runs keep reading their artifacts from the real store (read-only). ``mlflow_db=False`` makes a manifests-only
+    store: MLflow creates a fresh, empty DB there on first use. ``dest`` must not exist.
+    """
+    import shutil
+    import sqlite3
+
+    src = _root(src)
+    dest = Path(dest)
+    if dest.exists():
+        raise FileExistsError(dest)
+    dest.mkdir(parents=True)
+    if dirs is None:
+        dirs = tuple(x.name for x in sorted(src.iterdir()) if x.is_dir() and x.name != "mlartifacts")
+    for d in dirs:
+        shutil.copytree(src / d, dest / d)
+    shutil.copy(src / "names.json", dest / "names.json")
+    if not mlflow_db:
+        return dest
+    shutil.copy(src / "mlflow.db", dest / "mlflow.db")
+    (dest / "mlartifacts").mkdir()
+    con = sqlite3.connect(dest / "mlflow.db")
+    con.execute("UPDATE experiments SET artifact_location = ? WHERE name = ?", ((dest / "mlartifacts").resolve().as_uri(), EXPERIMENT))
+    con.commit()
+    con.close()
+    return dest
 
 
 # ---------------------------------------------------------------------------------------------
@@ -513,7 +551,7 @@ def load_checkpoint(pretrained: Path, config_overrides: dict | None = None):
 
 
 # ---------------------------------------------------------------------------------------------
-# stand-in stages (lineage keys only; no invented numbers)
+# stand-in stages (lineage keys only; no invented numbers): screen and attribute
 # ---------------------------------------------------------------------------------------------
 
 
@@ -542,6 +580,38 @@ def screen_standin(candidate: str, reference: str, name: str, out_dir: Path, lin
         digest = score_table_digest(table, "suspicion_score")  # NaN payload hashes as 'nan'
         r.output_file("screening_scores", path, kind="score_table", entity_id=digest)
         return r.run_id, path
+
+
+def attribute_standin(train_run_id: str, eval_run_id: str, name: str, out_dir: Path,
+                      lineage_root: Path | None = None, chain: str | None = None) -> tuple[str, Path, str]:
+    """Stage ``attribute`` stand-in (PoC §9.1 Step 3): an episode x metric table keyed by the training
+    subset's (episode_id, content_hash). ``placeholder_score`` is a deterministic hash of the key, used
+    only to exercise drop-top-k downstream; it is not an influence estimate."""
+    c = client(lineage_root)
+    tr, ev = c.get_run(train_run_id), c.get_run(eval_run_id)
+    subset = Subset.load(tr.data.tags["subset_id"], lineage_root)
+    table = subset.keys(lineage_root).copy()
+    table["placeholder_score"] = [_placeholder(e, h, "attribution-stand-in") for e, h in zip(table["episode_id"], table["content_hash"])]
+    table["stand_in"] = True
+    check_scores(table, train_run_id, lineage_root)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / "attribution_scores.STAND_IN.parquet"
+    table.to_parquet(path, index=False)
+    digest = score_table_digest(table, "placeholder_score")
+    with stage_run("attribute", name, lineage_root, stand_in=True, chain=chain) as r:
+        r.input_subset(subset, "training", None)
+        r.input_entity("checkpoint", tr.data.tags["checkpoint.weights.sha256"], "checkpoint")
+        r.input_entity("rollouts", ev.data.tags["output.rollouts.sha256"], "rollouts")
+        r.params({"method": "stand-in (no attribution computed)", "metric": "placeholder_score",
+                  "payload": "placeholder_score = sha256(key) mapped to [0,1); not an influence estimate",
+                  "train_run_id": train_run_id, "eval_run_id": eval_run_id, "n_rows": len(table)})
+        r.output_file("attribution_scores", path, kind="score_table", entity_id=digest)
+        return r.run_id, path, digest
+
+
+# ---------------------------------------------------------------------------------------------
+# the eval stage (evaluation layer S5): batch plan, attribution-grade protocol, closed-loop rollouts
+# ---------------------------------------------------------------------------------------------
 
 
 CANONICAL_TASKS = [("libero_spatial", t) for t in range(10)] + [("libero_10", t) for t in range(10)]  # AC5.8 order
@@ -595,31 +665,6 @@ def attribution_protocol_errors(policy: str, tasks: list, n_init: int, init_offs
     if batch_size < 1 or 50 % batch_size:
         errs.append(f"batch_size {batch_size} does not divide 50")
     return errs
-
-
-def scratch_lineage_copy(dest: Path, src: Path | None = None) -> Path:
-    """A scratch copy of a lineage store for tests that write MLflow runs: every manifest dir, ``names.json`` and
-    ``mlflow.db`` are copied, and on the copy only the experiment's ``artifact_location`` (stored as an absolute URI
-    in the DB) is repointed to ``dest/mlartifacts``, so new runs cannot write into the real store. Old runs keep
-    reading their artifacts from the real store (read-only)."""
-    import shutil
-    import sqlite3
-
-    src = _root(src)
-    dest = Path(dest)
-    if dest.exists():
-        raise FileExistsError(dest)
-    dest.mkdir(parents=True)
-    for d in sorted(x for x in src.iterdir() if x.is_dir() and x.name != "mlartifacts"):
-        shutil.copytree(d, dest / d.name)
-    for f in ("names.json", "mlflow.db"):
-        shutil.copy(src / f, dest / f)
-    (dest / "mlartifacts").mkdir()
-    con = sqlite3.connect(dest / "mlflow.db")
-    con.execute("UPDATE experiments SET artifact_location = ? WHERE name = ?", ((dest / "mlartifacts").resolve().as_uri(), EXPERIMENT))
-    con.commit()
-    con.close()
-    return dest
 
 
 def eval_run(policy: str, tasks: list[tuple[str, int]], n_init: int, name: str, out_dir: Path | None = None,
@@ -709,6 +754,8 @@ def eval_run(policy: str, tasks: list[tuple[str, int]], n_init: int, name: str, 
         out = {"run_id": r.run_id, "rollouts": rel(path), "n_rollouts": len(df), "n_success": int(df["event"].sum()),
                "trajectories": None, "out_dir": rel(out_dir)}
         if traj is not None:
+            # identifies this physical copy, not the content: LeRobot's writer orders stats.json keys differently
+            # from run to run, so a bit-identical re-run gets another digest (refactor.md F2)
             digest = sha256_json(file_digests(out_dir / "trajectories"))
             r.produced("trajectories", digest, "trajectories")
             r.tags({"eval.trajectories.frames": traj["frames"], "eval.trajectories.episodes": traj["episodes"]})
@@ -717,31 +764,9 @@ def eval_run(policy: str, tasks: list[tuple[str, int]], n_init: int, name: str, 
         return out
 
 
-def attribute_standin(train_run_id: str, eval_run_id: str, name: str, out_dir: Path,
-                      lineage_root: Path | None = None, chain: str | None = None) -> tuple[str, Path, str]:
-    """Stage ``attribute`` stand-in (PoC §9.1 Step 3): an episode x metric table keyed by the training
-    subset's (episode_id, content_hash). ``placeholder_score`` is a deterministic hash of the key, used
-    only to exercise drop-top-k downstream; it is not an influence estimate."""
-    c = client(lineage_root)
-    tr, ev = c.get_run(train_run_id), c.get_run(eval_run_id)
-    subset = Subset.load(tr.data.tags["subset_id"], lineage_root)
-    table = subset.keys(lineage_root).copy()
-    table["placeholder_score"] = [_placeholder(e, h, "attribution-stand-in") for e, h in zip(table["episode_id"], table["content_hash"])]
-    table["stand_in"] = True
-    check_scores(table, train_run_id, lineage_root)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / "attribution_scores.STAND_IN.parquet"
-    table.to_parquet(path, index=False)
-    digest = score_table_digest(table, "placeholder_score")
-    with stage_run("attribute", name, lineage_root, stand_in=True, chain=chain) as r:
-        r.input_subset(subset, "training", None)
-        r.input_entity("checkpoint", tr.data.tags["checkpoint.weights.sha256"], "checkpoint")
-        r.input_entity("rollouts", ev.data.tags["output.rollouts.sha256"], "rollouts")
-        r.params({"method": "stand-in (no attribution computed)", "metric": "placeholder_score",
-                  "payload": "placeholder_score = sha256(key) mapped to [0,1); not an influence estimate",
-                  "train_run_id": train_run_id, "eval_run_id": eval_run_id, "n_rows": len(table)})
-        r.output_file("attribution_scores", path, kind="score_table", entity_id=digest)
-        return r.run_id, path, digest
+# ---------------------------------------------------------------------------------------------
+# the select stage (subsets for counterfactual retraining)
+# ---------------------------------------------------------------------------------------------
 
 
 SELECT_OPS = ("drop_top_k", "drop_random_k", "drop_group")
@@ -949,6 +974,7 @@ def diff(run_a: str, run_b: str, lineage_root: Path | None = None) -> dict:
               if pa.get(k) != pb.get(k) and k not in BOOKKEEPING_PARAMS}
 
     def cfg(run):
+        """The run's checkpoint ``train_config.json`` (MLflow artifact), flattened to dotted keys."""
         p = mlflow.artifacts.download_artifacts(run_id=run.info.run_id, artifact_path="checkpoint/train_config.json",
                                                 tracking_uri=tracking_uri(lineage_root))
         return _flatten(json.loads(Path(p).read_text()))
