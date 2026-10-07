@@ -15,6 +15,11 @@ Grounding
   as reaching the cap) and the PhAIL-semantics operation KM functionals as *descriptive*; **family PhAIL** is PhAIL's
   own semantics (operation pairs with ghosts, τ = 240 s, AUC ties dropped), used only to reproduce PhAIL (S2, S7).
 
+Where it sits (docs/dataflow.md): the shared vocabulary of Step 2 (Evaluation: which scalars describe a policy),
+Step 3 (Attribution: which per-rollout return each metric gets) and Step 4 (Verification: which metrics the verdict
+tests, in which family). Read it first: every column name in ``returns.parquet`` and every metric in a verdict
+comes from an entry here.
+
 This module is data only (no imports of the metric code), so ``vlapoc.evaluation`` (S1), ``vlapoc.returns`` (S6)
 and ``vlapoc.verdict`` (S7) can all import it; ``metrics_registry.json`` (written with every returns run) is
 ``to_json()``. Fields per entry: ``key``, ``metric`` (display name), ``family`` (W / O / O-descriptive / PhAIL /
@@ -25,6 +30,7 @@ computes it, or None), ``identity`` (the return ↔ verdict relation), ``transfe
 
 from __future__ import annotations
 
+# The three time variables an entry's functional can be taken of (the ``T`` field); one per family.
 T_W = "whole-task time to success T (s, 20 Hz sim time; LIBERO _check_success); censored only at τ_episode = 60 s"
 T_O = "inter-completion time T_k of operation k (S4 rule; PhAIL §3.1 pairs; the unfinished attempt is the tail τ_end − t_last)"
 T_P = "PhAIL operation pairs (T_i since the previous placement; ghosts (inf, 1); censored tail), wall clock"
@@ -171,10 +177,11 @@ ENTRIES: list[dict] = [
 
 VERDICT_FAMILIES = {"W": ["f30", "auc_h", "rmst60", "hrt60", "censored60"], "O": ["rmst60_op_cap"],
                     "PhAIL": ["phail_f30", "phail_hrt240", "phail_rmst240", "phail_auc"]}
-FAMILY_TAU_S = {"W": 60.0, "O": 60.0, "PhAIL": 240.0}  # the verdict family's RMST/HRT cap τ
+FAMILY_TAU_S = {"W": 60.0, "O": 60.0, "PhAIL": 240.0}  # the verdict family's RMST/HRT cap τ (s), recorded with each verdict
 
 
 def entry(key: str) -> dict:
+    """The registry entry with this ``key`` (e.g. ``"rmst60"``); ``KeyError`` if there is none."""
     for e in ENTRIES:
         if e["key"] == key:
             return e
@@ -187,10 +194,13 @@ def return_columns(family: str = "W") -> list[str]:
 
 
 def verdict_metrics(family: str) -> list[dict]:
+    """The entries ``vlapoc.verdict.compare_policies`` tests in ``family`` ("W", "O" or "PhAIL"), in
+    ``VERDICT_FAMILIES`` order. That order fixes the bootstrap matrix's columns and the Holm family."""
     return [entry(k) for k in VERDICT_FAMILIES[family]]
 
 
 def to_json() -> list[dict]:
+    """Shallow copies of every entry: the content of ``metrics_registry.json`` written with every returns run."""
     return [dict(e) for e in ENTRIES]
 
 

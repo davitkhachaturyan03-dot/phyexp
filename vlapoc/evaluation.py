@@ -46,10 +46,22 @@ simulated time, T = steps / 20), ``duration_s`` = the rollout's observed duratio
 out), ``total_items`` = number of operations, no ghost events (LIBERO defines no unrecoverable-state rule;
 plan P13, owner decision 6), and ``multi_grip_threshold_s = 0`` (sim timestamps are exact; PhAIL's 0.3 s
 clustering exists for annotation jitter, ``episode_to_T_pairs`` docstring; a recorded divergence, S4).
+
+Where it sits (docs/dataflow.md)
+--------------------------------
+Step 2, item 4 ("compute T-curves, F(30 s), RMST, HRT, AUC"): every scalar of the evaluation layer is computed here,
+for LIBERO rollouts (S5 records via ``libero_arm``), the LIBERO human reference (``libero_human_arm``) and PhAIL's
+released cohort (``phail_cohort_arms``). ``vlapoc.returns`` (Step 3) and ``vlapoc.verdict`` (Step 4) call these
+functions rather than re-deriving any metric; ``vlapoc.metrics_registry`` names which function implements which
+PoC metric.
+
+Reading order: episodes and arms -> scalars (functionals of the KM F) -> macro / HRT / AUC / P-P / KS -> the
+clustered bootstrap -> the registry view and the two plot helpers.
 """
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import Callable, Iterable
@@ -58,11 +70,11 @@ import numpy as np
 
 from vlapoc.third_party import phail_stats as ps
 
-Arm = dict  # {cell: list[Episode]}
+Arm = dict  # {cell: list[Episode]}; a cell is a PhAIL object or a LIBERO "suite/task_id"
 
 
 # ---------------------------------------------------------------------------------------------
-# episodes and their (T, E) pairs
+# episodes, their (T, E) pairs, and arms ({cell: [Episode]}) for PhAIL and LIBERO
 # ---------------------------------------------------------------------------------------------
 
 
@@ -114,6 +126,46 @@ def phail_cohort_arms(path=None) -> dict[str, Arm]:
                               cohort_source=r.cohort_source)
         arms.setdefault(r.model_short, {}).setdefault(r.eval_object, []).append(ep)
     return {m: {o: arms[m][o] for o in sorted(arms[m])} for m in arms}
+
+
+def libero_arm(rollouts, family: str = "W") -> Arm:
+    """``{suite/task: [Episode]}`` from a rollout record (S5) in a declared family (``vlapoc.metrics_registry``):
+    ``"W"`` one whole-task pair per rollout, (T_s, 1) on success else (τ_episode_s, 0); ``"O"`` the rollout's
+    operation pairs (S4 rule, stored in ``pairs``)."""
+    arm: dict = {}
+    for r in rollouts.itertuples():
+        if family == "W":
+            pairs = ((float(r.T_s), 1),) if int(r.event) else ((float(r.tau_episode_steps) / 20.0, 0),)
+        elif family == "O":
+            pairs = tuple((float(t), int(e)) for t, e in json.loads(r.pairs))
+        else:
+            raise ValueError("LIBERO family must be 'W' or 'O'")
+        arm.setdefault(f"{r.suite}/{int(r.libero_task_id)}", []).append(Episode(r.rollout_id, pairs))
+    return arm
+
+
+def libero_human_arm(family: str = "W", cells: Iterable[str] | None = None) -> Arm:
+    """The fixed human anchor per task (all 1000 v0 originals): family W = whole-task ``T_success_s`` from S3's
+    ``human_reference.parquet``; family O = operation pairs from S4's ``human_operations.parquet``."""
+    import pandas as pd
+
+    from vlapoc.libero_convert import REPO_ROOT
+
+    base = REPO_ROOT / "data" / "eval" / "human_reference"
+    arm: dict = {}
+    if family == "W":
+        h = pd.read_parquet(base / "human_reference.parquet")
+        h = h[h["success_any"].astype(bool)]
+        for r in h.sort_values("episode_id").itertuples():
+            arm.setdefault(f"{r.suite}/{int(r.libero_task_id)}", []).append(Episode(r.episode_id, ((float(r.T_success_s), 1),)))
+    elif family == "O":
+        h = pd.read_parquet(base / "human_operations.parquet")
+        for (s_, t, e), g in h.sort_values(["episode_id", "op_k"]).groupby(["suite", "libero_task_id", "episode_id"]):
+            arm.setdefault(f"{s_}/{int(t)}", []).append(Episode(e, tuple((float(x), int(y)) for x, y in zip(g["T_op_s"], g["event"]))))
+    else:
+        raise ValueError("LIBERO family must be 'W' or 'O'")
+    keep = None if cells is None else set(cells)
+    return {c: v for c, v in sorted(arm.items()) if keep is None or c in keep}
 
 
 def collect_TE(eps: Iterable[Episode]) -> tuple[np.ndarray, np.ndarray]:
@@ -319,48 +371,6 @@ def rmst_capped(eps: Iterable[Episode], tau: float) -> float:
     descriptive operation RMST only when no pair is censored before τ."""
     capped = [Episode(ep.key, tuple((t, 1) if e else (float("inf"), 1) for t, e in ep.pairs)) for ep in eps]
     return rmst(capped, tau)
-
-
-def libero_arm(rollouts, family: str = "W") -> Arm:
-    """``{suite/task: [Episode]}`` from a rollout record (S5) in a declared family (``vlapoc.metrics_registry``):
-    ``"W"`` one whole-task pair per rollout, (T_s, 1) on success else (τ_episode_s, 0); ``"O"`` the rollout's
-    operation pairs (S4 rule, stored in ``pairs``)."""
-    import json
-
-    arm: dict = {}
-    for r in rollouts.itertuples():
-        if family == "W":
-            pairs = ((float(r.T_s), 1),) if int(r.event) else ((float(r.tau_episode_steps) / 20.0, 0),)
-        elif family == "O":
-            pairs = tuple((float(t), int(e)) for t, e in json.loads(r.pairs))
-        else:
-            raise ValueError("LIBERO family must be 'W' or 'O'")
-        arm.setdefault(f"{r.suite}/{int(r.libero_task_id)}", []).append(Episode(r.rollout_id, pairs))
-    return arm
-
-
-def libero_human_arm(family: str = "W", cells: Iterable[str] | None = None) -> Arm:
-    """The fixed human anchor per task (all 1000 v0 originals): family W = whole-task ``T_success_s`` from S3's
-    ``human_reference.parquet``; family O = operation pairs from S4's ``human_operations.parquet``."""
-    import pandas as pd
-
-    from vlapoc.libero_convert import REPO_ROOT
-
-    base = REPO_ROOT / "data" / "eval" / "human_reference"
-    arm: dict = {}
-    if family == "W":
-        h = pd.read_parquet(base / "human_reference.parquet")
-        h = h[h["success_any"].astype(bool)]
-        for r in h.sort_values("episode_id").itertuples():
-            arm.setdefault(f"{r.suite}/{int(r.libero_task_id)}", []).append(Episode(r.episode_id, ((float(r.T_success_s), 1),)))
-    elif family == "O":
-        h = pd.read_parquet(base / "human_operations.parquet")
-        for (s_, t, e), g in h.sort_values(["episode_id", "op_k"]).groupby(["suite", "libero_task_id", "episode_id"]):
-            arm.setdefault(f"{s_}/{int(t)}", []).append(Episode(e, tuple((float(x), int(y)) for x, y in zip(g["T_op_s"], g["event"]))))
-    else:
-        raise ValueError("LIBERO family must be 'W' or 'O'")
-    keep = None if cells is None else set(cells)
-    return {c: v for c, v in sorted(arm.items()) if keep is None or c in keep}
 
 
 def pp_curve(model_eps: Iterable[Episode], ref_eps: Iterable[Episode], tau: float, n: int = 200) -> tuple[np.ndarray, np.ndarray]:
