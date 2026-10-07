@@ -51,6 +51,14 @@ T convention: index 0 of a trace is the post-settle state, so ``T_steps`` = numb
 LIBERO's goal check first holds, ``T_s = T_steps / 20``. A rollout that has not succeeded after
 ``tau_episode_steps`` actions is right-censored (PhAIL §3.1 p. 4). LIBERO has no unrecoverable-state rule
 (plan P13, owner decision 6), so there are no ghost events and no ghost column.
+
+Where it sits (docs/dataflow.md)
+--------------------------------
+Step 2 (Evaluation), items 1-3: run the rollouts, record whether and when each succeeded, keep the raw signals a
+failure rule would need. ``vlapoc.runs.eval_run`` wraps ``run_rollouts`` in an MLflow ``eval`` run tied to the
+checkpoint; ``vlapoc.returns`` (Step 3) and ``vlapoc.verdict`` (Step 4) read the ``rollouts.parquet`` it writes.
+Reading order: ``RECORD_COLUMNS`` / ``validate_record`` (what a rollout record is), ``plan_rollouts`` and
+``run_rollouts`` (how it is produced), then ``ProbedLiberoEnv`` (what is added to LeRobot's env).
 """
 
 from __future__ import annotations
@@ -72,7 +80,8 @@ TAU_EPISODE_STEPS = 1200  # 60 s at 20 Hz (plan: τ_episode = 60 s, owner defaul
 FPS = 20
 LIBERO_DUMMY_ACTION = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0]  # lerobot.envs.libero.get_libero_dummy_action
 
-# Rollout record schema (one row per rollout; AC5.1 validates against it)
+# Rollout record schema: one row per rollout, column -> pandas dtype (AC5.1 validates against it). T_steps/T_s are
+# null for a rollout that never succeeded (censored at tau_episode_steps); pairs/ops/traces are JSON strings.
 RECORD_COLUMNS = {
     "eval_run_id": "string", "rollout_id": "string", "suite": "string", "libero_task_id": "int64", "task_name": "string",
     "init_state_index": "int64", "seed": "int64", "checkpoint_sha256": "string", "train_run_id": "string",
@@ -148,9 +157,14 @@ def _probed_env_class():
 
         def _ensure_env(self) -> None:
             super()._ensure_env()
+            # robosuite ends an episode at timestep >= horizon (default 1000 in LIBERO's ControlEnv); allow
+            # tau_episode policy steps after LeRobot's settle steps (module docstring, item 2)
             self._env.env.horizon = self._max_episode_steps + self.num_steps_wait + 1
 
         def probe(self) -> dict:
+            """The goal check at the current sim state: each conjunct's truth (LIBERO ``_eval_predicate``), the
+            whole goal (``_check_success``) and the world positions (m, rounded to 0.01 mm) of the task's objects
+            of interest."""
             dom = self._env.env
             goal = dom.parsed_problem["goal_state"]
             pos = {n: [round(float(x), 5) for x in dom.sim.data.body_xpos[dom.obj_body_id[n]]]
@@ -159,6 +173,8 @@ def _probed_env_class():
                     "obj_pos": pos}
 
         def reset(self, seed=None, **kwargs):
+            """LeRobot's reset, then the t0 hashes and the first probe. The previous episode's trace (an autoreset
+            under ``SyncVectorEnv``) is kept in ``finished``."""
             if self.trace:
                 self.finished.append(self.trace)
             obs, info = super().reset(seed=seed, **kwargs)
@@ -168,6 +184,7 @@ def _probed_env_class():
             return obs, info
 
         def step(self, action):
+            """LeRobot's step, then a probe of the state the action led to."""
             out = super().step(action)
             self.trace.append(self.probe())
             return out
@@ -177,7 +194,8 @@ def _probed_env_class():
             return self.finished[0] if self.finished else self.trace
 
         def conjunct_labels(self) -> list[str]:
-            return ["(" + " ".join(c) + ")" for c in self._env.env.parsed_problem["goal_state"]]
+            """The task's goal conjuncts as labels, e.g. ``"(on akita_black_bowl_1 plate_1)"``."""
+            return [lg.conjunct_label(c) for c in self._env.env.parsed_problem["goal_state"]]
 
     return ProbedLiberoEnv
 
@@ -208,6 +226,8 @@ def noop_policy() -> PolicySpec:
     from torch import nn
 
     class NoopPolicy(nn.Module):
+        """The minimum LeRobot's ``rollout()`` needs from a policy: ``reset`` and ``select_action``."""
+
         def reset(self):
             pass
 
@@ -258,11 +278,13 @@ class _Capture:
         self.frames: list[dict] = []
 
     def __call__(self, observation):
+        import torch
+
         out = self.inner(observation)
         frame = {}
         for k in ("observation.images.image", "observation.images.image2"):
             img = out[k].detach().to("cpu").float()  # (B, 3, H, W) in [0, 1]
-            frame[k] = (img * 255.0).round().clamp(0, 255).to(dtype=__import__("torch").uint8).permute(0, 2, 3, 1).numpy()
+            frame[k] = (img * 255.0).round().clamp(0, 255).to(dtype=torch.uint8).permute(0, 2, 3, 1).numpy()
         frame["observation.state"] = out["observation.state"].detach().to("cpu").float().numpy()
         self.frames.append(frame)
         return out
@@ -315,6 +337,66 @@ def plan_rollouts(tasks: list[tuple[str, int]], n_init: int, seed_base: int = 0,
     return [RolloutSpec(s, t, init_offset + j, seed_base + init_offset + j) for s, t in tasks for j in range(n_init)]
 
 
+def _first_episode_steps(done_i: np.ndarray) -> int:
+    """Actions executed in a rollout's first episode: through the first ``done`` step, or every step of the
+    ``rollout()`` call if it never ended (``done_i`` is one env's row of LeRobot's per-step ``done``)."""
+    return int(np.argmax(done_i) + 1) if done_i.any() else int(len(done_i))
+
+
+def _rollout_row(env, r: RolloutSpec, task_name: str, spec: PolicySpec, n_steps: int, actions: np.ndarray,
+                 tau_episode_steps: int, render_hw: int, control_mode: str, eval_run_id: str, wall: float,
+                 batch_size: int) -> tuple[dict, dict]:
+    """One rollout's record row (``RECORD_COLUMNS``, in that order) and its ``operations_from_trace`` result.
+
+    ``env`` is the rollout's ``ProbedLiberoEnv``; its first-episode trace has ``n_steps + 1`` probes (t0, then one
+    after each action), and ``actions`` (``n_steps`` x 7) are the actions LeRobot executed. ``wall`` is the batch's
+    wall time, shared out equally over its ``batch_size`` rollouts.
+    """
+    from vlapoc.libero_goals import operations_from_trace, rle
+
+    tr = env.first_trace()[: n_steps + 1]
+    truth = np.array([p["truth"] for p in tr], dtype=bool)
+    succ = np.array([p["success"] for p in tr], dtype=bool)
+    rid = f"{r.suite}/{r.libero_task_id}/init{r.init_state_index:03d}/seed{r.seed}"
+    o = operations_from_trace(truth, succ, n_steps, labels=env.conjunct_labels(), key=rid)
+    t_s = o["success_step"]
+    row = {
+        "eval_run_id": eval_run_id, "rollout_id": rid, "suite": r.suite, "libero_task_id": r.libero_task_id, "task_name": task_name,
+        "init_state_index": r.init_state_index, "seed": r.seed, "checkpoint_sha256": spec.checkpoint_sha256,
+        "train_run_id": spec.train_run_id, "external_checkpoint": spec.external_checkpoint,
+        "policy_type": spec.policy_type, "tau_episode_steps": tau_episode_steps, "render_hw": render_hw,
+        "control_mode": control_mode, "T_steps": float(t_s) if t_s is not None else None,
+        "T_s": t_s / FPS if t_s is not None else None, "event": int(t_s is not None), "censored": bool(o["censored"]),
+        "n_ops": o["n_ops"], "n_ops_done": o["n_ops_done"],
+        "ops": json.dumps([{"k": k + 1, "t_steps": t, "conjuncts": c} for k, (t, c) in enumerate(zip(o["t_ops"], o["op_conjuncts"]))]),
+        "pairs": json.dumps(o["episode"].pairs), "conjuncts": json.dumps(env.conjunct_labels()),
+        "conjunct_trace_rle": json.dumps([rle(truth[:, c]) for c in range(truth.shape[1])]),
+        "success_trace_rle": json.dumps(rle(succ)),
+        # per-step arm-action norm over the 6 arm dims (raw signal for a later idle rule; no threshold applied)
+        "arm_action_norm": [round(float(x), 6) for x in np.linalg.norm(actions[:, :6], axis=1)],
+        "obj_pos": json.dumps({n: [p["obj_pos"][n] for p in tr] for n in tr[0]["obj_pos"]}),
+        "t0_state_sha256": env.t0_state_sha256[0], "t0_model_sha256": env.t0_model_sha256[0], "sim_steps": n_steps, "wall_seconds": round(wall / batch_size, 3),
+        "batch_size": batch_size, "traj_episode_index": None,
+    }
+    return row, o
+
+
+def _check_against_lerobot(rollout_id: str, success_step: int | None, n_steps: int, lerobot_success: bool) -> None:
+    """Raise unless the probe's goal check agrees with LeRobot's own ``success`` flag: same outcome, and a success
+    ends the episode at exactly the success step (LeRobot terminates on ``check_success()``)."""
+    if lerobot_success != (success_step is not None) or (success_step is not None and success_step != n_steps):
+        raise AssertionError(f"{rollout_id}: probe success step {success_step} disagrees with LeRobot (success {lerobot_success}, "
+                             f"steps {n_steps})")
+
+
+def _trajectory_episode(cap: _Capture, i: int, n_steps: int, actions: np.ndarray, task_language: str) -> dict:
+    """Env ``i``'s first ``n_steps`` captured frames plus its executed actions: one episode for ``write_trajectories``."""
+    return {"images": np.stack([f["observation.images.image"][i] for f in cap.frames[:n_steps]]),
+            "images2": np.stack([f["observation.images.image2"][i] for f in cap.frames[:n_steps]]),
+            "state": np.stack([f["observation.state"][i] for f in cap.frames[:n_steps]]),
+            "action": actions, "task": task_language}
+
+
 def run_rollouts(spec: PolicySpec, rollouts: list[RolloutSpec], tau_episode_steps: int = TAU_EPISODE_STEPS,
                  render_hw: int = 128, batch_size: int = 1, control_mode: str = "relative",
                  record_trajectories: bool = False, traj_root: Path | None = None, eval_run_id: str = "",
@@ -335,8 +417,6 @@ def run_rollouts(spec: PolicySpec, rollouts: list[RolloutSpec], tau_episode_step
     from lerobot.processor import LiberoProcessorStep, PolicyProcessorPipeline
     from lerobot.scripts.lerobot_eval import rollout
     from lerobot.utils.random_utils import set_seed
-
-    from vlapoc.libero_goals import operations_from_trace, rle
 
     Env = _probed_env_class()
     rows, traj_eps = [], []
@@ -364,43 +444,16 @@ def run_rollouts(spec: PolicySpec, rollouts: list[RolloutSpec], tau_episode_step
             actions = ret["action"].numpy()
             for i, r in enumerate(batch):
                 e = venv.envs[i].unwrapped
-                n_steps = int(np.argmax(done[i]) + 1) if done[i].any() else int(done.shape[1])
-                tr = e.first_trace()[: n_steps + 1]
-                truth = np.array([p["truth"] for p in tr], dtype=bool)
-                succ = np.array([p["success"] for p in tr], dtype=bool)
-                rid = f"{suite}/{tid}/init{r.init_state_index:03d}/seed{r.seed}"
-                o = operations_from_trace(truth, succ, n_steps, labels=e.conjunct_labels(), key=rid)
+                n_steps = _first_episode_steps(done[i])
+                row, o = _rollout_row(e, r, task.name, spec, n_steps, actions[i, :n_steps], tau_episode_steps, render_hw,
+                                      control_mode, eval_run_id, wall, len(batch))
                 t_s = o["success_step"]
-                a = actions[i, :n_steps]
-                row = {
-                    "eval_run_id": eval_run_id, "rollout_id": rid, "suite": suite, "libero_task_id": tid, "task_name": task.name,
-                    "init_state_index": r.init_state_index, "seed": r.seed, "checkpoint_sha256": spec.checkpoint_sha256,
-                    "train_run_id": spec.train_run_id, "external_checkpoint": spec.external_checkpoint,
-                    "policy_type": spec.policy_type, "tau_episode_steps": tau_episode_steps, "render_hw": render_hw,
-                    "control_mode": control_mode, "T_steps": float(t_s) if t_s is not None else None,
-                    "T_s": t_s / FPS if t_s is not None else None, "event": int(t_s is not None), "censored": bool(o["censored"]),
-                    "n_ops": o["n_ops"], "n_ops_done": o["n_ops_done"],
-                    "ops": json.dumps([{"k": k + 1, "t_steps": t, "conjuncts": c} for k, (t, c) in enumerate(zip(o["t_ops"], o["op_conjuncts"]))]),
-                    "pairs": json.dumps(o["episode"].pairs), "conjuncts": json.dumps(e.conjunct_labels()),
-                    "conjunct_trace_rle": json.dumps([rle(truth[:, c]) for c in range(truth.shape[1])]),
-                    "success_trace_rle": json.dumps(rle(succ)),
-                    "arm_action_norm": [round(float(x), 6) for x in np.linalg.norm(a[:, :6], axis=1)],
-                    "obj_pos": json.dumps({n: [p["obj_pos"][n] for p in tr] for n in tr[0]["obj_pos"]}),
-                    "t0_state_sha256": e.t0_state_sha256[0], "t0_model_sha256": e.t0_model_sha256[0], "sim_steps": n_steps, "wall_seconds": round(wall / len(batch), 3),
-                    "batch_size": len(batch), "traj_episode_index": None,
-                }
-                lerobot_success = bool(ret["success"][i, :n_steps].any())
-                if lerobot_success != (t_s is not None) or (t_s is not None and t_s != n_steps):
-                    raise AssertionError(f"{rid}: probe success step {t_s} disagrees with LeRobot (success {lerobot_success}, "
-                                         f"steps {n_steps})")
+                _check_against_lerobot(row["rollout_id"], t_s, n_steps, bool(ret["success"][i, :n_steps].any()))
                 if cap is not None:
                     row["traj_episode_index"] = float(len(traj_eps))
-                    traj_eps.append({"images": np.stack([f["observation.images.image"][i] for f in cap.frames[:n_steps]]),
-                                     "images2": np.stack([f["observation.images.image2"][i] for f in cap.frames[:n_steps]]),
-                                     "state": np.stack([f["observation.state"][i] for f in cap.frames[:n_steps]]),
-                                     "action": a, "task": task.language})
+                    traj_eps.append(_trajectory_episode(cap, i, n_steps, actions[i, :n_steps], task.language))
                 rows.append(row)
-                log(f"[rollouts] {rid}: {'success at step ' + str(t_s) if t_s is not None else 'censored at ' + str(n_steps)}"
+                log(f"[rollouts] {row['rollout_id']}: {'success at step ' + str(t_s) if t_s is not None else 'censored at ' + str(n_steps)}"
                     f" ({o['n_ops_done']}/{o['n_ops']} ops), {wall / len(batch):.1f}s")
             if cap is not None:
                 cap.frames.clear()  # the batch's frames are copied into traj_eps above; free them before the next batch

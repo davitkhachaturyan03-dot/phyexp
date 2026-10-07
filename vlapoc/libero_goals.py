@@ -46,6 +46,14 @@ pins the assets: ``get_assets_path()`` returns the module-level ``_assets_path_c
 exists, so the assets come from ``data/libero_assets`` (HF dataset ``lerobot/libero-assets`` at
 ``ASSETS_REVISION``) instead of an on-demand download to ``~/.cache/libero/assets``. Call it before
 anything imports ``libero`` (``lerobot.envs.libero`` included).
+
+Where it sits (docs/dataflow.md)
+--------------------------------
+Step 2, item 2 ("success + when, via the benchmark's goal check") and the human reference that HRT and AUC are
+measured against. ``scripts/human_reference.py`` replays the 1000 v0 demos through ``replay_goal_trace`` once
+(S3) and turns the stored traces into per-operation T with ``operations_from_trace`` (S4). The rollout harness
+``vlapoc.rollouts`` calls the same ``operations_from_trace`` on every rollout (S5), so a demo and a rollout get T
+by one rule.
 """
 
 from __future__ import annotations
@@ -55,6 +63,7 @@ import importlib.util
 import json
 import os
 import re
+from itertools import groupby
 from pathlib import Path
 
 import numpy as np
@@ -204,14 +213,9 @@ def first_true(x: np.ndarray) -> int:
 
 
 def rle(x: np.ndarray) -> list[list[int]]:
-    """Run-length encoding of a 1-D bool array: ``[[value, length], ...]`` (compact trace storage)."""
-    out: list[list[int]] = []
-    for v in np.asarray(x, dtype=bool):
-        if out and out[-1][0] == int(v):
-            out[-1][1] += 1
-        else:
-            out.append([int(v), 1])
-    return out
+    """Run-length encoding of a 1-D bool array: ``[[value, length], ...]`` with value 0/1 (compact trace storage
+    in the rollout record and the human-reference parquet; ``rle_decode`` inverts it)."""
+    return [[int(v), sum(1 for _ in run)] for v, run in groupby(np.asarray(x, dtype=bool))]
 
 
 def rle_decode(runs: list[list[int]]) -> np.ndarray:
