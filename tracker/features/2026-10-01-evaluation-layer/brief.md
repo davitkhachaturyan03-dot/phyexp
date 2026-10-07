@@ -161,4 +161,13 @@ Answered 2026-10-02:
 
 ## Owner rulings
 
-(none yet)
+### 2026-10-06: `dispute-r2.md` (AC7.1, GR00T vs ACT seed stability)
+
+- **Question put to the owner:** "AC7.1 dispute: GR00T vs ACT gives the trade-off outcome (ii) in 4/5 seeds
+  at 1000 bootstrap draws, and in 5/5 at 10,000 draws. How should this be resolved?"
+- **Owner's decision (verbatim):** "B. Accept 4/5 (executor)".
+- **Meaning, per the case file's Option B:** restate AC7.1 as "GR00T vs ACT → (ii) in ≥ 4/5 seeds; the gate
+  fires in 5/5 and RMST favours GR00T in 5/5; the AUC direction (ACT) is at the Holm boundary (Holm p
+  0.024–0.054)". n_boot stays 1000, including for the server verdicts (AC7.5).
+- **Final and owner-approved.** Record it as an owner-approved divergence in the plan, the report and the
+  spec-coverage table. The analyzer does not re-open it.
