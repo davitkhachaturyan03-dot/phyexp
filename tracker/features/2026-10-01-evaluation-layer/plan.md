@@ -1,12 +1,27 @@
 # Plan: Evaluation layer (PhAIL primitives on LIBERO, validated on PhAIL's real-robot data)
 
-**Round:** 2 (plan rework after `analysis-r1.md`, 2026-10-05). Round 1 was written 2026-10-02.
+**Round:** 3 (owner ruling on `dispute-r2.md`, 2026-10-07). Round 2 (plan rework after `analysis-r1.md`) was
+2026-10-05; round 1 was written 2026-10-02.
 **Feature folder:** `tracker/features/2026-10-01-evaluation-layer/`. **Brief:** [`brief.md`](brief.md) (binding,
 including the owner answers of 2026-10-02).
 
 Evidence labels used throughout: **quoted** (from a source, with the quote or file/line), **measured** (run in
 a planning session, or measured by the executor/analyzer and cited from `execution-log.md` /
 `analysis-r1.md`), **inferred** (planner's reasoning, unverified).
+
+## Changes in this revision (r3)
+
+This applies the owner ruling of 2026-10-06 on `dispute-r2.md`: **"B. Accept 4/5 (executor)"**, final (brief.md,
+"Owner rulings"). Nothing else changed.
+
+1. **AC7.1 restated.** "GR00T vs ACT → (ii) in ≥ 4/5 seeds; the gate fires in 5/5 and RMST favours GR00T in 5/5;
+   the AUC direction (ACT) is at the Holm boundary (Holm p 0.024–0.054)". The other three pairs are unchanged
+   (5/5).
+2. **n_boot stays 1000**, including for AC7.5's server verdict commands. AC7.5 now notes that, under this
+   ruling, a server verdict near the Holm boundary may depend on the bootstrap seed.
+3. **Owner-approved divergence, 2026-10-06, `dispute-r2.md`.** The PhAIL GR00T–ACT trade-off (ii) is not
+   robust to the bootstrap seed at n_boot 1000. The summarizer carries this into the report and the
+   spec-coverage table (§3.3 / §4.4 rows) as owner-approved.
 
 ## Changes in this revision (r2)
 
@@ -880,13 +895,16 @@ LIBERO's own predicates. Custom code only where nothing exists:**
   - **CLI** over two eval runs, recorded as a `verify` MLflow run, or under `select`/`eval` per the existing
     stage list (the executor decides; extend `STAGES` if needed).
 - **Acceptance criteria:**
-  - [ ] AC7.1 **(r2 restated from PhAIL's released artifact, F-P1)** On the S2 cohort (sorted export, AC2.9), in 5/5 bootstrap seeds (0–4):
-    - **OpenPI vs GR00T → (iii).**
-    - **OpenPI vs ACT → (iii) at this N.** PhAIL's released `out/explore/ks_power/dashboard_per_obj_macro.json`
-      gives OpenPI–ACT `p 0.10294852573713144, status WEAK` (measured, analysis-r1). Our gate measured 0.105–0.123.
-    - **GR00T vs ACT → (ii)**, the §5.3 crossing: the released JSON gives p 0.016 `HOLDS`; RMST favours GR00T and
-      AUC favours ACT, both Holm-significant (executor measured, 5/5 seeds).
-    - **Any model vs SmolVLA → (i).**
+  - [ ] AC7.1 **(r2 restated from PhAIL's released artifact, F-P1; r3 per owner ruling 2026-10-06)** On the S2 cohort (sorted export, AC2.9), with n_boot = 1000 and bootstrap seeds 0–4:
+    - **OpenPI vs GR00T → (iii)** in 5/5 seeds.
+    - **OpenPI vs ACT → (iii) at this N** in 5/5 seeds. PhAIL's released
+      `out/explore/ks_power/dashboard_per_obj_macro.json` gives OpenPI–ACT `p 0.10294852573713144, status WEAK`
+      (measured, analysis-r1). Our gate measured 0.105–0.123.
+    - **(r3) GR00T vs ACT → (ii) in ≥ 4/5 seeds; the gate fires in 5/5 and RMST favours GR00T in 5/5; the AUC
+      direction (ACT) is at the Holm boundary (Holm p 0.024–0.054).** This is the §5.3 crossing; the released
+      JSON gives p 0.016 `HOLDS`. This is an **owner-approved divergence**, 2026-10-06, `dispute-r2.md`, ruling
+      "B. Accept 4/5 (executor)" (brief, "Owner rulings").
+    - **Any model vs SmolVLA → (i)** in 5/5 seeds.
     - **The prose-vs-artifact discrepancy is recorded in the report.** PhAIL p. 9 says "ACT and OpenPI/GR00T
       are different (KS rejects)" (quoted), but its own released macro-KS does not reject OpenPI–ACT at
       α = 0.05. PoC §3.3 p. 7's "resolved … OpenPI vs. ACT at 30 rollouts per … cell" is a detection rate from
@@ -902,7 +920,11 @@ LIBERO's own predicates. Custom code only where nothing exists:**
       is forced, the same one is used for both arms and all seeds.
     - The verdict's batch-plan guard (AC7.8) passes without override.
     - Family W is the declared verdict. Family O is reported alongside, labelled.
-    - Sources: [PoC §2.6 p. 5, §9.1 Step 4 p. 19; LeRobot LIBERO docs, paired comparisons (quoted in AC5.8)]
+    - **(r3, owner ruling 2026-10-06, `dispute-r2.md`)** The server verdict commands use `n_boot = 1000`. Under
+      this ruling, a server verdict whose Holm-adjusted p lands near α (as GR00T–ACT's AUC did on PhAIL data:
+      Holm p 0.024–0.054 across seeds) may depend on the bootstrap seed. The verdict records its seed, and the
+      report states this.
+    - Sources: [PoC §2.6 p. 5, §9.1 Step 4 p. 19; LeRobot LIBERO docs, paired comparisons (quoted in AC5.8); owner ruling 2026-10-06]
   - [ ] AC7.6 **(r2)** The verdict artifacts of AC7.1–AC7.4 are regenerated from the sorted PhAIL export (AC2.9) and the family-W LIBERO arms. The logged p-values are updated, and the S7 log notes that the p-values are Monte-Carlo draws conditional on episode order and seed [analysis-r1 E3, E4]
   - [ ] AC7.7 **(r2, F-P2)** Family consistency on LIBERO: for both AC5.4 eval runs, the verdict's per-arm family-W metrics equal the S6 cell means of the matching returns (AC6.10 run from the verdict side), and the op-family `rmst60_op_cap` equals the operation-sample mean of `ret_rmst60_op_cap`. A label check: every verdict label contains its family [PoC §3.4 p. 7, §4.4 p. 10]
   - [ ] AC7.8 **(r2, F-P5)** The batch-plan guard: `compare_policies` on two eval runs with different `eval.batch_plan` raises without the override. With the override, the label contains "unpaired plan". Two runs with the same plan pass [LeRobot docs paired comparison; measured batch effect]
