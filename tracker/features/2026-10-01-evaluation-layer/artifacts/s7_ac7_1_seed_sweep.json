@@ -578,5 +578,25 @@
    }
   }
  },
- "pass": false
+ "all_seeds_match_expected": false,
+ "r3": {
+  "criterion": "plan r3 AC7.1 (owner ruling B, dispute-r2.md, 2026-10-06)",
+  "n_seeds": 5,
+  "GR00T-ACT": {
+   "n_ii": 4,
+   "n_gate_fires": 5,
+   "n_rmst_favours_GR00T": 5,
+   "pass": true
+  },
+  "other_pairs_matching_seeds": {
+   "OpenPI-GR00T": 5,
+   "OpenPI-ACT": 5,
+   "OpenPI-SmolVLA": 5,
+   "GR00T-SmolVLA": 5,
+   "ACT-SmolVLA": 5
+  },
+  "other_pairs_pass": true,
+  "pass": true
+ },
+ "pass": true
 }
