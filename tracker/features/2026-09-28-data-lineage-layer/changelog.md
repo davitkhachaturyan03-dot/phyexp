@@ -97,3 +97,80 @@ Changes after the first release (2026-10-01), one dated entry per change, added 
   - `--summary` → `T_success_s < duration_s: 1000/1000`; `an HRT anchored on duration_s is 1.162x too
     high` (libero_spatial), `1.049x` (libero_10).
 - **Divergence:** none from the spec. This corrects this feature's own wording.
+
+## 2026-10-08: `verify_runs_s5.py` AC5.3 checks the real eval stage's record (round-1 mode failed with `KeyError: 'suites'`)
+- **Why:** orchestrator request, from the evaluation-layer refactor record (`tracker/features/2026-10-01-evaluation-layer/refactor.md`
+  "N5"): `scripts/verify_runs_s5.py` in round-1 mode fails at AC5.3 with `KeyError: 'suites'`, because the block reads
+  params of the retired `eval_standin`. "Update only the AC5.3 block … so it checks the same AC5.3 requirements against
+  the real eval stage's recorded params and tags. Don't weaken the AC: every AC5.3 field must still be checked."
+- **Cause (measured):** the round-1 `eval_standin` (`git show 4448ed2~1:vlapoc/runs.py`) logged params `suites`,
+  `libero_task_ids`, `init_state_indices` and `seeds`, tags `eval.checkpoint.loaded` / `eval.checkpoint.n_params`, and
+  a plan column `outcome`. `runs.eval_run` replaced it in evaluation-layer S5 (`4448ed2`, single record system) and
+  writes none of those keys. The verifier still read `suites` at `4448ed2` and at the pre-refactor baseline `553b3d1`
+  (`grep -F -c "suites="` = 1 at each), so the break dates to `4448ed2`, not to the refactor.
+- **Grounding:** this feature's plan AC5.3 ("An eval-run record contains the sha256 of the checkpoint it loaded, the
+  producing train run ID, suite, `libero_task_id`s, init-state indices and seeds"); PoC §2.1 item 1 p. 3 ("Every eval
+  rollout should be tied back to that checkpoint") and item 3 p. 3 ("fixed seeds and initial states"). Both are cited
+  in the block's comment.
+- **Prior art:** none needed. This is a verifier fix: it reads MLflow params and tags through the existing `vlapoc.runs`
+  client and reuses `vlapoc.rollouts.validate_record`.
+- **Where each AC5.3 field is now checked** (read from `eval_run` and `rollouts.RECORD_COLUMNS`/`plan_rollouts`/`checkpoint_policy`):
+  every field is compared in the run's params/tags **and** in the rollout record the run logged, against the eval
+  request in the script.
+
+  | AC5.3 field | `eval_run` params / tags | rollout record column |
+  |---|---|---|
+  | checkpoint sha256 it loaded | `checkpoint_sha256`; tag `input.checkpoint` | `checkpoint_sha256` |
+  | producing train run | `train_run_id`; `policy` = `train:<id>` | `train_run_id` |
+  | suite | `tasks` = `[[suite, libero_task_id], …]` | `suite` |
+  | `libero_task_id`s | `tasks` | `libero_task_id` |
+  | init-state indices | `n_init`, `init_offset`, `init_state_rule` | `init_state_index` |
+  | seeds | `seed_base`, `init_state_rule` | `seed` |
+
+  The checkpoint sha256 must also equal train-A's `checkpoint.weights.sha256` and a fresh sha256 of
+  `<checkpoint.path>/model.safetensors`, the file `checkpoint_policy` hashes and loads. The record must be the run's
+  own logged output (its sha256 equals the `output.rollouts.sha256` tag). The stand-in's `eval.checkpoint.loaded` /
+  `n_params` tags were not AC5.3 fields. Their real-stage counterpart is checked instead: the rollout ran on the loaded
+  policy (`policy_type` param and record = the checkpoint's `config.json` type), with `vlapoc.stand_in=false`.
+  No AC5.3 field is missing from the real record.
+- **Files:** `scripts/verify_runs_s5.py`, the AC5.3 block only (commit `91f0902`; the rest of the file is unchanged).
+- **Evidence** (`HF_DATASETS_CACHE=$PWD/data/hf_datasets_cache LIBERO_CONFIG_PATH=$PWD/data/libero_config HF_HUB_OFFLINE=1
+  MUJOCO_GL=cgl`; full stdout in `data/scratch/ac53_fix/`):
+  - `.venv/bin/python scripts/verify_runs_s5.py` (round-1, scratch store `data/lineage_scratch/s5` built by
+    `runs.scratch_lineage_copy`, HEAD `91f0902`) → `exit=0 seconds=76`:
+    - `AC5.1 runs: 7, stages ['build', 'eval', 'select', 'split', 'train'] (all in (…): True)`; digest search →
+      `['s5-select-random5', 's5-train-A', 's5-train-A-seed1']`.
+    - `AC5.2 git_sha_is_HEAD: True`, `weights_sha256_matches_disk: True`, `normalizer_sha256_matches_disk: True`,
+      `normalization_stats: per-subset: …`.
+    - `AC5.3 checkpoint_sha256: {'param': 'cdee42fbf84f56ec', 'tag input.checkpoint': 'checkpoint:cdee42fbf84f56ec',
+      'record': ['cdee42fbf84f56ec']}; … True`; `AC5.3 train_run_id: {'param': 'a9cc11041b4a', 'param policy':
+      'train:a9cc11041b4a', 'record': ['a9cc11041b4a']}; … True`; suite, `libero_task_ids` (`[['libero_spatial', 0]]`),
+      `init_state_indices` and `seeds` (`[['libero_spatial', 0, 0]]` from params and from the record) → `True` each.
+    - `AC5.3 eval run: rollout record is its logged output (…): True; policy_type param/record == checkpoint config type
+      'act': True; stand_in=false; rows=1 (eval.n_rollouts tag 1); events=[0] censored=[True]; record schema errors: []`.
+    - `AC5.3 every field recorded (params/tags and rollout record) and equal to the request: True`.
+    - `AC5.4 trace(s5-train-B) … raw files reached: 20`; `consumers` lists train-A `True`, train-B `False`;
+      `diff(A, B): removed 5, added 0, changed_version 0`; `diff(A, A-seed1)` → `params {'seed': ('0', '1')}`.
+    - `AC5.5` v1-keyed table `'ok': True`; v0-keyed → `rejected: 6/10 score rows are not episode versions trained on …`.
+    - `AC5.6 tracking uri scheme=sqlite; HF_HUB_OFFLINE=1; wandb CLI installed=False`.
+  - Negative control: `data/scratch/ac53_fix/ac53_block_check.py` is a read-only harness that executes the committed
+    AC5.3 block against this run's store. With train-A it prints the same lines as above, ending `… equal to the
+    request: True`. With `--wrong-train` (train-A-seed1 passed as train-A) it prints `AC5.3 checkpoint_sha256: … False`,
+    `AC5.3 train_run_id: … False`, `… equal to the request: False`, while suite, task ids, init states and seeds stay
+    `True`. The check is not vacuous (outputs `ac53_block_check.txt`, `ac53_block_check_wrong_train.txt`).
+  - `.venv/bin/python scripts/verify_runs_s5.py --r2` → `exit=0`: AC5.8 lowest/highest `True`, child == S6 child
+    `True`; AC5.9 `child n=912`, `raw files reached: 20`; AC5.10 `distinct subset ids: 3/3`, all reproducible;
+    `real mlflow.db sha256 unchanged: True (7845d8d7634e); real mlartifacts tree unchanged: True (203 paths); scratch
+    removed: True`.
+  - `shasum -a 256 data/lineage/mlflow.db` before and after both runs → `7845d8d7634e2757…` both times;
+    `find data/lineage -newer <start marker>` → nothing; no verifier processes left.
+- **Left as committed (outside this change's scope, for the owner or the summarizer):**
+  - Both modes rewrite this feature's `artifacts/s5_summary.json`, `s5_diff_A_B.json` and `s5_r2_summary.json`. The
+    regenerated files are kept in `data/scratch/ac53_fix/data_lineage_artifacts/` and the committed ones were restored.
+    `s5_r2_membership_matrix.csv` regenerated byte-identical. The committed `s5_summary.json` AC5.3 entry is still the
+    round-1 stand-in evidence (`"plan_rows": 1000, "outcomes": ["not_run"]`).
+  - `S5-mlflow-run-lineage.html` (AC5.3 row: "loaded=true (51600263 params); stand_in=true"; deliverables list
+    `eval_standin`) still describes round 1. It has been out of date since `4448ed2`, not because of this change.
+  - The refactorer's N5 store was moved aside to `data/lineage_scratch/s5.refactor-n5-diagnostic` (2.3 GB, nothing
+    deleted). `data/lineage_scratch/s5` (2.3 GB) is now this run's store.
+- **Divergence:** none. AC5.3 is checked as written; the fields are read from where the real eval stage records them.
