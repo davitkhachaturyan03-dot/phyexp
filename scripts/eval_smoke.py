@@ -29,6 +29,7 @@ os.environ.setdefault("HF_DATASETS_CACHE", str(REPO_ROOT / "data" / "hf_datasets
 
 
 def main() -> int:
+    """Parse the CLI (usage in the module docstring); run tracked (``eval_run``) or untracked (``run_rollouts``)."""
     p = argparse.ArgumentParser()
     p.add_argument("--policy", required=True, help="noop | train:<run_id> | hf:<repo>@<rev>:<local dir>")
     p.add_argument("--tasks", required=True, help="suite:task_id[,suite:task_id...]")

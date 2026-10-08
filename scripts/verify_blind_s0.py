@@ -65,6 +65,7 @@ def tamper(lr: Path, vid: str, name: str, fn) -> list[str]:
 
 
 def main() -> int:
+    """AC0.3 (order preserved, blind) on a scratch 20-episode derivation, then the AC0.5 negative tests."""
     out: dict = {}
     scratch = REPO_ROOT / "data" / "scratch"
     scratch.mkdir(parents=True, exist_ok=True)
@@ -113,20 +114,24 @@ def main() -> int:
 
         # ---- AC0.5: negative tests --------------------------------------------------------------
         def extra_column(t):
+            """Negative test: add the leaky ``parent_content_hash`` column back."""
             return t.assign(parent_content_hash=t["episode_id"].map(dict(zip(pe["episode_id"], pe["content_hash"]))))
 
         def permute_index(t):
+            """Negative test: swap two rows' ``episode_index``."""
             t = t.copy()
             a, b = t.index[t.episode_index == 0][0], t.index[t.episode_index == 5][0]
             t.loc[[a, b], "episode_index"] = t.loc[[b, a], "episode_index"].to_numpy()
             return t
 
         def change_bookkeeping(t):
+            """Negative test: change one bookkeeping value (``source_demo``)."""
             t = t.copy()
             t.loc[t.episode_index == 11, "source_demo"] = "demo_999"
             return t
 
         def shuffle_rows(t):
+            """Negative test: same rows, shuffled order."""
             return t.sample(frac=1.0, random_state=0).reset_index(drop=True)
 
         neg = {name: tamper(lr, cvid, name, fn) for name, fn in [

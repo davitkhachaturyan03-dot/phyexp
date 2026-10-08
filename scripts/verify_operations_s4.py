@@ -35,6 +35,7 @@ def trace(T: int, on: dict[int, list[tuple[int, int]]], C: int) -> np.ndarray:
 
 
 def case(name: str, truth: np.ndarray, tau_end: int | None, expect_pairs: list[tuple[float, int]], expect_n: int) -> dict:
+    """Run one LABELLED-SYNTHETIC trace through ``operations_from_trace`` and compare its pairs with the expected ones."""
     succ = truth.all(axis=1)
     r = operations_from_trace(truth, succ, tau_end, labels=[f"g{c}" for c in range(truth.shape[1])], key=name)
     got = [(round(t, 9), e) for t, e in r["episode"].pairs]
@@ -46,6 +47,7 @@ def case(name: str, truth: np.ndarray, tau_end: int | None, expect_pairs: list[t
 
 
 def main() -> int:
+    """AC4.2 (seven synthetic cases) and AC4.5 (one implementation, two callers)."""
     out = {"data": "LABELLED-SYNTHETIC boolean traces; 20 steps = 1 s"}
     res = [
         # two conjuncts, g0 first then g1 (stays true): ops at 40 and 100 -> T = 2.0 s, 3.0 s

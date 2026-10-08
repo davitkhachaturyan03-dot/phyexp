@@ -43,6 +43,7 @@ def _sha(a) -> str:
 
 
 def snapshot(env) -> dict:
+    """Digests of one env's flattened state and model placement, plus the property-initializer count."""
     dom = env._env.env
     m = dom.sim.model
     names = [m.body_id2name(i) for i in range(m.nbody)]
@@ -52,6 +53,7 @@ def snapshot(env) -> dict:
 
 
 def diff(a: dict, b: dict) -> dict:
+    """Which bodies moved between two snapshots, and by how much (m)."""
     if a["_names"] != b["_names"]:
         return {"same_body_names": False}
     d = np.abs(a["_body_pos"] - b["_body_pos"]).max(axis=1)
@@ -61,6 +63,7 @@ def diff(a: dict, b: dict) -> dict:
 
 
 def main() -> int:
+    """The three reset patterns of the module docstring on libero_spatial task 0 and libero_10 task 8."""
     from vlapoc import rollouts as ro
 
     Env = ro._probed_env_class()

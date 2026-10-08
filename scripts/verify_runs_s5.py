@@ -40,13 +40,11 @@ RUNS = LR / "runs"
 
 
 def setup() -> None:
-    """(Re)create the round-1 scratch lineage root from copies of the real manifests (no MLflow DB)."""
+    """(Re)create the round-1 scratch lineage root: copies of the real version/subset/split manifests and no MLflow DB
+    (MLflow creates a fresh, empty one there), so these runs never mix with the real chain."""
     if LR.exists():
         shutil.rmtree(LR)
-    LR.mkdir(parents=True)
-    for d in ("versions", "subsets", "splits"):
-        shutil.copytree(LINEAGE_ROOT / d, LR / d)
-    shutil.copy(LINEAGE_ROOT / "names.json", LR / "names.json")
+    runs.scratch_lineage_copy(LR, dirs=("versions", "subsets", "splits"), mlflow_db=False)
 
 
 def main() -> int:
@@ -184,7 +182,6 @@ def r2() -> int:
     ``data/lineage/mlartifacts``. The real DB's sha256 and the real artifact tree are compared before/after.
     """
     import hashlib
-    import sqlite3
     import tempfile
 
     import numpy as np
@@ -197,17 +194,7 @@ def r2() -> int:
     scratch_root = REPO_ROOT / "data" / "scratch"
     scratch_root.mkdir(parents=True, exist_ok=True)
     base = Path(tempfile.mkdtemp(prefix="verify_s5_r2_", dir=scratch_root))
-    lr = base / "lineage"
-    lr.mkdir()
-    for d in ("versions", "subsets", "splits"):
-        shutil.copytree(LINEAGE_ROOT / d, lr / d)
-    shutil.copy(LINEAGE_ROOT / "names.json", lr / "names.json")
-    shutil.copy(real_db, lr / "mlflow.db")
-    (lr / "mlartifacts").mkdir()
-    con = sqlite3.connect(lr / "mlflow.db")
-    con.execute("UPDATE experiments SET artifact_location = ? WHERE name = ?", ((lr / "mlartifacts").resolve().as_uri(), runs.EXPERIMENT))
-    con.commit()
-    con.close()
+    lr = runs.scratch_lineage_copy(base / "lineage", dirs=("versions", "subsets", "splits"))  # + mlflow.db, repointed
     print(f"scratch lineage root {lr.relative_to(REPO_ROOT)} (copy of real manifests + mlflow.db; artifact location repointed)")
     s: dict = {}
     try:

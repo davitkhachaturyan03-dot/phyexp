@@ -37,6 +37,7 @@ SMOLVLA_BASE = REPO_ROOT / "data" / "hf_models" / "smolvla_base"  # lerobot/smol
 
 
 def check(version: str) -> None:
+    """AC8.1: ``aggregate_stats`` over all episodes vs the version's ``meta/stats.json``."""
     from vlapoc.subset_stats import check as _check
 
     r = _check(version)
@@ -46,6 +47,7 @@ def check(version: str) -> None:
 
 
 def train(subset: str, policy: str, name: str, steps: int, batch_size: int) -> None:
+    """A 2-step training run with per-subset stats (SmolVLA from smolvla_base, or ACT)."""
     from vlapoc.runs import train_run
 
     if policy == "smolvla":
@@ -99,6 +101,7 @@ def normalizer(run_id: str) -> None:
 
 
 def drop_subset(parent: str, k: int) -> None:
+    """AC8.3: a child subset with k random episodes dropped (``drop_random_k``, seed 0)."""
     from vlapoc.lineage import Subset, drop_random_k
 
     child = drop_random_k(Subset.load(parent), k, seed=0)
@@ -106,6 +109,7 @@ def drop_subset(parent: str, k: int) -> None:
 
 
 def diff(a: str, b: str) -> None:
+    """AC8.3: ``vlapoc.runs.diff`` of two train runs; the stats digests appear under ``data``."""
     from vlapoc.runs import diff as _diff
 
     d = _diff(a, b)
@@ -116,6 +120,7 @@ def diff(a: str, b: str) -> None:
 
 
 def main() -> int:
+    """Run the selected mode (usage in the module docstring)."""
     p = argparse.ArgumentParser()
     p.add_argument("--check")
     p.add_argument("--train-smolvla")

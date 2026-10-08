@@ -41,6 +41,7 @@ def _compare(a: pd.DataFrame, b: pd.DataFrame) -> dict:
 
 
 def rerun(path: Path) -> None:
+    """AC5.2 (a): re-run a stored noop eval in this process and compare the records column by column."""
     from vlapoc import rollouts as ro
 
     ref = pd.read_parquet(path / "rollouts.parquet")
@@ -130,6 +131,7 @@ def horizon() -> None:
 
 
 def pairing() -> None:
+    """AC5.6: the same 4 rollouts at batch 1 and batch 4 start from the same init state and t0 sim state."""
     from vlapoc import rollouts as ro
 
     plan = ro.plan_rollouts([("libero_spatial", 3)], 4)
@@ -280,6 +282,7 @@ def t0_model(compare_dir: Path | None) -> None:
 
 
 def main() -> int:
+    """Run the selected mode (usage in the module docstring)."""
     p = argparse.ArgumentParser()
     p.add_argument("--rerun", type=Path)
     p.add_argument("--resets", action="store_true")

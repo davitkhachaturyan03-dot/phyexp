@@ -1,16 +1,18 @@
-"""Lineage dry run (S6): every downstream PoC stage type, end to end, on the real v0/v1 data.
+"""Lineage dry run (data+lineage S6): every downstream PoC stage type, end to end, on the real v0/v1 data.
 
 Records this chain as MLflow runs (PoC §9.1 pp.18-19 Steps 1-4, §2.6 p.5, §10 p.20):
 
     build(v0) -> split(v0) -> derive(v1) -> screen [stand-in] -> train-full (v1/candidate, seed 0 and 1)
-    -> eval [stand-in] -> attribute [stand-in] -> select drop-top-k / drop-random-k (same k)
-    -> train on each -> eval [stand-in] on each
+    -> eval (seed 0) -> attribute [stand-in] -> select drop-top-k / drop-random-k (same k)
+    -> train on each -> eval on each
 
 build/split/derive are reused when a run that produced v0 / v0's split / v1 already exists (they are
 content-addressed and were recorded by the S4 commands). Train steps are real LeRobot training runs
-(ACT, a few steps, MPS, wandb off). Stand-ins carry ``vlapoc.stand_in=true`` and produce only lineage
-keys plus placeholder payloads: screening scores are NaN, the rollout plan has outcome ``not_run``,
-attribution scores are a hash of the key. No outcome numbers are invented.
+(ACT, a few steps, MPS, wandb off, per-subset normalization since evaluation-layer S8). Eval steps are real
+LIBERO rollouts at smoke scale since evaluation-layer S5 (libero_spatial task 0, ``--eval-n`` init states,
+``--eval-tau`` steps), named "[smoke]" (their ``vlapoc.smoke`` tag stays ``unspecified``). Stand-ins carry ``vlapoc.stand_in=true`` and produce only
+lineage keys plus placeholder payloads: screening scores are NaN, attribution scores are a hash of the key.
+No outcome numbers are invented.
 
     .venv/bin/python scripts/lineage_dry_run.py --k 20 --seed 0      # full chain: records runs in data/lineage
     .venv/bin/python scripts/lineage_dry_run.py --tamper-only        # AC6.5 only; records no run
@@ -54,14 +56,14 @@ from vlapoc.lineage import (  # noqa: E402
 )
 
 FEATURE_DIR = REPO_ROOT / "tracker" / "features" / "2026-09-28-data-lineage-layer"
-ART = FEATURE_DIR / "artifacts"
+ART = FEATURE_DIR / "artifacts"  # the full chain's evidence (data+lineage feature)
+EVAL_FEATURE_ART = REPO_ROOT / "tracker" / "features" / "2026-10-01-evaluation-layer" / "artifacts"  # --eval-smoke's evidence
 SCRATCH_ROOT = REPO_ROOT / "data" / "scratch"  # gitignored (data/); never a session-bound path (AC3.9)
-
-
 EVAL_TASKS = [("libero_spatial", 0)]  # smoke-scale evals in the dry run (evaluation-layer S5); full protocol: server runbook
 
 
 def log(msg: str) -> None:
+    """Print and flush (the chain's progress lines are read live from long runs)."""
     print(msg, flush=True)
 
 
@@ -156,6 +158,7 @@ def graph(run_ids: list[str]) -> dict:
 def mermaid(g: dict) -> str:
     """Mermaid ``flowchart LR`` text for a ``graph()`` result: runs as boxes, entities as stadiums."""
     def nid(x):
+        """A stable Mermaid node id for an entity or run id."""
         return "n" + hashlib.sha256(x.encode()).hexdigest()[:10]
 
     lines = ["flowchart LR"]
@@ -171,9 +174,6 @@ def mermaid(g: dict) -> str:
     for e in g["edges"]:
         lines.append(f'  {nid(e["from"])} -->|{e["label"]}| {nid(e["to"])}')
     return "\n".join(lines) + "\n"
-
-
-EVAL_FEATURE_ART = REPO_ROOT / "tracker" / "features" / "2026-10-01-evaluation-layer" / "artifacts"
 
 
 def eval_smoke(subset: str = "v0/reference", k: int = 5, seed: int = 0, steps: int = 2, batch_size: int = 2,
@@ -273,6 +273,7 @@ def main() -> int:
                     help="run only the AC6.5 tamper refusal against the existing v1 (records no run)")
     a = ap.parse_args()
     if a.eval_smoke:
+        # the S9 chain's own defaults (k 5, 2 training steps) apply unless --k / --steps were set to something else
         eval_smoke(k=5 if a.k == 20 else a.k, seed=a.seed, steps=2 if a.steps == 5 else a.steps)
         return 0
     if a.tamper_only:

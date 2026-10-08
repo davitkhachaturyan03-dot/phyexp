@@ -51,6 +51,7 @@ def synthetic_rollouts(rng: np.random.Generator, cells: dict[str, float], n: int
 
 
 def km_eps(df: pd.DataFrame) -> list:
+    """Whole-task episodes of SYNTHETIC rollout rows (censored rows at τ_episode)."""
     return [ev.libero_episode(r.rollout_id, [] if r.censored else [r.T_s], (r.tau_episode_steps / 20) if r.censored else r.T_s, 1)
             for r in df.itertuples()]
 
@@ -73,6 +74,7 @@ def w_identities(ro: pd.DataFrame, human: dict) -> dict:
 
 
 def synthetic() -> None:
+    """AC6.1 (synthetic, incl. ties), AC6.11 (synthetic), AC6.2, AC6.4, AC6.6 and AC6.8."""
     rng = np.random.default_rng(0)
     cells = {"syn/0": 4.0, "syn/1": 7.0, "syn/2": 10.0}
     human = {("syn", i): np.round(rng.gamma(3.0, 1.0, 50) * s * 0.4, 6) + 1e-7 * np.arange(50) for i, s in enumerate(cells.values())}
@@ -115,6 +117,7 @@ def synthetic() -> None:
     w = {c: v["w"] for c, v in meta["hrt_weights"].items()}
 
     def hrt_exact(df):
+        """HRT(60) of perturbed SYNTHETIC rollouts against the fixed synthetic human arm."""
         return ev.hrt({c: km_eps(df[df["rollout_id"].str.startswith(c + "/")]) for c in cells},
                       {c: [ev.libero_episode(f"h{i}", [x], x, 1) for i, x in enumerate(human[(c.split('/')[0], int(c.split('/')[1]))])]
                        for c in cells}, 60.0)
@@ -306,6 +309,7 @@ def against_verdict(paths: list[Path]) -> None:
 
 
 def main() -> int:
+    """Run the selected modes and merge their results into ``artifacts/s6_verify_returns.json``."""
     p = argparse.ArgumentParser()
     p.add_argument("--synthetic", action="store_true")
     p.add_argument("--join", type=Path, help="a returns.parquet from python -m vlapoc.returns")

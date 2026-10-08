@@ -103,6 +103,7 @@ def _tasks(suites: list[str], only: str | None = None) -> list[tuple[str, list[d
 
 
 def replay(suites: list[str], workers: int, use_demo_xml: bool = True, only: str | None = None) -> pd.DataFrame:
+    """Replay every demo of ``suites`` (one worker process per task file) and return one row per demo."""
     t0 = time.time()
     jobs = [(sf, eps, use_demo_xml) for sf, eps in _tasks(suites, only)]
     with ProcessPoolExecutor(max_workers=workers) as ex:
@@ -114,6 +115,7 @@ def replay(suites: list[str], workers: int, use_demo_xml: bool = True, only: str
 
 
 def cmd_replay(a) -> None:
+    """S3 / AC3.1-AC3.2: replay all v0 demos through the demo XML, write ``human_reference.parquet`` and ``sim_env.json``."""
     from vlapoc import libero_goals as lg
 
     home_libero_before = Path.home().joinpath(".libero").exists()
@@ -139,6 +141,7 @@ def cmd_replay(a) -> None:
 
 
 def cmd_bddl_check(a) -> None:
+    """AC3.6: replay the same stored states in the BDDL-built scene and compare first-success steps with the demo-XML replay."""
     df = replay(a.suites.split(","), a.workers, use_demo_xml=False, only=a.only)
     ref = pd.read_parquet(OUT_DIR / "human_reference.parquet").set_index("episode_id")
     df = df.set_index("episode_id")
@@ -156,6 +159,7 @@ def cmd_bddl_check(a) -> None:
 
 
 def cmd_init_states(a) -> None:
+    """AC3.7: count each task's fixed init states through LeRobot's ``get_task_init_states``."""
     from vlapoc import libero_goals as lg
 
     lg.setup_libero()
@@ -173,6 +177,7 @@ def cmd_init_states(a) -> None:
 
 
 def cmd_summary(a) -> None:
+    """AC3.3-AC3.4: the gap between first success and demo length, and the per-task human reference table and figure."""
     from vlapoc import evaluation as ev
 
     df = pd.read_parquet(OUT_DIR / "human_reference.parquet")
@@ -324,6 +329,7 @@ def cmd_operations(a) -> None:
 
 
 def main() -> int:
+    """Dispatch to one command (usage in the module docstring); with no flag, the full replay."""
     p = argparse.ArgumentParser()
     p.add_argument("--suites", default="libero_spatial,libero_10")
     p.add_argument("--workers", type=int, default=8)

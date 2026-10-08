@@ -121,6 +121,7 @@ def probe(s3_url: str) -> dict:
 
 
 def main() -> int:
+    """List, fetch or probe the PhAIL bucket (usage in the module docstring)."""
     p = argparse.ArgumentParser()
     p.add_argument("--list", action="store_true")
     p.add_argument("--fetch", action="store_true")

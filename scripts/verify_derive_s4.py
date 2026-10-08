@@ -81,12 +81,11 @@ def padding(summary: dict) -> None:
     for p in (SCRATCH_LINEAGE, SCRATCH_OUT):
         if p.exists():
             shutil.rmtree(p)
+    from vlapoc.runs import scratch_lineage_copy
+
     v0 = resolve_version("v0")
-    SCRATCH_LINEAGE.mkdir(parents=True)
-    shutil.copytree(LINEAGE_ROOT / "versions" / v0["dataset_version_id"], SCRATCH_LINEAGE / "versions" / v0["dataset_version_id"])
-    for d in ("subsets", "splits"):
-        shutil.copytree(LINEAGE_ROOT / d, SCRATCH_LINEAGE / d)
-    shutil.copy(LINEAGE_ROOT / "names.json", SCRATCH_LINEAGE / "names.json")
+    # v0's version record only (the derivation registers v0pad next to it), the subsets and splits, no MLflow DB
+    scratch_lineage_copy(SCRATCH_LINEAGE, dirs=(f"versions/{v0['dataset_version_id']}", "subsets", "splits"), mlflow_db=False)
     cand = Subset.load("v0/candidate")
     target = cand.episode_ids[0]
     eps0 = version_episodes("v0")

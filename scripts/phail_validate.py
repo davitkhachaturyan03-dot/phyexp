@@ -45,10 +45,12 @@ OUT: dict = {}
 
 
 def load_arms() -> dict:
+    """PhAIL's cohort as ``{model: {object: [Episode]}}`` (``vlapoc.evaluation.phail_cohort_arms``)."""
     return ev.phail_cohort_arms()  # one loader, shared with vlapoc.verdict (S7)
 
 
 def maxdiff(a, b) -> float:
+    """max |a - b| over arrays, counting equal-signed infinities as equal."""
     a, b = np.asarray(a, float), np.asarray(b, float)
     both_inf = np.isinf(a) & np.isinf(b) & (np.sign(a) == np.sign(b))
     with np.errstate(invalid="ignore"):
@@ -56,6 +58,7 @@ def maxdiff(a, b) -> float:
 
 
 def ac2_1(arms: dict, ref: dict) -> None:
+    """AC2.1: our functions vs PhAIL's own on the same exported cohort (scalars, cells, KS, P-P, logrank, macro-KS)."""
     diffs = {}
     # pooled per model (tab_leaderboard._per_model_row)
     h_pooled = ev.pooled(arms[TELEOP])
@@ -120,6 +123,7 @@ def ac2_1(arms: dict, ref: dict) -> None:
 
 
 def ac2_2(arms: dict, ref: dict) -> None:
+    """AC2.2: exported episode counts per model vs Table 2, and which cohort sources are private."""
     counts = {m: sum(len(v) for v in arms[m].values()) for m in (*MODELS, TELEOP)}
     cand_private = set()
     with open(CLONE / "out" / "release_classifier" / "candidates.jsonl") as f:
@@ -151,6 +155,7 @@ def _ci(arms_, fn, seed=0, n_boot=1000, **kw):
 
 
 def ac2_3_4_5(arms: dict) -> None:
+    """AC2.3 published numbers side by side, AC2.4 the four yardsticks and their winners, AC2.5 the HRT CI variant."""
     pub_ci = {r["short"]: r for r in json.loads((CLONE / "out/paper/tab_headline_ci.json").read_text())}
     pp_sum = json.loads((CLONE / "out/explore/pp_summary.json").read_text())
     lb = json.loads((CLONE / "out/paper/tab_leaderboard.json").read_text())["rows"]
@@ -239,6 +244,7 @@ def ac2_3_4_5(arms: dict) -> None:
 
 
 def ac2_6() -> None:
+    """AC2.6: the p. 8 data-access caveat answered from the saved listing, probe and croissant.json."""
     listing = json.loads((ART / "s2_phail_listing_summary.json").read_text())
     probe = json.loads((ART / "s2_phail_access_probe.json").read_text())
     other = json.loads((ART / "s2_phail_other_prefixes.json").read_text())
@@ -265,6 +271,7 @@ def ac2_6() -> None:
 
 
 def ac2_7_8(arms: dict) -> None:
+    """AC2.7 the two figures on real data, AC2.8 the three UPH forms side by side."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -339,6 +346,7 @@ def hrt_ci_seeds(arms: dict, seeds: int) -> None:
 
 
 def main() -> int:
+    """Run AC2.1-AC2.8 (or ``--hrt-ci-seeds N`` alone) and write ``artifacts/phail_validation.json``."""
     if "--hrt-ci-seeds" in sys.argv:
         hrt_ci_seeds(load_arms(), int(sys.argv[sys.argv.index("--hrt-ci-seeds") + 1]))
         return 0

@@ -30,10 +30,12 @@ OUT: dict = {"data": "SYNTHETIC (numpy, fixed seeds); no real rollout outcomes"}
 
 
 def sha(p: Path) -> str:
+    """sha256 hex digest of a file's bytes."""
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
 def ac1_1() -> None:
+    """AC1.1: the vendored ``phail_stats.py`` and its LICENSE are byte-identical to the clone; the attribution header is present."""
     v, c = REPO_ROOT / "vlapoc/third_party/phail_stats.py", CLONE / "build/stats.py"
     lic = REPO_ROOT / "vlapoc/third_party/LICENSE-phail-paper"
     init = (REPO_ROOT / "vlapoc/third_party/__init__.py").read_text()
@@ -48,6 +50,7 @@ def ac1_1() -> None:
 
 
 def ac1_2() -> None:
+    """AC1.2: vendored KM survival and Greenwood CI vs ``scipy.stats.ecdf`` on SYNTHETIC finite censored data."""
     from scipy.stats import CensoredData, ecdf
 
     rng = np.random.default_rng(1)
@@ -71,6 +74,7 @@ def ac1_2() -> None:
 
 
 def ac1_3() -> None:
+    """AC1.3: ghost semantics on SYNTHETIC data (KM mass at infinity = g/n; RMST = mean of min(T, τ) with ghosts at τ)."""
     rng = np.random.default_rng(2)
     eps = []
     g = 0
@@ -97,6 +101,7 @@ def ac1_3() -> None:
 
 
 def ac1_4() -> None:
+    """AC1.4: censoring semantics of ``episode_from_ops`` (zero-success episodes kept; no tail when all ops are done)."""
     tau_ep = 60.0
     zero = ev.episode_from_ops("zero", [], tau_ep, 2)
     full = ev.episode_from_ops("full", [5.0, 12.0], 20.0, 2)
@@ -118,6 +123,7 @@ def ac1_4() -> None:
 
 
 def ac1_5() -> None:
+    """AC1.5: episode-clustered vs per-operation bootstrap CI width on SYNTHETIC correlated operations."""
     rng = np.random.default_rng(3)
     eps = []
     for i in range(40):  # correlated: an episode-level speed factor multiplies all 5 of its operations
@@ -138,6 +144,7 @@ def ac1_5() -> None:
 
 
 def ac1_6() -> None:
+    """AC1.6: every registry entry's named functions exist with docstrings; writes ``s1_metric_registry.md``."""
     reg = ev.metric_registry()
     required = ["F(30 s) / Success@τ", "median", "RMST(τ)", "UPH", "completion", "MTBF/A", "HRT", "AUC vs reference",
                 "KS / macro-KS", "P-P plot", "ghost-event rate", "censored rate"]
@@ -157,6 +164,7 @@ def equivalence() -> None:
     rng = np.random.default_rng(4)
 
     def syn_ns(scale: float, n: int) -> list:
+        """A SYNTHETIC PhAIL-style episode record (the attributes ``episode_to_T_pairs`` reads)."""
         out = []
         for _ in range(n):
             k = 3
@@ -213,6 +221,7 @@ def equivalence() -> None:
 
 
 def ac1_7() -> None:
+    """AC1.7: count the grounding citations in ``vlapoc/evaluation.py``."""
     src = (REPO_ROOT / "vlapoc/evaluation.py").read_text()
     cites = {k: src.count(k) for k in ("PoC §3.2 (p. 6)", "PoC §10 (p. 20)", "§3.1 p. 4", "Table 1 p. 5", "§3.2 p. 5", "§3.3 p. 6")}
     print(f"AC1.7 citations in vlapoc/evaluation.py: {cites}")
@@ -220,6 +229,7 @@ def ac1_7() -> None:
 
 
 def main() -> int:
+    """Run AC1.1-AC1.7 plus the equivalence checks and write ``artifacts/s1_verify_metrics.json``."""
     for f in (ac1_1, ac1_2, ac1_3, ac1_4, ac1_5, ac1_6, equivalence, ac1_7):
         f()
     (ART / "s1_verify_metrics.json").write_text(json.dumps(OUT, indent=2, default=str))

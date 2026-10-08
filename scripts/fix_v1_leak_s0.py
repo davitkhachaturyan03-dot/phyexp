@@ -48,10 +48,12 @@ ART = REPO_ROOT / "tracker" / "features" / "2026-10-01-evaluation-layer" / "arti
 
 
 def sha(p: Path) -> str:
+    """sha256 hex digest of a file's bytes."""
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
 def main() -> int:
+    """Apply the four steps of the module docstring to v1 (idempotent) and write ``artifacts/s0_fix_v1.json``."""
     v0, v1 = resolve_version("v0"), resolve_version("v1")
     vdir = LINEAGE_ROOT / "versions" / v1["dataset_version_id"]
     tables = {"version_table": vdir / "episodes.parquet",

@@ -50,6 +50,7 @@ SHORT = {"Physical Intelligence Open π₀.₅": "OpenPI", "NVIDIA GR00T N1.6": 
 
 
 def by_obj(eps):
+    """Group PhAIL episodes by ``eval_object`` (PhAIL's cell)."""
     out = defaultdict(list)
     for e in eps:
         out[e.eval_object].append(e)
@@ -61,6 +62,7 @@ def main() -> int:
     # candidate_urls:``), so its episode order depends on hash randomization, and every bootstrap draw follows
     # episode order. Sorting by ``s3_url`` makes the export and every p-value below deterministic (evaluation
     # layer AC2.9, analysis-r1 E3); D and the point estimates do not depend on order.
+    """Export the sorted mixed cohort and PhAIL's own reference values (module docstring)."""
     eps = sorted(loader.load(cohort="mixed"), key=lambda e: e.s3_url)
     rows = [{"s3_url": e.s3_url, "cohort_source": e.cohort_source, "place_ts": [float(t) for t in e.place_ts],
              "duration_s": float(e.duration_s), "total_items": int(e.total_items), "n_inf_events": int(e.n_inf_events),

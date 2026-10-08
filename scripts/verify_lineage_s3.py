@@ -56,13 +56,11 @@ SCRATCH_ROOT = REPO_ROOT / "data" / "scratch"  # gitignored (data/)
 
 
 def scratch_lineage_root(base: Path) -> Path:
-    """Copy of the real lineage manifests (versions, subsets, splits, names) without the MLflow DB."""
-    lr = base / "lineage"
-    lr.mkdir(parents=True)
-    for d in ("versions", "subsets", "splits"):
-        shutil.copytree(LINEAGE_ROOT / d, lr / d)
-    shutil.copy(LINEAGE_ROOT / "names.json", lr / "names.json")
-    return lr
+    """``base/lineage``: a copy of the real lineage manifests (versions, subsets, splits, names) without the MLflow DB
+    (``vlapoc.runs.scratch_lineage_copy``; imported here so the other checks do not load MLflow)."""
+    from vlapoc.runs import scratch_lineage_copy
+
+    return scratch_lineage_copy(base / "lineage", dirs=("versions", "subsets", "splits"), mlflow_db=False)
 
 
 def served_episode_ids(root: Path, subset: Subset, eps: pd.DataFrame, lr: Path, full_getitem: bool = False):
