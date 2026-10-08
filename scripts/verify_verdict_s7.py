@@ -6,7 +6,7 @@ own"); PhAIL §3.3 p. 6 (outcomes (i)/(ii)/(iii)), App. I p. 18 (three CDFs whos
 
     .venv/bin/python scripts/verify_verdict_s7.py          # unit checks (LABELLED SYNTHETIC data)
     .venv/bin/python -m pytest -q scripts/verify_verdict_s7.py
-    .venv/bin/python scripts/verify_verdict_s7.py --phail-seeds 0 1 2 3 4   # AC7.1 (r2): restated outcomes in every seed
+    .venv/bin/python scripts/verify_verdict_s7.py --phail-seeds 0 1 2 3 4   # AC7.1 (r3): the restated outcomes over seeds 0-4
     .venv/bin/python scripts/verify_verdict_s7.py --family-consistency data/eval/<run> [...]   # AC7.7
     .venv/bin/python scripts/verify_verdict_s7.py --plan-guard <eval a> <eval b mismatched> <eval c same plan as b> --lineage-root <scratch>  # AC7.8
 """
@@ -54,6 +54,7 @@ def intransitive_arms(rep: int = 20) -> dict:
 
 
 def sup_sign(arm_a: dict, arm_b: dict) -> tuple[float, str]:
+    """The KS sup-sign: |F_a - F_b| at its maximum on a 0.25 s grid, and which arm's CDF is higher there."""
     grid = np.arange(0.0, 100.0, 0.25)
     d = ev.F_curve(arm_a["x"], grid) - ev.F_curve(arm_b["x"], grid)
     i = int(np.argmax(np.abs(d)))
@@ -75,11 +76,33 @@ def test_ks_sign_cycles_but_verdict_direction_comes_from_rmst():
 
 
 EXPECTED_AC7_1 = {("OpenPI", "GR00T"): "iii", ("OpenPI", "ACT"): "iii", ("GR00T", "ACT"): "ii",
-                  ("OpenPI", "SmolVLA"): "i", ("GR00T", "SmolVLA"): "i", ("ACT", "SmolVLA"): "i"}  # plan r2 AC7.1
+                  ("OpenPI", "SmolVLA"): "i", ("GR00T", "SmolVLA"): "i", ("ACT", "SmolVLA"): "i"}  # plan AC7.1 (r2, r3)
+# Plan r3 AC7.1, owner ruling B of 2026-10-06 (dispute-r2.md; brief "Owner rulings"): GR00T vs ACT -> (ii) in >= 4/5
+# seeds, the gate fires in 5/5 and RMST favours GR00T in 5/5 (its AUC direction sits at the Holm boundary, so (ii)
+# depends on the bootstrap seed at n_boot 1000). Every other pair must give its expected outcome in every seed.
+BOUNDARY_PAIR = ("GR00T", "ACT")
+BOUNDARY_MIN_SHARE = 4 / 5
+
+
+def ac7_1_r3(out: dict, seeds: list[int]) -> dict:
+    """The r3 AC7.1 criterion over the per-(pair, seed) results of ``phail_seeds``."""
+    x, y = BOUNDARY_PAIR
+    rows = [out[f"{x}-{y}-seed{sd}"] for sd in seeds]
+    n_ii = sum(r["outcome"] == "ii" for r in rows)
+    n_gate = sum(r["gate_p"] < 0.05 for r in rows)
+    n_rmst = sum(r["favours"]["phail_rmst240"] == x for r in rows)
+    boundary_ok = n_ii >= BOUNDARY_MIN_SHARE * len(seeds) and n_gate == len(seeds) and n_rmst == len(seeds)
+    others = {f"{a}-{b}": sum(out[f"{a}-{b}-seed{sd}"]["outcome"] == want for sd in seeds)
+              for (a, b), want in EXPECTED_AC7_1.items() if (a, b) != BOUNDARY_PAIR}
+    others_ok = all(n == len(seeds) for n in others.values())
+    return {"criterion": "plan r3 AC7.1 (owner ruling B, dispute-r2.md, 2026-10-06)", "n_seeds": len(seeds),
+            f"{x}-{y}": {"n_ii": n_ii, "n_gate_fires": n_gate, "n_rmst_favours_" + x: n_rmst, "pass": boundary_ok},
+            "other_pairs_matching_seeds": others, "other_pairs_pass": others_ok, "pass": boundary_ok and others_ok}
 
 
 def phail_seeds(seeds: list[int]) -> None:
-    """AC7.1 (r2): the six PhAIL pairs on the sorted export, family PhAIL, in every seed; outcomes vs the restatement."""
+    """AC7.1 (r3): the six PhAIL pairs on the sorted export, family PhAIL, in every seed. Each per-seed line compares the
+    outcome with the pair's expected outcome; the pass line applies the r3 criterion (``ac7_1_r3``)."""
     arms = ev.phail_cohort_arms()
     out, ok = {}, True
     for (x, y), want in EXPECTED_AC7_1.items():
@@ -93,8 +116,17 @@ def phail_seeds(seeds: list[int]) -> None:
             print(f"AC7.1 {x} vs {y} seed {sd}: gate D̄ {v['gate']['D']:.4f} p {v['gate']['p']:.4f} -> ({got}) expected ({want}) "
                   f"{'OK' if got == want else 'MISMATCH'}; Holm p " + ", ".join(f"{k} {m['p_holm']:.3f}->{m['favours']}" for k, m in v["metrics"].items()),
                   flush=True)
-    print(f"AC7.1 all {len(out)} (pair, seed) outcomes match the r2 restatement: {ok}")
-    json.dump({"seeds": seeds, "results": out, "pass": ok}, open(ART / "s7_ac7_1_seed_sweep.json", "w"), indent=1)
+    r3 = ac7_1_r3(out, seeds)
+    x, y = BOUNDARY_PAIR
+    b = r3[f"{x}-{y}"]
+    n = len(seeds)
+    print(f"AC7.1 every (pair, seed) outcome equals the pair's expected outcome: {ok} (the superseded r2 rule)")
+    print(f"AC7.1 (r3) {x} vs {y}: (ii) in {b['n_ii']}/{n} seeds (needs >= {BOUNDARY_MIN_SHARE:.0%}), gate fires {b['n_gate_fires']}/{n}, "
+          f"RMST favours {x} {b['n_rmst_favours_' + x]}/{n}: {b['pass']}; other pairs match in every seed: {r3['other_pairs_pass']} "
+          f"({', '.join(f'{k} {v}/{n}' for k, v in r3['other_pairs_matching_seeds'].items())})")
+    print(f"AC7.1 (r3, owner ruling B, dispute-r2.md) pass: {r3['pass']}")
+    json.dump({"seeds": seeds, "results": out, "all_seeds_match_expected": ok, "r3": r3, "pass": r3["pass"]},
+              open(ART / "s7_ac7_1_seed_sweep.json", "w"), indent=1)
 
 
 def family_consistency(paths: list[Path]) -> None:
@@ -172,6 +204,7 @@ def plan_guard_runs(a: str, b_mismatch: str, c_same: str, lineage_root: Path) ->
 
 
 def main() -> int:
+    """Run the mode named on the command line (usage in the module docstring); with no mode, the unit checks."""
     import argparse
 
     ap = argparse.ArgumentParser()
