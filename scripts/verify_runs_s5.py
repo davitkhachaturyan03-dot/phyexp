@@ -108,16 +108,64 @@ def main() -> int:
     s["AC5.2"] = fields
 
     # ---- AC5.3 ------------------------------------------------------------------------------------
+    # PoC §2.1 p.3 "Every eval rollout should be tied back to that checkpoint" (item 1) with "fixed seeds and initial
+    # states" (item 3). The six AC5.3 fields as the real eval stage (runs.eval_run, evaluation-layer S5) records them:
+    # the round-1 eval_standin logged suites / libero_task_ids / init_state_indices / seeds as params of their own;
+    # eval_run logs the request (params tasks = [[suite, libero_task_id], ...], n_init, init_offset, seed_base, the
+    # init_state_rule) and the realised per-rollout values in its rollout record (vlapoc.rollouts.RECORD_COLUMNS).
+    # Each field is checked in the run's params/tags AND in the record it logged, against the eval request above.
+    from vlapoc.rollouts import validate_record
     re_ = c.get_run(ev)
-    ep = re_.data.params
-    print(f"AC5.3 eval run: checkpoint_sha256 == train-A weights: {ep['checkpoint_sha256'] == a['weights_sha256']}; "
-          f"train_run_id == A: {ep['train_run_id'] == a['run_id']}; suites={ep['suites']}; libero_task_ids={ep['libero_task_ids']}; "
-          f"init_state_indices={ep['init_state_indices']}; seeds={ep['seeds']}; loaded={re_.data.tags['eval.checkpoint.loaded']} "
-          f"({re_.data.tags['eval.checkpoint.n_params']} params); stand_in={re_.data.tags['vlapoc.stand_in']}")
+    ep, et = re_.data.params, re_.data.tags
+    req_tasks, req_n_init, req_offset, req_seed_base = [["libero_spatial", 0]], 1, 0, 0  # the eval_run(...) call above
     pl = pd.read_parquet(plan)
-    print(f"AC5.3 rollout plan rows={len(pl)} outcomes={pl['outcome'].unique().tolist()} columns={list(pl.columns)}")
-    s["AC5.3"] = {"ckpt_match": ep["checkpoint_sha256"] == a["weights_sha256"], "train_run": ep["train_run_id"] == a["run_id"],
-                  "plan_rows": len(pl), "outcomes": pl["outcome"].unique().tolist()}
+    rec_is_logged = et["output.rollouts.sha256"] == sha256_file(plan)  # the record read below is the run's own output
+    ck_loaded = sha256_file(ck / "model.safetensors")  # the file rollouts.checkpoint_policy hashes and loads
+    p_tasks = json.loads(ep["tasks"])
+    p_init = [[sv, tid, int(ep["init_offset"]) + j] for sv, tid in p_tasks for j in range(int(ep["n_init"]))]  # init_state_rule
+    p_seeds = [[sv, tid, int(ep["seed_base"]) + i] for sv, tid, i in p_init]
+    want_init = [[sv, tid, req_offset + j] for sv, tid in req_tasks for j in range(req_n_init)]
+    want_seeds = [[sv, tid, req_seed_base + i] for sv, tid, i in want_init]
+    rows = pl.sort_values(["suite", "libero_task_id", "init_state_index"])
+    r_tasks = sorted({(sv, int(t)) for sv, t in zip(rows["suite"], rows["libero_task_id"])})
+    r_init = [[sv, int(t), int(i)] for sv, t, i in zip(rows["suite"], rows["libero_task_id"], rows["init_state_index"])]
+    r_seeds = [[sv, int(t), int(x)] for sv, t, x in zip(rows["suite"], rows["libero_task_id"], rows["seed"])]
+    ac53 = {
+        "checkpoint_sha256": (
+            {"param": ep["checkpoint_sha256"][:16], "tag input.checkpoint": et["input.checkpoint"][:27],
+             "record": sorted(x[:16] for x in set(pl["checkpoint_sha256"]))},
+            ep["checkpoint_sha256"] == ck_loaded == a["weights_sha256"] and et["input.checkpoint"] == f"checkpoint:{ck_loaded}"
+            and set(pl["checkpoint_sha256"]) == {ck_loaded}),
+        "train_run_id": (
+            {"param": ep["train_run_id"][:12], "param policy": ep["policy"][:18], "record": sorted(x[:12] for x in set(pl["train_run_id"]))},
+            ep["train_run_id"] == a["run_id"] and ep["policy"] == f"train:{a['run_id']}" and set(pl["train_run_id"]) == {a["run_id"]}),
+        "suite": (
+            {"param tasks": sorted({sv for sv, _ in p_tasks}), "record": sorted(set(pl["suite"]))},
+            sorted({sv for sv, _ in p_tasks}) == sorted(set(pl["suite"])) == sorted({sv for sv, _ in req_tasks})),
+        "libero_task_ids": (
+            {"param tasks": p_tasks, "record": [list(x) for x in r_tasks]},
+            sorted(map(tuple, p_tasks)) == r_tasks == sorted(map(tuple, req_tasks))),
+        "init_state_indices": (
+            {"params (n_init, init_offset, rule)": p_init, "record": r_init},
+            sorted(p_init) == r_init == sorted(want_init)),
+        "seeds": (
+            {"params (seed_base, rule)": p_seeds, "record": r_seeds},
+            sorted(p_seeds) == r_seeds == sorted(want_seeds)),
+    }
+    for k, (vals, ok) in ac53.items():
+        print(f"AC5.3 {k}: {vals}; equal to the request and to train-A: {ok}")
+    print(f"AC5.3 init_state_rule param: {ep['init_state_rule']!r}")
+    ck_type = json.loads((ck / "config.json").read_text())["type"]
+    loaded = ep["policy_type"] == ck_type and set(pl["policy_type"]) == {ck_type}
+    print(f"AC5.3 eval run: rollout record is its logged output (sha256 == output.rollouts.sha256 tag): {rec_is_logged}; "
+          f"policy_type param/record == checkpoint config type {ck_type!r}: {loaded}; stand_in={et['vlapoc.stand_in']}; "
+          f"rows={len(pl)} (eval.n_rollouts tag {et['eval.n_rollouts']}); events={pl['event'].tolist()} censored={pl['censored'].tolist()}; "
+          f"record schema errors: {validate_record(pl)}")
+    ac53_pass = all(ok for _, ok in ac53.values()) and rec_is_logged and loaded and et["vlapoc.stand_in"] == "false"
+    print(f"AC5.3 every field recorded (params/tags and rollout record) and equal to the request: {ac53_pass}")
+    s["AC5.3"] = {**{k: {"recorded": vals, "ok": ok} for k, (vals, ok) in ac53.items()}, "record_is_logged_output": rec_is_logged,
+                  "policy_type_matches_checkpoint": loaded, "stand_in": et["vlapoc.stand_in"], "rows": len(pl),
+                  "events": pl["event"].tolist(), "censored": pl["censored"].tolist(), "pass": ac53_pass}
 
     # ---- AC5.4 ------------------------------------------------------------------------------------
     tr = runs.trace(bb["run_id"], LR)
