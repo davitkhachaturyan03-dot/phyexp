@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S1 Metric layer — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+  /* report-specific visuals; every colour is a tracker.css variable (no hex) */
+  figure.fig svg { max-width: 680px; margin: 0 auto; }
+  .shot { display: block; width: 100%; max-width: 640px; height: auto; margin: 0 auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  .ax { stroke: var(--border); stroke-width: 1; }
+  .gr { stroke: var(--border); stroke-width: .7; opacity: .7; }
+  .tk { fill: var(--muted); font: 10px var(--mono); }
+  .tl { fill: var(--text); font: 600 12px var(--sans); }
+  .lb { fill: var(--text); font: 11px var(--sans); }
+  .lbm { fill: var(--muted); font: 10.5px var(--sans); }
+  .lbs { fill: var(--muted); font: 9.5px var(--mono); }
+  .val { fill: var(--text); font: 600 9.5px var(--mono); }
+  .s-a { stroke: var(--accent); stroke-width: 2.2; fill: none; }
+  .s-b { stroke: var(--text); stroke-width: 1.6; fill: none; stroke-dasharray: 6 3; }
+  .s-c { stroke: var(--muted); stroke-width: 1.4; fill: none; stroke-dasharray: 2 3; }
+  .sl-a { stroke: var(--accent); stroke-width: 2.4; fill: none; }
+  .sl-b { stroke: var(--text); stroke-width: 1.8; fill: none; stroke-dasharray: 6 3; }
+  .sl-c { stroke: var(--muted); stroke-width: 1.8; fill: none; }
+  .sl-d { stroke: var(--muted); stroke-width: 1.4; fill: none; stroke-dasharray: 2 3; }
+  .dot { fill: var(--surface); stroke: var(--muted); stroke-width: 1.6; }
+  .dot-win { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+  .f-a { fill: var(--accent); stroke: var(--surface); stroke-width: 1.5; }
+  .f-b { fill: var(--text); stroke: var(--surface); stroke-width: 1.5; }
+  .ci { stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
+  .ci-hl { stroke: var(--accent); stroke-width: 2.4; stroke-linecap: round; }
+  .zero { stroke: var(--text); stroke-width: 1; opacity: .6; }
+  .alpha { stroke: var(--bad); stroke-width: 1.3; stroke-dasharray: 4 3; }
+  .ref { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+  .shade { fill: var(--muted); opacity: .14; }
+  .cens { stroke: var(--text); stroke-width: 1.6; }
+  .box { fill: var(--surface); stroke: var(--border); stroke-width: 1.2; }
+  .box-hl { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.4; }
+  .box-ent { fill: var(--surface-2); stroke: var(--border); stroke-width: 1; }
+  .nlab { fill: var(--text); font: 600 10.5px var(--sans); }
+  .nent { fill: var(--text); font: 10px var(--mono); }
+  .nsub { fill: var(--muted); font: 9.5px var(--mono); }
+  .nfile { fill: var(--text); font: 600 11.5px var(--mono); }
+  .elab { fill: var(--muted); font: italic 9px var(--sans); }
+  .edge { stroke: var(--muted); stroke-width: 1.1; fill: none; }
+  .edge-hl { stroke: var(--accent); stroke-width: 1.6; fill: none; }
+  .conn { stroke: var(--border); stroke-width: 1.4; stroke-dasharray: 3 3; }
+  .ah { fill: var(--muted); } .ah.hl { fill: var(--accent); }
+  .seg-plain { fill: var(--surface-2); stroke: var(--border); }
+  .seg-hl { fill: var(--accent); }
+  .bar-done { fill: var(--accent); }
+  .bar-open { fill: var(--surface-2); stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 3 2; }
+  .barlab { fill: var(--surface); font: 600 9px var(--sans); }
+  table.heat { min-width: 780px; }
+  table.heat td, table.heat th { padding: 5px 8px; font-size: 12.5px; white-space: nowrap; }
+  table.heat .dir { font-weight: 400; text-transform: none; letter-spacing: 0; }
+  table.reg { min-width: 860px; }
+  table.reg td { font-size: 13px; }
+  table.reg td:last-child { min-width: 280px; }
+  .tile .value { font-variant-numeric: normal; }
+  ul.tight li, ol.tight li { margin-bottom: 6px; }
+  td .pill { white-space: nowrap; }
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 14px 18px; margin: 0 0 20px; }
+  .callout p:last-child { margin-bottom: 0; }
+  td.ok, td.pend { white-space: nowrap; }
+  .ev code { font-size: 0.82em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Evaluation layer (PhAIL primitives)</a></p>
+  <h1>S1 · Metric layer: PhAIL's primitives over (T, E) pairs</h1>
+  <p class="dek">Every primitive and scalar in PoC §3.2 is now a named function of the Kaplan–Meier CDF. The KM itself comes
+  from PhAIL's own code, vendored byte-identical, so ghost events (T = ∞) and censored timeouts work as PhAIL defines
+  them. One registry names every metric, its functional and its τ.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">7/7 met</span></span>
+    <span><b>Depends on</b> —</span>
+    <span><b>Validated on real data in</b> <a href="S2-phail-validation.html">S2</a></span>
+  </div>
+</header>
+
+<h2>Why</h2>
+<p>Owner decision 4 (brief): "cover all metrics the PoC specifies", and where one does not transfer, "say so rather than
+silently dropping it". The PoC's evaluation layer is PhAIL's distributional method, and every scalar it names is a
+summary of one CDF:</p>
+<blockquote>"Success@τ, median, RMST, UPH, completion, MTBF/A are all projections of F" — PoC §3.2, p. 6</blockquote>
+<p>The rule that goes with it, "KS cannot rank on its own" (same page), separates scoring (a scalar with a CI) from
+significance (macro-KS). S7 builds the verdict on that split.</p>
+
+<h2>What was built</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File / function</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>vlapoc/third_party/phail_stats.py</code></td><td>PhAIL's <code>build/stats.py</code> at commit <code>18ce72d</code>, unmodified (sha256 <code>802387d3…</code>): <code>episode_to_T_pairs</code>, <code>kaplan_meier</code> (T = ∞ allowed), <code>km_step</code>, <code>rmst</code>, <code>ks_distance</code>, the bootstrap KS. License and attribution sit in <code>third_party/__init__.py</code> and <code>LICENSE-phail-paper</code> (Apache-2.0).</td></tr>
+    <tr><td><code>vlapoc/evaluation.py::Episode</code>, <code>episode_from_ops</code>, <code>libero_episode</code></td><td>One rollout as its operation-level (T, E) pairs, built through PhAIL's pair rule. LIBERO episodes use threshold 0 and have no ghosts.</td></tr>
+    <tr><td><code>F_at</code>, <code>median_T</code>, <code>rmst</code>, <code>completion</code>, <code>uph</code>, <code>mtbfa</code>, <code>ghost_event_rate</code>, <code>censored_rate</code></td><td>The PhAIL Table 1 scalars, each a functional of the KM F with its τ in the docstring.</td></tr>
+    <tr><td><code>hrt</code>, <code>auc_censored</code> / <code>auc_ties_half</code>, <code>pp_curve</code>, <code>macro_ks</code>, <code>logrank_stratified</code></td><td>HRT (per cell, equal-weight macro), censored AUC vs the human reference, P-P curves, the per-cell macro-KS with PhAIL's pooled-resample bootstrap, and the stratified logrank sanity line.</td></tr>
+    <tr><td><code>cluster_bootstrap</code>, <code>hrt_ci</code>, <code>F_band</code></td><td>95% CIs that resample whole episodes within each cell, never single operations.</td></tr>
+    <tr><td><code>vlapoc/metrics_registry.py</code> (round 2)</td><td>The single registry (28 entries) that S1, S6 and S7 all read: key, family, T definition, τ, censoring, functional, return column, verdict metric, transfer status and reason.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Acceptance criteria</h2>
+<div class="scroll">
+<table class="ev">
+  <thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence (re-run 2026-10-11, <code>scripts/verify_metrics_s1.py</code>)</th></tr></thead>
+  <tbody>
+    <tr><td>AC1.1 The vendored file is byte-identical to <code>build/stats.py</code> at <code>18ce72d</code>, and its license is present</td><td>Apache-2.0 §4</td><td class="ok"><span class="pill good">met</span></td><td><code>vendored sha256 802387d343463cd4… == clone build/stats.py: True; LICENSE identical: True; attribution header: True</code></td></tr>
+    <tr><td>AC1.2 KM agrees with <code>scipy.stats.ecdf(CensoredData)</code> on finite censored data, ≤ 1e-12 (SYNTHETIC)</td><td>§3.2 p. 6</td><td class="ok"><span class="pill good">met</span></td><td><code>400 pairs … max |S_vendored - S_scipy.ecdf| over 146 event times = 3.331e-16</code></td></tr>
+    <tr><td>AC1.3 Ghosts: 1 − F(∞) = g/n; RMST = mean min(T, τ) with ghosts → τ (SYNTHETIC)</td><td>§3.2 p. 6; PhAIL §3.1 p. 4</td><td class="ok"><span class="pill good">met</span></td><td><code>55 operations, 5 ghosts: ghost_event_rate = 0.0909…, g/n = 0.0909…, |diff| = 2.8e-17</code>; <code>RMST(30 s) … |diff| = 0.0e+00</code></td></tr>
+    <tr><td>AC1.4 A zero-success episode adds one censored pair of length τ_episode and is never dropped</td><td>PhAIL §3.1 p. 4</td><td class="ok"><span class="pill good">met</span></td><td><code>zero-success episode (τ_episode 60 s, 2 ops) -&gt; ((60.0, 0),)</code>; <code>stays in the risk set: 5 pairs, S after the first event = 0.8</code></td></tr>
+    <tr><td>AC1.5 The episode-clustered CI is wider than the per-operation CI on correlated operations (SYNTHETIC)</td><td>§3.2 p. 6</td><td class="ok"><span class="pill good">met</span></td><td><code>rmst30 … width ratio 1.399</code>; <code>F10 … width ratio 1.228</code></td></tr>
+    <tr><td>AC1.6 Every §3.2 primitive and Table 1 scalar has a named function with its functional and τ</td><td>§3.2 p. 6; decision 4</td><td class="ok"><span class="pill good">met</span></td><td><code>registry: 23 entries, every named function exists with a docstring; required missing: []</code> (14 in round 1; the r2 registry is wider)</td></tr>
+    <tr><td>AC1.7 Grounding docstrings cite PoC §3.2 p. 6 and PhAIL §3.1–3.3</td><td>vla-build</td><td class="ok"><span class="pill good">met</span></td><td><code>{'PoC §3.2 (p. 6)': 1, 'PoC §10 (p. 20)': 1, '§3.1 p. 4': 7, 'Table 1 p. 5': 2, '§3.2 p. 5': 6, '§3.3 p. 6': 3}</code></td></tr>
+  </tbody>
+</table>
+</div>
+<p>Equivalence checks, also re-run: macro-KS through PhAIL's own function vs ours, on synthetic data with ghosts and censoring,
+gives <code>D=0.1902324217651046 p=0.6866267465069861</code> on both sides (identical). The stratified logrank equals scipy's
+on one stratum to 5.55e-16. On real data the equivalence is S2's job.</p>
+
+<h2>Example</h2>
+<p>How ghost events and censoring enter (LABELLED SYNTHETIC, from the re-run): an episode that never succeeds before τ_episode
+contributes one censored pair, not a failure, and it stays in the risk set.</p>
+<pre><code>AC1.4 SYNTHETIC zero-success episode (τ_episode 60 s, 2 ops) -&gt; ((60.0, 0),); all ops done -&gt; ((5.0, 1), (7.0, 1))
+      (no censored tail); 1 of 2 done -&gt; ((8.0, 1), (52.0, 0)); LIBERO simultaneous ops (threshold 0) -&gt; ((10.0, 1), (0.0, 1))
+AC1.3 SYNTHETIC 55 operations, 5 ghosts (T=inf), 0 censored: ghost_event_rate = 0.09090909090909088, g/n = 0.09090909090909091
+AC1.3 RMST(30 s) = 14.55964694266428; mean(min(T, 30)) with ghosts -&gt; 30 = 14.55964694266428; |diff| = 0.0e+00</code></pre>
+<p>The asymptote gap 1 − F(∞) is exactly the ghost (hard-failure) rate, as §3.2 says, and RMST integrates a ghost to the
+cap τ, as PhAIL §3.1 says.</p>
+
+<h2>Visual: the metric registry</h2>
+<p>The metric layer has no picture of its own. Its output is this vocabulary, which every later number cites. Generated from
+<a href="artifacts/s6_metrics_registry.json">s6_metrics_registry.json</a>, the same object every returns run writes.</p>
+<!--FIG:registry_table:start--><div class="scroll"><table class="reg"><thead><tr><th>PoC metric</th><th>family</th><th>transfer status</th><th>return column(s) / verdict</th><th>reason (from the registry)</th></tr></thead><tbody><tr><td>F(30 s) / Success@τ</td><td><code>W</code></td><td><span class="pill good">built</span></td><td><code>ret_f30</code><br>verdict: <code>F_at</code></td><td>transfers literally: τ_episode = 60 s keeps 30 s an interior point of the CDF</td></tr><tr><td>RMST(τ)</td><td><code>W</code></td><td><span class="pill good">built</span></td><td><code>ret_rmst60</code><br>verdict: <code>rmst</code></td><td>negative capped time (§4.3)</td></tr><tr><td>AUC vs reference</td><td><code>W</code></td><td><span class="pill good">built</span></td><td><code>ret_auc_expected</code>, <code>ret_auc_sampled</code><br>verdict: <code>auc_ties_half</code></td><td>§9.1 Step 3 &#x27;whether the rollout beat a sampled human time&#x27; (sampled) and its expectation</td></tr><tr><td>HRT</td><td><code>W</code></td><td><span class="pill good">built (linearized)</span></td><td><code>ret_hrt60_lin</code><br>verdict: <code>hrt</code></td><td>a ratio: first-order (delta-method) per-rollout return (§4.3)</td></tr><tr><td>censored rate</td><td><code>W</code></td><td><span class="pill good">built</span></td><td><code>ret_censored60</code><br>verdict: <code>one_minus_F</code></td><td>timeouts are censored, not failed (§3.2); &#x27;the censored tail&#x27; as a target (§3.4)</td></tr><tr><td>operation RMST, capped</td><td><code>O</code></td><td><span class="pill good">built</span></td><td><code>ret_rmst60_op_cap</code><br>verdict: <code>rmst_capped</code></td><td>§3.4 &#x27;operation-level (T, event) pairs give several outcome samples per rollout&#x27;; an unfinished attempt can never outrank a completed operation (analysis-r1 F-P3)</td></tr><tr><td>operation RMST (descriptive)</td><td><code>O-descriptive</code></td><td><span class="pill good">built (descriptive)</span></td><td></td><td>PhAIL-semantics per-sub-task CDF (S4); not an attribution target</td></tr><tr><td>operation HRT (descriptive)</td><td><code>O-descriptive</code></td><td><span class="pill good">built (descriptive)</span></td><td></td><td>per-sub-task view of HRT; not an attribution target</td></tr><tr><td>F(30 s), PhAIL semantics</td><td><code>PhAIL</code></td><td><span class="pill accent">PhAIL validation</span></td><td>verdict: <code>F_at</code></td><td>PoC §4.1 yardstick on PhAIL&#x27;s data</td></tr><tr><td>HRT(240 s), PhAIL semantics</td><td><code>PhAIL</code></td><td><span class="pill accent">PhAIL validation</span></td><td>verdict: <code>hrt</code></td><td>PhAIL headline scalar</td></tr><tr><td>global RMST(240 s), PhAIL semantics</td><td><code>PhAIL</code></td><td><span class="pill accent">PhAIL validation</span></td><td>verdict: <code>rmst</code></td><td>PoC §4.1 &#x27;global RMST&#x27;</td></tr><tr><td>AUC vs human, PhAIL semantics</td><td><code>PhAIL</code></td><td><span class="pill accent">PhAIL validation</span></td><td>verdict: <code>auc_ties_dropped</code></td><td>PhAIL&#x27;s tie rule; not comparable with the LIBERO ties-½ AUC without saying so (plan R15)</td></tr><tr><td>median</td><td><code>scoring-only</code></td><td><span class="pill ">scoring only</span></td><td></td><td>no per-rollout return in the PoC</td></tr><tr><td>UPH</td><td><code>scoring-only</code></td><td><span class="pill warn">projection only</span></td><td></td><td>production UPH also needs reset and recovery time (PhAIL p.5); sim time excludes inference latency</td></tr><tr><td>completion</td><td><code>scoring-only</code></td><td><span class="pill ">scoring only</span></td><td></td><td>no separate return: 1 - censored rate when there are no ghosts</td></tr><tr><td>MTBF/A</td><td><code>scoring-only</code></td><td><span class="pill warn">adapted, scoring only</span></td><td></td><td>&#x27;failures/assists&#x27; become non-completions; no operator in simulation</td></tr><tr><td>time-to-success T</td><td><code>primitive</code></td><td><span class="pill good">built (adapted)</span></td><td></td><td>simulated seconds at 20 Hz, not wall clock (see wall-clock T)</td></tr><tr><td>Kaplan–Meier CDF F(t)</td><td><code>primitive</code></td><td><span class="pill good">built</span></td><td></td><td>vendored PhAIL kaplan_meier (T = inf allowed)</td></tr><tr><td>ghost-event rate</td><td><code>not-transferable</code></td><td><span class="pill bad">not available on LIBERO (built and validated on PhAIL&#x27;s data)</span></td><td></td><td>LIBERO defines no unrecoverable-state rule (plan P13; owner decision 6): no ghost events exist</td></tr><tr><td>KS / macro-KS</td><td><code>procedure</code></td><td><span class="pill good">significance gate (S7)</span></td><td></td><td>a two-sample test, never a ranker (PhAIL App. I)</td></tr><tr><td>P-P plot</td><td><code>procedure</code></td><td><span class="pill ">visualization</span></td><td></td><td>not a scalar</td></tr><tr><td>clustered bootstrap CI</td><td><code>procedure</code></td><td><span class="pill good">built</span></td><td></td><td>a CI procedure, not a metric</td></tr><tr><td>stratified logrank (sanity)</td><td><code>procedure</code></td><td><span class="pill good">built (sanity line)</span></td><td></td><td>PhAIL reports it as a sanity check</td></tr><tr><td>intervention / safety-stop rate</td><td><code>not-transferable</code></td><td><span class="pill bad">not transferable</span></td><td></td><td>no operator in simulation</td></tr><tr><td>wall-clock T</td><td><code>protocol</code></td><td><span class="pill warn">adapted</span></td><td></td><td>simulated time at 20 Hz; excludes policy inference latency (PhAIL&#x27;s wall clock includes it)</td></tr><tr><td>blind randomized scheduling</td><td><code>protocol</code></td><td><span class="pill warn">replaced</span></td><td></td><td>fixed init states + seeds + a fixed batch plan give scene-level pairing PhAIL cannot have (&#x27;initial physical configurations are not replayed&#x27;)</td></tr><tr><td>failure types: missed grasp, wrong object, ignored instruction, idle</td><td><code>not-transferable</code></td><td><span class="pill bad">not built</span></td><td></td><td>LIBERO defines no such rule (P13); the catalog&#x27;s exact-zero idle rule does not transfer to policy actions; raw signals are recorded so rules can be added without new rollouts</td></tr><tr><td>failure types: success / timeout_no_progress / timeout_partial_k_of_n</td><td><code>W</code></td><td><span class="pill good">built</span></td><td><code>failure_type</code></td><td>from goal-conjunct traces</td></tr></tbody></table></div><!--FIG:registry_table:end-->
+
+<h2>Divergences and limitations</h2>
+<ul class="tight">
+  <li><b>Restated, not imported:</b> <code>auc_censored</code>, <code>pp_curve</code>, <code>macro_auc</code>, UPH, MTBF/A and the logrank arithmetic
+  come from PhAIL scripts that import its data loader at module level, so they cannot be imported. Each is restated with its
+  source cited, and S2 shows equality on PhAIL's data (max |diff| 0 to 3.6e-15).</li>
+  <li><b><code>macro_ks</code> re-runs the bootstrap loop</b> because PhAIL's <code>_collect_T_E</code> hard-codes its 0.3 s multi-grip threshold
+  (quoted, <code>phail_stats.py:171-178</code>), and LIBERO needs 0. The D and p values are identical to PhAIL's on PhAIL's data.</li>
+  <li><b>UPH = 3600 / RMST(τ_episode)</b>, as in PhAIL's figure code. Table 1's form and <code>common.py</code>'s form differ by up to 3× (S2 AC2.8).</li>
+  <li><b><code>ghost_event_rate</code> is the KM mass at T = ∞</b>, not the raw g/n (kept as <code>ghost_fraction</code>), because KM moves censored mass to the right.</li>
+  <li><b>HRT is a ratio</b> (0.1375), where PhAIL prints a percentage (13.75%). <code>mtbfa</code> returns ∞ when F(τ_episode) = 1.</li>
+  <li><b>"Clustered is always wider" is not general.</b> It holds for positively correlated operations (AC1.5). On LIBERO's human demos the clustered
+  CI of the pooled median was narrower in 6 of 9 two-operation tasks (S4).</li>
+</ul>
+
+<footer class="doc">Evidence: <a href="execution-log.md">execution-log.md</a> (S1) · <a href="artifacts/s1_verify_metrics_stdout.txt">s1_verify_metrics_stdout.txt</a> ·
+<a href="artifacts/s1_metric_registry.md">s1_metric_registry.md</a></footer>
+</div>
+</body>
+</html>

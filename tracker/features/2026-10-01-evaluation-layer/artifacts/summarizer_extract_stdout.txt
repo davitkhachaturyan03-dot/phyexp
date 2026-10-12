@@ -1,0 +1,18 @@
+PhAIL cohort data/phail/cohort_mixed.parquet sha256 35b7181bc92c42c5
+  OpenPI   episodes 163 pairs  776 RMST(240)   77.572 s  F at [2.0, 5.0, 10.0, 20.0, 30.0, 60.0, 120.0, 240.0]: [0.0361, 0.0361, 0.0763, 0.3348, 0.4741, 0.6627, 0.763, 0.8005]
+  GR00T    episodes 164 pairs  766 RMST(240)   77.312 s  F at [2.0, 5.0, 10.0, 20.0, 30.0, 60.0, 120.0, 240.0]: [0.0157, 0.017, 0.054, 0.3857, 0.5091, 0.6654, 0.7517, 0.8123]
+  ACT      episodes 151 pairs  580 RMST(240)  100.929 s  F at [2.0, 5.0, 10.0, 20.0, 30.0, 60.0, 120.0, 240.0]: [0.031, 0.0328, 0.1374, 0.3561, 0.4409, 0.5676, 0.6456, 0.6757]
+  SmolVLA  episodes 116 pairs  268 RMST(240)  166.373 s  F at [2.0, 5.0, 10.0, 20.0, 30.0, 60.0, 120.0, 240.0]: [0.0037, 0.0037, 0.0037, 0.1263, 0.1828, 0.2638, 0.3423, 0.3955]
+  Teleop   episodes 396 pairs 3952 RMST(240)   10.516 s  F at [2.0, 5.0, 10.0, 20.0, 30.0, 60.0, 120.0, 240.0]: [0.0114, 0.0137, 0.5774, 0.957, 0.9932, 0.9995, 1.0, 1.0]
+  GR00T vs ACT pooled CDF: sign changes of F_ACT - F_GR00T at [14.55] s; ACT ahead at most by 0.0915 (t = 9.5 s); GR00T ahead at most by 0.1366 (t = 237.45 s)
+human reference data/eval/human_reference/human_reference.parquet sha256 92ca4c5d5a1d946a: 1000 demos, success_any 1000
+  libero_spatial  n 500 median T_success 5.30 s vs duration 6.20 s; RMST(60) 5.3564 vs 6.2250 s; ratio 1.1622
+  libero_10       n 500 median T_success 12.45 s vs duration 13.15 s; RMST(60) 13.1662 vs 13.8090 s; ratio 1.0488
+  human libero_spatial/0: n 50, T_success median 3.90 s, max 7.60 s
+  human libero_10/8: n 50, T_success median 19.83 s, max 24.75 s
+  SmolVLA libero_spatial/0 (eval-smolvla-harness-spatial0-20261004T150110Z): 6/10 succeeded; family W F(30) 0.600, RMST(60) 26.185 s, median 3.75; family O pairs 10, KM RMST(60) 26.185 s
+  SmolVLA libero_10/8 (eval-smolvla-harness-l10t8-20261004T153306Z): 3/10 succeeded; family W F(30) 0.300, RMST(60) 48.400 s, median inf; family O pairs 15, KM RMST(60) 36.986 s
+  returns-e138fec97361/returns.parquet: 10 rows; cell means ret_f30 0.6000, ret_rmst60 -26.1850, ret_auc_expected 0.4800, ret_auc_sampled 0.3500, ret_hrt60_lin -0.1577, ret_censored60 0.4000
+  returns-e92604a8b995/returns.parquet: 10 rows; cell means ret_f30 0.3000, ret_rmst60 -48.4000, ret_auc_expected 0.0850, ret_auc_sampled 0.0000, ret_hrt60_lin -0.4161, ret_censored60 0.7000
+  returns-e92604a8b995/operation_returns.parquet: 15 operation samples; mean ret_rmst60_op_cap -38.146667; unfinished attempts 7, all -60: True
+wrote tracker/features/2026-10-01-evaluation-layer/artifacts/summarizer_data.json

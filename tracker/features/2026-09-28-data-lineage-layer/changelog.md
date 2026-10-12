@@ -174,3 +174,20 @@ Changes after the first release (2026-10-01), one dated entry per change, added 
   - The refactorer's N5 store was moved aside to `data/lineage_scratch/s5.refactor-n5-diagnostic` (2.3 GB, nothing
     deleted). `data/lineage_scratch/s5` (2.3 GB) is now this run's store.
 - **Divergence:** none. AC5.3 is checked as written; the fields are read from where the real eval stage records them.
+
+## 2026-10-11: S5 page AC5.3 row and `s5_summary.json` AC5.3 refreshed to the real eval stage's evidence
+- **Why:** the 2026-10-08 entry left these two records describing round 1's `eval_standin` ("loaded=true (51600263 params);
+  stand_in=true"; `"plan_rows": 1000, "outcomes": ["not_run"]`). The evaluation-layer summarizer was asked to refresh them.
+- **Grounding:** plan AC5.3; PoC §2.1 items 1 and 3, p. 3 (as in the 2026-10-08 entry).
+- **Prior art:** none needed (record update).
+- **Files:**
+  - `S5-mlflow-run-lineage.html`: the AC5.3 row keeps the round-1 evidence, marked as such, and adds the 2026-10-08 re-run
+    lines (checkpoint sha, train run, suite, task ids, init states, seeds all `True`; `stand_in=false`; negative control
+    `False`). The deliverables row notes that `eval_standin` was replaced by `eval_run`.
+  - `artifacts/s5_summary.json`: the `AC5.3` entry is replaced with the regenerated one from
+    `data/scratch/ac53_fix/data_lineage_artifacts/s5_summary.json`, and an `AC5.3_provenance` key records where it came from.
+    The other entries and `run_ids` are the original 2026-09-29 run's.
+  - `report.html`: a dated line in "Changes since first release", and a dated note on the "stand-ins only" known issue
+    (evaluation is now real).
+- **Evidence:** the 2026-10-08 entry's re-run (`verify_runs_s5.py`, exit 0, HEAD `91f0902`); nothing re-run for this record update.
+- **Divergence:** none.

@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S7 Verification gate — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+  /* report-specific visuals; every colour is a tracker.css variable (no hex) */
+  figure.fig svg { max-width: 680px; margin: 0 auto; }
+  .shot { display: block; width: 100%; max-width: 640px; height: auto; margin: 0 auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  .ax { stroke: var(--border); stroke-width: 1; }
+  .gr { stroke: var(--border); stroke-width: .7; opacity: .7; }
+  .tk { fill: var(--muted); font: 10px var(--mono); }
+  .tl { fill: var(--text); font: 600 12px var(--sans); }
+  .lb { fill: var(--text); font: 11px var(--sans); }
+  .lbm { fill: var(--muted); font: 10.5px var(--sans); }
+  .lbs { fill: var(--muted); font: 9.5px var(--mono); }
+  .val { fill: var(--text); font: 600 9.5px var(--mono); }
+  .s-a { stroke: var(--accent); stroke-width: 2.2; fill: none; }
+  .s-b { stroke: var(--text); stroke-width: 1.6; fill: none; stroke-dasharray: 6 3; }
+  .s-c { stroke: var(--muted); stroke-width: 1.4; fill: none; stroke-dasharray: 2 3; }
+  .sl-a { stroke: var(--accent); stroke-width: 2.4; fill: none; }
+  .sl-b { stroke: var(--text); stroke-width: 1.8; fill: none; stroke-dasharray: 6 3; }
+  .sl-c { stroke: var(--muted); stroke-width: 1.8; fill: none; }
+  .sl-d { stroke: var(--muted); stroke-width: 1.4; fill: none; stroke-dasharray: 2 3; }
+  .dot { fill: var(--surface); stroke: var(--muted); stroke-width: 1.6; }
+  .dot-win { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+  .f-a { fill: var(--accent); stroke: var(--surface); stroke-width: 1.5; }
+  .f-b { fill: var(--text); stroke: var(--surface); stroke-width: 1.5; }
+  .ci { stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
+  .ci-hl { stroke: var(--accent); stroke-width: 2.4; stroke-linecap: round; }
+  .zero { stroke: var(--text); stroke-width: 1; opacity: .6; }
+  .alpha { stroke: var(--bad); stroke-width: 1.3; stroke-dasharray: 4 3; }
+  .ref { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+  .shade { fill: var(--muted); opacity: .14; }
+  .cens { stroke: var(--text); stroke-width: 1.6; }
+  .box { fill: var(--surface); stroke: var(--border); stroke-width: 1.2; }
+  .box-hl { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.4; }
+  .box-ent { fill: var(--surface-2); stroke: var(--border); stroke-width: 1; }
+  .nlab { fill: var(--text); font: 600 10.5px var(--sans); }
+  .nent { fill: var(--text); font: 10px var(--mono); }
+  .nsub { fill: var(--muted); font: 9.5px var(--mono); }
+  .nfile { fill: var(--text); font: 600 11.5px var(--mono); }
+  .elab { fill: var(--muted); font: italic 9px var(--sans); }
+  .edge { stroke: var(--muted); stroke-width: 1.1; fill: none; }
+  .edge-hl { stroke: var(--accent); stroke-width: 1.6; fill: none; }
+  .conn { stroke: var(--border); stroke-width: 1.4; stroke-dasharray: 3 3; }
+  .ah { fill: var(--muted); } .ah.hl { fill: var(--accent); }
+  .seg-plain { fill: var(--surface-2); stroke: var(--border); }
+  .seg-hl { fill: var(--accent); }
+  .bar-done { fill: var(--accent); }
+  .bar-open { fill: var(--surface-2); stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 3 2; }
+  .barlab { fill: var(--surface); font: 600 9px var(--sans); }
+  table.heat { min-width: 780px; }
+  table.heat td, table.heat th { padding: 5px 8px; font-size: 12.5px; white-space: nowrap; }
+  table.heat .dir { font-weight: 400; text-transform: none; letter-spacing: 0; }
+  table.reg { min-width: 860px; }
+  table.reg td { font-size: 13px; }
+  table.reg td:last-child { min-width: 280px; }
+  .tile .value { font-variant-numeric: normal; }
+  ul.tight li, ol.tight li { margin-bottom: 6px; }
+  td .pill { white-space: nowrap; }
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 14px 18px; margin: 0 0 20px; }
+  .callout p:last-child { margin-bottom: 0; }
+  td.ok, td.pend { white-space: nowrap; }
+  .ev code { font-size: 0.82em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Evaluation layer (PhAIL primitives)</a></p>
+  <h1>S7 · The verification gate: macro-KS first, then per-metric CIs with Holm</h1>
+  <p class="dek">The two-step verdict that counterfactual retraining will be judged by. It first asks whether two policies differ at all (macro-KS),
+  then which way, separately for each metric (episode-clustered bootstrap CIs, Holm across metrics). On PhAIL's real data it says "can't tell" for
+  OpenPI–GR00T and OpenPI–ACT, finds the GR00T–ACT trade-off in 4 of 5 bootstrap seeds, and ranks every model above SmolVLA.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">8/9 met</span> <span class="pill warn">AC7.5 pending server</span></span>
+    <span><b>AC7.1</b> <span class="pill accent">owner-approved divergence (ruling B)</span></span>
+    <span><b>Depends on</b> S1, S2, S6</span>
+  </div>
+</header>
+
+<h2>Why</h2>
+<blockquote>"Two-step verdict per intervention. First the macro-KS gate … Then each metric's bootstrap CI gives the direction for that metric." — PoC §4.4, p. 10</blockquote>
+<blockquote>"use the PhAIL significance gate (Section 3.4) to decide whether the change is real before claiming it." — PoC §2.6, p. 5</blockquote>
+<p>Two more rules from the same page: crossing curves are the trade-off signature, and four metrics multiply the claims, so "correct for it (e.g.
+Bonferroni or Holm across metrics)" before labelling a trade-off (quoted, §4.4 p. 10). And from §3.2 p. 6: "KS cannot rank on its own" (quoted).</p>
+
+<h2>What was built</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File / function</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>vlapoc/verdict.py::compare_policies</code></td><td>Step 1: macro-KS D̄ with PhAIL's pooled-resample, episode-clustered bootstrap p (<code>n_boot_ks</code> 2000). Step 2: the declared family's metrics, bootstrapped jointly by resampling whole episodes (<code>n_boot</code> 1000), with a 95% CI, a two-sided bootstrap p and a Holm-adjusted p for each. The refactor split it into <code>_check_batch_plans</code>, <code>_bootstrap_differences</code>, <code>_bootstrap_p</code> and <code>_metric_result</code>, keeping the RNG draw order.</td></tr>
+    <tr><td><code>outcome</code></td><td>(iii): the gate does not fire. (i): it fires and every Holm-significant metric agrees on the direction. (ii): it fires and they disagree, so the CDFs cross. <code>gate_only</code>: it fires but no metric is significant after Holm.</td></tr>
+    <tr><td><code>holm</code></td><td>Six lines, checked against a hand example: statsmodels is not installed, and scipy has only Benjamini–Hochberg.</td></tr>
+    <tr><td>families W, O, PhAIL</td><td>Metrics come from the registry by family: LIBERO W (5 metrics), LIBERO O (<code>rmst60_op_cap</code>), and PhAIL (F(30 s), HRT(240), RMST(240), AUC, with PhAIL's semantics) for the reproduction. Every label carries its family.</td></tr>
+    <tr><td><code>verify_run</code></td><td>Records the verdict as a <code>verify</code> stage MLflow run that consumes both eval runs' rollouts. It refuses arms whose batch plans differ, and sets <code>verify.attribution_grade=true</code> only when both evals were asserted attribution-grade.</td></tr>
+    <tr><td><code>null_calibration</code>, <code>describe</code>, CLI <code>--phail</code>, <code>--phail-all</code>, <code>--eval-runs</code></td><td>PhAIL App. J's same-model split; a printable verdict.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Acceptance criteria</h2>
+<div class="scroll">
+<table class="ev">
+  <thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead>
+  <tbody>
+    <tr><td>AC7.1 (r3) PhAIL outcomes over seeds 0–4: OpenPI–GR00T (iii) 5/5; OpenPI–ACT (iii) 5/5; <b>GR00T–ACT (ii) in ≥ 4/5, gate 5/5, RMST → GR00T 5/5</b>; any vs SmolVLA (i) 5/5</td><td>PhAIL §3.3, §5; PoC §4.4 p. 10</td><td class="ok"><span class="pill good">met</span> <span class="pill accent">ruling B</span></td><td><code>AC7.1 (r3) GR00T vs ACT: (ii) in 4/5 seeds (needs &gt;= 80%), gate fires 5/5, RMST favours GR00T 5/5: True; other pairs match in every seed: True</code> (re-run 2026-10-11)</td></tr>
+    <tr><td>AC7.2 Null calibration: rejection rate on same-model halves inside [0.02, 0.10]</td><td>PhAIL App. J</td><td class="ok"><span class="pill good">met</span></td><td>OpenPI 0.050, GR00T 0.035, ACT 0.065, SmolVLA 0.075, Teleop 0.045 (200 trials × 500; figure below)</td></tr>
+    <tr><td>AC7.3 KS never ranks: PhAIL App. I's intransitive CDFs cycle on sup-sign while the verdict's direction comes from a scalar</td><td>PoC §3.2 p. 6; PhAIL App. I</td><td class="ok"><span class="pill good">met</span></td><td>sup-signs <code>A≻B≻C≻A</code>; <code>[family O]</code> verdict A vs B → (i), direction B, Δ +11.40 s [+6.85, +16.05]; the gate dict has no sign field (SYNTHETIC)</td></tr>
+    <tr><td>AC7.4 LIBERO smoke: a verdict end to end, recorded as a run, labelled smoke</td><td>§9.1 Step 4 p. 19</td><td class="ok"><span class="pill good">met</span></td><td>ACT smoke (0/10) vs SmolVLA (6/10) on libero_spatial:0 → <code>[smoke (not attribution-grade), family W]</code> D̄ 0.6000, p 0.0090 → (i) SmolVLA; all 5 metrics Holm 0.0100</td></tr>
+    <tr><td>AC7.5 Full-data SmolVLA vs a drop-20-random retrain, both evaluated per AC5.8, identical batch plan; family W declared</td><td>§2.6 p. 5, §9.1 Step 4</td><td class="pend"><span class="pill warn">pending server</span></td><td>runbook: <code>python -m vlapoc.verdict --eval-runs &lt;full&gt; &lt;drop20&gt; --family W</code> (and <code>--family O</code>). n_boot 1000; the verdict records its seed</td></tr>
+    <tr><td>AC7.6 (r2) Verdict artifacts regenerated from the sorted export; p disclosed as Monte-Carlo draws</td><td>analysis-r1 E3, E4</td><td class="ok"><span class="pill good">met</span></td><td><code>python -m vlapoc.verdict --phail-all</code> output identical to <code>s7_phail_verdicts_stdout.txt</code> (analyzer, round 2)</td></tr>
+    <tr><td>AC7.7 (r2) Family consistency from the verdict side</td><td>§3.4 p. 7, §4.4 p. 10</td><td class="ok"><span class="pill good">met</span></td><td><code>AC7.7 max |verdict - S6| = 7.11e-15; labels carry their family: True; pass: True</code> (re-run)</td></tr>
+    <tr><td>AC7.8 (r2) The batch-plan guard</td><td>LeRobot paired-comparison docs</td><td class="ok"><span class="pill good">met</span></td><td>different plans → raised; override → label <code>'smoke (not attribution-grade), family W, unpaired plan'</code>; same plan → <code>batch_plan_match True</code></td></tr>
+    <tr><td>AC7.9 (r2) Smoke verdicts are labelled smoke</td><td>analysis-r1 E1</td><td class="ok"><span class="pill good">met</span></td><td>chain verify run <code>85f7d7d9</code>: <code>verify.attribution_grade=false</code>, label <code>smoke (not attribution-grade), family W</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Example: the six PhAIL verdicts</h2>
+<p>PhAIL's released cohort (sorted export), family PhAIL, τ 240 s, n_boot 1000, n_boot_ks 2000, α 0.05. Seed-0 numbers from
+<a href="artifacts/s7_phail_verdicts.json">s7_phail_verdicts.json</a>; ranges from <a href="artifacts/s7_ac7_1_seed_sweep.json">s7_ac7_1_seed_sweep.json</a>.</p>
+<!--FIG:verdict_table:start--><div class="scroll"><table><thead><tr><th>pair</th><th class="num">macro-KS D̄</th><th class="num">gate p, seed 0</th><th class="num">gate p, seeds 0–4</th><th>Holm-significant metrics (seed 0)</th><th>outcome, seed 0</th><th>outcomes over 5 seeds</th><th>expected (AC7.1)</th></tr></thead><tbody><tr><td><b>OpenPI vs GR00T</b></td><td class="num">0.1239</td><td class="num">0.1129 (does not fire)</td><td class="num">0.1129–0.1174</td><td>none</td><td><b>(iii)</b></td><td>(iii) 5/5</td><td>(iii)</td></tr><tr><td><b>OpenPI vs ACT</b></td><td class="num">0.1418</td><td class="num">0.1074 (does not fire)</td><td class="num">0.0960–0.1079</td><td>rmst240 → OpenPI</td><td><b>(iii)</b></td><td>(iii) 5/5</td><td>(iii)</td></tr><tr><td><b>OpenPI vs SmolVLA</b></td><td class="num">0.4655</td><td class="num">0.0005 (fires)</td><td class="num">0.0005–0.0005</td><td>f30 → OpenPI; hrt240 → OpenPI; rmst240 → OpenPI; auc → OpenPI</td><td><b>(i)</b> OpenPI</td><td>(i) 5/5</td><td>(i)</td></tr><tr><td><b>GR00T vs ACT</b></td><td class="num">0.1754</td><td class="num">0.0070 (fires)</td><td class="num">0.0065–0.0100</td><td>rmst240 → GR00T; auc → ACT</td><td><b>(ii)</b></td><td>(ii) 4/5, (i) 1/5</td><td>(ii) in ≥ 4/5 (r3)</td></tr><tr><td><b>GR00T vs SmolVLA</b></td><td class="num">0.4344</td><td class="num">0.0005 (fires)</td><td class="num">0.0005–0.0005</td><td>f30 → GR00T; hrt240 → GR00T; rmst240 → GR00T; auc → GR00T</td><td><b>(i)</b> GR00T</td><td>(i) 5/5</td><td>(i)</td></tr><tr><td><b>ACT vs SmolVLA</b></td><td class="num">0.3607</td><td class="num">0.0005 (fires)</td><td class="num">0.0005–0.0005</td><td>f30 → ACT; hrt240 → ACT; rmst240 → ACT; auc → ACT</td><td><b>(i)</b> ACT</td><td>(i) 5/5</td><td>(i)</td></tr></tbody></table></div><!--FIG:verdict_table:end-->
+<pre><code>$ .venv/bin/python -m vlapoc.verdict --phail GR00T ACT        # re-run 2026-10-11
+[family PhAIL] GR00T vs ACT (4 cells, n 164/151 episodes): macro-KS D̄ 0.1754 p 0.0070 (fires) -&gt; outcome (ii)
+    phail_f30     F(30 s)            GR00T 0.5091 | ACT 0.4409 | Δ +0.0682 [+0.0039, +0.1272] p 0.0380 Holm 0.0759 -&gt; favours GR00T
+    phail_hrt240  HRT(240 s)         GR00T 0.1335 | ACT 0.1049 | Δ +0.0286 [+0.0006, +0.0496] p 0.0500 Holm 0.0759 -&gt; favours GR00T
+    phail_rmst240 global RMST(240 s) GR00T 77.3125 | ACT 100.9287 | Δ -23.6162 [-40.9426, -7.1305] p 0.0060 Holm 0.0240 -&gt; favours GR00T *
+    phail_auc     AUC vs human       GR00T 0.0949 | ACT 0.1338 | Δ -0.0388 [-0.0706, -0.0119] p 0.0100 Holm 0.0300 -&gt; favours ACT *
+    sanity: stratified logrank chi2 11.76 p 0.000607</code></pre>
+<p>(Labels shortened.) The gate fires, and two metrics survive Holm with opposite signs. That is PhAIL §5.3's crossing: ACT wins the early,
+AUC-weighted region and GR00T the integrated RMST.</p>
+
+<h3>The PhAIL prose-vs-artifact discrepancy (OpenPI–ACT)</h3>
+<div class="callout">
+<p>PhAIL p. 9 says "ACT and OpenPI/GR00T are different (KS rejects)" (quoted). PhAIL's own released
+<code>out/explore/ks_power/dashboard_per_obj_macro.json</code> gives OpenPI–ACT <code>p 0.10294852573713144, status WEAK</code> (measured,
+analysis-r1). Our gate, on the deterministic sorted export, gives <b>p 0.0960–0.1079 across seeds 0–4</b> (analysis-r3 N7; the round-1
+range 0.105–0.123 came from the unsorted export and is superseded). For GR00T–ACT the released JSON says <code>p 0.016, HOLDS</code>, and our
+gate fires in 5/5 seeds. PoC §3.3 p. 7's "Macro-KS resolved … OpenPI vs. ACT at 30 rollouts per (model, object) cell" is a detection rate from
+PhAIL §5.2's subsampling experiment at τ = 120 s, not a full-cohort rejection. The artifact wins: AC7.1 expects (iii) for OpenPI–ACT.</p>
+</div>
+
+<h2>Visual</h2>
+<figure class="fig">
+<!--FIG:verdict_forest:start--><svg viewBox="0 0 680 384" role="img" aria-label="Per-metric differences with episode-clustered bootstrap 95% CIs for two PhAIL pairs"><text x="16.0" y="38.0" class="tl">GR00T vs ACT</text><text x="150.0" y="38.0" class="lbm">gate: macro-KS D̄ 0.175, p 0.0070 → fires; outcome (ii)</text><text x="330.0" y="54.0" class="lbs">← favours ACT</text><text x="560.0" y="54.0" class="lbs" text-anchor="end">favours GR00T →</text><text x="16.0" y="79.0" class="lb">F(30 s)</text><text x="150.0" y="79.0" class="lbs">Δ GR00T−ACT +0.068</text><line x1="330.0" y1="75.0" x2="560.0" y2="75.0" class="gr"/><line x1="448.0" y1="75.0" x2="545.0" y2="75.0" class="ci"/><circle cx="498.6" cy="75.0" r="4" class="dot"><title>F(30 s): Δ +0.0682, 95% CI [+0.0039, +0.1272], p 0.0380, Holm 0.0759</title></circle><text x="572.0" y="79.0" class="lbs">Holm p 0.076</text><text x="16.0" y="109.0" class="lb">HRT(240 s)</text><text x="150.0" y="109.0" class="lbs">Δ GR00T−ACT +0.029</text><line x1="330.0" y1="105.0" x2="560.0" y2="105.0" class="gr"/><line x1="446.2" y1="105.0" x2="545.0" y2="105.0" class="ci"/><circle cx="502.7" cy="105.0" r="4" class="dot"><title>HRT(240 s): Δ +0.0286, 95% CI [+0.0006, +0.0496], p 0.0500, Holm 0.0759</title></circle><text x="572.0" y="109.0" class="lbs">Holm p 0.076</text><text x="16.0" y="139.0" class="lb">global RMST(240 s)</text><text x="150.0" y="139.0" class="lbs">Δ GR00T−ACT -23.6 s</text><line x1="330.0" y1="135.0" x2="560.0" y2="135.0" class="gr"/><line x1="462.4" y1="135.0" x2="545.0" y2="135.0" class="ci-hl"/><circle cx="502.7" cy="135.0" r="5" class="dot-win"><title>global RMST(240 s): Δ -23.6162, 95% CI [-40.9426, -7.1305], p 0.0060, Holm 0.0240</title></circle><text x="572.0" y="139.0" class="lb">Holm p 0.024 ✱</text><text x="16.0" y="169.0" class="lb">AUC vs human</text><text x="150.0" y="169.0" class="lbs">Δ GR00T−ACT -0.039</text><line x1="330.0" y1="165.0" x2="560.0" y2="165.0" class="gr"/><line x1="345.0" y1="165.0" x2="428.2" y2="165.0" class="ci-hl"/><circle cx="390.0" cy="165.0" r="5" class="dot-win"><title>AUC vs human: Δ -0.0388, 95% CI [-0.0706, -0.0119], p 0.0100, Holm 0.0300</title></circle><text x="572.0" y="169.0" class="lb">Holm p 0.030 ✱</text><line x1="445.0" y1="60.0" x2="445.0" y2="180.0" class="zero"/><text x="16.0" y="212.0" class="tl">OpenPI vs ACT</text><text x="150.0" y="212.0" class="lbm">gate: macro-KS D̄ 0.142, p 0.1074 → does not fire; outcome (iii)</text><text x="330.0" y="228.0" class="lbs">← favours ACT</text><text x="560.0" y="228.0" class="lbs" text-anchor="end">favours OpenPI →</text><text x="16.0" y="253.0" class="lb">F(30 s)</text><text x="150.0" y="253.0" class="lbs">Δ OpenPI−ACT +0.033</text><line x1="330.0" y1="249.0" x2="560.0" y2="249.0" class="gr"/><line x1="409.9" y1="249.0" x2="545.0" y2="249.0" class="ci"/><circle cx="478.9" cy="249.0" r="4" class="dot"><title>F(30 s): Δ +0.0332, 95% CI [-0.0343, +0.0978], p 0.3616, Holm 0.3616</title></circle><text x="572.0" y="253.0" class="lbs">Holm p 0.362</text><text x="16.0" y="283.0" class="lb">HRT(240 s)</text><text x="150.0" y="283.0" class="lbs">Δ OpenPI−ACT +0.033</text><line x1="330.0" y1="279.0" x2="560.0" y2="279.0" class="gr"/><line x1="451.6" y1="279.0" x2="545.0" y2="279.0" class="ci"/><circle cx="504.8" cy="279.0" r="4" class="dot"><title>HRT(240 s): Δ +0.0327, 95% CI [+0.0036, +0.0546], p 0.0300, Holm 0.0899</title></circle><text x="572.0" y="283.0" class="lbs">Holm p 0.090</text><text x="16.0" y="313.0" class="lb">global RMST(240 s)</text><text x="150.0" y="313.0" class="lbs">Δ OpenPI−ACT -23.4 s</text><line x1="330.0" y1="309.0" x2="560.0" y2="309.0" class="gr"/><line x1="458.9" y1="309.0" x2="545.0" y2="309.0" class="ci-hl"/><circle cx="501.3" cy="309.0" r="5" class="dot-win"><title>global RMST(240 s): Δ -23.3569, 95% CI [-41.5105, -5.7850], p 0.0080, Holm 0.0320</title></circle><text x="572.0" y="313.0" class="lb">Holm p 0.032 ✱</text><text x="16.0" y="343.0" class="lb">AUC vs human</text><text x="150.0" y="343.0" class="lbs">Δ OpenPI−ACT -0.033</text><line x1="330.0" y1="339.0" x2="560.0" y2="339.0" class="gr"/><line x1="345.0" y1="339.0" x2="437.9" y2="339.0" class="ci"/><circle cx="394.5" cy="339.0" r="4" class="dot"><title>AUC vs human: Δ -0.0333, 95% CI [-0.0660, -0.0047], p 0.0320, Holm 0.0899</title></circle><text x="572.0" y="343.0" class="lbs">Holm p 0.090</text><line x1="445.0" y1="234.0" x2="445.0" y2="354.0" class="zero"/><text x="16.0" y="372.0" class="lbs">✱ significant after Holm (4 metrics, α 0.05). Each row has its own scale; the line marks no difference.</text></svg><!--FIG:verdict_forest:end-->
+  <figcaption><b>Direction comes from the scalars, and only after the gate.</b> Per-metric differences with episode-clustered 95% CIs (seed 0), oriented
+  so that right favours the first model. GR00T vs ACT: the gate fires (p 0.007), RMST favours GR00T and AUC favours ACT, both significant after
+  Holm, so (ii). OpenPI vs ACT: RMST alone survives Holm (0.032), but the gate does not fire (p 0.107), so the verdict is (iii) and no direction is
+  claimed. Source: <code>s7_phail_verdicts.json</code>.</figcaption>
+</figure>
+<figure class="fig">
+<!--FIG:seed_sweep:start--><svg viewBox="0 0 680 284" role="img" aria-label="Gate p-values and Holm-adjusted metric p-values across five bootstrap seeds for the PhAIL pairs"><line x1="262.7" y1="24.0" x2="262.7" y2="234.0" class="gr"/><text x="262.7" y="249.0" class="tk" text-anchor="middle">0.001</text><line x1="382.7" y1="24.0" x2="382.7" y2="234.0" class="gr"/><text x="382.7" y="249.0" class="tk" text-anchor="middle">0.01</text><line x1="466.6" y1="24.0" x2="466.6" y2="234.0" class="gr"/><text x="466.6" y="249.0" class="tk" text-anchor="middle">0.05</text><line x1="502.7" y1="24.0" x2="502.7" y2="234.0" class="gr"/><text x="502.7" y="249.0" class="tk" text-anchor="middle">0.1</text><line x1="560.0" y1="24.0" x2="560.0" y2="234.0" class="gr"/><text x="560.0" y="249.0" class="tk" text-anchor="middle">0.3</text><line x1="200.0" y1="234.0" x2="560.0" y2="234.0" class="ax"/><line x1="466.6" y1="20.0" x2="466.6" y2="234.0" class="alpha"/><text x="470.6" y="18.0" class="lbs">α = 0.05</text><text x="380.0" y="266.0" class="lbm" text-anchor="middle">p (log scale) · each dot one bootstrap seed (0–4), n_boot 1000, sorted export</text><text x="190.0" y="51.0" class="lb" text-anchor="end">OpenPI vs GR00T · gate p</text><text x="570.0" y="51.0" class="lb">(iii) 5/5</text><circle cx="509.1" cy="42.2" r="4" class="dot"><title>OpenPI vs GR00T · gate p, seed 0: p 0.1129</title></circle><circle cx="510.5" cy="44.6" r="4" class="dot"><title>OpenPI vs GR00T · gate p, seed 1: p 0.1159</title></circle><circle cx="511.1" cy="47.0" r="4" class="dot"><title>OpenPI vs GR00T · gate p, seed 2: p 0.1174</title></circle><circle cx="510.0" cy="49.4" r="4" class="dot"><title>OpenPI vs GR00T · gate p, seed 3: p 0.1149</title></circle><circle cx="509.3" cy="51.8" r="4" class="dot"><title>OpenPI vs GR00T · gate p, seed 4: p 0.1134</title></circle><text x="190.0" y="85.0" class="lb" text-anchor="end">OpenPI vs ACT · gate p</text><text x="570.0" y="85.0" class="lb">(iii) 5/5</text><circle cx="506.5" cy="76.2" r="4" class="dot"><title>OpenPI vs ACT · gate p, seed 0: p 0.1074</title></circle><circle cx="504.0" cy="78.6" r="4" class="dot"><title>OpenPI vs ACT · gate p, seed 1: p 0.1024</title></circle><circle cx="504.0" cy="81.0" r="4" class="dot"><title>OpenPI vs ACT · gate p, seed 2: p 0.1024</title></circle><circle cx="506.7" cy="83.4" r="4" class="dot"><title>OpenPI vs ACT · gate p, seed 3: p 0.1079</title></circle><circle cx="500.6" cy="85.8" r="4" class="dot"><title>OpenPI vs ACT · gate p, seed 4: p 0.0960</title></circle><text x="190.0" y="119.0" class="lb" text-anchor="end">GR00T vs ACT · gate p</text><text x="570.0" y="119.0" class="lb">fires 5/5</text><circle cx="364.1" cy="110.2" r="4" class="dot-win"><title>GR00T vs ACT · gate p, seed 0: p 0.0070</title></circle><circle cx="360.3" cy="112.6" r="4" class="dot-win"><title>GR00T vs ACT · gate p, seed 1: p 0.0065</title></circle><circle cx="382.7" cy="115.0" r="4" class="dot-win"><title>GR00T vs ACT · gate p, seed 2: p 0.0100</title></circle><circle cx="374.2" cy="117.4" r="4" class="dot-win"><title>GR00T vs ACT · gate p, seed 3: p 0.0085</title></circle><circle cx="374.2" cy="119.8" r="4" class="dot-win"><title>GR00T vs ACT · gate p, seed 4: p 0.0085</title></circle><text x="190.0" y="153.0" class="lb" text-anchor="end">GR00T vs ACT · RMST Holm p</text><text x="570.0" y="153.0" class="lb">→ GR00T 5/5</text><circle cx="428.3" cy="144.2" r="4" class="dot-win"><title>GR00T vs ACT · RMST Holm p, seed 0: p 0.0240</title></circle><circle cx="371.1" cy="146.6" r="4" class="dot-win"><title>GR00T vs ACT · RMST Holm p, seed 1: p 0.0080</title></circle><circle cx="454.9" cy="149.0" r="4" class="dot-win"><title>GR00T vs ACT · RMST Holm p, seed 2: p 0.0400</title></circle><circle cx="443.3" cy="151.4" r="4" class="dot-win"><title>GR00T vs ACT · RMST Holm p, seed 3: p 0.0320</title></circle><circle cx="439.9" cy="153.8" r="4" class="dot-win"><title>GR00T vs ACT · RMST Holm p, seed 4: p 0.0300</title></circle><text x="190.0" y="187.0" class="lb" text-anchor="end">GR00T vs ACT · AUC Holm p</text><text x="570.0" y="187.0" class="lb">→ ACT 4/5</text><circle cx="439.9" cy="178.2" r="4" class="dot-win"><title>GR00T vs ACT · AUC Holm p, seed 0: p 0.0300</title></circle><circle cx="470.6" cy="180.6" r="4" class="dot"><title>GR00T vs ACT · AUC Holm p, seed 1: p 0.0539</title></circle><circle cx="454.9" cy="183.0" r="4" class="dot-win"><title>GR00T vs ACT · AUC Holm p, seed 2: p 0.0400</title></circle><circle cx="443.3" cy="185.4" r="4" class="dot-win"><title>GR00T vs ACT · AUC Holm p, seed 3: p 0.0320</title></circle><circle cx="428.3" cy="187.8" r="4" class="dot-win"><title>GR00T vs ACT · AUC Holm p, seed 4: p 0.0240</title></circle><text x="190.0" y="221.0" class="lb" text-anchor="end">each vs SmolVLA · gate p</text><text x="570.0" y="221.0" class="lb">(i) 15/15</text><circle cx="226.6" cy="212.2" r="4" class="dot-win"><title>each vs SmolVLA · gate p, seed 0: p 0.0005</title></circle><circle cx="226.6" cy="214.6" r="4" class="dot-win"><title>each vs SmolVLA · gate p, seed 1: p 0.0005</title></circle><circle cx="226.6" cy="217.0" r="4" class="dot-win"><title>each vs SmolVLA · gate p, seed 2: p 0.0005</title></circle><circle cx="226.6" cy="219.4" r="4" class="dot-win"><title>each vs SmolVLA · gate p, seed 3: p 0.0005</title></circle><circle cx="226.6" cy="221.8" r="4" class="dot-win"><title>each vs SmolVLA · gate p, seed 4: p 0.0005</title></circle><circle cx="226.6" cy="212.2" r="4" class="dot-win"><title>each vs SmolVLA · gate p, seed 0: p 0.0005</title></circle><circle cx="226.6" cy="214.6" r="4" class="dot-win"><title>each vs SmolVLA · gate p, seed 1: p 0.0005</title></circle><circle cx="226.6" cy="217.0" r="4" class="dot-win"><title>each vs SmolVLA · gate p, seed 2: p 0.0005</title></circle><circle cx="226.6" cy="219.4" r="4" class="dot-win"><title>each vs SmolVLA · gate p, seed 3: p 0.0005</title></circle><circle cx="226.6" cy="221.8" r="4" class="dot-win"><title>each vs SmolVLA · gate p, seed 4: p 0.0005</title></circle><circle cx="226.6" cy="212.2" r="4" class="dot-win"><title>each vs SmolVLA · gate p, seed 0: p 0.0005</title></circle><circle cx="226.6" cy="214.6" r="4" class="dot-win"><title>each vs SmolVLA · gate p, seed 1: p 0.0005</title></circle><circle cx="226.6" cy="217.0" r="4" class="dot-win"><title>each vs SmolVLA · gate p, seed 2: p 0.0005</title></circle><circle cx="226.6" cy="219.4" r="4" class="dot-win"><title>each vs SmolVLA · gate p, seed 3: p 0.0005</title></circle><circle cx="226.6" cy="221.8" r="4" class="dot-win"><title>each vs SmolVLA · gate p, seed 4: p 0.0005</title></circle></svg><!--FIG:seed_sweep:end-->
+  <figcaption><b>How stable is each label across bootstrap seeds?</b> Each dot is one seed (0–4) at n_boot 1000; filled dots are below α. OpenPI–GR00T
+  and OpenPI–ACT never fire (gate p 0.096–0.117). GR00T–ACT's gate fires in every seed and its RMST direction is significant in every seed, but its AUC
+  Holm p straddles α (0.024–0.054): seed 1 gives 0.054, so that seed reports (i), not (ii). This is the owner-approved 4/5 (ruling B). Every model vs
+  SmolVLA sits at the bootstrap floor (p 0.0005). Source: <code>s7_ac7_1_seed_sweep.json</code>.</figcaption>
+</figure>
+<figure class="fig">
+<!--FIG:null_cal:start--><svg viewBox="0 0 680 230" role="img" aria-label="Null calibration of the macro-KS gate on PhAIL&#x27;s data: rejection rates with 1.96 SE"><rect x="180.0" y="22.0" width="240.0" height="158.0" rx="0" class="shade"/><text x="300.0" y="18.0" class="lbs" text-anchor="middle">plan band [0.02, 0.10] at 200 trials</text><text x="120.0" y="195.0" class="tk" text-anchor="middle">0.00</text><line x1="120.0" y1="180.0" x2="120.0" y2="184.0" class="ax"/><text x="180.0" y="195.0" class="tk" text-anchor="middle">0.02</text><line x1="180.0" y1="180.0" x2="180.0" y2="184.0" class="ax"/><text x="240.0" y="195.0" class="tk" text-anchor="middle">0.04</text><line x1="240.0" y1="180.0" x2="240.0" y2="184.0" class="ax"/><text x="300.0" y="195.0" class="tk" text-anchor="middle">0.06</text><line x1="300.0" y1="180.0" x2="300.0" y2="184.0" class="ax"/><text x="360.0" y="195.0" class="tk" text-anchor="middle">0.08</text><line x1="360.0" y1="180.0" x2="360.0" y2="184.0" class="ax"/><text x="420.0" y="195.0" class="tk" text-anchor="middle">0.10</text><line x1="420.0" y1="180.0" x2="420.0" y2="184.0" class="ax"/><text x="480.0" y="195.0" class="tk" text-anchor="middle">0.12</text><line x1="480.0" y1="180.0" x2="480.0" y2="184.0" class="ax"/><text x="540.0" y="195.0" class="tk" text-anchor="middle">0.14</text><line x1="540.0" y1="180.0" x2="540.0" y2="184.0" class="ax"/><line x1="120.0" y1="180.0" x2="540.0" y2="180.0" class="ax"/><line x1="270.0" y1="22.0" x2="270.0" y2="180.0" class="alpha"/><text x="330.0" y="210.0" class="lbm" text-anchor="middle">rejection rate of the macro-KS gate on same-model random halves (true null), α = 0.05</text><text x="110.0" y="49.0" class="lb" text-anchor="end">OpenPI</text><line x1="180.0" y1="45.0" x2="360.0" y2="45.0" class="ci-hl"/><circle cx="270.0" cy="45.0" r="4.5" class="f-a"><title>OpenPI: rejection rate 0.050 ± 0.030 (1.96 SE), mean p 0.427</title></circle><text x="548.0" y="49.0" class="lbs">0.050 (mean p 0.43)</text><text x="110.0" y="79.0" class="lb" text-anchor="end">GR00T</text><line x1="150.0" y1="75.0" x2="300.0" y2="75.0" class="ci-hl"/><circle cx="225.0" cy="75.0" r="4.5" class="f-a"><title>GR00T: rejection rate 0.035 ± 0.025 (1.96 SE), mean p 0.442</title></circle><text x="548.0" y="79.0" class="lbs">0.035 (mean p 0.44)</text><text x="110.0" y="109.0" class="lb" text-anchor="end">ACT</text><line x1="213.0" y1="105.0" x2="417.0" y2="105.0" class="ci-hl"/><circle cx="315.0" cy="105.0" r="4.5" class="f-a"><title>ACT: rejection rate 0.065 ± 0.034 (1.96 SE), mean p 0.379</title></circle><text x="548.0" y="109.0" class="lbs">0.065 (mean p 0.38)</text><text x="110.0" y="139.0" class="lb" text-anchor="end">SmolVLA</text><line x1="234.0" y1="135.0" x2="456.0" y2="135.0" class="ci-hl"/><circle cx="345.0" cy="135.0" r="4.5" class="f-a"><title>SmolVLA: rejection rate 0.075 ± 0.037 (1.96 SE), mean p 0.372</title></circle><text x="548.0" y="139.0" class="lbs">0.075 (mean p 0.37)</text><text x="110.0" y="169.0" class="lb" text-anchor="end">Teleop</text><line x1="168.0" y1="165.0" x2="342.0" y2="165.0" class="ci-hl"/><circle cx="255.0" cy="165.0" r="4.5" class="f-a"><title>Teleop: rejection rate 0.045 ± 0.029 (1.96 SE), mean p 0.496</title></circle><text x="548.0" y="169.0" class="lbs">0.045 (mean p 0.50)</text></svg><!--FIG:null_cal:end-->
+  <figcaption><b>The gate does not fire on noise.</b> Splitting one model's episodes into random halves (a true null, 200 trials), the gate rejects
+  at 3.5–7.5%, inside the planned band and around the nominal 5%. PhAIL reports 0.042–0.078 for its own setups (quoted, App. J). Bars are
+  ±1.96 SE. Source: <code>s7_ac7_2_null_calibration_stdout.txt</code>.</figcaption>
+</figure>
+
+<h2>Divergences and limitations</h2>
+<ul class="tight">
+  <li><b>AC7.1 GR00T–ACT (ii) in 4/5 seeds at n_boot 1000: owner-approved divergence</b> (2026-10-06, <a href="dispute-r2.md">dispute-r2.md</a>).
+  Owner's decision, verbatim: <b>"B. Accept 4/5 (executor)"</b>. The analyzer had recommended raising n_boot to 10,000, where the AUC Holm p is
+  0.025–0.032 and (ii) holds in 5/5 seeds (measured). The ruling keeps n_boot 1000 and records that this trade-off label is not robust to the
+  bootstrap seed at that precision.</li>
+  <li><b>AC7.5 seed caveat.</b> Under the same ruling the server verdicts keep n_boot 1000. A server verdict whose Holm p lands near α may depend on
+  the bootstrap seed, so the verdict records its seed.</li>
+  <li><b><code>gate_only</code></b> is a fourth outcome PhAIL's taxonomy lacks: the gate fires but no metric's Holm-adjusted CI excludes 0. §4.4 says each
+  metric's CI "gives the direction" (quoted), so none is claimed. It did not occur on PhAIL's pairs. Accepted by the analyzer as a recorded divergence.</li>
+  <li><b>The human anchor is held fixed in the difference bootstrap</b> (inferred: removes common-mode noise). S2's single-policy HRT CI resamples it, to
+  match PhAIL's Table 2.</li>
+  <li><b>The p-value floor:</b> with n_boot 1000 the smallest bootstrap p is 2/1001 ≈ 0.002, and Holm × 4 gives 0.008. The macro-KS floor at 2000 draws is 0.0005.</li>
+  <li><b>Not built:</b> a paired-by-init-state bootstrap (the spec's gate is PhAIL's unpaired pooled resampling; a later refinement). N3: the batch-plan key
+  omits τ_episode, render size and device.</li>
+</ul>
+
+<footer class="doc">Evidence: <a href="execution-log.md">execution-log.md</a> (S7, Round 2) · <a href="analysis-r2.md">analysis-r2.md</a> · <a href="dispute-r2.md">dispute-r2.md</a> ·
+<a href="analysis-r3.md">analysis-r3.md</a> · <a href="artifacts/summarizer_rerun_stdout.txt">summarizer_rerun_stdout.txt</a></footer>
+</div>
+</body>
+</html>

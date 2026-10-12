@@ -39,12 +39,103 @@
     "normalization_stats": "full dataset meta/stats.json of the version (LeRobot default..."
   },
   "AC5.3": {
-    "ckpt_match": true,
-    "train_run": true,
-    "plan_rows": 1000,
-    "outcomes": [
-      "not_run"
-    ]
+    "checkpoint_sha256": {
+      "recorded": {
+        "param": "cdee42fbf84f56ec",
+        "tag input.checkpoint": "checkpoint:cdee42fbf84f56ec",
+        "record": [
+          "cdee42fbf84f56ec"
+        ]
+      },
+      "ok": true
+    },
+    "train_run_id": {
+      "recorded": {
+        "param": "a9cc11041b4a",
+        "param policy": "train:a9cc11041b4a",
+        "record": [
+          "a9cc11041b4a"
+        ]
+      },
+      "ok": true
+    },
+    "suite": {
+      "recorded": {
+        "param tasks": [
+          "libero_spatial"
+        ],
+        "record": [
+          "libero_spatial"
+        ]
+      },
+      "ok": true
+    },
+    "libero_task_ids": {
+      "recorded": {
+        "param tasks": [
+          [
+            "libero_spatial",
+            0
+          ]
+        ],
+        "record": [
+          [
+            "libero_spatial",
+            0
+          ]
+        ]
+      },
+      "ok": true
+    },
+    "init_state_indices": {
+      "recorded": {
+        "params (n_init, init_offset, rule)": [
+          [
+            "libero_spatial",
+            0,
+            0
+          ]
+        ],
+        "record": [
+          [
+            "libero_spatial",
+            0,
+            0
+          ]
+        ]
+      },
+      "ok": true
+    },
+    "seeds": {
+      "recorded": {
+        "params (seed_base, rule)": [
+          [
+            "libero_spatial",
+            0,
+            0
+          ]
+        ],
+        "record": [
+          [
+            "libero_spatial",
+            0,
+            0
+          ]
+        ]
+      },
+      "ok": true
+    },
+    "record_is_logged_output": true,
+    "policy_type_matches_checkpoint": true,
+    "stand_in": "false",
+    "rows": 1,
+    "events": [
+      0
+    ],
+    "censored": [
+      true
+    ],
+    "pass": true
   },
   "AC5.4": {
     "trace": [
@@ -101,5 +192,15 @@
     "A_seed1": "3321308777fa4a1ca4566d5c1b290cc9",
     "eval": "a41a69ebdb704ed68add5f7b61593d18",
     "v1mix": "f8fc1a9eae504575b24f72c51a92b91c"
+  },
+  "AC5.3_provenance": {
+    "refreshed": "2026-10-11, by the evaluation-layer summarizer",
+    "source": "data/scratch/ac53_fix/data_lineage_artifacts/s5_summary.json (verify_runs_s5.py round-1 mode, HEAD 91f0902, 2026-10-08, scratch store data/lineage_scratch/s5)",
+    "why": "AC5.3 now checks the real eval stage's record (commit 91f0902; changelog 2026-10-08). The previous entry was the round-1 eval_standin evidence (plan_rows 1000, outcomes ['not_run']).",
+    "run_ids_of_that_run": {
+      "A": "a9cc11041b4a4ea9a0bc24d132a641a5",
+      "eval": "5a0c06b7706840b1bb5f8b2356425b12"
+    },
+    "note": "Only AC5.3 was replaced. The other entries and run_ids above are from the original 2026-09-29 run."
   }
 }

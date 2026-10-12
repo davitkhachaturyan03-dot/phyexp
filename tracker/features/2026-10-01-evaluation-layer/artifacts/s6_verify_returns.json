@@ -206,8 +206,8 @@
   "metric_columns": [
    "ret_f30",
    "ret_rmst60",
-   "ret_auc_sampled",
    "ret_auc_expected",
+   "ret_auc_sampled",
    "ret_hrt60_lin",
    "ret_censored60"
   ],

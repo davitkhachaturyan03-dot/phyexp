@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S5 Rollout harness and eval stage — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+  /* report-specific visuals; every colour is a tracker.css variable (no hex) */
+  figure.fig svg { max-width: 680px; margin: 0 auto; }
+  .shot { display: block; width: 100%; max-width: 640px; height: auto; margin: 0 auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  .ax { stroke: var(--border); stroke-width: 1; }
+  .gr { stroke: var(--border); stroke-width: .7; opacity: .7; }
+  .tk { fill: var(--muted); font: 10px var(--mono); }
+  .tl { fill: var(--text); font: 600 12px var(--sans); }
+  .lb { fill: var(--text); font: 11px var(--sans); }
+  .lbm { fill: var(--muted); font: 10.5px var(--sans); }
+  .lbs { fill: var(--muted); font: 9.5px var(--mono); }
+  .val { fill: var(--text); font: 600 9.5px var(--mono); }
+  .s-a { stroke: var(--accent); stroke-width: 2.2; fill: none; }
+  .s-b { stroke: var(--text); stroke-width: 1.6; fill: none; stroke-dasharray: 6 3; }
+  .s-c { stroke: var(--muted); stroke-width: 1.4; fill: none; stroke-dasharray: 2 3; }
+  .sl-a { stroke: var(--accent); stroke-width: 2.4; fill: none; }
+  .sl-b { stroke: var(--text); stroke-width: 1.8; fill: none; stroke-dasharray: 6 3; }
+  .sl-c { stroke: var(--muted); stroke-width: 1.8; fill: none; }
+  .sl-d { stroke: var(--muted); stroke-width: 1.4; fill: none; stroke-dasharray: 2 3; }
+  .dot { fill: var(--surface); stroke: var(--muted); stroke-width: 1.6; }
+  .dot-win { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+  .f-a { fill: var(--accent); stroke: var(--surface); stroke-width: 1.5; }
+  .f-b { fill: var(--text); stroke: var(--surface); stroke-width: 1.5; }
+  .ci { stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
+  .ci-hl { stroke: var(--accent); stroke-width: 2.4; stroke-linecap: round; }
+  .zero { stroke: var(--text); stroke-width: 1; opacity: .6; }
+  .alpha { stroke: var(--bad); stroke-width: 1.3; stroke-dasharray: 4 3; }
+  .ref { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+  .shade { fill: var(--muted); opacity: .14; }
+  .cens { stroke: var(--text); stroke-width: 1.6; }
+  .box { fill: var(--surface); stroke: var(--border); stroke-width: 1.2; }
+  .box-hl { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.4; }
+  .box-ent { fill: var(--surface-2); stroke: var(--border); stroke-width: 1; }
+  .nlab { fill: var(--text); font: 600 10.5px var(--sans); }
+  .nent { fill: var(--text); font: 10px var(--mono); }
+  .nsub { fill: var(--muted); font: 9.5px var(--mono); }
+  .nfile { fill: var(--text); font: 600 11.5px var(--mono); }
+  .elab { fill: var(--muted); font: italic 9px var(--sans); }
+  .edge { stroke: var(--muted); stroke-width: 1.1; fill: none; }
+  .edge-hl { stroke: var(--accent); stroke-width: 1.6; fill: none; }
+  .conn { stroke: var(--border); stroke-width: 1.4; stroke-dasharray: 3 3; }
+  .ah { fill: var(--muted); } .ah.hl { fill: var(--accent); }
+  .seg-plain { fill: var(--surface-2); stroke: var(--border); }
+  .seg-hl { fill: var(--accent); }
+  .bar-done { fill: var(--accent); }
+  .bar-open { fill: var(--surface-2); stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 3 2; }
+  .barlab { fill: var(--surface); font: 600 9px var(--sans); }
+  table.heat { min-width: 780px; }
+  table.heat td, table.heat th { padding: 5px 8px; font-size: 12.5px; white-space: nowrap; }
+  table.heat .dir { font-weight: 400; text-transform: none; letter-spacing: 0; }
+  table.reg { min-width: 860px; }
+  table.reg td { font-size: 13px; }
+  table.reg td:last-child { min-width: 280px; }
+  .tile .value { font-variant-numeric: normal; }
+  ul.tight li, ol.tight li { margin-bottom: 6px; }
+  td .pill { white-space: nowrap; }
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 14px 18px; margin: 0 0 20px; }
+  .callout p:last-child { margin-bottom: 0; }
+  td.ok, td.pend { white-space: nowrap; }
+  .ev code { font-size: 0.82em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Evaluation layer (PhAIL primitives)</a></p>
+  <h1>S5 · Rollout harness, rollout record and the eval stage</h1>
+  <p class="dek">The first real closed-loop rollouts in the repo. A thin adapter over LeRobot's own <code>rollout()</code> records, per rollout,
+  whether and when the LIBERO goal check succeeded, per-sub-task times, a fixed initial state with both its state and fixture hashes, and the
+  lossless trajectory that CUPID-style attribution needs. Each eval is an MLflow run tied to its checkpoint, replacing the old stand-in.
+  Validated on 20 SmolVLA rollouts (external checkpoint).</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">9/10 met</span> <span class="pill warn">AC5.8 pending server</span></span>
+    <span><b>Depends on</b> <a href="S3-human-reference.html">S3</a>, <a href="S4-subtask-time.html">S4</a></span>
+  </div>
+</header>
+
+<h2>Why</h2>
+<blockquote>"Run many rollouts per task (e.g. 50) with fixed initial states." … "record whether and when it succeeded, using the benchmark's goal check." — PoC §9.1 Step 2, p. 18</blockquote>
+<blockquote>"Every eval rollout should be tied back to that checkpoint." — PoC §2.1 item 1, p. 3</blockquote>
+<p>CUPID's estimator weights every state-action pair a rollout visited by that rollout's return (CUPID Prop. 1, p. 5). So the store must keep
+trajectories, not only outcomes. LeRobot's <code>lerobot-eval</code> keeps only per-episode aggregates, and its recording is lossy video
+(quoted, <code>lerobot_eval.py</code>), which is why a probe and a lossless capture were added around its unchanged <code>rollout()</code>.</p>
+
+<h2>What was built</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File / function</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>vlapoc/rollouts.py::RECORD_COLUMNS</code>, <code>validate_record</code></td><td>What one rollout record is: 33 columns. Keys (<code>rollout_id</code>, task, init state, seed), the policy (<code>checkpoint_sha256</code>, <code>train_run_id</code> or <code>external_checkpoint</code>), protocol (τ, render), outcome (<code>T_s</code>, <code>event</code>, <code>censored</code>, <code>ops</code>, <code>pairs</code>), raw signals (goal-conjunct trace, task-object positions, arm-action norm), <code>t0_state_sha256</code>, <code>t0_model_sha256</code> and <code>batch_size</code>.</td></tr>
+    <tr><td><code>ProbedLiberoEnv</code></td><td>LeRobot's <code>LiberoEnv</code> plus: a fixed init state per env, the inner horizon raised to τ + settle + 1, a per-step goal probe, and the t0 state and fixture hashes.</td></tr>
+    <tr><td><code>run_rollouts</code> (split by the refactor into <code>_first_episode_steps</code>, <code>_rollout_row</code>, <code>_check_against_lerobot</code>, <code>_trajectory_episode</code>)</td><td>LeRobot's <code>rollout()</code>, unchanged, with <b>one fresh env per rollout</b>. Each rollout's operations come from S4's <code>operations_from_trace</code>, and LeRobot's own success flag is cross-checked against the probe (it raises on disagreement).</td></tr>
+    <tr><td><code>write_trajectories</code></td><td>A lossless LeRobot v3 dataset in the training schema (PNG), one episode per rollout, <code>frame_index</code> = policy step: (s′, a′) is recoverable.</td></tr>
+    <tr><td><code>vlapoc/runs.py::eval_run</code>, <code>batch_plan</code>, <code>attribution_protocol_errors</code></td><td>The eval stage as an MLflow run. Its input is the checkpoint sha; its outputs are the rollouts sha and the trajectories digest. It records the batch plan, and "attribution-grade" only when the caller asserts it <i>and</i> the protocol passes (round 2).</td></tr>
+    <tr><td><code>scripts/eval_smoke.py</code>, <code>verify_rollouts_s5.py</code>, <code>verify_resets_s5.py</code></td><td>The CLI for one eval run, and the checks.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Acceptance criteria</h2>
+<div class="scroll">
+<table class="ev">
+  <thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead>
+  <tbody>
+    <tr><td>AC5.1 A no-op smoke: every rollout is censored at τ_episode, and the record validates</td><td>§3.2 p. 6</td><td class="ok"><span class="pill good">met</span></td><td>6/6 <code>censored at 1200</code>; <code>schema errors: [] | columns 32 == schema True</code> (round 1; the schema is 33 since r2)</td></tr>
+    <tr><td>AC5.2 Determinism: re-runs give bit-identical records except <code>wall_seconds</code></td><td>§2.1 item 3 p. 3</td><td class="ok"><span class="pill good">met</span></td><td>noop re-run in a new process: <code>30 columns compared …; differing columns: none</code>; ACT on CPU, two processes: <code>{'rows': 4, 'columns_compared': 30, 'differing': {}}</code></td></tr>
+    <tr><td>AC5.3 (r2) Lineage: the eval of the ACT smoke checkpoint traces to v0's raw files; tagged smoke</td><td>§2.1 item 1 p. 3</td><td class="ok"><span class="pill good">met</span></td><td>trace JSON-equal to <code>s5_ac5_3_trace.json</code>; r2 smoke eval <code>f8f3b153</code>: <code>eval.attribution_grade=false</code>, <code>vlapoc.smoke=true</code>, 20 raw files</td></tr>
+    <tr><td>AC5.4 A real policy (<code>HuggingFaceVLA/smolvla_libero@6721902b</code>) on libero_spatial:0 and libero_10:8 × 10 init states, labelled harness validation</td><td>§9.1 Step 2 p. 18</td><td class="ok"><span class="pill good">met</span></td><td><code>6/10 … RMST(60) 26.19 s</code>; <code>3/10 … RMST(60) 48.40 s</code> (re-run of <code>--summary</code>). The analyzer re-ran a slice: init 3 → step 78, init 4 → step 71, as logged</td></tr>
+    <tr><td>AC5.5 Trajectory store: loads with <code>LeRobotDataset</code>; frames = Σ sim_steps; each frame maps to (rollout, policy step)</td><td>CUPID Prop. 1 p. 5</td><td class="ok"><span class="pill good">met</span></td><td><code>10 episodes, 5237 frames; sum(sim_steps) = 5237</code>; <code>9680 = 9680</code>; <code>frame_index == policy step … True</code>; <code>video keys: []</code></td></tr>
+    <tr><td>AC5.6 Rollout j uses init state j regardless of <code>batch_size</code></td><td>P16, P17</td><td class="ok"><span class="pill good">met</span></td><td>batch 1 vs 4: identical <code>(init_state_index, seed, t0_state_sha256)</code>; libero_10:8 <code>(state, body_pos, site_pos) identical: True</code></td></tr>
+    <tr><td>AC5.7 Grounding docstrings cite §9.1 Step 2, §2.1 items 1 and 3, §3.5 A, LeRobot's <code>rollout()</code></td><td>vla-build</td><td class="ok"><span class="pill good">met</span></td><td>grep: all <code>True</code> (<code>s5_ac5_7_grounding.txt</code>)</td></tr>
+    <tr><td>AC5.8 SmolVLA from S8, 50 init states × 20 tasks, τ 60 s, 128², trajectories, fixed batch plan, per training seed</td><td>§2.1 item 3, §9.1 Step 2</td><td class="pend"><span class="pill warn">pending server</span></td><td>command in <a href="artifacts/server-runbook.md">server-runbook.md</a>: <code>--n 50 --tau 1200 --render 128 --batch-size 50 --record-trajectories --attribution-grade</code></td></tr>
+    <tr><td>AC5.9 (r2) Attribution grade is asserted by the caller and checked against the protocol</td><td>analysis-r1 E1</td><td class="ok"><span class="pill good">met</span></td><td>2 init states refused with 3 reasons; the full protocol on a smoke checkpoint refused with <code>["train run is not tagged vlapoc.smoke=false (got 'absent')"]</code>; runs before/after <code>38/38</code>; default → <code>eval.attribution_grade=false</code></td></tr>
+    <tr><td>AC5.10 (r2) <code>t0_model_sha256</code>: fixture placement is part of the fixed initial state</td><td>§2.1 item 3 p. 3</td><td class="ok"><span class="pill good">met</span></td><td>equal at batch 1/2, on repeat and across eval runs; one env reset ×3 → <code>['e62c4829473e', '873c350ba3a4', '04f422206485']</code> while <code>t0_state_sha256</code> stays <code>54f7df61644e</code> ×3</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Example</h2>
+<p>The 20 real rollouts (<code>verify_rollouts_s5.py --summary</code>, re-run 2026-10-11). External checkpoint, not trained on our data, MPS, render 256²
+(its own input size), τ_episode 1200 steps, batch 5:</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>Task</th><th class="num">Success ≤ 1200 steps</th><th class="num">Within LeRobot's budget</th><th>T of successes (steps)</th><th>Ops done</th><th class="num">F(30 s)</th><th class="num">median</th><th class="num">RMST(60)</th></tr></thead>
+  <tbody>
+    <tr><td>libero_spatial:0 (bowl to plate)</td><td class="num">6/10</td><td class="num">6/10 (280)</td><td>67, 71, 73, 74, 75, 77</td><td>{0: 4, 1: 6} of 1</td><td class="num">0.60</td><td class="num">3.75 s</td><td class="num">26.19 s</td></tr>
+    <tr><td>libero_10:8 (two moka pots on the stove)</td><td class="num">3/10</td><td class="num">3/10 (520)</td><td>404, 407, 469</td><td>{0: 5, 1: 2, 2: 3} of 2</td><td class="num">0.30</td><td class="num">∞ (F &lt; 0.5)</td><td class="num">48.40 s</td></tr>
+  </tbody>
+</table>
+</div>
+<p>Every failure is censored at exactly 1200 steps. The two partial libero_10 rollouts (init 1 and 5) each placed one pot. No success came after
+LeRobot's 280/520-step budgets, so on these 20 rollouts τ = 60 s changed no outcome. No published success rate exists for this checkpoint (model
+card and LeRobot docs, fetched 2026-10-04), so <b>these numbers are compared with no reference and say nothing about the checkpoint's quality</b>.
+They show only that the harness runs a real policy and records real outcomes.</p>
+
+<h2>Visual</h2>
+<figure class="fig">
+<!--FIG:smolvla_km:start--><svg viewBox="0 0 680 300" role="img" aria-label="Kaplan-Meier time-to-success of 20 real SmolVLA rollouts on two LIBERO tasks, against the human reference"><line x1="70.0" y1="230.0" x2="320.0" y2="230.0" class="gr"/><text x="65.0" y="233.5" class="tk" text-anchor="end">0</text><line x1="70.0" y1="183.5" x2="320.0" y2="183.5" class="gr"/><text x="65.0" y="187.0" class="tk" text-anchor="end">0.25</text><line x1="70.0" y1="137.0" x2="320.0" y2="137.0" class="gr"/><text x="65.0" y="140.5" class="tk" text-anchor="end">0.5</text><line x1="70.0" y1="90.5" x2="320.0" y2="90.5" class="gr"/><text x="65.0" y="94.0" class="tk" text-anchor="end">0.75</text><line x1="70.0" y1="44.0" x2="320.0" y2="44.0" class="gr"/><text x="65.0" y="47.5" class="tk" text-anchor="end">1</text><line x1="70.0" y1="230.0" x2="70.0" y2="234.0" class="ax"/><text x="70.0" y="245.0" class="tk" text-anchor="middle">0</text><line x1="111.7" y1="230.0" x2="111.7" y2="234.0" class="ax"/><text x="111.7" y="245.0" class="tk" text-anchor="middle">10</text><line x1="153.3" y1="230.0" x2="153.3" y2="234.0" class="ax"/><text x="153.3" y="245.0" class="tk" text-anchor="middle">20</text><line x1="195.0" y1="230.0" x2="195.0" y2="234.0" class="ax"/><text x="195.0" y="245.0" class="tk" text-anchor="middle">30</text><line x1="236.7" y1="230.0" x2="236.7" y2="234.0" class="ax"/><text x="236.7" y="245.0" class="tk" text-anchor="middle">40</text><line x1="278.3" y1="230.0" x2="278.3" y2="234.0" class="ax"/><text x="278.3" y="245.0" class="tk" text-anchor="middle">50</text><line x1="320.0" y1="230.0" x2="320.0" y2="234.0" class="ax"/><text x="320.0" y="245.0" class="tk" text-anchor="middle">60</text><line x1="70.0" y1="230.0" x2="320.0" y2="230.0" class="ax"/><line x1="70.0" y1="44.0" x2="70.0" y2="230.0" class="ax"/><text x="195.0" y="260.0" class="lbm" text-anchor="middle">simulated seconds (20 Hz steps / 20)</text><text x="36.0" y="137.0" class="lbm" text-anchor="middle" transform="rotate(-90 36.0 137.0)">F(t), whole-task (family W)</text><text x="70.0" y="20.0" class="tl">libero_spatial:0 · bowl to plate</text><text x="70.0" y="36.0" class="lbs">6/10 succeeded · F(30 s) 0.60 · RMST(60) 26.2 s</text><path d="M70.0,230.0 L83.3,230.0 L83.3,226.3 L84.2,226.3 L84.6,215.1 L85.0,204.0 L85.4,177.9 L85.8,166.8 L86.2,129.6 L86.7,103.5 L87.1,92.4 L87.5,70.0 L88.5,70.0 L88.5,66.3 L91.0,66.3 L91.0,62.6 L93.1,62.6 L93.5,55.2 L93.8,51.4 L99.6,51.4 L99.6,47.7 L101.7,47.7 L101.7,44.0 L320.0,44.0" class="s-c"/><rect x="70.0" y="44.0" width="250.0" height="74.4" rx="0" class="shade"/><text x="257.5" y="85.2" class="lbs" text-anchor="middle">censored at τ = 60 s: 40%</text><path d="M70.0,230.0 L84.0,230.0 L84.0,211.4 L84.8,211.4 L85.2,174.2 L85.6,137.0 L86.0,118.4 L320.0,118.4" class="s-a"/><circle cx="84.8" cy="238.0" r="2.5" class="f-a"><title>libero_spatial/0/init003/seed3: success at 3.55 s</title></circle><circle cx="84.0" cy="238.0" r="2.5" class="f-a"><title>libero_spatial/0/init005/seed5: success at 3.35 s</title></circle><circle cx="85.2" cy="238.0" r="2.5" class="f-a"><title>libero_spatial/0/init006/seed6: success at 3.65 s</title></circle><circle cx="85.6" cy="238.0" r="2.5" class="f-a"><title>libero_spatial/0/init007/seed7: success at 3.75 s</title></circle><circle cx="86.0" cy="238.0" r="2.5" class="f-a"><title>libero_spatial/0/init008/seed8: success at 3.85 s</title></circle><circle cx="85.4" cy="238.0" r="2.5" class="f-a"><title>libero_spatial/0/init009/seed9: success at 3.70 s</title></circle><line x1="320.0" y1="111.4" x2="320.0" y2="125.4" class="cens"/><text x="316.0" y="136.4" class="lbs" text-anchor="end">4 censored</text><line x1="195.0" y1="44.0" x2="195.0" y2="230.0" class="ref"/><line x1="400.0" y1="230.0" x2="650.0" y2="230.0" class="gr"/><text x="395.0" y="233.5" class="tk" text-anchor="end">0</text><line x1="400.0" y1="183.5" x2="650.0" y2="183.5" class="gr"/><text x="395.0" y="187.0" class="tk" text-anchor="end">0.25</text><line x1="400.0" y1="137.0" x2="650.0" y2="137.0" class="gr"/><text x="395.0" y="140.5" class="tk" text-anchor="end">0.5</text><line x1="400.0" y1="90.5" x2="650.0" y2="90.5" class="gr"/><text x="395.0" y="94.0" class="tk" text-anchor="end">0.75</text><line x1="400.0" y1="44.0" x2="650.0" y2="44.0" class="gr"/><text x="395.0" y="47.5" class="tk" text-anchor="end">1</text><line x1="400.0" y1="230.0" x2="400.0" y2="234.0" class="ax"/><text x="400.0" y="245.0" class="tk" text-anchor="middle">0</text><line x1="441.7" y1="230.0" x2="441.7" y2="234.0" class="ax"/><text x="441.7" y="245.0" class="tk" text-anchor="middle">10</text><line x1="483.3" y1="230.0" x2="483.3" y2="234.0" class="ax"/><text x="483.3" y="245.0" class="tk" text-anchor="middle">20</text><line x1="525.0" y1="230.0" x2="525.0" y2="234.0" class="ax"/><text x="525.0" y="245.0" class="tk" text-anchor="middle">30</text><line x1="566.7" y1="230.0" x2="566.7" y2="234.0" class="ax"/><text x="566.7" y="245.0" class="tk" text-anchor="middle">40</text><line x1="608.3" y1="230.0" x2="608.3" y2="234.0" class="ax"/><text x="608.3" y="245.0" class="tk" text-anchor="middle">50</text><line x1="650.0" y1="230.0" x2="650.0" y2="234.0" class="ax"/><text x="650.0" y="245.0" class="tk" text-anchor="middle">60</text><line x1="400.0" y1="230.0" x2="650.0" y2="230.0" class="ax"/><line x1="400.0" y1="44.0" x2="400.0" y2="230.0" class="ax"/><text x="525.0" y="260.0" class="lbm" text-anchor="middle">simulated seconds (20 Hz steps / 20)</text><text x="400.0" y="20.0" class="tl">libero_10:8 · two moka pots on the stove</text><text x="400.0" y="36.0" class="lbs">3/10 succeeded · F(30 s) 0.30 · RMST(60) 48.4 s</text><path d="M400.0,230.0 L468.8,230.0 L468.8,226.3 L470.8,226.3 L470.8,222.6 L472.5,222.6 L472.5,218.8 L473.3,218.8 L473.3,215.1 L474.2,215.1 L474.4,207.7 L475.4,207.7 L475.8,196.5 L476.2,192.8 L476.5,185.4 L477.3,185.4 L477.5,177.9 L477.9,174.2 L478.5,174.2 L478.8,163.0 L479.4,163.0 L479.4,159.3 L480.2,159.3 L480.6,151.9 L481.7,151.9 L481.9,144.4 L482.3,140.7 L482.7,133.3 L483.1,125.8 L484.0,125.8 L484.2,118.4 L484.6,114.7 L485.2,114.7 L485.6,103.5 L487.1,103.5 L487.1,99.8 L489.2,99.8 L489.2,96.1 L491.2,96.1 L491.2,92.4 L492.3,92.4 L492.7,77.5 L493.1,70.0 L493.3,66.3 L495.0,66.3 L495.2,58.9 L497.1,58.9 L497.1,55.2 L500.8,55.2 L500.8,51.4 L502.9,51.4 L503.1,44.0 L650.0,44.0" class="s-c"/><rect x="400.0" y="44.0" width="250.0" height="130.2" rx="0" class="shade"/><text x="587.5" y="113.1" class="lbs" text-anchor="middle">censored at τ = 60 s: 70%</text><path d="M400.0,230.0 L484.2,230.0 L484.2,211.4 L484.8,211.4 L484.8,192.8 L497.7,192.8 L497.7,174.2 L650.0,174.2" class="s-a"/><circle cx="497.7" cy="238.0" r="2.5" class="f-a"><title>libero_10/8/init003/seed3: success at 23.45 s</title></circle><circle cx="484.2" cy="238.0" r="2.5" class="f-a"><title>libero_10/8/init006/seed6: success at 20.20 s</title></circle><circle cx="484.8" cy="238.0" r="2.5" class="f-a"><title>libero_10/8/init007/seed7: success at 20.35 s</title></circle><line x1="650.0" y1="167.2" x2="650.0" y2="181.2" class="cens"/><text x="646.0" y="192.2" class="lbs" text-anchor="end">7 censored</text><line x1="525.0" y1="44.0" x2="525.0" y2="230.0" class="ref"/><line x1="80.0" y1="288.0" x2="106.0" y2="288.0" class="s-a"/><text x="112.0" y="292.0" class="lbm">SmolVLA rollouts (KM, 10 init states)</text><line x1="400.0" y1="288.0" x2="426.0" y2="288.0" class="s-c"/><text x="432.0" y="292.0" class="lbm">50 human demos, same task</text></svg><!--FIG:smolvla_km:end-->
+  <figcaption><b>The first KM time-to-success curves from real LIBERO rollouts.</b> Orange: the whole-task KM CDF of 10 SmolVLA rollouts per task.
+  Dotted: the 50 human demos of the same task (goal-check T, S3). The shaded band is the mass still unfinished at τ = 60 s, all of it censored
+  timeouts. LIBERO defines no ghost-event rule, so it is not a hard-failure rate. On libero_spatial:0 SmolVLA succeeds in 3.35–3.85 s or not at all;
+  on libero_10:8 its three successes come after 20 s, at the human pace (median 19.8 s). The dashed line marks F(30 s). Computed now from the stored
+  rollout records with <code>vlapoc.evaluation</code>.</figcaption>
+</figure>
+
+<h2>Divergences and limitations</h2>
+<ul class="tight">
+  <li><b>LeRobot's <code>LiberoEnv</code> cannot run a 60 s episode as shipped.</b> LIBERO's inner horizon is 1000 steps, minus 10 settle steps; unpatched,
+  it raised <code>executing action in terminated episode</code> at step 991 (measured). <code>ProbedLiberoEnv</code> raises the horizon.</li>
+  <li><b>LIBERO moves fixtures on re-reset (measured, inferred unintended upstream).</b> <code>object_property_initializers</code> grows on every hard reset,
+  so in 4/20 tasks one env object reset 3× with the same seed moved libero_10:8's stove by 7.2 mm. The harness builds one fresh env per rollout, and
+  <code>t0_model_sha256</code> now detects a violation, which <code>t0_state_sha256</code> cannot.</li>
+  <li><b>SmolVLA outcomes depend on the batch plan</b> (measured: init 4 succeeds at step 71 at batch 1 and never at batch 5). The policy draws
+  flow-matching noise from torch's global RNG per batch. Per-rollout policy RNG would need LeRobot internals patched (out of scope), so the fixed
+  batch plan (batch 50, one task per batch, eval seed 0) is the declared control, following LeRobot's paired-comparison guidance.</li>
+  <li><b>The batch-2 evidence slip, resolved.</b> A stalled executor wrote "That stub import was a slip on my part" and left contradictory AC5.2 results.
+  The replacement executor traced each file. The committed <code>{arm_action_norm: 6}</code> was a comparator artifact (numpy truncates <code>str(ndarray)</code>,
+  reproduced by comparing a record against itself). The heredoc ACT output, whose provenance cannot be checked, was renamed
+  <code>s5_ac5_2_ac5_3_act_stdout.INVALID.txt</code> and superseded by a clean recheck. The analyzer reproduced the recheck.</li>
+  <li><b>Round-1 runs mis-tagged <code>eval.attribution_grade=true</code></b> (<code>3392bb4d</code>, <code>fe507fa3</code>, and the verify run <code>7080353a</code>): read the tag
+  as "has a train run". MLflow history is append-only, so they were not rewritten; they lack the <code>.asserted</code> tag, so no verdict counts them.</li>
+  <li><b>Known issues (non-blocking):</b> N1, scratch-store tests write outputs into the real <code>data/eval/</code>. N2, round-1 records, including both SmolVLA
+  runs, fail <code>validate_record</code> for the missing <code>t0_model_sha256</code>. N3, the batch-plan key omits τ, render size and device. F2, the trajectories
+  entity id hashes a physical copy, so a bit-identical re-run gets a new id (LeRobot writes <code>stats.json</code> keys in a varying order).</li>
+  <li><b>Cost on this Mac:</b> 0.29–0.4 s per env-step on MPS (the checkpoint re-plans every step), so one failed 1200-step rollout ≈ 6 min. AC5.8 is server work.</li>
+  <li><b>New dependencies and downloads:</b> <code>transformers 5.5.4</code> and <code>num2words 0.5.14</code> (the <code>lerobot[smolvla]</code> extra);
+  <code>smolvla_libero</code> 1,218,055,540 bytes; SmolVLM2's 11 non-weight files (4,866,925 bytes), not its 2.03 GB weights.</li>
+</ul>
+
+<footer class="doc">Evidence: <a href="execution-log.md">execution-log.md</a> (S5, S5 continuations, Round 2) · <a href="artifacts/s5_ac5_4_summary.json">s5_ac5_4_summary.json</a> ·
+<a href="artifacts/s5_smolvla_batch_effect.txt">s5_smolvla_batch_effect.txt</a> · <a href="artifacts/s5_ac5_10_stdout.txt">s5_ac5_10_stdout.txt</a></footer>
+</div>
+</body>
+</html>

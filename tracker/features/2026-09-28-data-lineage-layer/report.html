@@ -1852,7 +1852,9 @@ features.</p>
   <li><b>Registering already-registered content under a new name rewrites that version's record name</b>
   (refactorer, measured in a scratch store).</li>
   <li><b>Screening, evaluation and attribution are stand-ins only.</b> No outcome number exists yet. The
-  selections' "scores" are placeholders.</li>
+  selections' "scores" are placeholders. <b>Updated 2026-10-11:</b> evaluation is now real
+  (<a href="../2026-10-01-evaluation-layer/report.html">evaluation layer</a>: LIBERO rollouts, per-metric returns, the macro-KS gate);
+  screening and attribution are still stand-ins, and the scores are still placeholders.</li>
   <li><b>Environment.</b> Python 3.14 vs lerobot 0.6.1's declared 3.12/3.13. SmolVLA training should use a
   3.12/3.13 venv or keep the entry point. There is no dependency manifest in the repo. Evaluation must
   render at 128² and confirm that LeRobot's <code>--env.task_ids</code> follows the same task order (R6).
@@ -1984,6 +1986,10 @@ run while reading.</p>
   <li><b>2026-10-03:</b> reward evidence and human-T wording corrected. The stored reward is hard-coded by LIBERO,
   so "no failed demos" now rests on a goal-check replay (1000/1000). <code>duration_s</code> is demo length,
   not human time-to-success: the goal first holds 9–82 steps earlier. See <a href="changelog.md">changelog.md</a>.</li>
+  <li><b>2026-10-08 (recorded 2026-10-11):</b> <code>scripts/verify_runs_s5.py</code> AC5.3 now checks the real eval stage's record
+  (<code>91f0902</code>). Its round-1 mode had failed with <code>KeyError: 'suites'</code> since the evaluation layer replaced <code>eval_standin</code>
+  (<code>4448ed2</code>). The S5 page's AC5.3 row and <code>artifacts/s5_summary.json</code>'s AC5.3 entry are refreshed. See
+  <a href="changelog.md">changelog.md</a>.</li>
 </ul>
 <p>Later changes are logged in <a href="changelog.md">changelog.md</a>.</p>
 

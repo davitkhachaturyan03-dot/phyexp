@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S4 Per-sub-task time-to-success — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+  /* report-specific visuals; every colour is a tracker.css variable (no hex) */
+  figure.fig svg { max-width: 680px; margin: 0 auto; }
+  .shot { display: block; width: 100%; max-width: 640px; height: auto; margin: 0 auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  .ax { stroke: var(--border); stroke-width: 1; }
+  .gr { stroke: var(--border); stroke-width: .7; opacity: .7; }
+  .tk { fill: var(--muted); font: 10px var(--mono); }
+  .tl { fill: var(--text); font: 600 12px var(--sans); }
+  .lb { fill: var(--text); font: 11px var(--sans); }
+  .lbm { fill: var(--muted); font: 10.5px var(--sans); }
+  .lbs { fill: var(--muted); font: 9.5px var(--mono); }
+  .val { fill: var(--text); font: 600 9.5px var(--mono); }
+  .s-a { stroke: var(--accent); stroke-width: 2.2; fill: none; }
+  .s-b { stroke: var(--text); stroke-width: 1.6; fill: none; stroke-dasharray: 6 3; }
+  .s-c { stroke: var(--muted); stroke-width: 1.4; fill: none; stroke-dasharray: 2 3; }
+  .sl-a { stroke: var(--accent); stroke-width: 2.4; fill: none; }
+  .sl-b { stroke: var(--text); stroke-width: 1.8; fill: none; stroke-dasharray: 6 3; }
+  .sl-c { stroke: var(--muted); stroke-width: 1.8; fill: none; }
+  .sl-d { stroke: var(--muted); stroke-width: 1.4; fill: none; stroke-dasharray: 2 3; }
+  .dot { fill: var(--surface); stroke: var(--muted); stroke-width: 1.6; }
+  .dot-win { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+  .f-a { fill: var(--accent); stroke: var(--surface); stroke-width: 1.5; }
+  .f-b { fill: var(--text); stroke: var(--surface); stroke-width: 1.5; }
+  .ci { stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
+  .ci-hl { stroke: var(--accent); stroke-width: 2.4; stroke-linecap: round; }
+  .zero { stroke: var(--text); stroke-width: 1; opacity: .6; }
+  .alpha { stroke: var(--bad); stroke-width: 1.3; stroke-dasharray: 4 3; }
+  .ref { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+  .shade { fill: var(--muted); opacity: .14; }
+  .cens { stroke: var(--text); stroke-width: 1.6; }
+  .box { fill: var(--surface); stroke: var(--border); stroke-width: 1.2; }
+  .box-hl { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.4; }
+  .box-ent { fill: var(--surface-2); stroke: var(--border); stroke-width: 1; }
+  .nlab { fill: var(--text); font: 600 10.5px var(--sans); }
+  .nent { fill: var(--text); font: 10px var(--mono); }
+  .nsub { fill: var(--muted); font: 9.5px var(--mono); }
+  .nfile { fill: var(--text); font: 600 11.5px var(--mono); }
+  .elab { fill: var(--muted); font: italic 9px var(--sans); }
+  .edge { stroke: var(--muted); stroke-width: 1.1; fill: none; }
+  .edge-hl { stroke: var(--accent); stroke-width: 1.6; fill: none; }
+  .conn { stroke: var(--border); stroke-width: 1.4; stroke-dasharray: 3 3; }
+  .ah { fill: var(--muted); } .ah.hl { fill: var(--accent); }
+  .seg-plain { fill: var(--surface-2); stroke: var(--border); }
+  .seg-hl { fill: var(--accent); }
+  .bar-done { fill: var(--accent); }
+  .bar-open { fill: var(--surface-2); stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 3 2; }
+  .barlab { fill: var(--surface); font: 600 9px var(--sans); }
+  table.heat { min-width: 780px; }
+  table.heat td, table.heat th { padding: 5px 8px; font-size: 12.5px; white-space: nowrap; }
+  table.heat .dir { font-weight: 400; text-transform: none; letter-spacing: 0; }
+  table.reg { min-width: 860px; }
+  table.reg td { font-size: 13px; }
+  table.reg td:last-child { min-width: 280px; }
+  .tile .value { font-variant-numeric: normal; }
+  ul.tight li, ol.tight li { margin-bottom: 6px; }
+  td .pill { white-space: nowrap; }
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 14px 18px; margin: 0 0 20px; }
+  .callout p:last-child { margin-bottom: 0; }
+  td.ok, td.pend { white-space: nowrap; }
+  .ev code { font-size: 0.82em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Evaluation layer (PhAIL primitives)</a></p>
+  <h1>S4 · Per-sub-task time-to-success T for libero_10</h1>
+  <p class="dek">A long-horizon LIBERO task now yields one time per sub-task, not only one per episode. One rule turns LIBERO's goal-conjunct
+  trace into PhAIL-style (T, E) pairs. It runs on the 500 libero_10 human demos (950 operation samples, Σ T_k = whole-task T in 500/500) and on
+  every rollout.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">6/6 met</span></span>
+    <span><b>Depends on</b> <a href="S3-human-reference.html">S3</a>, <a href="S1-metric-layer.html">S1</a></span>
+    <span><b>Required story</b> owner decision 7</span>
+  </div>
+</header>
+
+<h2>Why</h2>
+<blockquote>"T = time (or steps) to task success per episode; for long-horizon LIBERO-10 tasks, per sub-task." — PoC §3.5 A, p. 7</blockquote>
+<blockquote>"Operation-level (T, event) pairs give several outcome samples per rollout" — PoC §3.4, p. 7</blockquote>
+<p>Owner decision 7: build it in this feature, as its own story. PhAIL's own unit is the operation, one placement among several per episode
+(PhAIL §3.1 p. 4). The libero_10 analogue is a goal conjunct.</p>
+
+<h2>What was built</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File / function</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>vlapoc/libero_goals.py::operations_table</code></td><td>Static, from LIBERO's BDDL parser: goal conjuncts, maintained conditions (goal ∩ <code>:init</code>) and the number of operations.</td></tr>
+    <tr><td><code>vlapoc/libero_goals.py::operations_from_trace</code></td><td><b>The single rule</b>, declared in its docstring:
+      <ul class="tight">
+        <li>Operations are the goal conjuncts that are false at t0. Conjuncts already true at t0 are maintained conditions (libero_10 task 8's <code>(turnon flat_stove_1)</code>).</li>
+        <li>Operation k &lt; n completes at the first step where at least k operation conjuncts hold at once. This counts conjuncts, so their order in the BDDL does not matter.</li>
+        <li>Operation n completes at the env's own <code>_check_success</code> step, so the last operation time is the whole-task T by construction.</li>
+        <li>T_k = t_k − t_{k−1}. An unfinished rollout adds one censored tail, built through PhAIL's <code>episode_to_T_pairs</code> with threshold 0.</li>
+      </ul></td></tr>
+    <tr><td><code>scripts/human_reference.py --operations</code></td><td>Applies the rule to the stored S3 traces (no second replay) → <code>human_operations.parquet</code>, 1,450 rows.</td></tr>
+    <tr><td><code>vlapoc/rollouts.py</code></td><td>The second caller: every rollout record carries <code>ops</code> and <code>pairs</code> from the same function.</td></tr>
+    <tr><td><code>scripts/verify_operations_s4.py</code></td><td>Seven labelled-synthetic traces, plus a grep proving there is one definition and two callers.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Acceptance criteria</h2>
+<div class="scroll">
+<table class="ev">
+  <thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead>
+  <tbody>
+    <tr><td>AC4.1 The operations table for all 20 tasks matches P14</td><td>§3.5 A p. 7; LIBERO BDDL</td><td class="ok"><span class="pill good">met</span></td><td><code>libero_10 n_ops per task (BDDL) = [2, 2, 2, 2, 2, 1, 2, 2, 2, 2]; maintained = {8: ['(turnon flat_stove_1)']}; demos whose t0 truth gives the same n_ops: 500/500</code>; libero_spatial all 1</td></tr>
+    <tr><td>AC4.2 Synthetic traces: either order, toggles, a broken maintained condition, simultaneous completion, partial timeout, zero ops</td><td>PhAIL §3.1 p. 4</td><td class="ok"><span class="pill good">met</span></td><td><code>AC4.2 7/7 synthetic cases pass</code> (re-run), e.g. <code>timeout after 1 of 2 ops: … pairs [(15.0, 1), (45.0, 0)]</code></td></tr>
+    <tr><td>AC4.3 On the 500 libero_10 demos, Σ_k T_k = whole-task <code>T_success_s</code>, with no censored pair</td><td>consistency with S3</td><td class="ok"><span class="pill good">met</span></td><td><code>sum_k T_k == T_success_s for 500/500; demos with events == n_ops: 500/500; censored pairs: 0; operation samples: 950 from 500 demos</code></td></tr>
+    <tr><td>AC4.4 Per-operation human CDFs and a per-op-index breakdown with clustered CIs (labelled descriptive, r2)</td><td>§3.2 p. 6, §3.5 A p. 7</td><td class="ok"><span class="pill good">met</span></td><td><code>s4_human_operation_stats.csv</code>, n_boot 1000; figure below. The registry labels <code>rmst60_op</code>/<code>hrt60_op</code> <code>O-descriptive</code></td></tr>
+    <tr><td>AC4.5 The harness imports the same function: one implementation</td><td>single record system</td><td class="ok"><span class="pill good">met</span></td><td><code>definitions of operations_from_trace … : 1 (['vlapoc/libero_goals.py']); callers: {'scripts/human_reference.py': True, 'vlapoc/rollouts.py': True}</code></td></tr>
+    <tr><td>AC4.6 The grounding docstring cites §3.5 A, §3.4, PhAIL §3.1 and LIBERO's <code>_check_success</code> lines</td><td>vla-build</td><td class="ok"><span class="pill good">met</span></td><td>grep: all <code>True</code>, including <code>libero_tabletop_manipulation.py:135-143</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Example</h2>
+<p>A real rollout (SmolVLA, external checkpoint, harness validation only): libero_10 task 8 "put both moka pots on the stove", init state 3, seed 3.
+The stove is already on at t0, so it is a maintained condition, and the task has two operations (one per pot). From the stored rollout record
+and <code>operation_returns.parquet</code>:</p>
+<pre><code>rollout_id                 op_k  t_start  t_end  T_op_s  event
+libero_10/8/init003/seed3     1        0    159    7.95      1     # first pot on the cook region
+libero_10/8/init003/seed3     2      159    469   15.50      1     # second pot: env's _check_success fires
+                                                   -----
+                                     sum = 23.45 s = whole-task T (469 steps / 20)
+libero_10/8/init001/seed1     1        0    796   39.80      1     # one pot placed ...
+libero_10/8/init001/seed1     2      796   1200   20.20      0     # ... then a censored tail to τ_episode = 60 s</code></pre>
+<p>The human demos for the same task take a median 9.05 s [8.75, 9.35] for operation 1 and 10.50 s [10.10, 11.05] for operation 2
+(<a href="artifacts/s4_human_operation_stats.csv">s4_human_operation_stats.csv</a>).</p>
+
+<h2>Visual</h2>
+<figure class="fig">
+<!--FIG:subtask_T:start--><svg viewBox="0 0 680 350" role="img" aria-label="Per-sub-task human time to success for the ten libero_10 tasks"><line x1="300.0" y1="30.0" x2="300.0" y2="294.0" class="gr"/><text x="300.0" y="309.0" class="tk" text-anchor="middle">3</text><line x1="337.8" y1="30.0" x2="337.8" y2="294.0" class="gr"/><text x="337.8" y="309.0" class="tk" text-anchor="middle">4</text><line x1="375.6" y1="30.0" x2="375.6" y2="294.0" class="gr"/><text x="375.6" y="309.0" class="tk" text-anchor="middle">5</text><line x1="413.3" y1="30.0" x2="413.3" y2="294.0" class="gr"/><text x="413.3" y="309.0" class="tk" text-anchor="middle">6</text><line x1="451.1" y1="30.0" x2="451.1" y2="294.0" class="gr"/><text x="451.1" y="309.0" class="tk" text-anchor="middle">7</text><line x1="488.9" y1="30.0" x2="488.9" y2="294.0" class="gr"/><text x="488.9" y="309.0" class="tk" text-anchor="middle">8</text><line x1="526.7" y1="30.0" x2="526.7" y2="294.0" class="gr"/><text x="526.7" y="309.0" class="tk" text-anchor="middle">9</text><line x1="564.4" y1="30.0" x2="564.4" y2="294.0" class="gr"/><text x="564.4" y="309.0" class="tk" text-anchor="middle">10</text><line x1="602.2" y1="30.0" x2="602.2" y2="294.0" class="gr"/><text x="602.2" y="309.0" class="tk" text-anchor="middle">11</text><line x1="640.0" y1="30.0" x2="640.0" y2="294.0" class="gr"/><text x="640.0" y="309.0" class="tk" text-anchor="middle">12</text><line x1="300.0" y1="294.0" x2="640.0" y2="294.0" class="ax"/><text x="470.0" y="324.0" class="lbm" text-anchor="middle">median operation time (s) · 95% episode-clustered CI · 50 demos/task</text><text x="16.0" y="20.0" class="tl">task · goal operations (BDDL)</text><text x="16.0" y="51.0" class="lb">0 · alphabet_soup + tomato_sauce</text><line x1="441.7" y1="43.0" x2="464.3" y2="43.0" class="ci-hl"/><circle cx="458.7" cy="43.0" r="4.5" class="f-a"><title>task 0 operation 1: median 7.20 s [6.75, 7.35]</title></circle><line x1="422.8" y1="51.0" x2="445.4" y2="51.0" class="ci"/><path d="M436.0,46.0 L441.0,51.0 L436.0,56.0 L431.0,51.0 Z" class="f-b"><title>task 0 operation 2: median 6.60 s [6.25, 6.85]</title></path><text x="16.0" y="77.0" class="lb">1 · cream_cheese + butter</text><line x1="439.8" y1="69.0" x2="447.3" y2="69.0" class="ci-hl"/><circle cx="443.6" cy="69.0" r="4.5" class="f-a"><title>task 1 operation 1: median 6.80 s [6.70, 6.90]</title></circle><line x1="385.0" y1="77.0" x2="400.1" y2="77.0" class="ci"/><path d="M390.7,72.0 L395.7,77.0 L390.7,82.0 L385.7,77.0 Z" class="f-b"><title>task 1 operation 2: median 5.40 s [5.25, 5.65]</title></path><text x="16.0" y="103.0" class="lb">2 · flat_stove + moka_pot</text><line x1="341.6" y1="95.0" x2="358.6" y2="95.0" class="ci-hl"/><circle cx="347.2" cy="95.0" r="4.5" class="f-a"><title>task 2 operation 1: median 4.25 s [4.10, 4.55]</title></circle><line x1="477.6" y1="103.0" x2="513.4" y2="103.0" class="ci"/><path d="M498.3,98.0 L503.3,103.0 L498.3,108.0 L493.3,103.0 Z" class="f-b"><title>task 2 operation 2: median 8.25 s [7.70, 8.65]</title></path><text x="16.0" y="129.0" class="lb">3 · white_cabinet_1_bottom + akita_black_bowl</text><line x1="453.0" y1="121.0" x2="462.4" y2="121.0" class="ci-hl"/><circle cx="456.8" cy="121.0" r="4.5" class="f-a"><title>task 3 operation 1: median 7.15 s [7.05, 7.30]</title></circle><line x1="341.6" y1="129.0" x2="368.0" y2="129.0" class="ci"/><path d="M349.1,124.0 L354.1,129.0 L349.1,134.0 L344.1,129.0 Z" class="f-b"><title>task 3 operation 2: median 4.30 s [4.10, 4.80]</title></path><text x="16.0" y="155.0" class="lb">4 · porcelain_mug + white_yellow_mug</text><line x1="373.7" y1="147.0" x2="390.7" y2="147.0" class="ci-hl"/><circle cx="379.3" cy="147.0" r="4.5" class="f-a"><title>task 4 operation 1: median 5.10 s [4.95, 5.40]</title></circle><line x1="422.8" y1="155.0" x2="441.7" y2="155.0" class="ci"/><path d="M430.3,150.0 L435.3,155.0 L430.3,160.0 L425.3,155.0 Z" class="f-b"><title>task 4 operation 2: median 6.45 s [6.25, 6.75]</title></path><text x="16.0" y="181.0" class="lb">5 · black_book</text><line x1="505.9" y1="173.0" x2="530.4" y2="173.0" class="ci-hl"/><circle cx="515.3" cy="173.0" r="4.5" class="f-a"><title>task 5 operation 1: median 8.70 s [8.45, 9.10]</title></circle><text x="16.0" y="207.0" class="lb">6 · porcelain_mug + chocolate_pudding</text><line x1="405.8" y1="199.0" x2="424.7" y2="199.0" class="ci-hl"/><circle cx="413.3" cy="199.0" r="4.5" class="f-a"><title>task 6 operation 1: median 6.00 s [5.80, 6.30]</title></circle><line x1="375.6" y1="207.0" x2="417.1" y2="207.0" class="ci"/><path d="M386.9,202.0 L391.9,207.0 L386.9,212.0 L381.9,207.0 Z" class="f-b"><title>task 6 operation 2: median 5.30 s [5.00, 6.10]</title></path><text x="16.0" y="233.0" class="lb">7 · alphabet_soup + cream_cheese</text><line x1="417.1" y1="225.0" x2="439.8" y2="225.0" class="ci-hl"/><circle cx="426.6" cy="225.0" r="4.5" class="f-a"><title>task 7 operation 1: median 6.35 s [6.10, 6.70]</title></circle><line x1="417.1" y1="233.0" x2="436.0" y2="233.0" class="ci"/><path d="M430.3,228.0 L435.3,233.0 L430.3,238.0 L425.3,233.0 Z" class="f-b"><title>task 7 operation 2: median 6.45 s [6.10, 6.60]</title></path><text x="16.0" y="259.0" class="lb">8 · moka_pot + moka_pot  (stove on: maintained)</text><line x1="517.2" y1="251.0" x2="539.9" y2="251.0" class="ci-hl"/><circle cx="528.6" cy="251.0" r="4.5" class="f-a"><title>task 8 operation 1: median 9.05 s [8.75, 9.35]</title></circle><line x1="568.2" y1="259.0" x2="604.1" y2="259.0" class="ci"/><path d="M583.3,254.0 L588.3,259.0 L583.3,264.0 L578.3,259.0 Z" class="f-b"><title>task 8 operation 2: median 10.50 s [10.10, 11.05]</title></path><text x="16.0" y="285.0" class="lb">9 · white_yellow_mug + microwave</text><line x1="464.3" y1="277.0" x2="502.1" y2="277.0" class="ci-hl"/><circle cx="477.6" cy="277.0" r="4.5" class="f-a"><title>task 9 operation 1: median 7.70 s [7.35, 8.35]</title></circle><line x1="402.0" y1="285.0" x2="428.4" y2="285.0" class="ci"/><path d="M413.3,280.0 L418.3,285.0 L413.3,290.0 L408.3,285.0 Z" class="f-b"><title>task 9 operation 2: median 6.00 s [5.70, 6.40]</title></path><circle cx="316.0" cy="340.0" r="4.5" class="f-a"></circle><text x="326.0" y="344.0" class="lbm">operation 1</text><path d="M410,335 L415,340 L410,345 L405,340 Z" class="f-b"/><text x="420.0" y="344.0" class="lbm">operation 2</text></svg><!--FIG:subtask_T:end-->
+  <figcaption><b>Per-sub-task human time for the ten libero_10 tasks.</b> Median time for operation 1 (circle) and operation 2 (diamond),
+  each with a 95% episode-clustered bootstrap CI over 50 demos. Operations are numbered by completion order (the rule counts conjuncts), not by
+  which conjunct finished. The two sub-tasks of a task can differ by a factor of two, in either direction: task 2 takes 4.25 s then 8.25 s,
+  task 3 takes 7.15 s then 4.30 s. Task 5 has a single operation. Hover a marker for its numbers. Source:
+  <code>s4_human_operation_stats.csv</code>.</figcaption>
+</figure>
+<figure class="fig">
+<!--FIG:op_timeline:start--><svg viewBox="0 0 680 312" role="img" aria-label="Operation segments of the ten SmolVLA rollouts on libero_10 task 8 with their capped operation returns"><line x1="130.0" y1="30.0" x2="130.0" y2="254.0" class="gr"/><text x="130.0" y="269.0" class="tk" text-anchor="middle">0</text><line x1="196.7" y1="30.0" x2="196.7" y2="254.0" class="gr"/><text x="196.7" y="269.0" class="tk" text-anchor="middle">200</text><line x1="263.3" y1="30.0" x2="263.3" y2="254.0" class="gr"/><text x="263.3" y="269.0" class="tk" text-anchor="middle">400</text><line x1="330.0" y1="30.0" x2="330.0" y2="254.0" class="gr"/><text x="330.0" y="269.0" class="tk" text-anchor="middle">600</text><line x1="396.7" y1="30.0" x2="396.7" y2="254.0" class="gr"/><text x="396.7" y="269.0" class="tk" text-anchor="middle">800</text><line x1="463.3" y1="30.0" x2="463.3" y2="254.0" class="gr"/><text x="463.3" y="269.0" class="tk" text-anchor="middle">1000</text><line x1="530.0" y1="30.0" x2="530.0" y2="254.0" class="gr"/><text x="530.0" y="269.0" class="tk" text-anchor="middle">1200</text><line x1="130.0" y1="254.0" x2="530.0" y2="254.0" class="ax"/><text x="330.0" y="284.0" class="lbm" text-anchor="middle">policy step (20 Hz; 1200 steps = τ_episode = 60 s)</text><text x="16.0" y="20.0" class="tl">rollout</text><text x="540.0" y="20.0" class="tl">return(s), s</text><text x="16.0" y="49.0" class="lb">init000/seed0</text><rect x="131.0" y="38.0" width="398.0" height="14" rx="3" class="bar-open"><title>libero_10/8/init000/seed0 op 1: steps 0–1200 (60.00 s), unfinished attempt (censored), return -60.00</title></rect><text x="330.0" y="49.0" class="barlab" text-anchor="middle">op 1</text><text x="540.0" y="49.0" class="lbs">-60.00</text><text x="16.0" y="71.0" class="lb">init001/seed1</text><rect x="131.0" y="60.0" width="263.3" height="14" rx="3" class="bar-done"><title>libero_10/8/init001/seed1 op 1: steps 0–796 (39.80 s), completed, return -39.80</title></rect><text x="262.7" y="71.0" class="barlab" text-anchor="middle">op 1</text><rect x="396.3" y="60.0" width="132.7" height="14" rx="3" class="bar-open"><title>libero_10/8/init001/seed1 op 2: steps 796–1200 (20.20 s), unfinished attempt (censored), return -60.00</title></rect><text x="462.7" y="71.0" class="barlab" text-anchor="middle">op 2</text><text x="540.0" y="71.0" class="lbs">-39.80 , -60.00</text><text x="16.0" y="93.0" class="lb">init002/seed2</text><rect x="131.0" y="82.0" width="398.0" height="14" rx="3" class="bar-open"><title>libero_10/8/init002/seed2 op 1: steps 0–1200 (60.00 s), unfinished attempt (censored), return -60.00</title></rect><text x="330.0" y="93.0" class="barlab" text-anchor="middle">op 1</text><text x="540.0" y="93.0" class="lbs">-60.00</text><text x="16.0" y="115.0" class="lb">init003/seed3</text><rect x="131.0" y="104.0" width="51.0" height="14" rx="3" class="bar-done"><title>libero_10/8/init003/seed3 op 1: steps 0–159 (7.95 s), completed, return -7.95</title></rect><text x="156.5" y="115.0" class="barlab" text-anchor="middle">op 1</text><rect x="184.0" y="104.0" width="101.3" height="14" rx="3" class="bar-done"><title>libero_10/8/init003/seed3 op 2: steps 159–469 (15.50 s), completed, return -15.50</title></rect><text x="234.7" y="115.0" class="barlab" text-anchor="middle">op 2</text><text x="540.0" y="115.0" class="lbs">-7.95 , -15.50</text><text x="16.0" y="137.0" class="lb">init004/seed4</text><rect x="131.0" y="126.0" width="398.0" height="14" rx="3" class="bar-open"><title>libero_10/8/init004/seed4 op 1: steps 0–1200 (60.00 s), unfinished attempt (censored), return -60.00</title></rect><text x="330.0" y="137.0" class="barlab" text-anchor="middle">op 1</text><text x="540.0" y="137.0" class="lbs">-60.00</text><text x="16.0" y="159.0" class="lb">init005/seed5</text><rect x="131.0" y="148.0" width="320.7" height="14" rx="3" class="bar-done"><title>libero_10/8/init005/seed5 op 1: steps 0–968 (48.40 s), completed, return -48.40</title></rect><text x="291.3" y="159.0" class="barlab" text-anchor="middle">op 1</text><rect x="453.7" y="148.0" width="75.3" height="14" rx="3" class="bar-open"><title>libero_10/8/init005/seed5 op 2: steps 968–1200 (11.60 s), unfinished attempt (censored), return -60.00</title></rect><text x="491.3" y="159.0" class="barlab" text-anchor="middle">op 2</text><text x="540.0" y="159.0" class="lbs">-48.40 , -60.00</text><text x="16.0" y="181.0" class="lb">init006/seed6</text><rect x="131.0" y="170.0" width="52.0" height="14" rx="3" class="bar-done"><title>libero_10/8/init006/seed6 op 1: steps 0–162 (8.10 s), completed, return -8.10</title></rect><text x="157.0" y="181.0" class="barlab" text-anchor="middle">op 1</text><rect x="185.0" y="170.0" width="78.7" height="14" rx="3" class="bar-done"><title>libero_10/8/init006/seed6 op 2: steps 162–404 (12.10 s), completed, return -12.10</title></rect><text x="224.3" y="181.0" class="barlab" text-anchor="middle">op 2</text><text x="540.0" y="181.0" class="lbs">-8.10 , -12.10</text><text x="16.0" y="203.0" class="lb">init007/seed7</text><rect x="131.0" y="192.0" width="65.3" height="14" rx="3" class="bar-done"><title>libero_10/8/init007/seed7 op 1: steps 0–202 (10.10 s), completed, return -10.10</title></rect><text x="163.7" y="203.0" class="barlab" text-anchor="middle">op 1</text><rect x="198.3" y="192.0" width="66.3" height="14" rx="3" class="bar-done"><title>libero_10/8/init007/seed7 op 2: steps 202–407 (10.25 s), completed, return -10.25</title></rect><text x="231.5" y="203.0" class="barlab" text-anchor="middle">op 2</text><text x="540.0" y="203.0" class="lbs">-10.10 , -10.25</text><text x="16.0" y="225.0" class="lb">init008/seed8</text><rect x="131.0" y="214.0" width="398.0" height="14" rx="3" class="bar-open"><title>libero_10/8/init008/seed8 op 1: steps 0–1200 (60.00 s), unfinished attempt (censored), return -60.00</title></rect><text x="330.0" y="225.0" class="barlab" text-anchor="middle">op 1</text><text x="540.0" y="225.0" class="lbs">-60.00</text><text x="16.0" y="247.0" class="lb">init009/seed9</text><rect x="131.0" y="236.0" width="398.0" height="14" rx="3" class="bar-open"><title>libero_10/8/init009/seed9 op 1: steps 0–1200 (60.00 s), unfinished attempt (censored), return -60.00</title></rect><text x="330.0" y="247.0" class="barlab" text-anchor="middle">op 1</text><text x="540.0" y="247.0" class="lbs">-60.00</text><rect x="130.0" y="294.0" width="22.0" height="12.0" rx="3" class="bar-done"/><text x="158.0" y="304.0" class="lbm">completed operation: return −min(T_op, 60)</text><rect x="420.0" y="294.0" width="22.0" height="12.0" rx="3" class="bar-open"/><text x="448.0" y="304.0" class="lbm">unfinished attempt: return −60</text></svg><!--FIG:op_timeline:end-->
+  <figcaption><b>The rule applied to ten real rollouts on libero_10 task 8.</b> Each bar is one operation sample on the step axis. Filled bars are
+  completed operations; dashed outlines are the one unfinished attempt per incomplete rollout, censored at τ_episode. Five rollouts placed no pot
+  (one censored 60 s sample each), two placed one, and three finished both: 15 operation samples from 10 rollouts. The right column is the
+  family-O return S6 assigns to each sample. Source: <code>returns-e92604a8b995/operation_returns.parquet</code>.</figcaption>
+</figure>
+
+<h2>Divergences and limitations</h2>
+<ul class="tight">
+  <li><b>Threshold 0, not PhAIL's 0.3 s</b> (declared in the docstring). Sim timestamps are exact; PhAIL's 0.3 s multi-grip clustering exists
+  for annotation jitter. Simultaneous completion gives T = 0 under both conventions.</li>
+  <li><b>Per-sub-task T is family O, not the headline attribution family</b> (plan r2, "Declared functionals"). Family W (whole-task T) is
+  declared for returns and the verdict, because the returns are per rollout (§9.1 Step 3 p. 19). A per-rollout sum of KM-consistent
+  per-operation terms would rank a rollout that made progress below one that made none (inferred, worked example in the plan). Family O
+  keeps its own verdict and its own operation-sample return.</li>
+  <li><b>Two operation functionals.</b> The descriptive per-operation KM (<code>rmst60_op</code>, unfinished attempts censored: 36.99 s on libero_10:8) and
+  the attribution functional <code>rmst60_op_cap</code> (an unfinished attempt counts as the 60 s cap: 38.15 s). The <code>_cap</code> form is pessimistic by
+  declaration (plan R16), so a slow completed operation can never be outranked by an abandoned one.</li>
+  <li><b>Clustered CIs can be narrower here.</b> For the pooled per-task median, the episode-clustered CI was narrower than the per-operation one in
+  6 of 9 two-operation tasks (ratio 0.405–0.900). Each demo contributes exactly one op 1 and one op 2, so resampling demos acts like stratification
+  (inferred). The PoC rule (resample whole episodes) is applied regardless.</li>
+</ul>
+
+<footer class="doc">Evidence: <a href="execution-log.md">execution-log.md</a> (S4) · <a href="artifacts/s4_human_operations_stdout.txt">s4_human_operations_stdout.txt</a> ·
+<a href="artifacts/s4_operations_table.csv">s4_operations_table.csv</a> · <a href="artifacts/s4_fig_human_operation_cdfs.png">per-operation CDFs (PNG)</a></footer>
+</div>
+</body>
+</html>

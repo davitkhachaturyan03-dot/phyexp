@@ -1,0 +1,108 @@
+# summarizer re-run 2026-10-12T00:24:59Z, git HEAD 60158bb
+mlflow.db sha256 before: 7845d8d7634e2757
+
+$ .venv/bin/python -m vlapoc.lineage version check-blind v1   # S0 (then v0)
+check_blind(v1) = ['episode_index']; fenced: True
+check_blind(v0) = []; fenced: False
+
+$ .venv/bin/python scripts/verify_metrics_s1.py   # S1
+AC1.1 vendored sha256 802387d343463cd4… == clone build/stats.py: True (clone HEAD 18ce72d5703dcbbbb10a980336aa5a1622601fb4); LICENSE identical: True; attribution header: True
+AC1.2 SYNTHETIC finite censored data (400 pairs, 256 events, 226 tied values): max |S_vendored - S_scipy.ecdf| over 146 event times = 3.331e-16; Greenwood 95% half-width max diff = 9.714e-17
+AC1.3 SYNTHETIC 55 operations, 5 ghosts (T=inf), 0 censored: ghost_event_rate = 0.09090909090909088, g/n = 0.09090909090909091, |diff| = 2.8e-17; 1 - F(max float) = 0.09090909090909083
+AC1.3 RMST(30 s) = 14.55964694266428; mean(min(T, 30)) with ghosts -> 30 = 14.55964694266428; |diff| = 0.0e+00
+AC1.4 SYNTHETIC zero-success episode (τ_episode 60 s, 2 ops) -> ((60.0, 0),); all ops done -> ((5.0, 1), (7.0, 1)) (no censored tail); 1 of 2 done -> ((8.0, 1), (52.0, 0)); LIBERO simultaneous ops (threshold 0) -> ((10.0, 1), (0.0, 1))
+AC1.4 the zero-success episode stays in the risk set: 5 pairs, S after the first event = np.float64(0.8) (= 1 - 1/5); censored_rate = 0.6667 (2 of 3 episodes)
+AC1.5 SYNTHETIC 40 episodes x 5 correlated ops, rmst30 = 6.3719: clustered 95% CI [5.1479, 7.7031] vs per-operation [5.4706, 7.2974]; width ratio 1.399
+AC1.5 SYNTHETIC 40 episodes x 5 correlated ops, F10 = 0.8050: clustered 95% CI [0.7350, 0.8701] vs per-operation [0.7500, 0.8600]; width ratio 1.228
+AC1.6 registry: 23 entries, every named function exists with a docstring; required missing: []
+EQ macro-KS SYNTHETIC (3 cells, ghosts + censoring): vendored per_obj_macro_bootstrap_ks D=0.1902324217651046 p=0.6866267465069861; evaluation.macro_ks D=0.1902324217651046 p=0.6866267465069861; identical: True
+EQ logrank SYNTHETIC one stratum (ties present): ours chi2=0.5102598713 p=0.4750263814; scipy Z^2=0.5102598713 p=0.4750263814; |dchi2|=5.55e-16
+EQ AUC hand example a=[1,3] b=[2,3(censored)] -> 0.666667 (expected 2/3); ghost vs 5 s -> 0.0; SYNTHETIC P-P area 0.35813 vs AUC 0.35817 (|diff| 3.9e-05)
+EQ HRT SYNTHETIC 2 cells: per cell {'c1': 0.5902, 'c2': 0.621}, macro 0.6056 (= mean: True); CI resample human [0.5191, 0.7111] vs human fixed [0.5486, 0.6708]
+AC1.7 citations in vlapoc/evaluation.py: {'PoC §3.2 (p. 6)': 1, 'PoC §10 (p. 20)': 1, '§3.1 p. 4': 7, 'Table 1 p. 5': 2, '§3.2 p. 5': 6, '§3.3 p. 6': 3}
+
+$ .venv/bin/python scripts/phail_validate.py   # S2 (stored sorted export, data/phail/cohort_mixed.parquet)
+cohort_mixed.parquet sha256: 35b7181bc92c42c5
+AC2.1 max |ours - PhAIL| pooled_per_model (rmst240, median, F20/30/60, pct_of_human): 0.000e+00
+AC2.1 max |ours - PhAIL| cells (rmst240, median, F20/30/60): 0.000e+00
+AC2.1 max |ours - PhAIL| cells censored AUC vs teleop: 0.000e+00
+AC2.1 max |ours - PhAIL| cells HRT %: 3.553e-15
+AC2.1 max |ours - PhAIL| macro AUC: 0.000e+00
+AC2.1 max |ours - PhAIL| KS distance per cell (24 = 6 pairs x 4 objects): 0.000e+00
+AC2.1 max |ours - PhAIL| P-P curve ACT|Batteries: 0.000e+00
+AC2.1 max |ours - PhAIL| macro P-P curve ACT: 0.000e+00
+AC2.1 max |ours - PhAIL| pooled logrank chi2/p (one stratum): 4.868e-17
+AC2.1 macro-KS D and p identical for all 6 pairs (same RNG): True
+AC2.2 cohort counts (exported mixed cohort vs Table 2): OpenPI 163/165, GR00T 164/165, ACT 151/151, SmolVLA 116/118, Teleop 396/396
+AC2.3 OpenPI   RMST ours 77.572 [69.51, 86.18] vs pub 77.693 [69.21, 86.95] (Δ -0.1209 s, CI width -6.1%)
+AC2.3 macro-KS OpenPI-GR00T: ours D=0.123916 p=0.125437 vs dashboard_per_obj_macro.json D=0.123916 p=0.119440 / paper p = 0.12
+AC2.3 tolerance checks: 23/26 within; failing: ['OpenPI RMST point ±0.1 s', 'GR00T RMST point ±0.1 s', 'SmolVLA RMST point ±0.1 s']
+AC2.4 F(30 s)                  OpenPI 0.474 [0.430, 0.517]  GR00T 0.509 [0.471, 0.545]  ACT 0.441 [0.385, 0.493]  SmolVLA 0.183 [0.125, 0.241]  -> winner GR00T
+AC2.4 HRT macro (%)            OpenPI 13.755 [12.402, 15.684]  GR00T 13.349 [12.018, 15.031]  ACT 10.487 [9.231, 13.079]  SmolVLA 6.445 [5.741, 7.374]  -> winner OpenPI
+AC2.4 global RMST(240 s) (s)   OpenPI 77.572 [69.515, 86.183]  GR00T 77.313 [69.136, 85.807]  ACT 100.929 [86.045, 119.122]  SmolVLA 166.373 [149.007, 184.427]  -> winner GR00T
+AC2.4 AUC vs human (macro)     OpenPI 0.100 [0.086, 0.117]  GR00T 0.095 [0.080, 0.110]  ACT 0.134 [0.108, 0.160]  SmolVLA 0.027 [0.016, 0.037]  -> winner ACT
+AC2.4 winners {'F(30 s)': 'GR00T', 'HRT macro (%)': 'OpenPI', 'global RMST(240 s) (s)': 'GR00T', 'AUC vs human (macro)': 'ACT'}; published GR00T/OpenPI/GR00T/ACT reproduced: True; distinct top-1: 3
+AC2.5 HRT CI endpoint error vs tab_headline_ci.json, summed over 4 models (pp): {'human_resampled': 0.6275677408637819, 'human_fixed': 0.8083132901405232}; closer variant: human_resampled
+AC2.6 teleoperation = fine-tuning set (phail/v1.0/dataset/teleoperation/): episodes=449 GB=13.95 access=public, anonymous HTTPS (not downloaded: not approved)
+AC2.6 croissant.json license https://creativecommons.org/licenses/by/4.0/; mentions of a 352-episode fine-tuning set: 3 (bucket: 449)
+
+$ .venv/bin/python scripts/human_reference.py --summary   # S3
+AC3.3 T_success_s < duration_s: 1000/1000
+AC3.3 gap = length_steps - T_success_steps per task (min/median/max): range over tasks: min 9-11, median 11.0-19.5, max 11-82 (planning: min 8-10, median 10-18, max 81)
+AC3.3 success holds over the final stored states: tail run min 0, median 11; success at the last stored state: 988/1000
+AC3.4 libero_spatial: median T_success 5.30 s vs duration 6.20 s; RMST60 5.356 vs 6.225 s -> an HRT anchored on duration_s is 1.162x too high
+AC3.4 libero_10: median T_success 12.45 s vs duration 13.15 s; RMST60 13.166 vs 13.809 s -> an HRT anchored on duration_s is 1.049x too high
+
+$ .venv/bin/python scripts/verify_operations_s4.py   # S4
+AC4.2 7/7 synthetic cases pass
+AC4.5 definitions of operations_from_trace in vlapoc/ + scripts/: 1 (['vlapoc/libero_goals.py']); callers: {'scripts/human_reference.py': True, 'vlapoc/rollouts.py': True}
+
+$ .venv/bin/python scripts/verify_rollouts_s5.py --summary data/eval/eval-smolvla-harness-spatial0-20261004T150110Z data/eval/eval-smolvla-harness-l10t8-20261004T153306Z   # S5 (stored AC5.4 rollouts)
+AC5.4 libero_10:8 (KITCHEN_SCENE8_put_both_moka_pots_on_the_stove): 3/10 succeeded within 1200 steps (3/10 within LeRobot's 520-step budget), censored 7; T (steps) of successes [404, 407, 469]; ops done {0: 5, 1: 2, 2: 3} of 2; KM whole-task F(30 s) 0.30, F(60 s) 0.30, median inf, RMST(60) 48.40 s; operation pairs 15; wall 347.9 s/rollout
+AC5.4 libero_spatial:0 (pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate): 6/10 succeeded within 1200 steps (6/10 within LeRobot's 280-step budget), censored 4; T (steps) of successes [67, 71, 73, 74, 75, 77]; ops done {0: 4, 1: 6} of 1; KM whole-task F(30 s) 0.60, F(60 s) 0.60, median 3.75, RMST(60) 26.19 s; operation pairs 10; wall 187.0 s/rollout
+
+$ .venv/bin/python scripts/verify_returns_s6.py --real data/eval/eval-smolvla-harness-spatial0-20261004T150110Z --real data/eval/eval-smolvla-harness-l10t8-20261004T153306Z --against-verdict   # S6
+AC6.1 REAL (eval-smolvla-harness-spatial0-20261004T150110Z, 10 rollouts, 1 cells), family W vs whole-task KM: max |mean(ret_rmst60) + RMST60| = 0.00e+00; max |mean(ret_f30) - F30| = 0.00e+00; max |mean(ret_censored60) - (1 - F60)| = 0.00e+00; max |mean(ret_auc_expected) - AUC_h| = 0.00e+00
+AC6.1 REAL (eval-smolvla-harness-l10t8-20261004T153306Z, 10 rollouts, 1 cells), family W vs whole-task KM: max |mean(ret_rmst60) + RMST60| = 7.11e-15; max |mean(ret_f30) - F30| = 5.55e-17; max |mean(ret_censored60) - (1 - F60)| = 0.00e+00; max |mean(ret_auc_expected) - AUC_h| = 0.00e+00
+AC6.10 max |diff| = 7.11e-15; all <= 1e-9 and every verdict label carries its family: True
+AC6.11 REAL eval-smolvla-harness-spatial0-20261004T150110Z|libero_spatial/0: unfinished attempts all -60: True; max unfinished -60.0, min completed -3.85; ranking correct: True
+AC6.11 REAL eval-smolvla-harness-l10t8-20261004T153306Z|libero_10/8: unfinished attempts all -60: True; max unfinished -60.0, min completed -48.4; ranking correct: True
+
+$ .venv/bin/python -m vlapoc.verdict --phail GR00T ACT   # S7, seed 0
+[family PhAIL] GR00T vs ACT (4 cells, n 164/151 episodes): macro-KS D̄ 0.1754 p 0.0070 (fires) -> outcome (ii)
+    phail_f30     F(30 s), PhAIL semantics [family PhAIL, τ 30 s]            GR00T 0.5091 | ACT 0.4409 | Δ +0.0682 [+0.0039, +0.1272] p 0.0380 Holm 0.0759 -> favours GR00T
+    phail_hrt240  HRT(240 s), PhAIL semantics [family PhAIL, τ 240 s]        GR00T 0.1335 | ACT 0.1049 | Δ +0.0286 [+0.0006, +0.0496] p 0.0500 Holm 0.0759 -> favours GR00T
+    phail_rmst240 global RMST(240 s), PhAIL semantics [family PhAIL, τ 240 s] GR00T 77.3125 | ACT 100.9287 | Δ -23.6162 [-40.9426, -7.1305] p 0.0060 Holm 0.0240 -> favours GR00T *
+    phail_auc     AUC vs human, PhAIL semantics [family PhAIL, τ none]       GR00T 0.0949 | ACT 0.1338 | Δ -0.0388 [-0.0706, -0.0119] p 0.0100 Holm 0.0300 -> favours ACT *
+    sanity: stratified logrank chi2 11.76 p 0.000607
+
+$ .venv/bin/python scripts/verify_verdict_s7.py --phail-seeds 0 1 2 3 4   # S7 AC7.1 under the r3 criterion
+AC7.1 OpenPI vs ACT seed 0: gate D̄ 0.1418 p 0.1074 -> (iii) expected (iii) OK; Holm p phail_f30 0.362->OpenPI, phail_hrt240 0.090->OpenPI, phail_rmst240 0.032->OpenPI, phail_auc 0.090->ACT
+AC7.1 OpenPI vs ACT seed 1: gate D̄ 0.1418 p 0.1024 -> (iii) expected (iii) OK; Holm p phail_f30 0.362->OpenPI, phail_hrt240 0.108->OpenPI, phail_rmst240 0.032->OpenPI, phail_auc 0.108->ACT
+AC7.1 OpenPI vs ACT seed 2: gate D̄ 0.1418 p 0.1024 -> (iii) expected (iii) OK; Holm p phail_f30 0.374->OpenPI, phail_hrt240 0.066->OpenPI, phail_rmst240 0.016->OpenPI, phail_auc 0.066->ACT
+AC7.1 OpenPI vs ACT seed 3: gate D̄ 0.1418 p 0.1079 -> (iii) expected (iii) OK; Holm p phail_f30 0.348->OpenPI, phail_hrt240 0.066->OpenPI, phail_rmst240 0.048->OpenPI, phail_auc 0.066->ACT
+AC7.1 OpenPI vs ACT seed 4: gate D̄ 0.1418 p 0.0960 -> (iii) expected (iii) OK; Holm p phail_f30 0.394->OpenPI, phail_hrt240 0.104->OpenPI, phail_rmst240 0.064->OpenPI, phail_auc 0.064->ACT
+AC7.1 GR00T vs ACT seed 0: gate D̄ 0.1754 p 0.0070 -> (ii) expected (ii) OK; Holm p phail_f30 0.076->GR00T, phail_hrt240 0.076->GR00T, phail_rmst240 0.024->GR00T, phail_auc 0.030->ACT
+AC7.1 GR00T vs ACT seed 1: gate D̄ 0.1754 p 0.0065 -> (i) expected (ii) MISMATCH; Holm p phail_f30 0.076->GR00T, phail_hrt240 0.076->GR00T, phail_rmst240 0.008->GR00T, phail_auc 0.054->ACT
+AC7.1 GR00T vs ACT seed 2: gate D̄ 0.1754 p 0.0100 -> (ii) expected (ii) OK; Holm p phail_f30 0.104->GR00T, phail_hrt240 0.104->GR00T, phail_rmst240 0.040->GR00T, phail_auc 0.040->ACT
+AC7.1 GR00T vs ACT seed 3: gate D̄ 0.1754 p 0.0085 -> (ii) expected (ii) OK; Holm p phail_f30 0.104->GR00T, phail_hrt240 0.104->GR00T, phail_rmst240 0.032->GR00T, phail_auc 0.032->ACT
+AC7.1 GR00T vs ACT seed 4: gate D̄ 0.1754 p 0.0085 -> (ii) expected (ii) OK; Holm p phail_f30 0.092->GR00T, phail_hrt240 0.092->GR00T, phail_rmst240 0.030->GR00T, phail_auc 0.024->ACT
+AC7.1 every (pair, seed) outcome equals the pair's expected outcome: False (the superseded r2 rule)
+AC7.1 (r3) GR00T vs ACT: (ii) in 4/5 seeds (needs >= 80%), gate fires 5/5, RMST favours GR00T 5/5: True; other pairs match in every seed: True (OpenPI-GR00T 5/5, OpenPI-ACT 5/5, OpenPI-SmolVLA 5/5, GR00T-SmolVLA 5/5, ACT-SmolVLA 5/5)
+AC7.1 (r3, owner ruling B, dispute-r2.md) pass: True
+
+$ .venv/bin/python scripts/verify_verdict_s7.py --family-consistency data/eval/eval-smolvla-harness-spatial0-20261004T150110Z data/eval/eval-smolvla-harness-l10t8-20261004T153306Z   # S7 AC7.7
+AC7.7 max |verdict - S6| = 7.11e-15; labels carry their family: True; pass: True
+
+$ .venv/bin/python scripts/verify_subset_stats_s8.py --check v0   # S8
+AC8.1 aggregate_stats over all 1000 episodes of v0 vs meta/stats.json, max |diff|: observation.state: mean 4.16e-17, std 2.43e-10, min 0.00e+00, max 0.00e+00, count 0.00e+00; action: mean 5.55e-17, std 1.93e-10, min 0.00e+00, max 0.00e+00, count 0.00e+00
+# (this section re-run at 2026-10-12T00:31:55Z after fixing the script's grep pattern; same command)
+
+$ .venv/bin/python -m vlapoc.lineage trace 85f7d7d95884483480996e97c3cccb19   # S9 (the r2 eval-smoke verify run)
+runs in trace: 13 | stages: ['build', 'eval', 'select', 'split', 'train', 'verify']
+stand-in runs: []
+entity kinds: ['checkpoint', 'rollouts', 'split', 'subset', 'version']
+raw files reached: 20 | first: KITCHEN_SCENE3_turn_on_the_stove_and_put_the_mok 6b30906a52a5741e
+
+mlflow.db sha256 after: 7845d8d7634e2757
+exit 0
