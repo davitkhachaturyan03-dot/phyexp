@@ -71,3 +71,37 @@ and calibration.
   demos helped the robot policy.
 - **Red, for outcome-based attribution:** egocentric human video only, with no robot to deploy on. Offline
   quality scoring (the DemInf baseline) is still possible, but it is the baseline to beat, not our method.
+
+## Note for people collecting egocentric data
+
+*Send or read out as is. Statements marked (inferred) are our reasoning, not measurements.*
+
+**Egocentric recordings are not yet VLA training data, and that gap is a business bottleneck for you, not only
+a technical one.** Since most egocentric data is collected to train VLAs (vision-language-action models), what
+decides its value is how much of it a VLA team can actually use as a training target.
+
+An egocentric recording, EgoDex for example, stores a head-camera video plus estimated human hand poses:
+transforms for the camera and 25 joints per hand, each with an ARKit confidence between 0 and 1, in a frame
+anchored to the room (quoted, EgoDex README). That's what a human did, not a command a robot can execute. To
+use it as a training target, the buyer has to bridge four gaps. All four are inferred, and they're the
+problems EgoMimic-style work addresses:
+
+1. **Embodiment.** A human hand has about 20+ degrees of freedom; a parallel gripper has 1. Arm reach and
+   kinematics differ too, so "the hand moved here" doesn't map uniquely onto a robot command.
+2. **Retargeting.** You choose a mapping, such as wrist pose to end-effector pose and finger closure to
+   gripper open/closed. That's a modelling choice, it loses information, and it bakes in your assumptions.
+3. **No robot state.** There are no joint positions or gripper readings, so the policy's state input doesn't
+   exist. You'd substitute estimated hand pose, which is noisy where confidence is low.
+4. **Visual and viewpoint mismatch.** The camera moves with the head and the images show a human hand, while
+   a robot sees from fixed or wrist cameras and sees its own arm. A policy trained only on human video sees
+   images it will never see when deployed.
+
+**Why this is your problem too (inferred).** Every gap is a cost the data's buyer pays before the first
+training run, or a reason the trained policy fails on a real robot. Data that needs all four bridged is worth
+less per hour than data that closes some of them at collection time. The more of your data a VLA team can use
+directly, the more it's worth to them, and the more likely they are to come back for the next campaign.
+
+**What would help (inferred):** ask us which of these gaps matter for the model you're collecting for, and
+whether some robot-side data (state, actions, matching camera views) can be collected alongside the
+egocentric recordings, since co-training human and robot data is how the published approaches get around the
+gaps.
