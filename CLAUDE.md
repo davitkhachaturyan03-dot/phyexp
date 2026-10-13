@@ -23,6 +23,9 @@ from the PoC), `vla-executor`, `vla-analyzer` (a PASS/REWORK gate that routes wo
 preloads `vla-build`, so the same five steps still apply, divided between the agents. Small
 fixes, questions and one-off scripts don't go through the pipeline.
 
+**Call notes go to `calls/` via the `call-notes` skill** (`.claude/skills/call-notes/SKILL.md`). That is
+business record-keeping, not PoC work: no `vla-build`, no feature folder. `calls/` is gitignored.
+
 ## Ground every answer in what already exists
 
 **For any request — a build, a research question, a design opinion, a throwaway script —

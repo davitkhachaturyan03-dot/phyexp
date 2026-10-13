@@ -31,3 +31,7 @@ docs/papers/
 .idea/
 .claude/settings.local.json
 .DS_Store
+
+# Call digests (personal and commercial information about other people): only the README is versioned.
+calls/*
+!calls/README.md
