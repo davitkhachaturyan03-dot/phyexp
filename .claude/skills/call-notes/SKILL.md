@@ -48,6 +48,9 @@ no tracker entry.
 8. **Reply** with the file path, the 3–5 summary bullets, and the next step with its owner and date. Don't
    commit: `calls/` is gitignored on purpose.
 
+**Pilot feasibility section:** take its questions from `calls/instructions/call-instructions.md`, section
+"Questions to ask to potential pilot cooperators", so the two stay in sync.
+
 ## Template
 
 ````markdown

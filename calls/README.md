@@ -4,6 +4,11 @@ One file per call with anyone related to the startup: potential ICPs (ideal cust
 data partners, pilot users, investors, advisors. Written by the `call-notes` skill
 (`.claude/skills/call-notes/SKILL.md`) whenever you ask Claude to store call notes.
 
+## Instructions
+
+`calls/instructions/` holds standing instructions for calls, such as the questions to ask potential pilot
+cooperators (`call-instructions.md`). It is versioned, unlike the digests.
+
 ## File names
 
 ```
@@ -31,4 +36,4 @@ or `grep -l acme calls/*` finds what you need.
 ## Privacy
 
 This folder holds personal and commercial information about other people. Its contents are
-**gitignored**; only this README is versioned. Keep it out of any shared or published repository.
+**gitignored**; only this README and `instructions/` are versioned. Keep it out of any shared or published repository.

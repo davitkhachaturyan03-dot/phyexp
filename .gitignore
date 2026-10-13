@@ -35,3 +35,4 @@ docs/papers/
 # Call digests (personal and commercial information about other people): only the README is versioned.
 calls/*
 !calls/README.md
+!calls/instructions/
