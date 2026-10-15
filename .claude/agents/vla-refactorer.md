@@ -1,7 +1,7 @@
 ---
 name: vla-refactorer
 description: Fourth stage of the feature-pipeline, run after the analyzer passes. Makes the feature's code clean, readable and documented enough for the project owner to understand, without changing behaviour, and proves that by re-running every verification command. Use only when the feature-pipeline skill dispatches it.
-model: inherit
+model: claude-sonnet-5-5
 color: yellow
 skills:
   - vla-build

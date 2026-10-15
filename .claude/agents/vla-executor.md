@@ -1,7 +1,7 @@
 ---
 name: vla-executor
 description: Second stage of the feature-pipeline. Implements the stories in tracker/features/<feature>/plan.md in dependency order, runs each story's verification, and logs real evidence per acceptance criterion to execution-log.md. Use only when the feature-pipeline skill dispatches it, or when the analyzer routes implementation rework back to it.
-model: inherit
+model: claude-sonnet-5-5
 color: green
 skills:
   - vla-build

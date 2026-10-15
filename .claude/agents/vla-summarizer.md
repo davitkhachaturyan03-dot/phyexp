@@ -1,7 +1,7 @@
 ---
 name: vla-summarizer
 description: Final stage of the feature-pipeline. Writes per-story documentation and one overall HTML report (report.html) inside the feature's folder, with real examples and inline-SVG visuals that can be demoed to the owner and stakeholders, then lists the feature and its spec coverage in tracker/index.html. Use only when the feature-pipeline skill dispatches it.
-model: inherit
+model: claude-sonnet-5-5
 color: purple
 skills:
   - vla-build
