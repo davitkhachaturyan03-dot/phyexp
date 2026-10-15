@@ -121,6 +121,8 @@ class EpisodeEdit:
     params: dict
     seed: int | None
     transform: Callable[[dict], dict]  # canonical episode dict -> canonical episode dict
+    new_task: str | None = None  # instruction swap: the task string the edited episode must carry (S2)
+    hypothesis: str = "none stated"  # PoC §4.5 p.11 metric hypothesis, written to labels.parquet (S2)
 
 
 # ---------------------------------------------------------------------------------------------

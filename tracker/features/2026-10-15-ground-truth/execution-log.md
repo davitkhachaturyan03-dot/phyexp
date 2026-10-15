@@ -1,0 +1,33 @@
+# Execution log: ground truth (injection experiment)
+
+## Round 1: 2026-10-15 / Batch 1 (S1-S3)
+
+### S1: Implement the seven corruption transforms with invariant checks on real episodes
+**Files:**
+- `vlapoc/corruptions.py` (new, ~520 lines): `action_noise`, `time_shift`, `instruction_swap`, `dropped_frames`, `detour`, `idle_padding`, `gripper_release` constructors, each returning a `derive.EpisodeEdit`; `eligible(type, episode)`, `clip_actions`, `final_release`, `constant_gripper_windows`, `hypothesis_for`, `make_edit`. Grounding docstring with PoC §2.5 p.5, §8.10 p.17, §4.5 p.11, RoboDrop App. A.1 p.13.
+- `vlapoc/derive.py` (+2 dataclass fields on `EpisodeEdit`, defaults make it backward compatible): `new_task: str | None = None`, `hypothesis: str = "none stated"`. Declared here because the S1 constructors set them; `derive_version` starts using them in S2.
+- `scripts/verify_corruptions_s1.py` (new): in-memory invariant runner, eligibility over the 960 candidates, hash dump/check, figures.
+
+**Premises checked:**
+- P1/P2 (clean range ±0.9375 on dims 0-2, gripper exactly {-1,+1}) → `meta/stats.json` action min/max = ±0.9375 on dims 0-2, gripper ±1.0 (printed); gripper binarity re-asserted on every output → holds.
+- P7 (release geometry) → recomputed on the 960 candidates: final release in 907/960; carry span median 63, ≥40 in 95.7%, ≥30 in 97.5% → holds (plan's 944/1000 was over all 1000).
+- Catalog `language_instruction` strings equal `tasks.parquet` strings (20 = 20, asserted in the script) → holds.
+- RoboDrop App. A.1 quote ("zero-mean Gaussian noise with standard deviation 0.25σa", "shifts the action sequence by two seconds") → read from PDF p.13 via pypdf this session → holds, and it states no direction, tail fill, gripper handling or clipping.
+
+**Acceptance criteria:**
+- ✅ AC1.1: seven names as in the plan. Every label's `params` has `source` (spec quote and page), `parameters` (each `{value, basis, from}` with basis in quoted/measured/inferred), `corrupted_frames` ([start, end) child ranges), plus flat clip counts. Checked by `check_params` on all 118 × 7 outputs, 0 failures. Evidence: `.venv/bin/python scripts/verify_corruptions_s1.py --version v0 --per-type 100 --seed 0 ...` → `AC1.1 example label params` block (artifacts/s1_run1.txt), e.g. `detour ... corrupted_frames=[[51, 112]]`, `idle_padding ... [[51, 71], [86, 106]]`.
+- ✅ AC1.2: 118 candidate episodes (eligible for all seven types, seeded) per type, all outputs in [-1, 1] with gripper in {-1,+1} → `invariant_failures` = 0 for all seven rows (artifacts/s1_run1.txt, s1_invariants.json).
+- ✅ AC1.3: `action_noise` totals over 118 episodes: n_values 167,846, n_clipped 521 (frac_clipped 0.31% of all values), dims 0-2: 521 clipped = 0.72% of dims-0-2 values (inside the expected 0.5-1.5%), `n_beyond_clean_range` 1,215 = 1.69% of dims-0-2 values lie in (0.9375, 1]. The other six types record `n_clipped = 0`, `frac_beyond_clean_range = 0`, asserted per episode → 0 failures. Note: `frac_clipped_dims0_2` is the recorded fraction over the three translation dims; all clipped values are on dims 0-2 (n_clipped_dims0_2 == n_clipped).
+- ✅ AC1.4: lengths (T for five types, T+40 for `detour` and `idle_padding`), image identity (every output image of detour/idle_padding/dropped_frames is byte-identical to a parent image: sha256 frame digests), no consecutive identical frame pair in `detour`, swap targets from the parent's tasks, same suite and ≠ original, and only declared arrays change (dropped_frames leaves action and state bit-identical; noise changes only dims 0-5 of action; swap changes only the task string; gripper_release changes only gripper frames inside its declared range) → 0 failures on 118 episodes per type.
+- ❌ AC1.5 (second clause only): same (seed, episode_id) gives the same hash in two fresh processes for all seven types (✅, `AC1.5 same (seed, episode_id) ... {all True}` in artifacts/s1_run2_check_hashes.txt). A different seed (0 vs 1) changes the hash for: action_noise 118/118, dropped_frames 118/118, idle_padding 118/118, detour 112/118, instruction_swap 105/118, time_shift 0/118, gripper_release 0/118. Reasons: `time_shift` and `gripper_release` are deterministic by their parameters (40-step shift, 20-step release; no random draw exists), so no seed can change them; `detour` and `instruction_swap` draw from a finite set (window start; 9 alternative tasks), so chance collisions occur (13/118 ≈ the 1/9 expectation for swap). The plan's wording assumed a seed dependence for every type but swap. Fix if wanted: amend the AC to "same-seed determinism for all; seed-sensitivity for the five stochastic types", or give the two deterministic types a seeded parameter (not done: parameters are quoted/inferred as fixed in the plan).
+- ✅ AC1.6: eligibility over 960 candidates (all in 20 tasks, 2 suites): action_noise, time_shift, instruction_swap, dropped_frames, detour, idle_padding 960 each; gripper_release 884. Each type has ≥13 eligible in 20 tasks. Gripper_release 884 matches the P7 re-measurement (907 with a final release, 97.5% of those with carry ≥ 30 → expected ≈ 884). Evidence: `AC1.6 eligibility` table in artifacts/s1_run1.txt.
+- ✅ AC1.7: module docstring cites PoC §2.5 p.5, §8.10 p.17, §4.5 p.11, RoboDrop App. A.1 p.13 for the two types it defines, lists each inferred parameter, and states the dims-0-5 divergence from v1.
+
+**Demo artifacts produced:** `artifacts/s1_invariants.json` (all numbers), `artifacts/s1_run1.txt` (printed table, run 1 with the hash dump), `artifacts/s1_run2_check_hashes.txt` (second process), `artifacts/s1_traces.png` (seven panels), `artifacts/s1_filmstrip.png` (dropped_frames, detour, idle_padding, corrupted vs clean).
+
+**Notes / divergences from plan or spec:**
+- Detour window: 21 frames [t, t+20] inclusive; child order 0..t+19, t+20 down to t, t+1..t+20, t+21..; a naive "forward, backward t+19..t, forward" repeats the turn frame and creates consecutive duplicates, so the turn frames are not repeated. `corrupted_frames` = [t, t+61).
+- RNG key: `derive._episode_rng(seed, "<type>:<episode_id>")` (salted with the type so streams differ per type); the plan said "the existing generator", which it still is.
+- `EpisodeEdit.params` is completed by the transform at run time (corrupted frames, clip counts, draws depend on the episode). `derive_version` serialises it after its writer pass, so this works unchanged; a caller must run the transform before reading those keys.
+- `frac_clipped` is defined over all T×7 values; `frac_clipped_dims0_2` over the 3T translation values (that is the number comparable to the P3 estimate).
+- The sample for the in-memory test is 118 candidates eligible for all seven types (a seeded draw), covering 19 of 20 tasks.
