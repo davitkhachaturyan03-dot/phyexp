@@ -37,9 +37,14 @@ from pypdf import PdfReader
 r = PdfReader('docs/VLA_Data_Attribution_PoC.pdf')
 for i, pg in enumerate(r.pages):
     print(f'--- p{i+1} ---'); print(pg.extract_text())
-" > /tmp/poc.txt
-grep -n -i -C3 'censor\|ghost event' /tmp/poc.txt
+" > data/scratch/poc.txt
+grep -n -i -C3 'censor\|ghost event' data/scratch/poc.txt
 ```
+
+**Write scratch files inside the project, under `data/scratch/` (gitignored), never `/tmp`.** A write
+outside the project's working directory, including a shell redirect like `> /tmp/x.txt`, needs the owner's
+approval even when Bash is allowed; the redirect target is checked like a file edit (Claude Code
+permissions docs, "Redirections"). Writing under `data/scratch/` runs without a prompt.
 
 `pypdf` is installed in `.venv`. If reading fails, `.venv/bin/pip install pypdf` — don't
 proceed without the spec.
