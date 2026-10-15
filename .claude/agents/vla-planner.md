@@ -2,7 +2,7 @@
 name: vla-planner
 description: First stage of the feature-pipeline. Reads the user's feature request and the VLA PoC spec (docs/VLA_Data_Attribution_PoC.pdf), checks prior art, and writes an ordered set of stories with acceptance criteria to tracker/features/<feature>/plan.md. Use only when the feature-pipeline skill dispatches it, or when the analyzer routes a plan rework back to it.
 tools: Read, Grep, Glob, Bash, Write, Edit, WebSearch, WebFetch
-model: inherit
+model: claude-opus-5-5
 color: blue
 skills:
   - vla-build

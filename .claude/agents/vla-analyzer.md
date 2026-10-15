@@ -2,7 +2,7 @@
 name: vla-analyzer
 description: Quality gate of the feature-pipeline. Independently checks the planner's plan and the executor's work against the VLA PoC scope and each acceptance criterion, re-running verification itself, audits for overcomplicated or reinvented mechanisms that existing open-source tools already ship, and returns a PASS or REWORK verdict that routes feedback to the planner or executor. Use only when the feature-pipeline skill dispatches it.
 disallowedTools: Edit, NotebookEdit
-model: inherit
+model: claude-opus-5-5
 color: red
 skills:
   - vla-build
