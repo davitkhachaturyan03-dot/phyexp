@@ -95,3 +95,31 @@
 - Plan P7: over the 960 candidates 907 have a final release (the plan's 944 was over all 1000); 884 are eligible for `gripper_release` (carry ≥ 30).
 - `action_noise` clip: 0.72% of translation values clipped, but 1.69% of translation values end up in (0.9375, 1], a range clean data never has (S4 will recount on stored bytes). A noise-level detector on max |a| could use that; S5's heuristics should include it if the owner wants the clipped-range leak measured.
 - Not run in this batch: `verify_derive_s4.py --padding` (full-scale derivation) and `--v1` (7 GB transient load).
+
+## Round 1: 2026-10-15 / Batch 2 (S4-S6)
+
+### S4: Derive the full-scale injected version `v2` from v0
+**Files:**
+- `vlapoc/groundtruth.py` (+): `select_injection` (seeded, stratified), `build_edits`, `derive_injection`, `derive_injection_run` (MLflow `derive` stage run, tags `labels_sha256`), CLI `python -m vlapoc.groundtruth derive`. Grounding docstring: PoC §2.5 p.5, §10 p.20, §8.7 p.15, RoboDrop App. A.1 p.13, plan D2/D3.
+- `scripts/verify_injection_s4.py` (new): AC4.1-4.7 verifier that recomputes everything from stored bytes.
+- Committed first (`d0a0a14`), because the CLI refuses a dirty `vlapoc/`; the MLflow run records that commit (`vlapoc.git_dirty=false`).
+
+**Premises checked:** the selection constraints (13 per type over 13 distinct tasks, 4 or 5 per task, 6/7 suite split, no repeated type within a task) are satisfiable → dry run of `select_injection` before deriving (window offsets `[0, 3, 6, 9, 12, 15, 18]` over the suite-interleaved task order) → holds. Eligible counts over the 960 candidates: 960 for six types, 884 for `gripper_release`.
+
+**Run:** `HF_DATASETS_CACHE=$PWD/data/hf_datasets_cache .venv/bin/python -m vlapoc.groundtruth derive --parent v0 --name v2 --per-type 13 --seed 0` in the background, log `data/scratch/logs/gt_s4_derive.log` (copy of the JSON output: `artifacts/s4_derive_cli_output.txt`). No process left running.
+
+**Acceptance criteria** (`.venv/bin/python scripts/verify_injection_s4.py --version v2 --parent v0 --run-id fece666aea1b44a08c2ff1da315d5701`, output `artifacts/s4_run.txt`, numbers `artifacts/s4_verify.json`, table `artifacts/s4_allocation.csv`):
+- ✅ AC4.1: `v2` = `eaeed043455a...`, 1000 episodes, `labels.parquet` 91 rows, 13 per type for each of the 7 types; all in `v0/candidate`, 0 in `v0/reference`.
+- ✅ AC4.2: allocation table printed (artifacts/s4_run.txt). Each type spans 13 distinct tasks, suite split 6/7 or 7/6 for every type, corrupted per task {4, 5} (11 tasks with 5, 9 with 4), no type repeated within a task; 91/960 = 9.48% of candidates.
+- ✅ AC4.3: `check_blind(v2) = []`; `verify_version` ok (77 files); `v2/reference` 40 (same ids as v0's) and `v2/candidate` 960 inherited; the 40 reference content hashes equal v0's.
+- ✅ AC4.4: all 1000 episodes re-hashed from the stored bytes equal the episode table; the 909 unedited ones equal v0's, both in the table and in the stored bytes; the 91 labelled episodes read back with `read_stored_episode` hash to their label's `content_hash` (91/91); S1's range, gripper-binary, length, content and image-provenance invariants hold on the stored data (0 failing episodes).
+- ✅ AC4.5: the 13 `action_noise` labels: `n_values` 16,912; `n_clipped` 65 (0.38% of all values, 0.90% of dims-0-2 values); `n_beyond_clean_range` 139 (1.92% of dims-0-2 values). A recount from the stored bytes gives the same: values exactly ±1 on dims 0-2 = 65 (clean data has none: clean max 0.9375) and values with 0.9375 < |a| ≤ 1 = 139; the same count in the parents' episodes is 0.
+- ✅ AC4.6: `du -sh data/lerobot/libero_spatial_10__v2` = 7.3G; free disk 92 GiB before, 83 GiB after (floor 20); `timing_s` guards 2.5 / write 532.7 / hash+blind check 18.1 / total 555.4 s; MLflow derive run `fece666aea1b44a08c2ff1da315d5701`.
+- ✅ AC4.7: `trace(fece666a...)` visits 3 runs (build, derive, split), reaches the v0 version entity and lists 20 raw files; the run's tag `labels_sha256` (`1505920498116c77...`) equals `derivation.json`.
+
+**Demo artifacts produced:** `artifacts/s4_run.txt`, `artifacts/s4_verify.json`, `artifacts/s4_allocation.csv`, `artifacts/s4_filmstrip.png` (one stored episode per type), `artifacts/s4_derive_cli_output.txt`.
+
+**Notes / divergences from plan or spec:**
+- The real `data/lineage/mlflow.db` changed as the AC requires (one `derive` run); sha256 before `7845d8d7...`, after `801a09ac...`. The lineage store also gained v2's version record, three subsets and a split under `data/lineage/` (labels and parents are lineage-only files there).
+- Gripper-release (R10): 2 of the 13 selected episodes have their final release before 0.8T.
+- The v2 copy is the one full-scale derived version of the feature; nothing else was derived at scale in this batch.

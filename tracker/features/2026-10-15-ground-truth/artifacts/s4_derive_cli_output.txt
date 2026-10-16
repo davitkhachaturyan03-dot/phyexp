@@ -1,0 +1,30 @@
+2026/10/15 18:31:10 INFO mlflow.agent.hint: Load the `instrumenting-with-mlflow-tracing` skill at /Users/davit_khachaturyan/Projects/personal/vlaExp/.venv/lib/python3.14/site-packages/mlflow/assistant/skills/instrumenting-with-mlflow-tracing/SKILL.md before writing any tracing code; it ships with this MLflow install. Set MLFLOW_DISABLE_AGENT_HINT=1 to silence this.
+{
+ "derive_run_id": "fece666aea1b44a08c2ff1da315d5701",
+ "dataset_version_id": "eaeed043455ad54efca38bc1bade20e3046f6e4418255cd3f4c8157af324bd6e",
+ "name": "v2",
+ "lerobot_root": "data/lerobot/libero_spatial_10__v2",
+ "parent_version_id": "3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7",
+ "n_edits": 91,
+ "n_episodes": 1000,
+ "n_frames": 201380,
+ "labels": "data/lineage/versions/eaeed043455ad54efca38bc1bade20e3046f6e4418255cd3f4c8157af324bd6e/labels.parquet",
+ "labels_sha256": "1505920498116c77bae056b3000ef3ac1643a4801dc9f695cd4f81b183386d8f",
+ "inherited_splits": [
+  {
+   "split_id": "b011ec703451f7ea2c0d2d16bf10f6ddc4c50a47dbab07dcce89ee7868efdaf5",
+   "reference": 40,
+   "candidate": 960
+  }
+ ],
+ "mechanism": "one LeRobotDataset writer pass in parent episode order (episode_index preserved)",
+ "blind_offending": [],
+ "timing_s": {
+  "guards": 2.5,
+  "write": 532.7,
+  "hash_and_blind_check": 18.1,
+  "total": 555.4
+ },
+ "selection_rule": "13 episodes per type over 7 types from v0/candidate (960): cyclic windows of 13 tasks over a suite-interleaved, seeded task order (window offsets [0, 3, 6, 9, 12, 15, 18]); within a cell a seeded draw among eligible unused candidates; numpy.random.default_rng(0)",
+ "fraction": 0.09479166666666666
+}

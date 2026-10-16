@@ -1,0 +1,109 @@
+{
+  "AC4.1": {
+    "episodes": 1000,
+    "labels": 91,
+    "per_type": {
+      "gripper_release": 13,
+      "action_noise": 13,
+      "time_shift": 13,
+      "instruction_swap": 13,
+      "dropped_frames": 13,
+      "idle_padding": 13,
+      "detour": 13
+    },
+    "in_candidate": true,
+    "in_reference": 0,
+    "pass": true
+  },
+  "AC4.2": {
+    "tasks_per_type": {
+      "action_noise": 13,
+      "detour": 13,
+      "dropped_frames": 13,
+      "gripper_release": 13,
+      "idle_padding": 13,
+      "instruction_swap": 13,
+      "time_shift": 13
+    },
+    "suite_split": {
+      "action_noise": [
+        6,
+        7
+      ],
+      "detour": [
+        6,
+        7
+      ],
+      "dropped_frames": [
+        6,
+        7
+      ],
+      "gripper_release": [
+        6,
+        7
+      ],
+      "idle_padding": [
+        6,
+        7
+      ],
+      "instruction_swap": [
+        6,
+        7
+      ],
+      "time_shift": [
+        6,
+        7
+      ]
+    },
+    "per_task": [
+      4,
+      5
+    ],
+    "no_repeat": true,
+    "fraction": 0.09479166666666666,
+    "pass": true
+  },
+  "AC4.3": {
+    "check_blind": [],
+    "verify_ok": true,
+    "ref": 40,
+    "cand": 960,
+    "ref_hashes_equal_parent": true,
+    "pass": true
+  },
+  "AC4.4": {
+    "table_matches_bytes": true,
+    "unedited_n": 909,
+    "unedited_equal_parent": true,
+    "stored_unedited_equal_parent": true,
+    "labelled_hash_ok": 91,
+    "invariant_failures": {},
+    "pass": true
+  },
+  "AC4.5": {
+    "labels": {
+      "n_clipped": 65,
+      "n_clipped_dims0_2": 65,
+      "n_beyond_clean_range": 139,
+      "n_values": 16912
+    },
+    "frac_clipped_dims0_2": 0.008967991169977926,
+    "frac_beyond": 0.019177704194260486,
+    "recount_clipped": 65,
+    "recount_beyond": 139,
+    "parent_beyond": 0,
+    "pass": true
+  },
+  "AC4.6": {
+    "du": "7.3G"
+  },
+  "AC4.7": {
+    "run_id": "fece666aea1b44a08c2ff1da315d5701",
+    "reached_parent": true,
+    "raw_files": 20,
+    "labels_sha256_tag": "1505920498116c77bae056b3000ef3ac1643a4801dc9f695cd4f81b183386d8f",
+    "git": "d0a0a14d03b38815f0d421ad16200ce09536d288",
+    "pass": true
+  },
+  "pass": true
+}
