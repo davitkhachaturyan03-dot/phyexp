@@ -1,0 +1,88 @@
+{
+  "AC6.1": {
+    "worst_abs_diff": 2.6997765134595397e-10,
+    "digest_v0_candidate": "2c62ec3fec3e078ff8742d3b2f7ea73817ce5b2504c5fff816513f6f3cf15056",
+    "digest_v2_candidate": "b2909c4995bec76d5eeb34fbe8f68c9ae01468505c418e0d2792bfd35c596965",
+    "pass": true
+  },
+  "AC6.2": {
+    "run_id": "a9986f2d670e4c2ebc06c434b9969911",
+    "seconds": 18.5,
+    "subset_id": "c571a43ed5ee7b87d584cc553dd1344395102aedb72fe9873a72df7091a4ecbc",
+    "types": [
+      "action_noise",
+      "detour",
+      "dropped_frames",
+      "gripper_release",
+      "idle_padding",
+      "instruction_swap",
+      "time_shift"
+    ],
+    "tag_subset_stats_sha256": "c60d2183e24e139afd801b547b30ee79cc5845c47c41c021d93a2540c849b255",
+    "normalizer_rows": [
+      {
+        "file": "rmalizer_processor.safetensors",
+        "stat": "observation.state.mean",
+        "max_abs_vs_subset": 5.680442649591555e-08,
+        "max_abs_vs_full_v2_stats_json": 0.8105294757616088
+      },
+      {
+        "file": "rmalizer_processor.safetensors",
+        "stat": "observation.state.std",
+        "max_abs_vs_subset": 3.159206518610347e-08,
+        "max_abs_vs_full_v2_stats_json": 0.4978991562323263
+      },
+      {
+        "file": "rmalizer_processor.safetensors",
+        "stat": "action.mean",
+        "max_abs_vs_subset": 5.812952980077668e-09,
+        "max_abs_vs_full_v2_stats_json": 0.09819606728284228
+      },
+      {
+        "file": "rmalizer_processor.safetensors",
+        "stat": "action.std",
+        "max_abs_vs_subset": 2.9461349027037897e-08,
+        "max_abs_vs_full_v2_stats_json": 0.04356748262784993
+      },
+      {
+        "file": "rmalizer_processor.safetensors",
+        "stat": "observation.state.mean",
+        "max_abs_vs_subset": 5.680442649591555e-08,
+        "max_abs_vs_full_v2_stats_json": 0.8105294757616088
+      },
+      {
+        "file": "rmalizer_processor.safetensors",
+        "stat": "observation.state.std",
+        "max_abs_vs_subset": 3.159206518610347e-08,
+        "max_abs_vs_full_v2_stats_json": 0.4978991562323263
+      },
+      {
+        "file": "rmalizer_processor.safetensors",
+        "stat": "action.mean",
+        "max_abs_vs_subset": 5.812952980077668e-09,
+        "max_abs_vs_full_v2_stats_json": 0.09819606728284228
+      },
+      {
+        "file": "rmalizer_processor.safetensors",
+        "stat": "action.std",
+        "max_abs_vs_subset": 2.9461349027037897e-08,
+        "max_abs_vs_full_v2_stats_json": 0.04356748262784993
+      }
+    ],
+    "pass": true,
+    "weights_sha256": "40f0f7ada0523f5207893830f040394b51ec0c7958a0af97a96d0cd42278b378"
+  },
+  "AC6.3": {
+    "tasks_equal": true,
+    "human_reference_digest_before": "68c888b1930d66de72615f54c2118f5b59003600083b49d6afeff86cbfc0f1a2",
+    "after": "68c888b1930d66de72615f54c2118f5b59003600083b49d6afeff86cbfc0f1a2",
+    "human_reference_newest_mtime_before_feature_start": true,
+    "pass": true
+  },
+  "real_store": {
+    "mlflow_db_unchanged": true,
+    "subsets_before": 12,
+    "subsets_after": 12
+  },
+  "pass": true
+}

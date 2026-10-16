@@ -165,3 +165,32 @@
 - The score tables themselves are under `data/eval/groundtruth/heuristics/` (not in git, per the repo rule).
 - The real `mlflow.db` changed as the ACs require: 6 `screen` runs and 6 `score` runs (plus the S4 derive run); sha256 after S5 is `see S6 entry` below.
 - `smoothness` AUROC for `time_shift` is 0.337 (< 0.5) because the zero tail lowers the mean step change; I report it as scored, not flipped.
+
+### S6: Prove v2 is trainable and evaluable locally, and write the server runbook
+**Files:**
+- `scripts/verify_consumers_s6.py` (new): per-subset stats checks, the SmolVLA smoke on a scratch label-side subset, the task-string and human-reference checks, and a before/after check of the real store.
+- `tracker/features/2026-10-15-ground-truth/artifacts/server-runbook.md` (new). **It is a ground-truth runbook in this feature's `artifacts/`; I did not edit the evaluation feature's `server-runbook.md`** (it reuses that file's environment section and AC8.5 / AC5.8 / AC6.7 commands by reference).
+
+**Premises checked:** `data/hf_models/smolvla_base` and `data/hf_home` exist (the evaluation S8 configuration needs them) → holds, so the ACT fallback was not needed. The evaluation feature's human-reference files were last modified 2026-10-07, before this feature started → holds.
+
+**Acceptance criteria** (`.venv/bin/python scripts/verify_consumers_s6.py`, output `artifacts/s6_run.txt`, `artifacts/s6_verify.json`; 33 s):
+- ✅ AC6.1: `python -m vlapoc.subset_stats --check v2` → aggregate_stats over all 1000 episodes equals v2's `stats.json`, worst max |diff| 2.70e-10 (tolerance 1e-6; action mean 1.1e-16, std 2.1e-10). `v2/candidate` stats digest `b2909c49...` differs from `v0/candidate`'s `2c62ec3f...`. Per-dim action mean/std of v2/candidate vs v0/candidate are in `artifacts/s6_action_stats_v2_vs_v0.csv`: the std ratio is 0.9973-1.0000 (largest shift: dim 0 mean -0.0012, std x0.9973), i.e. the injection moves the normalization by under 0.3%.
+- ✅ AC6.2: SmolVLA 2-step fine-tune from `smolvla_base` on MPS (`policy_overrides load_vlm_weights=False`, batch 2, seed 0, tagged smoke) on a 14-episode subset of v2 holding one labelled episode of each of the seven types plus seven clean candidates from distinct tasks. The subset was built label-side in a **scratch** lineage copy (`data/scratch/gt_s6/lineage`, op `gt_smoke_subset`, `groundtruth: true`); `data/lineage/subsets` has 12 files before and after. The run finished in 18.5 s with `episodes_match` true; tag `train.subset_stats.sha256` `c60d2183e24e139a...` equals the recomputed digest, and the saved normalizer and unnormalizer mean/std equal the subset stats (max |diff| ≤ 5.7e-8) while differing from v2's full `stats.json` (up to 0.81 for state mean). Scratch run id `a9986f2d670e...` lives in the scratch MLflow DB, deleted afterwards. The scratch dir (lineage copy, HF cache, 1.2 GB checkpoint) was removed.
+- ✅ AC6.3: v2's 20 task strings (task_index to string) equal v0's. The `data/eval/human_reference/` tree digest is `68c888b1930d66de...` before and after the script; its files were last modified 2026-10-07, before this feature began, so the HRT anchor is still the 1000 v0 originals.
+- ✅ AC6.4: `artifacts/server-runbook.md` lists GT-R1 to GT-R6, each with command, inputs (version and subset ids), outputs, disk estimate (labelled inferred or measured) and order; GT-R1-GT-R5 are pending server, GT-R6 pending later features. Checked by reading it against the AC's list.
+- ✅ AC6.5: the runbook ("What cannot be shown here") states that LIBERO has no ghost-event rule (evaluation brief decision 6), so the gripper-release "drops" hypothesis can only appear as success, F(tau) or timeouts.
+
+**Demo artifacts produced:** `artifacts/s6_run.txt`, `artifacts/s6_verify.json`, `artifacts/s6_action_stats_v2_vs_v0.csv`, `artifacts/server-runbook.md`.
+
+**Notes / divergences from plan or spec:**
+- AC6.2's run is tagged `smoke` (the name contains "smoke"), as `train_run` requires for smoke runs, and it never entered the real MLflow store.
+- Real store: `data/lineage/mlflow.db` sha256 was `ecd5b4b4...` before and after S6 (it already included the S4/S5 runs); the batch as a whole changed it from `7845d8d7...` (batch-1 end) to `ecd5b4b4...`, through 1 derive run (S4) plus 6 screen and 6 score runs (S5), as those ACs require.
+- `train_run` and the eval path do not go through `open_for_method`. That is intended for the injected training arm (runbook says so) but means the loader's protection covers methods only, not trainers; a trainer given `v1/candidate` would still run.
+
+### Findings for the analyzer (batch 2)
+- Five of seven corruption types are found with AUROC 1.0 by a single one-line statistic on stored data (noise by roughness, time shift and idle padding by idle steps, dropped and idle frames by duplicate-frame count, swaps by the instruction vs `task_name` cross-check); `gripper_release` is at chance for all six heuristics and `detour` is weak (best AUROC 0.73). Recovery on the pooled set therefore overstates how hard the benchmark is for a real method.
+- The H5/H6 findability is a property of how the corruptions are built (exact duplicates, true provenance, plan D1/P4), not of the loader. Both are measured; fixing them needs re-rendering or opaque keys (out of scope).
+- `action_noise` leaves 1.92% of translation values in (0.9375, 1], a range clean data never has (measured, S4). A `max |a|` statistic would likely separate it; it was not among H1-H6 and was not added.
+- `EpisodeEdit.params` is completed by the transform at run time (S1 note); the labels written by `derive_version` are therefore only complete after the writer pass.
+- Open from the plan, unchanged: clip bound [-1, 1] and swap provenance (D1) kept as defaults.
+- Disk after the batch: 83 GiB free; v2 copy 7.3 GB; real `data/lineage` grew by v2's version record, three subsets, a split and 13 runs.
