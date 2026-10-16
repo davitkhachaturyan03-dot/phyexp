@@ -123,3 +123,45 @@
 - The real `data/lineage/mlflow.db` changed as the AC requires (one `derive` run); sha256 before `7845d8d7...`, after `801a09ac...`. The lineage store also gained v2's version record, three subsets and a split under `data/lineage/` (labels and parents are lineage-only files there).
 - Gripper-release (R10): 2 of the 13 selected episodes have their final release before 0.8T.
 - The v2 copy is the one full-scale derived version of the feature; nothing else was derived at scale in this batch.
+
+### S5: Score recovery on the ground-truth side and run the heuristic baselines through the loader
+**Files:**
+- `vlapoc/groundtruth.py` (+): `recovery_metrics`, `score_recovery` (key check via `lineage.check_score_keys`), `leak_check`, `score_run` (MLflow `score` stage), CLI `python -m vlapoc.groundtruth score --version ... --scores ... --column ...`. Grounding docstrings: PoC §2.1 item 4 p.3, §2.5 p.5, RoboDrop §5.1 p.7 and Table 7 (oracle); the tie rule is stated as inferred.
+- `vlapoc/methods/heuristics.py` (new): H1-H6; reads only through `open_for_method`; records one `screen` stage run per heuristic.
+- `vlapoc/lineage.py`: `_check_score_keys` made public as `check_score_keys` (old name kept as an alias).
+- `vlapoc/runs.py`: `score` added to `STAGES`.
+- `scripts/verify_recovery_s5.py`, `scripts/s5_recovery_table.py` (new).
+
+**Premises checked:** sklearn 1.9.1 is installed (`roc_auc_score`, `roc_curve`, `average_precision_score` import fine) → holds. `smoothness` direction: `catalog.py` line 56 "lower is smoother", so a high value is the suspicious one → used a priori. Directions for all six heuristics were fixed in the module docstring before scoring ("high = more suspicious"); nothing was tuned afterwards.
+
+**Acceptance criteria:**
+- ✅ AC5.1: `.venv/bin/python scripts/verify_recovery_s5.py` → 26 of 26 comparisons equal hand-computed values: perfect ranker (recall@k 1, precision@k 1, AUROC 1, AP 1, balanced accuracy 1), the same ranking given as `direction="lowest"`, reversed ranker (recall 0, AUROC 0, AP (1/9 + 2/10)/2 = 0.155556, balanced accuracy 0.5), constant score (recall@2 = 0.2 and recall@4 = 0.4 = k/n, AUROC 0.5, AP 0.2), 3-tie (recall@2 = 2/3, recall@4 = 1, AUROC 7/8, balanced accuracy 0.75, AP 0.75). Derivations are in the script's comments. Output `artifacts/s5_verify_run.txt`.
+- ✅ AC5.2: per type (13 injected vs 869 clean, n = 882) and pooled (91 vs 869, n = 960), each with `random_recall_at_npos` (13/882 = 0.0147 per type; 0.0948 pooled), `random_auroc` 0.5 and n. Sanity check on 200 seeded random rankers: mean pooled AUROC 0.4987, mean recall@k 0.0931 (expected 0.0948).
+- ✅ AC5.3: a v0-keyed table (same episode_ids, v0 hashes; 91 of 960 hashes differ) → `LineageError: score table keys != parent subset's episode versions: 91 unknown/stale ...`; a table missing one candidate → `LineageError ... 1 unscored`.
+- ✅ AC5.4: `.venv/bin/python -m vlapoc.methods.heuristics --subset v2/candidate --out data/eval/groundtruth/heuristics/` (90 s), then `python -m vlapoc.groundtruth score --version v2 --scores <h>.parquet --column <h> --out ...` for each of the six; table assembled by `scripts/s5_recovery_table.py` into `artifacts/s5_recovery_heuristics.csv` (and `s5_recovery_table.txt`; per-heuristic JSON in `artifacts/s5_recovery_json/`). No expected values were set. Results, AUROC (recall@k, k = 13 per type; pooled k = 91):
+
+  | heuristic | action_noise | time_shift | instruction_swap | dropped_frames | detour | idle_padding | gripper_release | pooled |
+  |---|---|---|---|---|---|---|---|---|
+  | H1 length_steps | 0.446 | 0.527 | 0.537 | 0.476 | 0.730 | 0.681 | 0.479 | 0.554 |
+  | H2 idle_steps | 0.445 | **1.000** | 0.485 | 0.520 | 0.445 | **1.000** | 0.481 | 0.625 |
+  | H3 gripper_toggles | 0.445 | 0.400 | 0.495 | 0.481 | 0.584 | 0.654 | 0.505 | 0.509 |
+  | H4 smoothness | **1.000** | 0.337 | 0.512 | 0.508 | 0.543 | 0.502 | 0.449 | 0.550 |
+  | H5 duplicate_frame_pairs | 0.500 | 0.500 | 0.500 | **1.000** | 0.500 | **1.000** | 0.500 | 0.643 |
+  | H6 instruction_mismatch | 0.500 | 0.500 | **1.000** | 0.500 | 0.500 | 0.500 | 0.500 | 0.571 |
+
+  Recall@13 is 1.000 in exactly those bold cells and at or near the random 0.015 elsewhere (largest other values: detour 0.105 by H3, 0.077 by H1/H4). Pooled recall@91: H5 0.335, H2 0.308, H4 0.220, H6 0.213, H1 0.143, H3 0.125 (random 0.095).
+  **What this says (measured, not set in advance):**
+  - Findable by a trivial heuristic (AUROC 1.0): `action_noise` (roughness H4, because clipped-noise raises the step change), `time_shift` (the 40-step zero tail is idle, H2; H4 is *below* 0.5, so the opposite direction would also separate it), `idle_padding` (H2 and H5, because pauses repeat frames and zero the arm), `dropped_frames` (H5, because a held frame is an exact duplicate; clean data has none), and `instruction_swap` (H6, the instruction vs `task_name` cross-check; plan design D1 predicted this).
+  - Not found by these six: `gripper_release` (best AUROC 0.505, no heuristic above chance) and `detour` (best 0.730 by length, recall 0.077, a weak signal because it adds 40 frames without changing the other statistics).
+  - Consequence for later features: five of the seven types are saturated by one-line statistics, so a screening method's recovery number is only informative on `gripper_release` and `detour` and on the pooled score minus those five. A gradient-based method should be compared against these baselines per type, not pooled only.
+  - H5 and H6 are also leaks of the *construction*, not of the loader: a held or paused frame is an exact duplicate (P4) and a swap leaves `task_name`/`episode_id` true (D1). They are measured here, not removed.
+- ✅ AC5.5: leak check (ground-truth side, ranking by `episode_index`): v1 recall@100 = 1.000 (AUROC 1.000, random 0.104); v2 recall@91 = 0.099 (AUROC 0.505, random 0.095). Output in `artifacts/s5_verify_run.txt`.
+- ✅ AC5.6: each of the six scoring calls is an MLflow `score` run (ids in `artifacts/s5_score_runs.txt`) whose tags include `score_table_digest`, `scored_version_id` (v2 `eaeed043455a...`) and `labels_sha256` (`150592049811...`), with `vlapoc.git_dirty=false`. `lineage trace` on each reaches v2 and its producing `screen` run (5 runs: score, screen, derive, build, split). Output `artifacts/s5_trace_check.txt`.
+- ✅ AC5.7: docstrings of `groundtruth.py` (scoring section) and `heuristics.py` cite PoC §2.1 item 4 p.3, §2.5 p.5, §5 p.11-12, §2.2 p.4, RoboDrop §5.1 p.7 and Table 7; the tie rule is marked inferred.
+
+**Demo artifacts produced:** `artifacts/s5_recovery_heuristics.csv`, `artifacts/s5_recovery_table.txt`, `artifacts/s5_recovery_json/`, `artifacts/s5_verify_run.txt`/`s5_verify.json`, `artifacts/s5_score_runs.txt`, `artifacts/s5_trace_check.txt`, `artifacts/s5_boundary_rescan.txt` (the S3 static scan re-run with `heuristics.py` present: no violations).
+
+**Notes / divergences from plan or spec:**
+- The score tables themselves are under `data/eval/groundtruth/heuristics/` (not in git, per the repo rule).
+- The real `mlflow.db` changed as the ACs require: 6 `screen` runs and 6 `score` runs (plus the S4 derive run); sha256 after S5 is `see S6 entry` below.
+- `smoothness` AUROC for `time_shift` is 0.337 (< 0.5) because the zero tail lowers the mean step change; I report it as scored, not flipped.
