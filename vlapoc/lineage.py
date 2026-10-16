@@ -515,7 +515,7 @@ def score_table_digest(score_table: pd.DataFrame, metric: str) -> str:
     return sha256_json({"metric": metric, "rows": rows})
 
 
-def _check_score_keys(parent: Subset, score_table: pd.DataFrame, metric: str, lineage_root: Path | None) -> None:
+def check_score_keys(parent: Subset, score_table: pd.DataFrame, metric: str, lineage_root: Path | None) -> None:
     """Raise unless the score table keys exactly the parent's (episode_id, content_hash) pairs, once each,
     with no NaN in ``metric``: no stale hashes, no unscored parent episodes, no extras."""
     for c in ("episode_id", "content_hash", metric):
@@ -535,6 +535,9 @@ def _check_score_keys(parent: Subset, score_table: pd.DataFrame, metric: str, li
             f"score table keys != parent subset's episode versions: {len(have - want)} unknown/stale "
             f"(e.g. {stale}), {len(want - have)} unscored (e.g. {missing})"
         )
+
+
+_check_score_keys = check_score_keys  # the original private name, kept for existing callers
 
 
 def drop_top_k(

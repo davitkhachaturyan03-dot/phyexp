@@ -38,7 +38,15 @@ from vlapoc import corruptions as C
 from vlapoc.catalog import read_episodes_meta
 from vlapoc.derive import derive_version, load_labels
 from vlapoc.libero_convert import REPO_ROOT
-from vlapoc.lineage import LineageError, Subset, parent_hashes, resolve_version, version_episodes
+from vlapoc.lineage import (
+    LineageError,
+    Subset,
+    check_score_keys,
+    parent_hashes,
+    resolve_version,
+    score_table_digest,
+    version_episodes,
+)
 
 
 def load_answer_key(version: str, lineage_root: Path | None = None) -> pd.DataFrame:
@@ -213,8 +221,157 @@ def derive_injection_run(parent: str = "v0", name: str = "v2", per_type: int = 1
         return r.run_id, out
 
 
+# ---------------------------------------------------------------------------------------------
+# recovery scoring (S5)
+# ---------------------------------------------------------------------------------------------
+# Grounding: PoC §2.1 item 4 (p. 3) "the method recovered 90% of the injected bad episodes" and §2.5 (p. 5)
+# "measure how many the method ranks near the top": the headline number is recall at k = the number of injected
+# episodes, i.e. the share of injected episodes inside the method's top-k. RoboDrop §5.1 (p. 6-7): "We then assess
+# how well these scores separate reliable from unreliable episodes using AUROC and best balanced accuracy", with
+# Table 7's "Oracle" (removes exactly the corrupted episodes; p. 14) as the upper bound, run on the server (S6).
+# Precision@k and average precision are additions (standard retrieval measures, sklearn).
+
+
+def recovery_metrics(scores, y, direction: str = "highest") -> dict:
+    """Ranking metrics of ``scores`` against 0/1 labels ``y`` (1 = injected).
+
+    ``direction="highest"``: a high score means "more likely corrupted"; ``"lowest"`` the reverse. Returns ``n``,
+    ``n_pos``, ``recall_at_npos`` and ``recall_at_2npos`` (k = n_pos and 2 n_pos), ``precision_at_npos``,
+    ``precision_at_2npos``, ``auroc`` (sklearn ``roc_auc_score``, ties count one half), ``best_balanced_accuracy``
+    (max over ``roc_curve`` thresholds of (TPR + TNR) / 2, RoboDrop §5.1), ``average_precision`` (sklearn), and the
+    random ranker's expectations (``random_recall_at_npos`` = k / n, ``random_auroc`` = 0.5).
+
+    Tie rule (inferred; the PoC and RoboDrop state none): tied scores are ranked in random order, so the expected
+    number of positives among the top k counts a tie group that straddles the boundary fractionally
+    (positives in the group x remaining slots / group size). A constant score then gives recall@k = k / n.
+    """
+    from sklearn.metrics import average_precision_score, roc_auc_score, roc_curve
+
+    s = np.asarray(scores, dtype=float)
+    y = np.asarray(y, dtype=int)
+    if direction not in ("highest", "lowest"):
+        raise ValueError("direction must be 'highest' or 'lowest'")
+    if np.isnan(s).any():
+        raise ValueError("NaN in scores")
+    s = s if direction == "highest" else -s
+    n, npos = len(s), int(y.sum())
+    if npos == 0 or npos == n:
+        raise ValueError("need both positives and negatives")
+
+    def exp_pos_top(k: int) -> float:
+        vals = np.unique(s)[::-1]
+        taken, got = 0, 0.0
+        for v in vals:
+            grp = s == v
+            g, gp = int(grp.sum()), int(y[grp].sum())
+            if taken + g <= k:
+                got += gp
+                taken += g
+            else:
+                got += gp * (k - taken) / g
+                break
+            if taken == k:
+                break
+        return got
+
+    fpr, tpr, _ = roc_curve(y, s)
+    out = {"n": n, "n_pos": npos}
+    for tag, k in (("npos", npos), ("2npos", min(2 * npos, n))):
+        e = exp_pos_top(k)
+        out[f"recall_at_{tag}"] = e / npos
+        out[f"precision_at_{tag}"] = e / k
+        out[f"random_recall_at_{tag}"] = k / n
+    out["auroc"] = float(roc_auc_score(y, s))
+    out["best_balanced_accuracy"] = float(((tpr + 1 - fpr) / 2).max())
+    out["average_precision"] = float(average_precision_score(y, s))
+    out["random_auroc"] = 0.5
+    out["random_average_precision"] = npos / n
+    return out
+
+
+def score_recovery(version: str, score_table: pd.DataFrame, column: str, direction: str = "highest",
+                   subset: str = "candidate", lineage_root: Path | None = None) -> dict:
+    """Score a method's ranking of ``<version>/<subset>`` against the version's answer key.
+
+    ``score_table`` must key exactly the subset's (``episode_id``, ``content_hash``) pairs, once each, with no NaN in
+    ``column`` (``lineage.check_score_keys``): a table computed on another version's hashes (v0's) is rejected, so
+    is a table with a missing or extra episode. Returns ``{"pooled": metrics, "per_type": {type: metrics}, ...}``.
+    Pooled: every labelled episode in the subset vs the unlabelled ones. Per type (RoboDrop's one-type-vs-clean
+    setting): that type's labelled episodes vs the same unlabelled episodes; other types' episodes are left out.
+    Also returns the score-table digest (``lineage.score_table_digest``), the version id and the labels' sha256.
+    Ground-truth side only.
+    """
+    v = resolve_version(version, lineage_root)
+    sub = Subset.load(f"{v['name']}/{subset}", lineage_root)
+    check_score_keys(sub, score_table, column, lineage_root)
+    labels = load_answer_key(version, lineage_root)
+    lt = dict(zip(labels["episode_id"], labels["corruption_type"]))
+    t = score_table.drop_duplicates("episode_id").set_index("episode_id")[column]
+    ids = list(sub.episode_ids)
+    typ = np.array([lt.get(i, "") for i in ids])
+    sc = t.loc[ids].to_numpy(dtype=float)
+    pooled = recovery_metrics(sc, (typ != "").astype(int), direction)
+    per_type = {}
+    for ty in sorted(set(labels["corruption_type"])):
+        m = (typ == ty) | (typ == "")
+        per_type[ty] = recovery_metrics(sc[m], (typ[m] == ty).astype(int), direction)
+    derivation = json.loads((_vdir(version, lineage_root) / "derivation.json").read_text())
+    return {"version": version, "version_id": v["dataset_version_id"], "subset": f"{v['name']}/{subset}", "column": column,
+            "direction": direction, "score_table_digest": score_table_digest(score_table, column),
+            "labels_sha256": derivation["labels_sha256"], "pooled": pooled, "per_type": per_type,
+            "tie_rule": "tied scores in random order (fractional counting at the k boundary; inferred)"}
+
+
+def _vdir(version: str, lineage_root: Path | None) -> Path:
+    from vlapoc.lineage import _root
+
+    return _root(lineage_root) / "versions" / resolve_version(version, lineage_root)["dataset_version_id"]
+
+
+def leak_check(version: str, lineage_root: Path | None = None) -> dict:
+    """Positional-leak demonstration (ground-truth side; "leak check, not a method"): rank the version's candidates by
+    ``episode_index`` (high index = suspicious) and score that ranking against the version's labels.
+
+    On v1 the edited episodes are ``episode_index`` 900-999 (``fence.json``), so recall@100 is 1.0; on a version that
+    keeps parent order the ranking is no better than chance. Reads the episode table directly, never through
+    ``open_for_method`` (v1 would be refused: that is the point).
+    """
+    v = resolve_version(version, lineage_root)
+    sub = Subset.load(f"{v['name']}/candidate", lineage_root)
+    t = sub.episodes(lineage_root)[["episode_id", "content_hash", "episode_index"]]
+    return score_recovery(version, t, "episode_index", "highest", "candidate", lineage_root)
+
+
+def score_run(version: str, score_path: Path, column: str, direction: str = "highest", subset: str = "candidate",
+              out_dir: Path | None = None, name: str | None = None, lineage_root: Path | None = None,
+              chain: str | None = None, extra_params: dict | None = None) -> tuple[str, dict]:
+    """Stage ``score`` (MLflow): ``score_recovery`` for a stored score table, recorded as a run that consumes the
+    version and the score table (entity = its digest, so ``lineage trace`` also reaches the screening run that
+    produced it) and tags the digest, the version id and ``labels_sha256``. Returns ``(run_id, result)``."""
+    import mlflow
+
+    from vlapoc.runs import stage_run
+
+    table = pd.read_parquet(score_path)
+    res = score_recovery(version, table, column, direction, subset, lineage_root)
+    out_dir = Path(out_dir) if out_dir else Path(score_path).parent
+    out_dir.mkdir(parents=True, exist_ok=True)
+    rpath = out_dir / f"recovery_{Path(score_path).stem}.json"
+    rpath.write_text(json.dumps(res, indent=2))
+    with stage_run("score", name or f"score-{Path(score_path).stem}", lineage_root, chain=chain) as r:
+        r.input_version(res["version_id"], "scored_version")
+        r.input_entity("score_table", res["score_table_digest"], "scores")
+        r.params({"column": column, "direction": direction, "subset": res["subset"], "n_candidates": res["pooled"]["n"],
+                  "n_injected": res["pooled"]["n_pos"], **(extra_params or {})})
+        r.tags({"score_table_digest": res["score_table_digest"], "scored_version_id": res["version_id"],
+                "labels_sha256": res["labels_sha256"]})
+        mlflow.log_metrics({f"pooled.{k}": float(v) for k, v in res["pooled"].items() if isinstance(v, (int, float))})
+        r.output_file("recovery", rpath, kind="file")
+        return r.run_id, res
+
+
 def main(argv: list[str] | None = None) -> int:
-    """CLI: ``derive`` (S4)."""
+    """CLI: ``derive`` (S4), ``score`` (S5)."""
     ap = argparse.ArgumentParser(prog="python -m vlapoc.groundtruth")
     sub = ap.add_subparsers(dest="cmd", required=True)
     d = sub.add_parser("derive", help="derive the injected version (all seven types) from a parent")
@@ -223,7 +380,21 @@ def main(argv: list[str] | None = None) -> int:
     d.add_argument("--per-type", type=int, default=13)
     d.add_argument("--seed", type=int, default=0)
     d.add_argument("--no-track", action="store_true", help="skip the MLflow run")
+    sc = sub.add_parser("score", help="score a method's score table against a version's answer key")
+    sc.add_argument("--version", required=True)
+    sc.add_argument("--scores", type=Path, required=True)
+    sc.add_argument("--column", required=True)
+    sc.add_argument("--direction", default="highest", choices=("highest", "lowest"))
+    sc.add_argument("--out", type=Path)
+    sc.add_argument("--no-track", action="store_true")
     a = ap.parse_args(argv)
+    if a.cmd == "score":
+        if a.no_track:
+            res = score_recovery(a.version, pd.read_parquet(a.scores), a.column, a.direction)
+            print(json.dumps({"pooled": res["pooled"], "per_type": {k: v["auroc"] for k, v in res["per_type"].items()}}, indent=1))
+        else:
+            run_id, res = score_run(a.version, a.scores, a.column, a.direction, out_dir=a.out)
+            print(json.dumps({"score_run_id": run_id, "pooled": res["pooled"]}, indent=1))
     if a.cmd == "derive":
         if a.no_track:
             out = derive_injection(a.parent, a.name, a.per_type, a.seed)
@@ -234,9 +405,9 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
+__all__ = ["load_answer_key", "select_injection", "build_edits", "derive_injection", "derive_injection_run",
+           "candidate_actions", "recovery_metrics", "score_recovery", "leak_check", "score_run"]
+
+
 if __name__ == "__main__":
     raise SystemExit(main())
-
-
-__all__ = ["load_answer_key", "select_injection", "build_edits", "derive_injection", "derive_injection_run",
-           "candidate_actions"]
