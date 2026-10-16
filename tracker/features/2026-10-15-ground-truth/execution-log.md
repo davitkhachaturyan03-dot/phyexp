@@ -61,3 +61,37 @@
 - `EpisodeEdit` gained `new_task` and `hypothesis` (the latter declared in the S1 commit).
 - v1's labels have no `hypothesis` column (v1 is not rebuilt).
 - Main `data/lineage/mlflow.db` sha256 unchanged (`7845d8d7...`); free disk 92 GiB; scratch dirs deleted.
+
+### S3: Add the method-facing loader and the ground-truth boundary (owner decision 3)
+**Files:**
+- `vlapoc/method_data.py` (new): `open_for_method(subset_ref, lineage_root=None) -> MethodView` (frozen: `version_id`, `subset_id`, `lerobot_root`, `episode_indices`, `catalog`, `reference_ids`, `iter_episodes()`). Every call: `Subset.load` → `verify_version` → `assert_blind` → ground-truth-chain refusal → diff guard. Module docstring lists the catalog columns (grounding: PoC §2.1 item 4 p.3, owner decision 3, evaluation S0 fence).
+- `vlapoc/groundtruth.py` (new, ground-truth side): `load_answer_key(version)` wraps `derive.load_labels` and cross-checks against `lineage.parent_hashes` and the version's episode table.
+- `vlapoc/methods/__init__.py` (new, empty package) so the static scan has a `vlapoc/methods/` target; S5 adds the heuristics there.
+- `scripts/verify_method_boundary_s3.py` (new).
+
+**Premises checked:** there is no `oracle_drop` op in `lineage.py` today (grep), so ground-truth-derived is defined by op name `oracle_drop`, any op containing `groundtruth`, or a `groundtruth` tag, followed through `parent_subset_id` and `from_subset_id`. → documented in the module docstring; later features that create ground-truth subsets must use one of those markers.
+
+**Acceptance criteria** (`.venv/bin/python scripts/verify_method_boundary_s3.py`, output `artifacts/s3_run.txt`, `artifacts/s3_verify.json`; 47 s):
+- ✅ AC3.1: `open_for_method("v1/candidate")` → `LineageError ... fenced=True, offending=['episode_index']`. `v0/candidate` opens (960 episodes, 40 reference ids, catalog columns == `CATALOG_COLUMNS`, first episode decodes: action (98, 7), image (98, 128, 128, 3)). The S2 scratch derived version opens (20 episodes). One byte flipped in a data file of the scratch child → `VersionIntegrityError: dataset copy at ... does not match version small20_gt` (file restored afterwards).
+- ✅ AC3.2: scratch subset with op `oracle_drop` (labelled episodes removed) → `LineageError ... is ground-truth-derived (op 'oracle_drop')`; a `drop_random_k` subset of it is refused too (chain recursion).
+- ✅ AC3.3: in one process, child then its parent → `LineageError: refusing to open a second version of one lineage ...`; parent then its child → same; reopening the same version is allowed. Caveat: the real-store analogue (v0 then v1) is refused too, but there by the fence check, which runs first, so it does not demonstrate the guard; the scratch cases do.
+- ✅ AC3.4: AST scan of `vlapoc/method_data.py` and `vlapoc/methods/*.py`: no violations. Six planted violations (from-import and module import of groundtruth, `load_labels` import, `lineage.parent_hashes` attribute, `labels.parquet` string, `fence.json` string) are each detected. Docstrings are exempt from the string scan; the forbidden-name set is `load_labels`, `parent_hashes`, `diff_versions`, `fence_record`, `load_answer_key`.
+- ✅ AC3.5: all 21 `CATALOG_COLUMNS` are named in the module docstring; the view's columns equal that list and lie within the tables `compare_blind` checks; `check_blind(scratch derived child) = []`. Only the one scratch derived version exists so far; the full-scale v2 (S4) will repeat this.
+- ✅ AC3.6: docstrings cite PoC §2.1 item 4 p.3, owner decision 3 (brief 2026-10-15) and the evaluation S0 fence.
+
+**Demo artifacts produced:** the refusal table is in `artifacts/s3_run.txt` (rows: v1 fenced, v0 open, scratch derived open, tampered refused, oracle refused, oracle-chain refused, diff-guard cases); `artifacts/s3_verify.json`.
+
+**Notes / divergences from plan or spec:**
+- `open_for_method` runs `verify_version` on every call (hashes the whole version's files; v0 about 20 s). That is what the AC asks for; a method that opens a version many times pays for it each time.
+- The diff guard registers a version only after every other check passes, and keys on (lineage root, version id), so scratch stores do not interfere with the real one.
+- The catalog still exposes provenance (`task_name`, `episode_id`, position) next to the instruction (design D1), so a swapped instruction is findable by cross-check; S5 measures it.
+- `MethodView.iter_episodes` reads each data file once and imports the private `derive._canonical_episode` (same package).
+- Main `data/lineage/mlflow.db` sha256 unchanged (`7845d8d7...`); S3 writes only under `data/scratch/` (deleted); free disk 92 GiB.
+
+### Findings for the analyzer
+- AC1.5 (second clause) as written cannot hold for `time_shift` and `gripper_release` (deterministic by their quoted/inferred parameters) and cannot hold for every episode of `instruction_swap` / `detour` (finite draw sets, chance collisions: 105/118 and 112/118 differ). Same-seed determinism across processes holds for all seven. Suggest amending the AC.
+- `meta/stats.json` of a derived copy differs between `PYTHONHASHSEED` values only in dict key order; content and `dataset_version_id` are identical. The plan's P12 quirk does not affect task order on the current writer path (measured, AC2.3/2.4).
+- data+lineage AC4.8's "contrast" number (60 files left by `isolate_hf_cache=False`) no longer reproduces: 0 files, also on pre-S2 code. The order-preserving writer from evaluation S0 no longer creates that cache; the isolation guarantee still holds. The data-lineage report quotes the old number.
+- Plan P7: over the 960 candidates 907 have a final release (the plan's 944 was over all 1000); 884 are eligible for `gripper_release` (carry ≥ 30).
+- `action_noise` clip: 0.72% of translation values clipped, but 1.69% of translation values end up in (0.9375, 1], a range clean data never has (S4 will recount on stored bytes). A noise-level detector on max |a| could use that; S5's heuristics should include it if the owner wants the clipped-range leak measured.
+- Not run in this batch: `verify_derive_s4.py --padding` (full-scale derivation) and `--v1` (7 GB transient load).

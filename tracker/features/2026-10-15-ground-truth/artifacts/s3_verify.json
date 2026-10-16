@@ -1,0 +1,94 @@
+{
+  "AC3.5": {
+    "documented": true,
+    "columns_ok": true,
+    "check_blind": []
+  },
+  "AC3.4": {
+    "clean_violations": [],
+    "planted_detected": {
+      "import groundtruth": true,
+      "import module": true,
+      "load_labels": true,
+      "parent_hashes attr": true,
+      "labels path": true,
+      "fence path": true
+    },
+    "pass": true
+  },
+  "table": [
+    {
+      "case": "v1/candidate (fenced, real store)",
+      "result": "REFUSED LineageError",
+      "reason": "version v1 (16076b9c5cb2) is not blind to its edits: fenced=True, offending=['episode_index'] (PoC \u00a72.1 item 4 p.3)",
+      "as_expected": true
+    },
+    {
+      "case": "v0/candidate (real store)",
+      "result": "opened",
+      "reason": "960 episodes",
+      "as_expected": true
+    },
+    {
+      "case": "S2 scratch derived version (7 edits, blind)",
+      "result": "opened",
+      "reason": "20 episodes",
+      "as_expected": true
+    },
+    {
+      "case": "scratch child with 1 byte of a data file changed",
+      "result": "REFUSED VersionIntegrityError",
+      "reason": "dataset copy at /Users/davit_khachaturyan/Projects/personal/vlaExp/data/scratch/gt_s3/lerobot/small20_gt does not match version small20_gt (3f43df4898",
+      "as_expected": true
+    },
+    {
+      "case": "oracle subset (op oracle_drop, labelled episodes removed)",
+      "result": "REFUSED LineageError",
+      "reason": "subset 'small20_gt/oracle' is ground-truth-derived (op 'oracle_drop'); a method under test must not be given a subset built from the labels (owner dec",
+      "as_expected": true
+    },
+    {
+      "case": "random-k subset of the oracle subset (chain contains oracle_drop)",
+      "result": "REFUSED LineageError",
+      "reason": "subset 'small20_gt/oracle_then_random' is ground-truth-derived (op 'oracle_drop'); a method under test must not be given a subset built from the label",
+      "as_expected": true
+    },
+    {
+      "case": "(open) child, then",
+      "result": "opened",
+      "reason": "20 episodes",
+      "as_expected": true
+    },
+    {
+      "case": "   ... its PARENT in the same process",
+      "result": "REFUSED LineageError",
+      "reason": "refusing to open a second version of one lineage in this process: 'small20_gt/all' (3f43df489885) was opened and bafb211603dd is its ancestor or desce",
+      "as_expected": true
+    },
+    {
+      "case": "(open) parent, then",
+      "result": "opened",
+      "reason": "20 episodes",
+      "as_expected": true
+    },
+    {
+      "case": "   ... its CHILD in the same process",
+      "result": "REFUSED LineageError",
+      "reason": "refusing to open a second version of one lineage in this process: 'small20/all' (bafb211603dd) was opened and 3f43df489885 is its ancestor or descenda",
+      "as_expected": true
+    },
+    {
+      "case": "(open) child, then the same child again",
+      "result": "opened",
+      "reason": "20 episodes",
+      "as_expected": true
+    },
+    {
+      "case": "   ... same version, another subset (reopen)",
+      "result": "opened",
+      "reason": "20 episodes",
+      "as_expected": true
+    }
+  ],
+  "pass": true
+}
