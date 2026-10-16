@@ -689,18 +689,27 @@ def diff_versions(a: str, b: str, lineage_root: Path | None = None) -> dict:
 # differed for exactly the 100 labelled rows, and row order (edited episodes at ``episode_index``
 # 900-999, in their own data files). Data-derived columns may differ (a noised episode's smoothness
 # does change); that is the signal a method is supposed to find.
+#
+# Ground-truth feature S2 (2026-10-15) reclassified the instruction: ``language_instruction`` (catalog) and
+# ``tasks`` (``meta/episodes``) are CONTENT, not bookkeeping. Reason: ``catalog.episode_content_hash`` hashes
+# the task string (``task.encode("utf-8")``, ``vlapoc/catalog.py:127-148``), so the instruction is already part
+# of an episode version's identity, and a swapped instruction (PoC §2.5 p. 5 "Swapped or wrong language
+# instructions") is a content edit that cannot be built if the blind check forbids it. Provenance columns
+# (``episode_id``, ``task_name``, ``libero_task_id``, ``suite``, ``scene``, ``objects``, ``source_*``) stay
+# bookkeeping: a swap leaves the collection record true (plan design D1). The matching consistency rule is that
+# a version's ``meta/episodes.tasks`` must equal its own table's ``language_instruction`` per episode.
 
-#: Columns whose value is computed from the episode's own frames; an edit may change them.
+#: Columns whose value is computed from the episode's own content; an edit may change them. Includes the
+#: instruction (hashed content, see the note above).
 DATA_DERIVED_COLUMNS = ("content_hash", "length_steps", "duration_s", "smoothness", "idle_fraction", "idle_steps",
-                        "gripper_toggles")
+                        "gripper_toggles", "language_instruction")
 #: Columns describing where an episode came from or sits; a derivation must copy them unchanged.
 #: Any other column found in a table (not data-derived, not ``episode_id``) is treated as bookkeeping too.
 BOOKKEEPING_COLUMNS = ("episode_index", "source_file", "source_demo", "init_state_sha256", "suite", "task_name",
-                       "libero_task_id", "language_instruction", "scene", "objects", "source", "operator",
-                       "collection_date")
+                       "libero_task_id", "scene", "objects", "source", "operator", "collection_date")
 #: LeRobot ``meta/episodes`` columns compared per episode; every other column there (length, data-file
-#: and frame-range layout, per-episode stats) follows the stored bytes and is data-derived.
-META_BOOKKEEPING_COLUMNS = ("episode_index", "tasks")
+#: and frame-range layout, per-episode stats, ``tasks``) follows the stored bytes and is data-derived.
+META_BOOKKEEPING_COLUMNS = ("episode_index",)
 ROW_ORDER = "(row order)"
 META_MISMATCH = "(meta/episodes does not match the episode table)"
 
@@ -765,6 +774,11 @@ def _compare_meta(child_root: Path, child: pd.DataFrame, parent_root: Path, pare
             return out
         metas.append(m.assign(episode_id=m["episode_index"].map(id_of)).set_index("episode_id"))
     cm, pm = metas[0], metas[1].loc[metas[0].index]
+    if "language_instruction" in child.columns:  # the instruction is content: the two copies must agree
+        li = child.set_index("episode_id")["language_instruction"].loc[cm.index]
+        if (cm["tasks"].map(lambda t: list(t)[0]).to_numpy() != li.to_numpy()).any():
+            out["offending"] = sorted(set(off + [META_MISMATCH]))
+            return out
     for col in META_BOOKKEEPING_COLUMNS:
         n = _differing(cm[col], pm[col])
         if n:
@@ -784,10 +798,17 @@ def compare_blind(child: pd.DataFrame, parent: pd.DataFrame, child_root: Path, p
     1. Column sets are identical (a derivation adds no column, e.g. no ``parent_content_hash``).
     2. Every bookkeeping column (``BOOKKEEPING_COLUMNS``, and any column that is neither data-derived nor
        ``episode_id``) equals the parent's value per ``episode_id``; so does the row order. In
-       ``meta/episodes``, ``episode_index`` (physical order) and ``tasks`` do.
+       ``meta/episodes``, ``episode_index`` (physical order) does.
 
-    Data-derived columns (``DATA_DERIVED_COLUMNS``; in ``meta/episodes`` length, file layout and stats)
-    are exempt. Returns ``{"offending": sorted column names (union over tables), "tables": per-table
+    Data-derived columns (``DATA_DERIVED_COLUMNS``; in ``meta/episodes`` length, file layout, stats and
+    ``tasks``) are exempt. Reclassification (ground-truth feature S2, 2026-10-15): the instruction
+    (``language_instruction`` in the tables, ``tasks`` in ``meta/episodes``) is hashed content
+    (``catalog.episode_content_hash`` hashes the task string, ``vlapoc/catalog.py:127-148``), so an instruction
+    swap may change it. Provenance (``task_name``, ``libero_task_id``, ``suite``, ``scene``, ``objects``,
+    ``source_file``, ``source_demo``, ``episode_id``) stays bookkeeping: a swap leaves the collection record
+    true (plan design D1), and changing any of it still fails. To keep the instruction from becoming a free
+    channel, ``meta/episodes.tasks`` must equal the child table's ``language_instruction`` per episode
+    (otherwise ``META_MISMATCH``). Returns ``{"offending": sorted column names (union over tables), "tables": per-table
     detail}``; an empty ``offending`` means blind. ``derive_version`` calls this before registering.
     """
     tables = {"version_episodes": _compare_episode_tables(child, parent)}

@@ -1,0 +1,35 @@
+objc[83115]: Class AVFFrameReceiver is implemented in both /Users/davit_khachaturyan/Projects/personal/vlaExp/.venv/lib/python3.14/site-packages/av/.dylibs/libavdevice.61.3.100.dylib (0x123d543a8) and /opt/homebrew/Cellar/ffmpeg/8.1.1/lib/libavdevice.62.3.101.dylib (0x138c8c328). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+objc[83115]: Class AVFAudioReceiver is implemented in both /Users/davit_khachaturyan/Projects/personal/vlaExp/.venv/lib/python3.14/site-packages/av/.dylibs/libavdevice.61.3.100.dylib (0x123d543f8) and /opt/homebrew/Cellar/ffmpeg/8.1.1/lib/libavdevice.62.3.101.dylib (0x138c8c378). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+[convert] 20/20 episodes, 4190 frames, 10s elapsed, 429 frames/s
+scratch parent small20: 20 episodes; stored content hash == v0's for the same episode_id: 20/20
+AC2.1 7 edits (['action_noise', 'time_shift', 'instruction_swap', 'dropped_frames', 'detour', 'idle_padding', 'gripper_release']) registered as 3f43df489885 in 13.6s; check_blind = []; assert_blind passes: yes
+AC2.1 labels.parquet: 7 rows, columns ['episode_id', 'parent_content_hash', 'content_hash', 'corruption_type', 'params', 'seed', 'hypothesis']; columns == required: True; hypothesis per type: {'action_noise': 'none stated', 'time_shift': 'none stated', 'instruction_swap': 'none stated', 'dropped_frames': 'none stated', 'detour': 'none stated', 'idle_padding': 'speed (time-based metrics), not reliability (PoC §8.10 p.17; §4.5 p.11)', 'gripper_release': 'reliability (drops), not speed (PoC §8.10 p.17; §4.5 p.11)'}
+AC2.3 child data files: ['data/chunk-000/file-000.parquet', 'data/chunk-000/file-001.parquet']; rows of the swapped episode: 137
+AC2.3 tasks.parquet equal to parent's (task -> task_index, from the raw files): True; 20 tasks, same order: True
+AC2.3 swapped episode pick_up_the_black_bowl_on_the_ramekin_an../demo_0: parent task_index 5 -> data rows carry [7] (target task's parent index 7); meta tasks ['pick up the black bowl on the stove and place it on the plate']
+AC2.3 episodes whose task_index differs from the parent's: [5] (expected only 5)
+
+AC2.6 blind-check table (scratch child; tampering is applied to the stored table and undone)
+                                                                                         case                                          check_blind  rejected
+                                              derived child as written (swap + 6 other edits)                                                   []     False
+                                   task_name changed on the swapped episode (provenance leak)                                        ['task_name']      True
+                                                libero_task_id changed on the swapped episode                                   ['libero_task_id']      True
+                                             source_demo changed on an edited (noise) episode                                      ['source_demo']      True
+                       language_instruction of an UNEDITED episode changed, meta/episodes not ['(meta/episodes does not match the episode table)']      True
+swapped episode's language_instruction put back to the parent's, meta/episodes keeps the swap ['(meta/episodes does not match the episode table)']      True
+AC2.6 provenance leak names task_name: True
+
+AC2.2 swap to a string not in the parent's tasks: LineageError: True; message: instruction edit(s) to task string(s) not in small20's tasks.parquet: ['pick up the black bowl on the ramekin and place it on the plate (not a benchmark task)'] (a swap must use one of the parent's tasks; nothing written)
+AC2.2 nothing written: out_root exists False, leftover temp dirs [], versions in store 2 -> 2
+AC2.2 swap on reference episode demo_14: LineageError: True; message: refusing to edit 1 reference-split episode(s) (PoC §8.7 p.15: corrupt only the training copy): ['libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_14']; nothing written: True
+
+AC2.5 check_blind(v1) = ['episode_index']; check_blind(v0) = []; assert_blind(v1) refused: True (version v1 (16076b9c5cb2) is not blind to its edits: fenced=True, offending=['episode_index'] (PoC §2.1 item 4 p.3))
+scratch removed: True
+
+AC2.4 PYTHONHASHSEED 0 vs 1: {'tasks_map': True, 'tasks_parquet_sha256': True, 'labels_rows_digest': True, 'content_hashes': True, 'dataset_version_id': True}; labels.parquet bytes equal: True; 6 child files, differing files: ['meta/stats.json']
+AC2.4 dataset_version_id (seed 0) 3f43df4898854eed, (seed 1) 3f43df4898854eed
+AC2.4 meta/stats.json differs in 0 entries; largest relative differences: []
+AC2.4 stats.json parsed equal: True; lengths 13928 / 13928; first differing char 7: seed0 '{\n    "observation.images.image2": {\n        "m' | seed1 '{\n    "task_index": {\n        "min": [\n        '; key order equal: False
+
+all S2 checks pass: True (92s); summary -> /Users/davit_khachaturyan/Projects/personal/vlaExp/tracker/features/2026-10-15-ground-truth/artifacts/s2_verify.json
+.venv/bin/python scripts/verify_derive_gt_s2.py  132.99s user 19.91s system 163% cpu 1:33.43 total

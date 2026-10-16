@@ -1,0 +1,15 @@
+[convert] 20/20 episodes, 4190 frames, 10s elapsed, 440 frames/s
+AC0.3 scratch parent small20 bafb211603dd: 20 episodes, 4190 frames
+AC0.3 derive_version: 3 edits at parent episode_index [3, 11, 16] (['idle_padding x20', 'robodrop action noise', 'robodrop action noise']); 13.7s, timing {'guards': 0.5, 'write': 10.8, 'hash_and_blind_check': 1.8, 'total': 13.7}, mechanism 'one LeRobotDataset writer pass in parent episode order (episode_index preserved)'
+AC0.3 episode_index equal to parent's: 20/20; edited episodes now at [3, 11, 16]; length change on the padded episode: 99 -> 119
+AC0.3 meta/episodes tasks per index equal to parent's: True; data-file episode ranges child {0: [0, 14], 1: [15, 19]} vs parent {0: [0, 14], 1: [15, 19]}
+AC0.3 parents.parquet == parent content_hash: True (20 rows); child columns == parent columns: True
+AC0.3 check_blind(child) = []
+AC0.5 extra bookkeeping column parent_content_hash: check_blind -> ['parent_content_hash']; rejected: True
+AC0.5 episode_index of parent rows 0 and 5 swapped: check_blind -> ['(meta/episodes does not match the episode table)', 'episode_index']; rejected: True
+AC0.5 source_demo changed on one edited row: check_blind -> ['source_demo']; rejected: True
+AC0.5 rows shuffled, values unchanged: check_blind -> ['(row order)']; rejected: True
+AC0.5 check_blind after restore: []
+AC0.5 assert_blind(v1) refused: version v1 (16076b9c5cb2) is not blind to its edits: fenced=True, offending=['episode_index'] (PoC §2.1 item 4 p.3)
+AC0.5 assert_blind(scratch child) passed (no exception)
+scratch removed: True

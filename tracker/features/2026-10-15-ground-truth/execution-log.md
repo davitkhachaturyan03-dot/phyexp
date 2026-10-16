@@ -31,3 +31,33 @@
 - `EpisodeEdit.params` is completed by the transform at run time (corrupted frames, clip counts, draws depend on the episode). `derive_version` serialises it after its writer pass, so this works unchanged; a caller must run the transform before reading those keys.
 - `frac_clipped` is defined over all T×7 values; `frac_clipped_dims0_2` over the 3T translation values (that is the number comparable to the P3 estimate).
 - The sample for the in-memory test is 118 candidates eligible for all seven types (a seeded draw), covering 19 of 20 tasks.
+
+### S2: Extend `derive_version` for instruction edits and count the instruction as content in the blind check
+**Files:**
+- `vlapoc/derive.py`: `EpisodeEdit.new_task` is honoured (guard: target must be in the parent's `tasks.parquet`, else `LineageError` before any write; a transform may change the task only to `new_task`); the writer pre-registers the parent's tasks in parent order (`ds.meta.save_episode_tasks`) before the first episode; `_derived_episode_table` refreshes `language_instruction` from the stored task (and requires every kept episode's stored task to equal the parent's); `labels.parquet` gains the `hypothesis` column. Docstrings of `EpisodeEdit`, `derive_version`, `_derived_episode_table`, `load_labels` updated.
+- `vlapoc/lineage.py`: `language_instruction` moved into `DATA_DERIVED_COLUMNS`; `tasks` removed from `META_BOOKKEEPING_COLUMNS`; new consistency rule in `_compare_meta`: `meta/episodes.tasks` must equal the child table's `language_instruction` per episode (else `META_MISMATCH`), so the instruction is not a free channel. `compare_blind` docstring and the section comment state the reclassification.
+- `scripts/verify_derive_gt_s2.py` (new).
+
+**Premises checked:**
+- R1 (pre-registering tasks on LeRobot's writer metadata object works) → AC2.3 on stored bytes: `tasks.parquet` identical to the parent's → holds.
+- P10 (hash includes the instruction) → read `vlapoc/catalog.py:127-148` → holds.
+- Scratch parent's stored content hashes equal v0's for the same `episode_id` (20/20) → holds, so the scratch parent is a faithful miniature.
+- P12 (hash-seed quirk) → measured in AC2.4: the task order is NOT affected on the current writer path.
+
+**Acceptance criteria** (`.venv/bin/python scripts/verify_derive_gt_s2.py`, output `artifacts/s2_run.txt`, numbers `artifacts/s2_verify.json`; 20-episode scratch parent with v0's full catalog columns):
+- ✅ AC2.1: one edit of each of the seven types registers (`3f43df489885`, 13.4 s) with `check_blind = []` and `assert_blind` passing. `labels.parquet` has 7 rows and columns `['episode_id','parent_content_hash','content_hash','corruption_type','params','seed','hypothesis']`; hypothesis is set only for `idle_padding` (speed) and `gripper_release` (reliability), `none stated` otherwise.
+- ✅ AC2.2: a swap to a string not in the parent's tasks → `LineageError: instruction edit(s) to task string(s) not in small20's tasks.parquet ...`; out_root absent, no temp dir, versions in store 2 -> 2. A swap of reference episode `.../demo_14` on real v0 (scratch lineage copy) → `LineageError: refusing to edit 1 reference-split episode(s) ...`, nothing written.
+- ✅ AC2.3: child `tasks.parquet` equals the parent's (raw pandas frames equal, 20 tasks, same order). The swapped episode's 137 data rows carry task_index 7 (the target's parent index; original 5). Only that one episode's task_index differs from the parent's (`[5]`); its meta `tasks` is the target string.
+- ✅ AC2.4: `PYTHONHASHSEED=0` vs `1`, one subprocess each: identical `tasks_map`, `tasks.parquet` sha256, `labels_rows_digest`, labels.parquet bytes, all content hashes and `dataset_version_id` (`3f43df4898854eed`). Of the 6 child files exactly one differs by bytes: `meta/stats.json`, only in dictionary key order (parsed JSON equal, 0 numeric entries differ; first difference at char 7: `observation.images.image2` first vs `task_index` first). It is not part of the version digest. This is LeRobot's own stats writer, not our code.
+- ✅ AC2.5: `check_blind(v1) = ['episode_index']`, `check_blind(v0) = []`, `assert_blind(v1)` refused (fenced). Existing verifiers: `verify_blind_s0.py` passes unchanged (AC0.3 `check_blind(child) = []`, the four AC0.5 tampers rejected, v1 refused; `artifacts/s2_regress_verify_blind_s0.txt`); it rewrote the evaluation feature's `s0_verify_blind.json` and a diff against HEAD showed only timings (write 11.2 -> 10.8 s, total 14.2 -> 13.7 s, frames/s), so I restored it with `git checkout`. `verify_derive_s4.py --guard --columns --cache` pass (`artifacts/s2_regress_verify_derive_s4.txt`; summary written to scratch). Not run: `--padding` (full-scale 7 GB derivation, out of scope for this batch) and `--v1` (a 7 GB transient load, and nothing in S2 touches what it checks).
+  - One expectation differs, NOT caused by S2: AC4.8's "contrast" (`isolate_hf_cache=False` left 60 files / 663 MB in data-lineage round 1) now leaves 0 files. I re-ran `--cache` on the pre-S2 code (`git stash`) and got the same 0, so the order-preserving writer introduced in evaluation S0 no longer produces that cache. The isolation guarantee (shared cache listing identical before/after, 134 files both times) still holds.
+- ✅ AC2.6: blind-check table (scratch child, tamper applied to the stored table and undone): as written `[]`; `task_name` changed on the swapped episode `['task_name']`; `libero_task_id` changed `['libero_task_id']`; `source_demo` changed on an edited episode `['source_demo']`; `language_instruction` of an unedited episode changed with meta untouched `['(meta/episodes does not match the episode table)']`; swapped row's instruction put back to the parent's while meta keeps the swap: same META_MISMATCH.
+- ✅ AC2.7: docstrings of `derive_version` and `compare_blind` (and the lineage section comment) state the reclassification, the hashed-content reason (`catalog.py:127-148`) and that provenance stays bookkeeping (D1).
+
+**Demo artifacts produced:** `artifacts/s2_run.txt` (blind-check table), `artifacts/s2_verify.json`, `artifacts/s2_regress_verify_blind_s0.txt`, `artifacts/s2_regress_verify_derive_s4.txt`.
+
+**Notes / divergences from plan or spec:**
+- Plan said "`tasks` out of META_BOOKKEEPING into the data-derived set". Doing only that would let `meta/episodes.tasks` drift from the catalog instruction unnoticed, so I added the tasks-equals-language_instruction consistency rule (extra, tested in AC2.6).
+- `EpisodeEdit` gained `new_task` and `hypothesis` (the latter declared in the S1 commit).
+- v1's labels have no `hypothesis` column (v1 is not rebuilt).
+- Main `data/lineage/mlflow.db` sha256 unchanged (`7845d8d7...`); free disk 92 GiB; scratch dirs deleted.

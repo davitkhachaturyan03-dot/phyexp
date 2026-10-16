@@ -1,0 +1,117 @@
+{
+  "AC2.1": {
+    "check_blind": [],
+    "labels_columns": [
+      "episode_id",
+      "parent_content_hash",
+      "content_hash",
+      "corruption_type",
+      "params",
+      "seed",
+      "hypothesis"
+    ],
+    "n_labels": 7,
+    "types": [
+      "action_noise",
+      "time_shift",
+      "instruction_swap",
+      "dropped_frames",
+      "detour",
+      "idle_padding",
+      "gripper_release"
+    ],
+    "hypothesis": [
+      "none stated",
+      "none stated",
+      "none stated",
+      "none stated",
+      "none stated",
+      "speed (time-based metrics), not reliability (PoC \u00a78.10 p.17; \u00a74.5 p.11)",
+      "reliability (drops), not speed (PoC \u00a78.10 p.17; \u00a74.5 p.11)"
+    ],
+    "pass": true
+  },
+  "AC2.3": {
+    "tasks_equal": true,
+    "raw_tasks_parquet_equal": true,
+    "swapped_rows_task_index": [
+      7
+    ],
+    "target_parent_index": 7,
+    "original_index": 5,
+    "pass": true
+  },
+  "AC2.6": {
+    "table": [
+      {
+        "case": "derived child as written (swap + 6 other edits)",
+        "check_blind": []
+      },
+      {
+        "case": "task_name changed on the swapped episode (provenance leak)",
+        "check_blind": [
+          "task_name"
+        ]
+      },
+      {
+        "case": "libero_task_id changed on the swapped episode",
+        "check_blind": [
+          "libero_task_id"
+        ]
+      },
+      {
+        "case": "source_demo changed on an edited (noise) episode",
+        "check_blind": [
+          "source_demo"
+        ]
+      },
+      {
+        "case": "language_instruction of an UNEDITED episode changed, meta/episodes not",
+        "check_blind": [
+          "(meta/episodes does not match the episode table)"
+        ]
+      },
+      {
+        "case": "swapped episode's language_instruction put back to the parent's, meta/episodes keeps the swap",
+        "check_blind": [
+          "(meta/episodes does not match the episode table)"
+        ]
+      }
+    ],
+    "pass": true
+  },
+  "AC2.2": {
+    "bad_target_message": "instruction edit(s) to task string(s) not in small20's tasks.parquet: ['pick up the black bowl on the ramekin and place it on the plate (not a benchmark task)'] (a swap must use one of the parent's tasks; nothing written)",
+    "reference_message": "refusing to edit 1 reference-split episode(s) (PoC \u00a78.7 p.15: corrupt only the training copy): ['libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_14']",
+    "nothing_written": true,
+    "pass": true
+  },
+  "AC2.5_own": {
+    "check_blind_v1": [
+      "episode_index"
+    ],
+    "check_blind_v0": [],
+    "assert_blind_v1_refused": true,
+    "pass": true
+  },
+  "AC2.4_stats_json_diffs": [],
+  "AC2.4_stats_json_text_context": [
+    "{\n    \"observation.images.image2\": {\n        \"min\": [\n            [\n                [\n ",
+    "{\n    \"task_index\": {\n        \"min\": [\n            0.0\n        ],\n        \"max\": [\n    "
+  ],
+  "AC2.4": {
+    "same": {
+      "tasks_map": true,
+      "tasks_parquet_sha256": true,
+      "labels_rows_digest": true,
+      "content_hashes": true,
+      "dataset_version_id": true
+    },
+    "labels_parquet_bytes_equal": true,
+    "n_files": 6,
+    "differing_files": [
+      "meta/stats.json"
+    ],
+    "pass": true
+  }
+}

@@ -1,0 +1,17 @@
+objc[83849]: Class AVFFrameReceiver is implemented in both /Users/davit_khachaturyan/Projects/personal/vlaExp/.venv/lib/python3.14/site-packages/av/.dylibs/libavdevice.61.3.100.dylib (0x129e483a8) and /opt/homebrew/Cellar/ffmpeg/8.1.1/lib/libavdevice.62.3.101.dylib (0x12fafc328). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+objc[83849]: Class AVFAudioReceiver is implemented in both /Users/davit_khachaturyan/Projects/personal/vlaExp/.venv/lib/python3.14/site-packages/av/.dylibs/libavdevice.61.3.100.dylib (0x129e483f8) and /opt/homebrew/Cellar/ffmpeg/8.1.1/lib/libavdevice.62.3.101.dylib (0x12fafc378). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+AC4.3 editing reference episode libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_14: LineageError raised: True
+AC4.3 message: refusing to edit 1 reference-split episode(s) (PoC §8.7 p.15: corrupt only the training copy): ['libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_14']
+AC4.3 nothing written: True; protected ids for v0: 40
+AC4.7 v0 version table (data/lineage/versions/3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7/episodes.parquet): 21 columns; label columns present: []
+AC4.7 v1 version table (data/lineage/versions/16076b9c5cb2a0e8c5d291fc0766977dc7286c6b9f87df39bd87fe5c17cd85f8/episodes.parquet): 21 columns; label columns present: []
+AC4.7 v1 catalog copy (data/lineage/catalog/libero_spatial_10__v1/episodes.parquet): 21 columns; label columns present: []
+AC4.7 v1 columns == v0 catalog columns (CATALOG_COLUMNS, no parent_content_hash): True; v1 version table == catalog copy columns: True; v0 columns == CATALOG_COLUMNS: True
+[convert] 20/20 episodes, 4190 frames, 10s elapsed, 425 frames/s
+AC4.8 scratch parent small20 bafb211603dd (20 episodes) registered in data/scratch/verify_s4_cache_tk_qq8ka/lineage
+AC4.8 shared HF_DATASETS_CACHE = data/hf_datasets_cache: before 134 files / 28952405234 bytes; after isolated derive_version 134 files / 28952405234 bytes; identical listing and bytes: True
+AC4.8 derivation 6cbeb214cd4c: 1 edit, timing {'guards': 0.5, 'write': 11.0, 'hash_and_blind_check': 1.9, 'total': 13.8}; derivation.json hf_datasets_cache: 'isolated temp dir under data/scratch, deleted after the derivation'
+AC4.8 isolated temp caches left under data/scratch/: []
+AC4.8 contrast, isolate_hf_cache=False: 0 cache files (0 .arrow, 0 parquet builder entries), 0 bytes left behind by one 20-episode derivation
+AC4.8 scratch removed: True
+summary -> data/scratch/gt_s2_art/s4_summary.json

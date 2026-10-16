@@ -112,8 +112,12 @@ class EpisodeEdit:
     """One ground-truth edit: which episode, what was done (type, params, seed), and the transform.
 
     ``transform`` receives the episode as ``read_stored_episode`` returns it and must return the same
-    keys with the same per-frame shapes and dtypes; it may change the number of frames but not the
-    task string. ``corruption_type``, ``params`` and ``seed`` are written to ``labels.parquet``.
+    keys with the same per-frame shapes and dtypes; it may change the number of frames. It may change the
+    task string only if the edit declares ``new_task`` (ground-truth feature S2), and then must return exactly
+    that string; ``new_task`` must already be one of the parent's tasks (``meta/tasks.parquet``), which
+    ``derive_version`` checks before writing anything. ``corruption_type``, ``params``, ``seed`` and
+    ``hypothesis`` (the PoC §4.5 p.11 metric hypothesis, ``"none stated"`` when the PoC states none) are written
+    to ``labels.parquet``.
     """
 
     episode_id: str
@@ -245,8 +249,20 @@ def derive_version(
     Blindness (PoC §2.1 item 4 p. 3: the method under test must find the corrupted episodes without
     being shown them; evaluation-layer S0). The derived version's method-facing tables (episode table,
     catalog copy, LeRobot ``meta/episodes``) have exactly the parent's columns, rows and
-    ``episode_index`` values; only data-derived columns (content hash, length, action statistics) may
-    differ, and only for the edited episodes. Ground truth lives in ``labels.parquet``, the pre-edit
+    ``episode_index`` values; only data-derived columns (content hash, length, action statistics, and since
+    the ground-truth feature S2 the instruction) may differ, and only for the edited episodes.
+
+    Instruction edits (ground-truth feature S2, PoC §2.5 p. 5 "Swapped or wrong language instructions"). An
+    edit with ``new_task`` changes the episode's task string. The instruction is hashed content
+    (``catalog.episode_content_hash`` hashes the task string, ``vlapoc/catalog.py:127-148``), so it counts as
+    data-derived in ``compare_blind``; provenance (``episode_id``, ``task_name``, ``libero_task_id``, ...) stays
+    bookkeeping and is never touched (plan design D1: a swap leaves the collection record true).
+    ``new_task`` must be in the parent's ``tasks.parquet`` or ``LineageError`` is raised before anything is
+    written. The parent's tasks are registered on the new dataset in the parent's order before the first
+    episode (``LeRobotDatasetMetadata.save_episode_tasks``), so ``meta/tasks.parquet`` and every unedited
+    episode's ``task_index`` equal the parent's (LeRobot would otherwise number tasks by first appearance, and
+    a swapped early episode would reorder them). ``language_instruction`` of the child's tables is refreshed
+    from the stored task. ``modify_tasks`` is not used: it works in place and re-indexes tasks alphabetically. Ground truth lives in ``labels.parquet``, the pre-edit
     hashes in ``parents.parquet``; both are lineage-only. ``vlapoc.lineage.compare_blind`` checks this
     before the version is registered and the derivation fails if any bookkeeping column differs.
 
@@ -287,6 +303,11 @@ def derive_version(
             f"training copy): {protected[:3]}"
         )
     parent_root = REPO_ROOT / pv["lerobot_root"]
+    parent_tasks = read_tasks(parent_root)  # task_index -> string; also the allowed instruction-swap targets
+    bad = sorted({e.new_task for e in edits if e.new_task is not None} - set(parent_tasks.values()))
+    if bad:
+        raise LineageError(f"instruction edit(s) to task string(s) not in {pv['name']}'s tasks.parquet: {bad[:3]} "
+                           "(a swap must use one of the parent's tasks; nothing written)")
     verify_version(pvid, lineage_root=lineage_root)  # never derive from a tampered copy
 
     out_root = Path(out_root) if out_root is not None else parent_root.parent / f"{parent_root.name}__{name}"
@@ -299,7 +320,7 @@ def derive_version(
     edits = sorted(edits, key=lambda e: idx_of[e.episode_id])  # parent order (labels row order)
     t_guard = time.time() - t0
     expected = _write_derived_dataset(parent_root, out_root, edits, dict(zip(eps["episode_index"], eps["episode_id"])),
-                                      info, image_writer_threads, isolate_hf_cache)
+                                      info, image_writer_threads, isolate_hf_cache, parent_tasks)
     t_write = time.time() - t0 - t_guard
 
     # --- re-establish identity by content, then check blindness against the parent ---------------
@@ -331,6 +352,7 @@ def derive_version(
         "corruption_type": e.corruption_type,
         "params": json.dumps(e.params, sort_keys=True),
         "seed": e.seed,
+        "hypothesis": e.hypothesis,
     } for e in edits])
     labels.to_parquet(vdir / "labels.parquet", index=False)
     # lineage-only: the pre-edit hash of every episode (vlapoc.lineage.parent_hashes)
@@ -361,13 +383,15 @@ def derive_version(
 
 
 def _write_derived_dataset(parent_root: Path, out_root: Path, edits: list[EpisodeEdit], id_of_index: dict, info: dict,
-                           image_writer_threads: int, isolate_hf_cache: bool) -> dict[str, str]:
+                           image_writer_threads: int, isolate_hf_cache: bool,
+                           parent_tasks: dict[int, str] | None = None) -> dict[str, str]:
     """Write the derived dataset to ``out_root``: one LeRobot writer pass in parent order (module docstring).
 
     Every parent episode is decoded in ``episode_index`` order, transformed if ``edits`` names it, and
     written with ``add_frame``/``save_episode``, so stored episode i of the child is episode i of the
     parent. The pass writes to a temp dir next to ``out_root`` and renames it on success, so a failed
-    pass leaves no half-written ``out_root``.
+    pass leaves no half-written ``out_root``. ``parent_tasks`` (``task_index -> string``) is registered on the new
+    dataset in index order before the first episode, so the child's task numbering equals the parent's.
 
     Returns ``expected``: ``expected[episode_id]`` is the content hash each edited episode must have
     once stored (computed from its transformed arrays).
@@ -387,14 +411,23 @@ def _write_derived_dataset(parent_root: Path, out_root: Path, edits: list[Episod
         ds = LeRobotDataset.create(repo_id=f"local/{out_root.name}", fps=info["fps"], features=user_features, root=tmp,
                                    robot_type=info.get("robot_type"), use_videos=False,
                                    image_writer_threads=image_writer_threads)
+        if parent_tasks is None:
+            parent_tasks = read_tasks(parent_root)
+        # Pre-register the parent's tasks in parent order: LeRobot numbers new tasks by first appearance, so a
+        # swapped instruction on an early episode would otherwise reorder tasks.parquet (plan R1; AC2.3).
+        ds.meta.save_episode_tasks([parent_tasks[i] for i in sorted(parent_tasks)])
         for ep_idx, src in iter_stored_episodes(parent_root):
             ep = src
             e = by_id.get(id_of_index[ep_idx])
             if e is not None:
                 ep = e.transform(dict(src))
                 _check_canonical(ep, src)
-                if ep["task"] != src["task"]:
-                    raise LineageError("task edits must go through LeRobot modify_tasks (not supported here)")
+                want = e.new_task if e.new_task is not None else src["task"]
+                if e.new_task is not None and e.new_task == src["task"]:
+                    raise LineageError(f"{e.episode_id}: new_task equals the episode's current task; not an instruction edit")
+                if ep["task"] != want:
+                    raise LineageError(f"{e.episode_id}: transform returned task {ep['task']!r}, expected {want!r}; a task "
+                                       "change must be declared with EpisodeEdit.new_task")
                 expected[e.episode_id] = episode_content_hash(ep["task"], ep["action"], ep["state"], ep["image"], ep["image2"])
             for i in range(len(ep["action"])):
                 ds.add_frame({IMAGE_KEYS[0]: ep["image"][i], IMAGE_KEYS[1]: ep["image2"][i],
@@ -418,7 +451,8 @@ def _derived_episode_table(eps: pd.DataFrame, edits: list[EpisodeEdit], expected
     stored episode i must be the parent's row i: every kept episode must hash to its parent hash and
     every edited one to ``expected``, or ``LineageError``. The result is the parent's rows, in the
     parent's row order and with the parent's columns, carrying this copy's ``content_hash``, length,
-    action statistics and ``duration_s`` (the data-derived columns, ``vlapoc.lineage.DATA_DERIVED_COLUMNS``).
+    action statistics, ``duration_s`` and ``language_instruction`` (the data-derived columns,
+    ``vlapoc.lineage.DATA_DERIVED_COLUMNS``; the instruction is hashed content, S2).
     Nothing about the edits is added (PoC §2.1 item 4 p. 3): ground truth lives only in ``labels.parquet``.
     """
     edited_ids = {e.episode_id for e in edits}
@@ -435,6 +469,13 @@ def _derived_episode_table(eps: pd.DataFrame, edits: list[EpisodeEdit], expected
     if [expected[i] for i in child.loc[~kept_mask, "episode_id"]] != list(new_hash[~kept_mask]):
         raise LineageError("stored edited episodes do not hash to their transformed content")
     child["content_hash"] = new_hash
+    if "language_instruction" in child.columns:
+        # The instruction is hashed content (S2): every kept episode's stored task must equal the parent's
+        # instruction, an edited episode's is whatever it now stores.
+        stored_task = stored["task"].to_numpy()
+        if not (stored_task[kept_mask] == child.loc[kept_mask, "language_instruction"].to_numpy()).all():
+            raise LineageError("a kept episode's stored task differs from the parent's language_instruction")
+        child["language_instruction"] = stored_task
     for c in ("length_steps", "smoothness", "idle_fraction", "idle_steps", "gripper_toggles"):
         child[c] = stored[c].to_numpy()
     child["duration_s"] = child["length_steps"] / fps
@@ -573,8 +614,9 @@ def derive_demo_action_noise(parent: str = "v0", name: str = "v1", per_task: int
 
 def load_labels(version: str, lineage_root: Path | None = None) -> pd.DataFrame:
     """A derived version's ground truth (``labels.parquet``): one row per edited episode with
-    ``episode_id``, ``parent_content_hash``, ``content_hash``, ``corruption_type``, ``params`` (JSON)
-    and ``seed``. Evaluation code only; the method under test must not read it (plan Rule 5)."""
+    ``episode_id``, ``parent_content_hash``, ``content_hash``, ``corruption_type``, ``params`` (JSON),
+    ``seed`` and, since the ground-truth feature S2, ``hypothesis`` (the PoC §4.5 p.11 metric hypothesis or
+    ``"none stated"``; labels of v1 have no such column). Evaluation code only; the method under test must not read it (plan Rule 5)."""
     vid = resolve_version(version, lineage_root)["dataset_version_id"]
     p = _root(lineage_root) / "versions" / vid / "labels.parquet"
     if not p.is_file():
