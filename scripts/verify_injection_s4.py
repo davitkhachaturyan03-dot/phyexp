@@ -42,18 +42,21 @@ def check_stored(ctype: str, par: dict, ch: dict, params: dict, parent_tasks: se
         fails.append("range")
     if not np.isin(b[:, 6], [-1.0, 1.0]).all():
         fails.append("gripper not binary")
-    if T2 != (T + 40 if ctype in ("detour", "idle_padding") else T):
+    if T2 != (T + 40 if ctype in ("detour", "idle_padding") else T - 40 if ctype == "time_shift" else T):
         fails.append(f"length {T} -> {T2}")
     same = lambda k: len(ch[k]) == len(par[k]) and np.array_equal(ch[k], par[k])  # noqa: E731
     pd_ = {k: set(C.frame_digests(par[k])) for k in ("image", "image2")}
     if ctype == "action_noise":
         if not (same("state") and same("image") and same("image2") and ch["task"] == par["task"] and np.array_equal(a[:, 6], b[:, 6])):
             fails.append("non-action array or gripper changed")
-    elif ctype == "time_shift":
-        if not (same("state") and same("image") and same("image2")) or not np.array_equal(b[:T - 40], a[40:]):
-            fails.append("shift body / other arrays")
-        if not ((b[T - 40:, :6] == 0).all() and (b[T - 40:, 6] == a[-1, 6]).all()):
-            fails.append("tail")
+    elif ctype == "time_shift":  # r2: a trim (obs 0..T-41 with actions 40..T-1)
+        if not (np.array_equal(ch["state"], par["state"][:T - 40]) and np.array_equal(ch["image"], par["image"][:T - 40])
+                and np.array_equal(ch["image2"], par["image2"][:T - 40])) or not np.array_equal(b, a[40:]):
+            fails.append("trim: state/images/actions are not the parent's frames 0..T-41 / actions 40..T-1")
+        if params.get("length_change") != -40:
+            fails.append("length_change != -40")
+        if int((b[:, :6] == 0).all(axis=1).sum()) != int((a[40:, :6] == 0).all(axis=1).sum()):
+            fails.append("AC1.8 idle_steps")
     elif ctype == "instruction_swap":
         if not (same("action") and same("state") and same("image") and same("image2")):
             fails.append("arrays changed")
@@ -85,6 +88,8 @@ def main() -> int:
     ap.add_argument("--version", default="v2")
     ap.add_argument("--parent", default="v0")
     ap.add_argument("--run-id")
+    ap.add_argument("--prefix", default="s4", help="artifact file prefix (s4, or s4_v3 for the round-2 version)")
+    ap.add_argument("--prior", help="AC4.8: the superseded version (v2) to compare labels with and to check it is fenced")
     ap.add_argument("--artifacts", type=Path, default=FEATURE_DIR / "artifacts")
     a = ap.parse_args()
     t0 = time.time()
@@ -113,7 +118,7 @@ def main() -> int:
     tt["total"] = tt.sum(axis=1)
     print("\nAC4.2 task x type allocation (rows: suite, libero_task_id)")
     print(tt.to_string())
-    tt.to_csv(a.artifacts / "s4_allocation.csv")
+    tt.to_csv(a.artifacts / f"{a.prefix}_allocation.csv")
     tasks_per_type = lab.groupby("corruption_type")["task_name"].nunique().to_dict()
     suites_per_type = {t: sorted(g.groupby("suite").size().to_list()) for t, g in lab.groupby("corruption_type")}
     per_task = sorted(set(tt["total"]))
@@ -222,8 +227,50 @@ def main() -> int:
         out["AC4.7"] = {"run_id": a.run_id, "reached_parent": reached_v0, "raw_files": len(tr["raw_files"] or []),
                         "labels_sha256_tag": tags.get("labels_sha256"), "git": tags.get("mlflow.source.git.commit"), "pass": ok7}
         ok &= ok7
+    # ---- AC4.8 (round 2): v2 vs v3, retirement, AC1.8 on the stored bytes --------------------------------------
+    if a.prior:
+        from vlapoc.lineage import fence_record
+        from vlapoc.method_data import _reset_session, open_for_method
+
+        old = load_answer_key(a.prior).set_index("episode_id")
+        new = labels.set_index("episode_id")
+        same_ids = set(old.index) == set(new.index) and (old["corruption_type"] == new.loc[old.index, "corruption_type"]).all()
+        nts = new["corruption_type"] != "time_shift"
+        eq = (old.loc[new.index[nts], "content_hash"] == new.loc[nts, "content_hash"]).all()
+        ts = new.index[~nts]
+        differ = (old.loc[ts, "content_hash"] != new.loc[ts, "content_hash"]).all()
+        lc = {json.loads(new.loc[i, "params"]).get("length_change") for i in ts}
+        old_lc = {json.loads(old.loc[i, "params"]).get("length_change") for i in ts}
+        print(f"\nAC4.8 {a.prior} vs {a.version}: same 91 episode_ids and types: {same_ids}; the {int(nts.sum())} non-time_shift rows keep their content_hash: "
+              f"{eq}; the {len(ts)} time_shift rows differ: {differ}; length_change in {a.version}: {sorted(lc)} (in {a.prior}: {sorted(map(str, old_lc))})")
+        fr = fence_record(a.prior)
+        vid_new = v["dataset_version_id"]
+        _reset_session()
+        try:
+            open_for_method(f"{a.prior}/candidate")
+            refused = None
+        except Exception as e:  # noqa: BLE001
+            refused = f"{type(e).__name__}: {e}"
+        _reset_session()
+        opened = open_for_method(f"{a.version}/candidate")
+        _reset_session()
+        child_tbl = ve.set_index("episode_id")
+        tr = {i: int(child_tbl.loc[i, "length_steps"]) for i in ts}
+        idle_ok = fails == {} and not any("AC1.8" in " ".join(f_) for f_ in fails.values())
+        print(f"AC4.8 fence_record({a.prior}): reason {fr['reason']!r}, superseded_by {fr.get('superseded_by', '')[:12]} == {a.version} {vid_new[:12]}: "
+              f"{fr.get('superseded_by') == vid_new}")
+        print(f"AC4.8 open_for_method({a.prior}/candidate) refused: {refused is not None}: {str(refused)[:160]}; open_for_method({a.version}/candidate) opened "
+              f"{len(opened.episode_indices)} episodes; AC1.8 (child idle_steps == parent's idle in a[40:T]) on the stored bytes for the {len(ts)} time_shift episodes: {idle_ok}")
+        prior_root = REPO_ROOT / resolve_version(a.prior)["lerobot_root"]
+        print(f"AC4.8 {a.prior}'s physical copy still exists (owner cleanup, not deleted): {prior_root.is_dir()}")
+        ok8 = bool(same_ids and eq and differ and lc == {-40} and fr and fr.get("superseded_by") == vid_new
+                   and "superseded by" in fr["reason"] and refused and len(opened.episode_indices) == 960 and idle_ok and prior_root.is_dir())
+        out["AC4.8"] = {"same_ids_types": bool(same_ids), "non_time_shift_hashes_equal": bool(eq), "time_shift_differ": bool(differ),
+                        "length_change": sorted(lc), "fence_reason": fr["reason"], "v2_refused": refused, "v3_opened": len(opened.episode_indices),
+                        "ac1_8_stored": idle_ok, "pass": ok8}
+        ok &= ok8
     out["pass"] = bool(ok)
-    (a.artifacts / "s4_verify.json").write_text(json.dumps(out, indent=2, default=str))
+    (a.artifacts / f"{a.prefix}_verify.json").write_text(json.dumps(out, indent=2, default=str))
 
     # filmstrip: one stored episode per type, before/after
     import matplotlib
@@ -242,7 +289,7 @@ def main() -> int:
             axes[r_, c_].axis("off")
     fig.suptitle("S4: frames inside the corrupted range of one stored v2 episode per type (images unchanged for noise, shift, swap, release)", fontsize=10)
     fig.tight_layout()
-    fig.savefig(a.artifacts / "s4_filmstrip.png", dpi=80)
+    fig.savefig(a.artifacts / f"{a.prefix}_filmstrip.png", dpi=80)
     print(f"\nall S4 checks pass: {ok} ({time.time() - t0:.0f}s)")
     return 0 if ok else 1
 

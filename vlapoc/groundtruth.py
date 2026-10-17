@@ -370,8 +370,22 @@ def score_run(version: str, score_path: Path, column: str, direction: str = "hig
         return r.run_id, res
 
 
+def retire_version(old: str, new: str, lineage_root: Path | None = None) -> Path:
+    """Fence ``old`` from method use because ``new`` supersedes it (single-record-system rule; plan r2 AC4.8).
+
+    Writes ``versions/<old id>/fence.json`` (``lineage.write_fence``) with reason ``"superseded by <new name>"`` and
+    ``superseded_by`` = ``new``'s version id, so ``open_for_method`` refuses ``old``. Does not touch ``old``'s dataset
+    copy: removing it is the owner's cleanup. Ground-truth side.
+    """
+    from vlapoc.lineage import write_fence
+
+    nv = resolve_version(new, lineage_root)
+    return write_fence(old, f"superseded by {nv['name']}", {"superseded_by": nv["dataset_version_id"],
+                                                            "superseded_by_name": nv["name"]}, lineage_root)
+
+
 def main(argv: list[str] | None = None) -> int:
-    """CLI: ``derive`` (S4), ``score`` (S5)."""
+    """CLI: ``derive`` (S4), ``score`` (S5), ``retire`` (r2)."""
     ap = argparse.ArgumentParser(prog="python -m vlapoc.groundtruth")
     sub = ap.add_subparsers(dest="cmd", required=True)
     d = sub.add_parser("derive", help="derive the injected version (all seven types) from a parent")
@@ -387,7 +401,12 @@ def main(argv: list[str] | None = None) -> int:
     sc.add_argument("--direction", default="highest", choices=("highest", "lowest"))
     sc.add_argument("--out", type=Path)
     sc.add_argument("--no-track", action="store_true")
+    rt = sub.add_parser("retire", help="fence a superseded version from method use")
+    rt.add_argument("--version", required=True)
+    rt.add_argument("--superseded-by", required=True)
     a = ap.parse_args(argv)
+    if a.cmd == "retire":
+        print(retire_version(a.version, a.superseded_by))
     if a.cmd == "score":
         if a.no_track:
             res = score_recovery(a.version, pd.read_parquet(a.scores), a.column, a.direction)
@@ -406,7 +425,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 __all__ = ["load_answer_key", "select_injection", "build_edits", "derive_injection", "derive_injection_run",
-           "candidate_actions", "recovery_metrics", "score_recovery", "leak_check", "score_run"]
+           "candidate_actions", "recovery_metrics", "score_recovery", "leak_check", "score_run", "retire_version"]
 
 
 if __name__ == "__main__":
