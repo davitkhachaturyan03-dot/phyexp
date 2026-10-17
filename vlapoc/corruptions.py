@@ -33,7 +33,8 @@ Parameter provenance. Every label's ``params`` has ``source`` and ``parameters``
   would make a value that clean data never has, and 50.1% of noised gripper values would fall outside
   [-1, 1] and be clipped. The gripper's own corruption is ``gripper_release``.
 - ``time_shift``: direction (actions lead observations: the logged command a[t] is the one the operator issued
-  2 s later, a'[t] = a[t + 40]); tail fill (arm 0, gripper held at its last value).
+  2 s later, a'[t] = a[t + 40]); trim instead of fill (owner ruling A, 2026-10-17): the child is T - 40 frames,
+  obs[0:T-40] paired with a[40:T]; round 1 padded an idle tail, which was only an artifact.
 - ``instruction_swap``: same-suite target, uniform.
 - ``dropped_frames``: one camera per burst, bursts until about 20% of frames are held. The burst length cap of
   10 frames is quoted from LeRobot's ``read_latest(max_age_ms=500)`` at 20 fps.
@@ -244,20 +245,30 @@ def action_noise(episode_id: str, sigma_a: np.ndarray, seed: int, scale: float =
 
 
 def time_shift(episode_id: str, seed: int, steps: int = SHIFT_STEPS) -> EpisodeEdit:
-    """``time_shift``: a'[t] = a[t + 40] for t < T - 40; the last 40 steps have arm action 0 and the gripper held
-    at a[T-1, 6] ("the operator stopped commanding").
+    """``time_shift``: a TRIM. The child is frames 0 .. T-steps-1 with each frame's state and images unchanged and
+    its action replaced by the action ``steps`` (40) steps later: a'[t] = a[t + 40], so the child has T - 40 frames.
 
     PoC §2.5 p.5 "time-shifted actions" (teleoperation lag); RoboDrop App. A.1 p.13 "shifts the action sequence
-    by two seconds relative to the observations" (40 steps = 2 s x 20 fps). Direction and tail are inferred
-    (RoboDrop states neither). Deterministic: ``seed`` is recorded but unused. Length unchanged.
+    by two seconds relative to the observations" (40 steps = 2 s x 20 fps). Direction (actions lead the
+    observations) is inferred: RoboDrop states none.
+
+    Round-2 change (owner ruling A, 2026-10-17, dispute-r1): round 1 filled the vacated last 40 steps with idle
+    (arm action 0, gripper held). That tail was detectable only as an artifact (an ``idle_steps`` of at least 40,
+    beyond the clean maximum of 21, gave AUROC 1.0) and put two seconds of idle into a type whose PoC row says nothing
+    about idle. The trim has no fill: every frame and every action is a real parent value. The cost, reported
+    openly (plan AC5.8): the episode is 40 steps shorter, a residual ``length_steps`` signal. ``params`` records
+    ``length_change = -40``. Deterministic (no random draw): ``seed`` is recorded but unused. Every parent has
+    T >= 75, so the shortest child has 35 frames.
     """
     params = {
         "source": "PoC §2.5 p.5 'time-shifted actions'; RoboDrop App. A.1 p.13 'shifts the action sequence by two "
                   "seconds relative to the observations'",
+        "length_change": -steps,
         "parameters": {
             "shift_steps": _p(steps, "quoted", "RoboDrop App. A.1 p.13 two seconds x 20 fps (meta/info.json)"),
             "direction": _p("a'[t] = a[t + shift]: actions lead the observations", "inferred", "RoboDrop does not state it"),
-            "tail_fill": _p("arm action 0, gripper held at a[T-1, 6]", "inferred", "RoboDrop does not state it"),
+            "vacated_steps": _p("trimmed: the child keeps frames 0 .. T-shift-1, no fill", "inferred",
+                                "owner ruling A (2026-10-17): the round-1 idle tail was an artifact"),
             "clip": _p([CLIP_LOW, CLIP_HIGH], "quoted", "owner decision 1"),
             "rng": _p("none: deterministic", "inferred", "no random draw"),
         },
@@ -268,11 +279,9 @@ def time_shift(episode_id: str, seed: int, steps: int = SHIFT_STEPS) -> EpisodeE
         t = len(a)
         if t <= steps:
             raise ValueError(f"{episode_id}: length {t} <= shift {steps}")
-        out = np.empty_like(a)
-        out[:t - steps] = a[steps:]
-        out[t - steps:, :6] = 0.0
-        out[t - steps:, 6] = a[-1, 6]
-        return _finish(params, ep, out, [(0, t)])
+        edited = _finish(params, ep, a[steps:], [(0, t - steps)])
+        keep = slice(0, t - steps)
+        return {**edited, "state": ep["state"][keep], "image": ep["image"][keep], "image2": ep["image2"][keep]}
 
     return EpisodeEdit(episode_id, "time_shift", params, seed, f, hypothesis=hypothesis_for("time_shift"))
 

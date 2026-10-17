@@ -194,3 +194,23 @@
 - `EpisodeEdit.params` is completed by the transform at run time (S1 note); the labels written by `derive_version` are therefore only complete after the writer pass.
 - Open from the plan, unchanged: clip bound [-1, 1] and swap provenance (D1) kept as defaults.
 - Disk after the batch: 83 GiB free; v2 copy 7.3 GB; real `data/lineage` grew by v2's version record, three subsets, a split and 13 runs.
+
+## Round 2: 2026-10-17
+
+Owner ruling A (brief.md, 2026-10-17; `dispute-r1.md`): fix `time_shift` only. Plan r2 (`62f80a5`). Work order: (1) the trim in `corruptions.py` and S1's verifier, (2) one re-derivation as v3 and v2's retirement, (3) S4-S6 on v3, (4) the 7.3G vs 6.8G reconciliation.
+
+### R2 step 1: the `time_shift` trim (S1)
+**Files:**
+- `vlapoc/corruptions.py`: `time_shift` now returns obs[0:T-40] (state, image, image2) paired with a[40:T]; no fill; `params["length_change"] = -40`; `vacated_steps` parameter tagged inferred (owner ruling A); docstring and module docstring state the change and the residual length signal.
+- `scripts/verify_corruptions_s1.py`: `time_shift` expectations (T-40, parent frames 0..T-41, parent actions 40..T-1, `length_change == -40`), AC1.8 check and distribution, AC1.5 amended thresholds asserted.
+
+**Acceptance criteria** (`artifacts/s1_r2_run1.txt`, `s1_r2_run2_check_hashes.txt`; r1 numbers kept in `artifacts/s1_invariants_r1.json`; same 118-episode seeded sample as round 1):
+- ✅ AC1.4: `time_shift` gives T-40 with state and images equal to parent frames 0..T-41 and actions equal to parent actions 40..T-1 bit for bit; all other type checks unchanged; 0 invariant failures on 118 episodes per type (`invariant_failures` 0 in all seven rows).
+- ✅ AC1.5 (amended): same (seed, episode_id) gives the same hash in two fresh processes for all seven types (all True). A different seed (0 vs 1) changes the hash for 118/118 `action_noise`, `dropped_frames`, `idle_padding`; 112/118 = 94.9% of `detour`; 105/118 = 89.0% of `instruction_swap` (both ≥ 80%); 0/118 for `time_shift` and `gripper_release`, asserted. The round-1 ❌ on this AC is resolved by the amendment, not by a code change.
+- ✅ AC1.6: eligibility unchanged: 960 for six types (`time_shift` needs T > 40, all 960), 884 for `gripper_release`; 907/960 have a final release; all types ≥ 13 eligible in 20 tasks.
+- ✅ AC1.8: for every `time_shift` output the child's idle_steps equals the parent's all-zero-arm steps within a[40:T]. Distribution over the 118 episodes: max 2, p99 2, > 0 in 6 episodes (the plan's 960-candidate measurement: max 7, p99 2); the clean maximum run is 21.
+- ✅ AC1.1-AC1.3, AC1.7 hold as in round 1 (params carry `source`, tagged parameters and `corrupted_frames`; `time_shift` records clip counts 0; the module docstring was updated for the trim).
+
+**Demo artifacts produced:** `artifacts/s1_traces.png`, `artifacts/s1_filmstrip.png` regenerated (the `time_shift` panel now shows a 40-step shorter child), `artifacts/s1_invariants.json` (r2), `artifacts/s1_invariants_r1.json` (r1 for comparison).
+
+**Notes:** `eligible("time_shift")` stays "T > 40" (shortest child 35 frames, measured in the plan).

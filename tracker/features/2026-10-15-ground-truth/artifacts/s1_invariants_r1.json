@@ -1,0 +1,553 @@
+{
+  "version": "v0",
+  "seed": 0,
+  "n_sample": 118,
+  "eligibility": [
+    {
+      "type": "action_noise",
+      "eligible": 960,
+      "of": 960,
+      "tasks": 20,
+      "suites": 2
+    },
+    {
+      "type": "time_shift",
+      "eligible": 960,
+      "of": 960,
+      "tasks": 20,
+      "suites": 2
+    },
+    {
+      "type": "instruction_swap",
+      "eligible": 960,
+      "of": 960,
+      "tasks": 20,
+      "suites": 2
+    },
+    {
+      "type": "dropped_frames",
+      "eligible": 960,
+      "of": 960,
+      "tasks": 20,
+      "suites": 2
+    },
+    {
+      "type": "detour",
+      "eligible": 960,
+      "of": 960,
+      "tasks": 20,
+      "suites": 2
+    },
+    {
+      "type": "idle_padding",
+      "eligible": 960,
+      "of": 960,
+      "tasks": 20,
+      "suites": 2
+    },
+    {
+      "type": "gripper_release",
+      "eligible": 884,
+      "of": 960,
+      "tasks": 20,
+      "suites": 2
+    }
+  ],
+  "p7": {
+    "final_release": 907,
+    "carry_median": 63,
+    "carry_ge_40": 0.9570011025358324,
+    "carry_ge_30": 0.9746416758544653
+  },
+  "invariants": [
+    {
+      "type": "action_noise",
+      "episodes": 118,
+      "invariant_failures": 0,
+      "mean_corrupted_share": 1.0,
+      "hypothesis": "none stated"
+    },
+    {
+      "type": "time_shift",
+      "episodes": 118,
+      "invariant_failures": 0,
+      "mean_corrupted_share": 1.0,
+      "hypothesis": "none stated"
+    },
+    {
+      "type": "instruction_swap",
+      "episodes": 118,
+      "invariant_failures": 0,
+      "mean_corrupted_share": 1.0,
+      "hypothesis": "none stated"
+    },
+    {
+      "type": "dropped_frames",
+      "episodes": 118,
+      "invariant_failures": 0,
+      "mean_corrupted_share": 0.22,
+      "hypothesis": "none stated"
+    },
+    {
+      "type": "detour",
+      "episodes": 118,
+      "invariant_failures": 0,
+      "mean_corrupted_share": 0.289,
+      "hypothesis": "none stated"
+    },
+    {
+      "type": "idle_padding",
+      "episodes": 118,
+      "invariant_failures": 0,
+      "mean_corrupted_share": 0.189,
+      "hypothesis": "speed (time-based metrics), not reliability (PoC \u00a78.10 p.17; \u00a74.5 p.11)"
+    },
+    {
+      "type": "gripper_release",
+      "episodes": 118,
+      "invariant_failures": 0,
+      "mean_corrupted_share": 0.122,
+      "hypothesis": "reliability (drops), not speed (PoC \u00a78.10 p.17; \u00a74.5 p.11)"
+    }
+  ],
+  "clip_action_noise": {
+    "n_values": 167846,
+    "n_clipped": 521,
+    "frac_clipped": 0.003104035842379324,
+    "n_clipped_dims0_2": 521,
+    "frac_clipped_dims0_2": 0.0072427502988850895,
+    "n_beyond_clean_range": 1215,
+    "frac_beyond_clean_range": 0.016890482942697474
+  },
+  "determinism": {
+    "same_seed_cross_process": null,
+    "different_seed_differs": {
+      "action_noise": {
+        "n": 118,
+        "differing": 118
+      },
+      "time_shift": {
+        "n": 118,
+        "differing": 0
+      },
+      "instruction_swap": {
+        "n": 118,
+        "differing": 105
+      },
+      "dropped_frames": {
+        "n": 118,
+        "differing": 118
+      },
+      "detour": {
+        "n": 118,
+        "differing": 112
+      },
+      "idle_padding": {
+        "n": 118,
+        "differing": 118
+      },
+      "gripper_release": {
+        "n": 118,
+        "differing": 0
+      }
+    }
+  },
+  "example_params": {
+    "action_noise": {
+      "source": "PoC \u00a72.5 p.5 'Noisy or time-shifted actions'; RoboDrop App. A.1 p.13 'zero-mean Gaussian noise with standard deviation 0.25 sigma_a ... sigma_a is the empirical action standard deviation'",
+      "parameters": {
+        "std_scale": {
+          "value": 0.25,
+          "basis": "quoted",
+          "from": "RoboDrop App. A.1 p.13"
+        },
+        "sigma_a": {
+          "value": [
+            0.33342540816251764,
+            0.3530923979576389,
+            0.41343791376439404,
+            0.03925990127527107,
+            0.06115131646463206,
+            0.08113058528269534,
+            0.999020719740617
+          ],
+          "basis": "measured",
+          "from": "v0 meta/stats.json action.std"
+        },
+        "noised_dims": {
+          "value": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "basis": "inferred",
+          "from": "gripper is exactly {-1,+1} in v0 (measured); differs from v1's 7-dim reading"
+        },
+        "clip": {
+          "value": [
+            -1.0,
+            1.0
+          ],
+          "basis": "quoted",
+          "from": "owner decision 1; LIBERO Box(-1, 1, (7,))"
+        },
+        "rng": {
+          "value": "derive._episode_rng(seed, '<type>:<episode_id>') = default_rng(SeedSequence([seed, int(sha256(key)[:16], 16)]))",
+          "basis": "inferred",
+          "from": "same scheme as derive.robodrop_action_noise"
+        }
+      },
+      "clip_bounds": [
+        -1.0,
+        1.0
+      ],
+      "n_values": 686,
+      "n_clipped": 8,
+      "frac_clipped": 0.011661807580174927,
+      "n_clipped_dims0_2": 8,
+      "frac_clipped_dims0_2": 0.027210884353741496,
+      "n_beyond_clean_range": 21,
+      "frac_beyond_clean_range": 0.07142857142857142,
+      "corrupted_frames": [
+        [
+          0,
+          98
+        ]
+      ]
+    },
+    "time_shift": {
+      "source": "PoC \u00a72.5 p.5 'time-shifted actions'; RoboDrop App. A.1 p.13 'shifts the action sequence by two seconds relative to the observations'",
+      "parameters": {
+        "shift_steps": {
+          "value": 40,
+          "basis": "quoted",
+          "from": "RoboDrop App. A.1 p.13 two seconds x 20 fps (meta/info.json)"
+        },
+        "direction": {
+          "value": "a'[t] = a[t + shift]: actions lead the observations",
+          "basis": "inferred",
+          "from": "RoboDrop does not state it"
+        },
+        "tail_fill": {
+          "value": "arm action 0, gripper held at a[T-1, 6]",
+          "basis": "inferred",
+          "from": "RoboDrop does not state it"
+        },
+        "clip": {
+          "value": [
+            -1.0,
+            1.0
+          ],
+          "basis": "quoted",
+          "from": "owner decision 1"
+        },
+        "rng": {
+          "value": "none: deterministic",
+          "basis": "inferred",
+          "from": "no random draw"
+        }
+      },
+      "clip_bounds": [
+        -1.0,
+        1.0
+      ],
+      "n_values": 686,
+      "n_clipped": 0,
+      "frac_clipped": 0.0,
+      "n_clipped_dims0_2": 0,
+      "frac_clipped_dims0_2": 0.0,
+      "n_beyond_clean_range": 0,
+      "frac_beyond_clean_range": 0.0,
+      "corrupted_frames": [
+        [
+          0,
+          98
+        ]
+      ]
+    },
+    "instruction_swap": {
+      "source": "PoC \u00a72.5 p.5 'Swapped or wrong language instructions' (annotation errors)",
+      "parameters": {
+        "original_task": {
+          "value": "pick up the black bowl between the plate and the ramekin and place it on the plate",
+          "basis": "measured",
+          "from": "stored task string"
+        },
+        "new_task": {
+          "value": "pick up the black bowl from table center and place it on the plate",
+          "basis": "inferred",
+          "from": "uniform over 9 other same-suite tasks"
+        },
+        "same_suite": {
+          "value": true,
+          "basis": "inferred",
+          "from": "keeps the instruction valid for the benchmark"
+        },
+        "provenance": {
+          "value": "episode_id, task_name, libero_task_id, scene, objects, position unchanged",
+          "basis": "inferred",
+          "from": "design D1: a real annotation error leaves the collection record true"
+        },
+        "rng": {
+          "value": "derive._episode_rng(seed, '<type>:<episode_id>') = default_rng(SeedSequence([seed, int(sha256(key)[:16], 16)]))",
+          "basis": "inferred",
+          "from": "target drawn at construction"
+        }
+      },
+      "corrupted_frames": [
+        [
+          0,
+          98
+        ]
+      ],
+      "n_clipped": 0,
+      "n_clipped_dims0_2": 0,
+      "n_beyond_clean_range": 0,
+      "frac_clipped": 0.0,
+      "frac_clipped_dims0_2": 0.0,
+      "frac_beyond_clean_range": 0.0
+    },
+    "dropped_frames": {
+      "source": "PoC \u00a72.5 p.5 'dropped frames' (hardware faults); LeRobot cameras/opencv read_latest: stale frame up to max_age_ms=500",
+      "parameters": {
+        "burst_length": {
+          "value": [
+            1,
+            10
+          ],
+          "basis": "quoted",
+          "from": "read_latest(max_age_ms=500) at 20 fps = 10 frames"
+        },
+        "held_fraction": {
+          "value": 0.2,
+          "basis": "inferred",
+          "from": "target share of held frames"
+        },
+        "camera": {
+          "value": "one per burst, uniform over {image, image2}",
+          "basis": "inferred",
+          "from": "no spec"
+        },
+        "hold": {
+          "value": "frame t in the burst shows the image of burst start - 1",
+          "basis": "quoted",
+          "from": "read_latest returns the previous frame"
+        },
+        "rng": {
+          "value": "derive._episode_rng(seed, '<type>:<episode_id>') = default_rng(SeedSequence([seed, int(sha256(key)[:16], 16)]))",
+          "basis": "inferred",
+          "from": "per-episode generator"
+        }
+      },
+      "n_clipped": 0,
+      "n_clipped_dims0_2": 0,
+      "n_beyond_clean_range": 0,
+      "frac_clipped": 0.0,
+      "frac_clipped_dims0_2": 0.0,
+      "frac_beyond_clean_range": 0.0,
+      "corrupted_frames": [
+        [
+          4,
+          7
+        ],
+        [
+          14,
+          19
+        ],
+        [
+          63,
+          66
+        ],
+        [
+          72,
+          78
+        ],
+        [
+          83,
+          90
+        ]
+      ],
+      "bursts": [
+        {
+          "start": 4,
+          "end": 7,
+          "camera": "image2"
+        },
+        {
+          "start": 14,
+          "end": 19,
+          "camera": "image2"
+        },
+        {
+          "start": 63,
+          "end": 66,
+          "camera": "image"
+        },
+        {
+          "start": 72,
+          "end": 78,
+          "camera": "image2"
+        },
+        {
+          "start": 83,
+          "end": 90,
+          "camera": "image2"
+        }
+      ],
+      "n_held_frames": 24,
+      "frac_held": 0.24489795918367346
+    },
+    "detour": {
+      "source": "PoC \u00a72.5 p.5 'Low-skill or hesitant demonstrations' (corrections); SCIZOR RQ4 'Move Back and Forth'",
+      "parameters": {
+        "window_steps": {
+          "value": 20,
+          "basis": "inferred",
+          "from": "1 s at 20 fps"
+        },
+        "placement": {
+          "value": "window of steps+1 frames with constant gripper inside [0.2T, 0.8T]",
+          "basis": "inferred",
+          "from": "idle/pauses never occur mid-episode in v0 (measured)"
+        },
+        "reverse_actions": {
+          "value": "arm dims 0-5 negated, gripper unchanged",
+          "basis": "inferred",
+          "from": "OSC_POSE delta control"
+        },
+        "rng": {
+          "value": "derive._episode_rng(seed, '<type>:<episode_id>') = default_rng(SeedSequence([seed, int(sha256(key)[:16], 16)]))",
+          "basis": "inferred",
+          "from": "start drawn uniformly among eligible windows"
+        }
+      },
+      "clip_bounds": [
+        -1.0,
+        1.0
+      ],
+      "n_values": 966,
+      "n_clipped": 0,
+      "frac_clipped": 0.0,
+      "n_clipped_dims0_2": 0,
+      "frac_clipped_dims0_2": 0.0,
+      "n_beyond_clean_range": 0,
+      "frac_beyond_clean_range": 0.0,
+      "corrupted_frames": [
+        [
+          51,
+          112
+        ]
+      ],
+      "window_start_parent": 51,
+      "window_end_parent": 71
+    },
+    "idle_padding": {
+      "source": "PoC \u00a78.10 p.17 'pad some with idle or hesitant segments'; \u00a72.5 p.5 'idle periods'; \u00a74.5 p.11",
+      "parameters": {
+        "pause_steps": {
+          "value": 20,
+          "basis": "inferred",
+          "from": "<= 21, the clean maximum identical-action run (measured)"
+        },
+        "n_pauses": {
+          "value": 2,
+          "basis": "inferred",
+          "from": "+40 steps = +23% of the median length (measured 172.5)"
+        },
+        "placement": {
+          "value": "distinct points at least 5 apart in [0.2T, 0.8T]",
+          "basis": "inferred",
+          "from": "clean idle frames sit at the start (measured)"
+        },
+        "idle_frame": {
+          "value": "observation and state repeated, arm action 0, gripper held",
+          "basis": "inferred",
+          "from": "as derive.idle_padding_edit"
+        },
+        "rng": {
+          "value": "derive._episode_rng(seed, '<type>:<episode_id>') = default_rng(SeedSequence([seed, int(sha256(key)[:16], 16)]))",
+          "basis": "inferred",
+          "from": "per-episode generator"
+        }
+      },
+      "n_clipped": 0,
+      "n_clipped_dims0_2": 0,
+      "n_beyond_clean_range": 0,
+      "frac_clipped": 0.0,
+      "frac_clipped_dims0_2": 0.0,
+      "frac_beyond_clean_range": 0.0,
+      "clip_bounds": [
+        -1.0,
+        1.0
+      ],
+      "n_values": 966,
+      "corrupted_frames": [
+        [
+          51,
+          71
+        ],
+        [
+          86,
+          106
+        ]
+      ],
+      "pause_points_parent": [
+        51,
+        66
+      ]
+    },
+    "gripper_release": {
+      "source": "PoC \u00a78.10 p.17 'gripper-release noise'; \u00a74.5 p.11 'noisy gripper release near placement aimed at drops'",
+      "parameters": {
+        "release_steps": {
+          "value": 20,
+          "basis": "inferred",
+          "from": "1 s at 20 fps; stays inside the carry phase (carry span >= 30)"
+        },
+        "min_carry_steps": {
+          "value": 30,
+          "basis": "measured",
+          "from": "P7: closed span before the final release >= 40 in 95% of v0"
+        },
+        "rng": {
+          "value": "none: deterministic",
+          "basis": "inferred",
+          "from": "no random draw"
+        }
+      },
+      "clip_bounds": [
+        -1.0,
+        1.0
+      ],
+      "n_values": 686,
+      "n_clipped": 0,
+      "frac_clipped": 0.0,
+      "n_clipped_dims0_2": 0,
+      "frac_clipped_dims0_2": 0.0,
+      "n_beyond_clean_range": 0,
+      "frac_beyond_clean_range": 0.0,
+      "corrupted_frames": [
+        [
+          65,
+          85
+        ]
+      ],
+      "final_release_index": 85,
+      "carry_steps": 49,
+      "final_release_rel_position": 0.8673469387755102
+    }
+  },
+  "failures": {
+    "action_noise": [],
+    "time_shift": [],
+    "instruction_swap": [],
+    "dropped_frames": [],
+    "detour": [],
+    "idle_padding": [],
+    "gripper_release": []
+  },
+  "seconds": 33.1
+}

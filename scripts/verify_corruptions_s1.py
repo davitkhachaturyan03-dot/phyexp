@@ -83,6 +83,9 @@ def check_params(edit, T_child: int) -> list[str]:
     return errs
 
 
+idle_dist: dict[str, int] = {}  # AC1.8: time_shift idle_steps over the test episodes (seed-0 pass only is recorded below)
+
+
 def run_episode(ctype: str, ep: dict, eid: str, seed: int, sigma, suite_tasks: dict, parent_tasks: set, suite_of_task: dict):
     """Apply one type to one episode and check its invariants. Returns (output, edit, failures list)."""
     kw = {}
@@ -101,7 +104,7 @@ def run_episode(ctype: str, ep: dict, eid: str, seed: int, sigma, suite_tasks: d
         fails.append("range")
     if not np.isin(b[:, 6], [-1.0, 1.0]).all():
         fails.append("gripper not binary")
-    exp_len = T + 40 if ctype in ("detour", "idle_padding") else T
+    exp_len = T + 40 if ctype in ("detour", "idle_padding") else T - 40 if ctype == "time_shift" else T
     if T2 != exp_len:
         fails.append(f"length {T2} != {exp_len}")
     same = lambda k: len(out[k]) == len(ep[k]) and np.array_equal(out[k], ep[k])  # noqa: E731
@@ -111,12 +114,18 @@ def run_episode(ctype: str, ep: dict, eid: str, seed: int, sigma, suite_tasks: d
         if not np.array_equal(a[:, 6], b[:, 6]):
             fails.append("gripper changed")
     elif ctype == "time_shift":
-        if not (same("state") and same("image") and same("image2") and out["task"] == ep["task"]):
-            fails.append("non-action array changed")
-        if not np.array_equal(b[:T - 40], a[40:]):
-            fails.append("shifted body differs")
-        if not ((b[T - 40:, :6] == 0).all() and (b[T - 40:, 6] == a[-1, 6]).all()):
-            fails.append("tail fill")
+        if not (np.array_equal(out["state"], ep["state"][:T - 40]) and np.array_equal(out["image"], ep["image"][:T - 40])
+                and np.array_equal(out["image2"], ep["image2"][:T - 40]) and out["task"] == ep["task"]):
+            fails.append("state/images are not parent frames 0..T-41")
+        if not np.array_equal(b, a[40:]):
+            fails.append("actions are not parent actions 40..T-1")
+        if edit.params.get("length_change") != -40:
+            fails.append("length_change != -40")
+        idle_child = int((b[:, :6] == 0).all(axis=1).sum())
+        idle_exp = int((a[40:, :6] == 0).all(axis=1).sum())
+        idle_dist[eid] = idle_child
+        if idle_child != idle_exp:  # AC1.8
+            fails.append(f"idle_steps {idle_child} != parent's idle in a[40:T] {idle_exp}")
     elif ctype == "instruction_swap":
         if not (same("action") and same("state") and same("image") and same("image2")):
             fails.append("arrays changed")
@@ -284,6 +293,21 @@ def main() -> int:
         print("AC1.5 episodes whose hash differs between seed "
               f"{a.seed} and {a.seed + 1} (of {len(sample)}):", {t: d["differing"] for t, d in det["different_seed_differs"].items()})
 
+    # ---- AC1.5 amended thresholds (plan r2) and AC1.8 distribution --------------------------------------
+    ac15_ok = True
+    if det["different_seed_differs"]:
+        d_ = det["different_seed_differs"]
+        n_ = len(sample)
+        ac15_ok = (all(d_[t]["differing"] == n_ for t in ("action_noise", "dropped_frames", "idle_padding"))
+                   and all(d_[t]["differing"] >= 0.8 * n_ for t in ("detour", "instruction_swap"))
+                   and all(d_[t]["differing"] == 0 for t in ("time_shift", "gripper_release")))
+        print(f"AC1.5 amended: noise/dropped/idle differ for all {n_}: {all(d_[t]['differing'] == n_ for t in ('action_noise', 'dropped_frames', 'idle_padding'))}; "
+              f"detour {d_['detour']['differing'] / n_:.1%} and swap {d_['instruction_swap']['differing'] / n_:.1%} >= 80%: "
+              f"{all(d_[t]['differing'] >= 0.8 * n_ for t in ('detour', 'instruction_swap'))}; time_shift and gripper_release seed-independent: "
+              f"{all(d_[t]['differing'] == 0 for t in ('time_shift', 'gripper_release'))} -> {ac15_ok}")
+    iv = np.array(list(idle_dist.values()))
+    print(f"AC1.8 time_shift child idle_steps == parent's idle in a[40:T] for every episode (checked in run_episode); distribution over "
+          f"{len(iv)} episodes: max {iv.max()}, p99 {np.percentile(iv, 99):.0f}, >0 in {(iv > 0).sum()}; clean maximum run is 21 (measured earlier)")
     # ---- AC1.1 an example label per type -----------------------------------------------------------
     print("\nAC1.1 example label params (keys), first sampled episode per type")
     for t in C.TYPES:
@@ -294,11 +318,12 @@ def main() -> int:
     summary = {"version": v["name"], "seed": a.seed, "n_sample": len(sample), "eligibility": elig_rows,
                "p7": {"final_release": n_final, "carry_median": int(np.median(car)),
                       "carry_ge_40": float(np.mean(np.array(car) >= 40)), "carry_ge_30": float(np.mean(np.array(car) >= 30))},
-               "invariants": rows, "clip_action_noise": clip, "determinism": det,
+               "invariants": rows, "clip_action_noise": clip, "determinism": det, "ac15_amended_ok": ac15_ok, "ac18_idle_steps": {"max": int(iv.max()), "p99": float(np.percentile(iv, 99)), "n_gt0": int((iv > 0).sum()), "n": int(len(iv))},
                "example_params": example_params, "failures": {t: fails_by[t][:5] for t in C.TYPES},
                "seconds": round(time.time() - t0, 1)}
     (a.artifacts / "s1_invariants.json").write_text(json.dumps(summary, indent=2, default=str))
     ok = all(not fails_by[t] for t in C.TYPES) and all(r["episodes"] >= a.per_type for r in rows)
+    ok = ok and ac15_ok
     if det["same_seed_cross_process"]:
         ok = ok and all(det["same_seed_cross_process"].values())
     print(f"\nall invariants hold on >= {a.per_type} episodes per type: {ok} ({time.time() - t0:.0f}s)")

@@ -152,6 +152,13 @@
       }
     }
   },
+  "ac15_amended_ok": true,
+  "ac18_idle_steps": {
+    "max": 2,
+    "p99": 2.0,
+    "n_gt0": 6,
+    "n": 118
+  },
   "example_params": {
     "action_noise": {
       "source": "PoC \u00a72.5 p.5 'Noisy or time-shifted actions'; RoboDrop App. A.1 p.13 'zero-mean Gaussian noise with standard deviation 0.25 sigma_a ... sigma_a is the empirical action standard deviation'",
@@ -220,6 +227,7 @@
     },
     "time_shift": {
       "source": "PoC \u00a72.5 p.5 'time-shifted actions'; RoboDrop App. A.1 p.13 'shifts the action sequence by two seconds relative to the observations'",
+      "length_change": -40,
       "parameters": {
         "shift_steps": {
           "value": 40,
@@ -231,10 +239,10 @@
           "basis": "inferred",
           "from": "RoboDrop does not state it"
         },
-        "tail_fill": {
-          "value": "arm action 0, gripper held at a[T-1, 6]",
+        "vacated_steps": {
+          "value": "trimmed: the child keeps frames 0 .. T-shift-1, no fill",
           "basis": "inferred",
-          "from": "RoboDrop does not state it"
+          "from": "owner ruling A (2026-10-17): the round-1 idle tail was an artifact"
         },
         "clip": {
           "value": [
@@ -254,7 +262,7 @@
         -1.0,
         1.0
       ],
-      "n_values": 686,
+      "n_values": 406,
       "n_clipped": 0,
       "frac_clipped": 0.0,
       "n_clipped_dims0_2": 0,
@@ -264,7 +272,7 @@
       "corrupted_frames": [
         [
           0,
-          98
+          58
         ]
       ]
     },
@@ -549,5 +557,5 @@
     "idle_padding": [],
     "gripper_release": []
   },
-  "seconds": 33.1
+  "seconds": 33.2
 }

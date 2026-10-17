@@ -1,0 +1,59 @@
+version v0 3c4dca68d6f1: 1000 episodes, 960 candidates, 20 tasks, suites ['libero_10', 'libero_spatial']
+
+AC1.6 eligibility over the 960 candidates
+            type  eligible  of  tasks  suites
+    action_noise       960 960     20       2
+      time_shift       960 960     20       2
+instruction_swap       960 960     20       2
+  dropped_frames       960 960     20       2
+          detour       960 960     20       2
+    idle_padding       960 960     20       2
+ gripper_release       884 960     20       2
+P7 recheck on candidates: final release in 907/960; carry span median 63, >=40 in 95.7%, >=30 in 97.5%
+
+sample: 118 candidates eligible for all seven types (seeded), over 19 tasks
+  ... 20/118 episodes (4s)
+  ... 40/118 episodes (7s)
+  ... 60/118 episodes (11s)
+  ... 80/118 episodes (18s)
+  ... 100/118 episodes (25s)
+
+AC1.2 / AC1.4 / AC1.1 invariants per type (range, gripper binary, length, content, params)
+            type  episodes  invariant_failures  mean_corrupted_share                                                              hypothesis
+    action_noise       118                   0                 1.000                                                             none stated
+      time_shift       118                   0                 1.000                                                             none stated
+instruction_swap       118                   0                 1.000                                                             none stated
+  dropped_frames       118                   0                 0.220                                                             none stated
+          detour       118                   0                 0.289                                                             none stated
+    idle_padding       118                   0                 0.189 speed (time-based metrics), not reliability (PoC §8.10 p.17; §4.5 p.11)
+ gripper_release       118                   0                 0.122              reliability (drops), not speed (PoC §8.10 p.17; §4.5 p.11)
+
+AC1.3 clip accounting, action_noise totals over the sample
+{
+ "n_values": 167846,
+ "n_clipped": 521,
+ "frac_clipped": 0.003104035842379324,
+ "n_clipped_dims0_2": 521,
+ "frac_clipped_dims0_2": 0.0072427502988850895,
+ "n_beyond_clean_range": 1215,
+ "frac_beyond_clean_range": 0.016890482942697474
+}
+other six types: n_clipped asserted 0 and frac_beyond_clean_range 0 inside run_episode (0 failures)
+
+AC1.5 hashes dumped to data/scratch/gt_s1r2_hashes.json
+AC1.5 episodes whose hash differs between seed 0 and 1 (of 118): {'action_noise': 118, 'time_shift': 0, 'instruction_swap': 105, 'dropped_frames': 118, 'detour': 112, 'idle_padding': 118, 'gripper_release': 0}
+AC1.5 amended: noise/dropped/idle differ for all 118: True; detour 94.9% and swap 89.0% >= 80%: True; time_shift and gripper_release seed-independent: True -> True
+AC1.8 time_shift child idle_steps == parent's idle in a[40:T] for every episode (checked in run_episode); distribution over 118 episodes: max 2, p99 2, >0 in 6; clean maximum run is 21 (measured earlier)
+
+AC1.1 example label params (keys), first sampled episode per type
+  action_noise: source="PoC §2.5 p.5 'Noisy or time-shifted actions'; RoboDrop App. A.1 p.13 '"; parameters={'std_scale': 'quoted', 'sigma_a': 'measured', 'noised_dims': 'inferred', 'clip': 'quoted', 'rng': 'inferred'}; corrupted_frames=[[0, 98]]; n_clipped=8
+  time_shift: source="PoC §2.5 p.5 'time-shifted actions'; RoboDrop App. A.1 p.13 'shifts th"; parameters={'shift_steps': 'quoted', 'direction': 'inferred', 'vacated_steps': 'inferred', 'clip': 'quoted', 'rng': 'inferred'}; corrupted_frames=[[0, 58]]; n_clipped=0
+  instruction_swap: source="PoC §2.5 p.5 'Swapped or wrong language instructions' (annotation erro"; parameters={'original_task': 'measured', 'new_task': 'inferred', 'same_suite': 'inferred', 'provenance': 'inferred', 'rng': 'inferred'}; corrupted_frames=[[0, 98]]; n_clipped=0
+  dropped_frames: source="PoC §2.5 p.5 'dropped frames' (hardware faults); LeRobot cameras/openc"; parameters={'burst_length': 'quoted', 'held_fraction': 'inferred', 'camera': 'inferred', 'hold': 'quoted', 'rng': 'inferred'}; corrupted_frames=[[4, 7], [14, 19], [63, 66]]; n_clipped=0
+  detour: source="PoC §2.5 p.5 'Low-skill or hesitant demonstrations' (corrections); SCI"; parameters={'window_steps': 'inferred', 'placement': 'inferred', 'reverse_actions': 'inferred', 'rng': 'inferred'}; corrupted_frames=[[51, 112]]; n_clipped=0
+  idle_padding: source="PoC §8.10 p.17 'pad some with idle or hesitant segments'; §2.5 p.5 'id"; parameters={'pause_steps': 'inferred', 'n_pauses': 'inferred', 'placement': 'inferred', 'idle_frame': 'inferred', 'rng': 'inferred'}; corrupted_frames=[[51, 71], [86, 106]]; n_clipped=0
+  gripper_release: source="PoC §8.10 p.17 'gripper-release noise'; §4.5 p.11 'noisy gripper relea"; parameters={'release_steps': 'inferred', 'min_carry_steps': 'measured', 'rng': 'inferred'}; corrupted_frames=[[65, 85]]; n_clipped=0
+
+all invariants hold on >= 100 episodes per type: True (33s)
+figures -> /Users/davit_khachaturyan/Projects/personal/vlaExp/tracker/features/2026-10-15-ground-truth/artifacts/s1_traces.png, /Users/davit_khachaturyan/Projects/personal/vlaExp/tracker/features/2026-10-15-ground-truth/artifacts/s1_filmstrip.png
+.venv/bin/python scripts/verify_corruptions_s1.py --version v0 --per-type 100  33.90s user 1.12s system 100% cpu 34.918 total
