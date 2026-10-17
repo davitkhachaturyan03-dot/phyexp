@@ -10,6 +10,7 @@ Reads the real store (v0, v1, v2 episode tables and labels); writes only ``artif
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -59,6 +60,11 @@ def fixtures() -> tuple[list[dict], bool]:
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--version", default="v3")
+    ap.add_argument("--prefix", default="s5_v3")
+    a = ap.parse_args()
+    V = a.version
     out: dict = {}
     ok = True
     rows, ok1 = fixtures()
@@ -69,14 +75,14 @@ def main() -> int:
     ok &= ok1
 
     # ---- AC5.2: per type and pooled, with random baselines (random scores, seeded, 200 draws) ----------------
-    cand = Subset.load("v2/candidate")
+    cand = Subset.load(f"{V}/candidate")
     keys = cand.keys()
     rng = np.random.default_rng(0)
     pooled_auc, pooled_rec, type_auc = [], [], {}
     for _ in range(200):
         t = keys.copy()
         t["r"] = rng.random(len(t))
-        res = score_recovery("v2", t, "r")
+        res = score_recovery(V, t, "r")
         pooled_auc.append(res["pooled"]["auroc"])
         pooled_rec.append(res["pooled"]["recall_at_npos"])
         for ty, m in res["per_type"].items():
@@ -97,39 +103,39 @@ def main() -> int:
     # ---- AC5.3: key safety ---------------------------------------------------------------------------------
     v0k = Subset.load("v0/candidate").keys().copy()
     v0k["r"] = 0.5
-    lab = load_answer_key("v2")
+    lab = load_answer_key(V)
     try:
-        score_recovery("v2", v0k, "r")
+        score_recovery(V, v0k, "r")
         m1 = None
     except LineageError as e:
         m1 = str(e)
     miss = keys.iloc[1:].copy()
     miss["r"] = 0.5
     try:
-        score_recovery("v2", miss, "r")
+        score_recovery(V, miss, "r")
         m2 = None
     except LineageError as e:
         m2 = str(e)
     nchg = int((v0k.set_index("episode_id")["content_hash"] != keys.set_index("episode_id")["content_hash"].loc[v0k["episode_id"]]).sum())
-    print(f"\nAC5.3 v0-keyed table ({nchg} of 960 hashes differ from v2's, the labelled ones): rejected: {m1 is not None}: {m1}")
+    print(f"\nAC5.3 v0-keyed table ({nchg} of 960 hashes differ from {V}'s, the labelled ones): rejected: {m1 is not None}: {m1}")
     print(f"AC5.3 table missing one candidate: rejected: {m2 is not None}: {m2}")
     ok3 = m1 is not None and m2 is not None and nchg == len(lab)
     out["AC5.3"] = {"v0_keyed_rejected": m1, "missing_rejected": m2, "hashes_differing": nchg, "pass": ok3}
     ok &= ok3
 
     # ---- AC5.5: positional leak, ground-truth side -----------------------------------------------------------
-    l1, l2 = leak_check("v1"), leak_check("v2")
+    l1, l2 = leak_check("v1"), leak_check(V)
     r1, r2 = l1["pooled"], l2["pooled"]
     print("\nAC5.5 leak check (ranking by episode_index; ground-truth side, not a method)")
     print(pd.DataFrame([{"version": "v1", "n_injected": r1["n_pos"], "recall_at_npos": r1["recall_at_npos"], "auroc": r1["auroc"],
                          "random_recall": r1["random_recall_at_npos"]},
-                        {"version": "v2", "n_injected": r2["n_pos"], "recall_at_npos": r2["recall_at_npos"], "auroc": r2["auroc"],
+                        {"version": V, "n_injected": r2["n_pos"], "recall_at_npos": r2["recall_at_npos"], "auroc": r2["auroc"],
                          "random_recall": r2["random_recall_at_npos"]}]).to_string(index=False))
     ok5 = r1["recall_at_npos"] == 1.0 and r1["n_pos"] == 100 and abs(r2["recall_at_npos"] - r2["random_recall_at_npos"]) < 0.12
-    out["AC5.5"] = {"v1": r1, "v2": r2, "pass": ok5}
+    out["AC5.5"] = {"v1": r1, V: r2, "pass": ok5}
     ok &= bool(ok5)
     out["pass"] = bool(ok)
-    (FEATURE_DIR / "artifacts" / "s5_verify.json").write_text(json.dumps(out, indent=2, default=float))
+    (FEATURE_DIR / "artifacts" / f"{a.prefix}_verify.json").write_text(json.dumps(out, indent=2, default=float))
     print(f"\nall S5 verifier checks pass: {ok}")
     return 0 if ok else 1
 

@@ -1,0 +1,45 @@
+AC4.1 v3 002a68e4caf2: 1000 episodes; labels rows 91; per type {'gripper_release': 13, 'action_noise': 13, 'time_shift': 13, 'instruction_swap': 13, 'dropped_frames': 13, 'idle_padding': 13, 'detour': 13}; all in v0/candidate: True; in reference: 0
+
+AC4.2 task x type allocation (rows: suite, libero_task_id)
+corruption_type                action_noise  detour  dropped_frames  gripper_release  idle_padding  instruction_swap  time_shift  total
+suite          libero_task_id                                                                                                          
+libero_10      0                          0       1               1                0             0                 1           1      4
+               1                          0       1               1                1             1                 1           0      5
+               2                          1       1               0                1             1                 0           1      5
+               3                          1       0               0                1             0                 1           1      4
+               4                          1       1               1                1             1                 0           0      5
+               5                          1       0               1                1             0                 1           1      5
+               6                          1       1               0                1             1                 0           0      4
+               7                          1       0               0                1             1                 1           1      5
+               8                          0       1               1                0             1                 1           0      4
+               9                          1       1               1                0             0                 1           1      5
+libero_spatial 0                          1       0               1                1             0                 1           1      5
+               1                          0       1               1                1             1                 0           0      4
+               2                          1       1               1                1             1                 0           0      5
+               3                          1       0               0                1             1                 0           1      4
+               4                          1       0               1                0             0                 1           1      4
+               5                          0       1               1                0             1                 1           0      4
+               6                          1       0               0                1             1                 1           1      5
+               7                          0       1               1                0             1                 1           1      5
+               8                          0       1               1                0             0                 1           1      4
+               9                          1       1               0                1             1                 0           1      5
+AC4.2 distinct tasks per type {'action_noise': 13, 'detour': 13, 'dropped_frames': 13, 'gripper_release': 13, 'idle_padding': 13, 'instruction_swap': 13, 'time_shift': 13}; suite split per type {'action_noise': [6, 7], 'detour': [6, 7], 'dropped_frames': [6, 7], 'gripper_release': [6, 7], 'idle_padding': [6, 7], 'instruction_swap': [6, 7], 'time_shift': [6, 7]}; corrupted per task [4, 5]; type repeated within a task: False; 91/960 = 9.48% of candidates
+
+AC4.3 check_blind(v3) = []; verify_version ok=True (77 files); v3/reference 40 == v0/reference ids: True; /candidate 960; reference content hashes equal parent's: True (2s)
+
+AC4.4 recomputed all 1000 hashes from the stored bytes: equal to the episode table: True; 909 unedited: table == v0 True, stored bytes == v0 True (n=909)
+AC4.4 91 labelled episodes read back: 91/91 hash to their label's content_hash; S1 invariants (range, gripper binary, length, content, image provenance) failing episodes: 0 {} (42s)
+
+AC4.5 13 action_noise labels: n_values 16912, n_clipped 65 (frac 0.3843% of all values; 0.897% of dims-0-2 values), n_beyond_clean_range 139 (1.918% of dims-0-2 values)
+AC4.5 recount from stored bytes: values exactly +-1 on dims 0-2 = 65; values with 0.9375 < |a| <= 1 = 139; same count in the parent's episodes = 0; match labels: True
+
+AC4.6 du -sh data/lerobot/libero_spatial_10__v3: 7.4G; labels_sha256 3e14922a63cfb345; release before 0.8T (R10): 2/13
+AC4.7 trace(d3dd9fd4): 3 runs ['build', 'derive', 'split'], reaches v0 version entity: True; raw files listed: 20; tag labels_sha256 == derivation.json: True; timing tags {'derive.timing.guards': '2.4', 'derive.timing.write': '538.5', 'derive.timing.hash_and_blind_check': '19.1', 'derive.timing.total': '562.2'}
+
+AC4.8 v2 vs v3: same 91 episode_ids and types: True; the 78 non-time_shift rows keep their content_hash: True; the 13 time_shift rows differ: True; length_change in v3: [-40] (in v2: ['None'])
+AC4.8 fence_record(v2): reason 'superseded by v3', superseded_by 002a68e4caf2 == v3 002a68e4caf2: True
+AC4.8 open_for_method(v2/candidate) refused: True: LineageError: version v2 (eaeed043455a) is not blind to its edits: fenced=True, offending=[] (PoC §2.1 item 4 p.3); open_for_method(v3/candidate) opened 960 episodes; AC1.8 (child idle_steps == parent's idle in a[40:T]) on the stored bytes for the 13 time_shift episodes: True
+AC4.8 v2's physical copy still exists (owner cleanup, not deleted): True
+
+all S4 checks pass: True (51s)
+.venv/bin/python scripts/verify_injection_s4.py --version v3 --parent v0    v  168.44s user 27.30s system 374% cpu 52.293 total

@@ -1,0 +1,29 @@
+{
+ "derive_run_id": "d3dd9fd4dff84d37b5be21fa563fcc57",
+ "dataset_version_id": "002a68e4caf285c0b4b4d06118c50d106b161a92a092fc6b529859b9925414c1",
+ "name": "v3",
+ "lerobot_root": "data/lerobot/libero_spatial_10__v3",
+ "parent_version_id": "3c4dca68d6f196c10d249b43bd94ae32f51b905735f25c7865e3c943caf553b7",
+ "n_edits": 91,
+ "n_episodes": 1000,
+ "n_frames": 200860,
+ "labels": "data/lineage/versions/002a68e4caf285c0b4b4d06118c50d106b161a92a092fc6b529859b9925414c1/labels.parquet",
+ "labels_sha256": "3e14922a63cfb345236c47caec0de74c0dee37f00c5ed9d1ffa1c5c78bad6549",
+ "inherited_splits": [
+  {
+   "split_id": "b939d39de1205adb3f065945ebcb3d6ffba0827a8ab8c6899749b166901bdf9e",
+   "reference": 40,
+   "candidate": 960
+  }
+ ],
+ "mechanism": "one LeRobotDataset writer pass in parent episode order (episode_index preserved)",
+ "blind_offending": [],
+ "timing_s": {
+  "guards": 2.4,
+  "write": 538.5,
+  "hash_and_blind_check": 19.1,
+  "total": 562.2
+ },
+ "selection_rule": "13 episodes per type over 7 types from v0/candidate (960): cyclic windows of 13 tasks over a suite-interleaved, seeded task order (window offsets [0, 3, 6, 9, 12, 15, 18]); within a cell a seeded draw among eligible unused candidates; numpy.random.default_rng(0)",
+ "fraction": 0.09479166666666666
+}

@@ -12,6 +12,7 @@ The real ``data/lineage`` is only read (its subset count and ``mlflow.db`` sha25
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import os
@@ -54,6 +55,11 @@ def sha(p: Path) -> str:
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--version", default="v3")
+    ap.add_argument("--prefix", default="s6_v3")
+    a = ap.parse_args()
+    V = a.version
     out: dict = {}
     ok = True
     t0 = time.time()
@@ -65,33 +71,33 @@ def main() -> int:
           f"({hr_n} files, newest mtime {time.strftime('%Y-%m-%d %H:%M', time.localtime(newest))})")
 
     # ---- AC6.1 ----------------------------------------------------------------------------------------------
-    r = check("v2")
-    cli = subprocess.run([sys.executable, "-m", "vlapoc.subset_stats", "--check", "v2"], cwd=REPO_ROOT, capture_output=True, text=True)
+    r = check(V)
+    cli = subprocess.run([sys.executable, "-m", "vlapoc.subset_stats", "--check", V], cwd=REPO_ROOT, capture_output=True, text=True)
     print("AC6.1 CLI:", [l for l in cli.stdout.splitlines() if l.startswith("AC8.1")][0][:330])
     worst = max(d for f in r["max_abs_diff"].values() for d in f.values())
-    cand0, cand2 = Subset.load("v0/candidate"), Subset.load("v2/candidate")
+    cand0, cand2 = Subset.load("v0/candidate"), Subset.load(f"{V}/candidate")
     s0 = subset_stats(REPO_ROOT / resolve_version("v0")["lerobot_root"], cand0.resolve())
-    s2 = subset_stats(REPO_ROOT / resolve_version("v2")["lerobot_root"], cand2.resolve())
+    s2 = subset_stats(REPO_ROOT / resolve_version(V)["lerobot_root"], cand2.resolve())
     d0, d2 = stats_digest(s0), stats_digest(s2)
-    print(f"AC6.1 aggregate over all v2 episodes vs v2 stats.json: worst max|diff| {worst:.2e} (tolerance 1e-6); "
-          f"v0/candidate digest {d0[:16]} vs v2/candidate digest {d2[:16]}: differ {d0 != d2}")
+    print(f"AC6.1 aggregate over all {V} episodes vs {V} stats.json: worst max|diff| {worst:.2e} (tolerance 1e-6); "
+          f"v0/candidate digest {d0[:16]} vs {V}/candidate digest {d2[:16]}: differ {d0 != d2}")
     rows = []
     names = ["x", "y", "z", "rx", "ry", "rz", "gripper"]
     for i, n in enumerate(names):
-        rows.append({"action_dim": f"{i} {n}", "mean_v0cand": s0["action"]["mean"][i], "mean_v2cand": s2["action"]["mean"][i],
+        rows.append({"action_dim": f"{i} {n}", "mean_v0cand": s0["action"]["mean"][i], "mean_target_cand": s2["action"]["mean"][i],
                      "d_mean": s2["action"]["mean"][i] - s0["action"]["mean"][i], "std_v0cand": s0["action"]["std"][i],
-                     "std_v2cand": s2["action"]["std"][i], "std_ratio": s2["action"]["std"][i] / s0["action"]["std"][i]})
+                     "std_target_cand": s2["action"]["std"][i], "std_ratio": s2["action"]["std"][i] / s0["action"]["std"][i]})
     tbl = pd.DataFrame(rows)
     print(tbl.round(5).to_string(index=False))
-    tbl.to_csv(FEATURE_DIR / "artifacts" / "s6_action_stats_v2_vs_v0.csv", index=False)
+    tbl.to_csv(FEATURE_DIR / "artifacts" / f"{a.prefix}_action_stats_vs_v0.csv", index=False)
     ok1 = worst <= 1e-6 and d0 != d2
-    out["AC6.1"] = {"worst_abs_diff": worst, "digest_v0_candidate": d0, "digest_v2_candidate": d2, "pass": ok1}
+    out["AC6.1"] = {"worst_abs_diff": worst, "digest_v0_candidate": d0, "digest_target_candidate": d2, "pass": ok1}
     ok &= ok1
 
     # ---- AC6.3 (tasks) -------------------------------------------------------------------------------------------
-    t0_, t2_ = read_tasks(REPO_ROOT / resolve_version("v0")["lerobot_root"]), read_tasks(REPO_ROOT / resolve_version("v2")["lerobot_root"])
+    t0_, t2_ = read_tasks(REPO_ROOT / resolve_version("v0")["lerobot_root"]), read_tasks(REPO_ROOT / resolve_version(V)["lerobot_root"])
     tasks_equal = t0_ == t2_ and len(t2_) == 20
-    print(f"AC6.3 v2's 20 task strings (task_index -> string) equal v0's: {tasks_equal}")
+    print(f"AC6.3 {V}'s 20 task strings (task_index -> string) equal v0's: {tasks_equal}")
 
     # ---- AC6.2 ----------------------------------------------------------------------------------------------------
     base = REPO_ROOT / "data" / "scratch" / "gt_s6"
@@ -101,9 +107,9 @@ def main() -> int:
         from vlapoc.runs import scratch_lineage_copy, train_run
 
         lr = scratch_lineage_copy(base / "lineage")
-        v2 = resolve_version("v2", lr)
-        lab = load_answer_key("v2", lr)
-        ve = version_episodes("v2", lr)
+        v2 = resolve_version(V, lr)
+        lab = load_answer_key(V, lr)
+        ve = version_episodes(V, lr)
         one_each = [g.sort_values("episode_id")["episode_id"].iloc[0] for _, g in lab.groupby("corruption_type")]
         clean = [e for e in cand2.episode_ids if e not in set(lab["episode_id"])]
         clean = list(ve[ve["episode_id"].isin(clean)].drop_duplicates("task_name").sort_values("episode_index")["episode_id"][:7])
@@ -116,7 +122,7 @@ def main() -> int:
         os.environ["HF_DATASETS_CACHE"] = str(base / "hf_datasets_cache")
         os.environ["HF_HOME"] = str(REPO_ROOT / "data" / "hf_home")
         os.environ["HF_HUB_OFFLINE"] = "1"
-        res = train_run(sub.subset_id, "train-smolvla-2step-v2gt-smoke", seed=0, steps=2, batch_size=2, policy_type="smolvla",
+        res = train_run(sub.subset_id, f"train-smolvla-2step-{V}gt-smoke", seed=0, steps=2, batch_size=2, policy_type="smolvla",
                         policy_overrides={"load_vlm_weights": False}, device="mps", pretrained_path=SMOLVLA_BASE,
                         pretrained_ref="lerobot/smolvla_base@d9f33c94a60fb382c90dea2164c96845bd955e28", smoke=True,
                         runs_root=base / "runs", lineage_root=lr)
@@ -142,12 +148,12 @@ def main() -> int:
                         v = saved[k].astype(np.float64).reshape(-1)
                         rows_n.append({"file": files[which].name[-30:], "stat": k,
                                        "max_abs_vs_subset": float(np.max(np.abs(v - np.asarray(expect[f][s]).reshape(-1)))),
-                                       "max_abs_vs_full_v2_stats_json": float(np.max(np.abs(v - np.asarray(full[f][s]).reshape(-1))))})
+                                       "max_abs_vs_full_stats_json": float(np.max(np.abs(v - np.asarray(full[f][s]).reshape(-1))))})
         tag = run.data.tags.get("train.subset_stats.sha256")
         print(f"AC6.2 train run {res['run_id'][:12]} finished in {res['seconds']}s: checkpoint {res['checkpoint']}, episodes_match {res['episodes_match']}, "
               f"n_episodes {res['n_episodes']}; tag train.subset_stats.sha256 {tag[:16]} == recomputed {stats_digest(expect)[:16]}: {tag == stats_digest(expect)}")
         print(pd.DataFrame(rows_n).to_string(index=False))
-        ok2 = res["episodes_match"] and tag == stats_digest(expect) and all(r_["max_abs_vs_subset"] <= 1e-6 and r_["max_abs_vs_full_v2_stats_json"] > 1e-6 for r_ in rows_n)
+        ok2 = res["episodes_match"] and tag == stats_digest(expect) and all(r_["max_abs_vs_subset"] <= 1e-6 and r_["max_abs_vs_full_stats_json"] > 1e-6 for r_ in rows_n)
         out["AC6.2"] = {"run_id": res["run_id"], "seconds": res["seconds"], "subset_id": sub.subset_id, "types": types_in,
                         "tag_subset_stats_sha256": tag, "normalizer_rows": rows_n, "pass": bool(ok2),
                         "weights_sha256": res["weights_sha256"]}
@@ -169,7 +175,7 @@ def main() -> int:
                     "pass": bool(ok3)}
     out["real_store"] = {"mlflow_db_unchanged": db_before == db_after, "subsets_before": n_sub_before, "subsets_after": n_sub_after}
     out["pass"] = bool(ok)
-    (FEATURE_DIR / "artifacts" / "s6_verify.json").write_text(json.dumps(out, indent=2, default=float))
+    (FEATURE_DIR / "artifacts" / f"{a.prefix}_verify.json").write_text(json.dumps(out, indent=2, default=float))
     print(f"\nall S6 checks pass: {ok} ({time.time() - t0:.0f}s)")
     return 0 if ok else 1
 
