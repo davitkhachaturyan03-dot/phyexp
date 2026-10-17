@@ -295,6 +295,6 @@ Owner ruling A (brief.md, 2026-10-17; `dispute-r1.md`): fix `time_shift` only. P
 - Regression: `scripts/verify_derive_gt_s2.py` re-run with the trim in the seven-type derivation (`artifacts/s2_r2_run.txt`): AC2.1-AC2.6 hold (scratch derivation registered `check_blind = []`; tasks.parquet equal to the parent's; `PYTHONHASHSEED` 0 vs 1 identical apart from `meta/stats.json` key order; v1 still `['episode_index']`, fenced). Its `s2_verify.json` was overwritten by that run and restored from git, the r2 evidence being the run text.
 
 ### Round 2 end state
-- Real `data/lineage/mlflow.db` sha256: start of round 2 `803a24d3...` (hmm: recorded before step 2's runs; see below), after v3's derive + 12 S5 runs `e5499b65acfc9cb9`, unchanged by S6 and the S2 re-run. (Round 1 ended at `ecd5b4b4...`; the step-2 pre-run reading `803a24d34b319975` was taken after the v3 derive run and before the S5 runs.)
+- Real `data/lineage/mlflow.db` sha256: `ecd5b4b4...` at the start of round 2 (end of round 1), `803a24d3...` after the v3 derive run, `e5499b65acfc9cb9` after the 12 S5 runs on v3 (6 screen, 6 score); unchanged by S6 and by the S2 re-run. The real store gained those 13 runs (as the ACs require) and v3's version record, three subsets, a split, and v2's `fence.json`.
 - Free disk 78 GiB (v3 copy 6.82 GiB of bytes, written as 7.4 GiB allocated); v2's physical copy is untouched (owner cleanup). No process left running. Scratch tidied (`data/scratch/gt_s1*` removed).
 - v2 is fenced in the lineage store: `versions/eaeed043455a.../fence.json`, reason "superseded by v3".
