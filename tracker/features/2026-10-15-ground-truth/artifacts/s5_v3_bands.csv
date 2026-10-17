@@ -1,0 +1,8 @@
+type,best_heuristic,best_auroc_as_scored,band,best_direction_free,best_auroc_direction_free
+action_noise,smoothness,1.0,"(a) found, AUROC >= 0.95",smoothness,1.0
+detour,length_steps,0.73,"(b) partly found, 0.6-0.95",length_steps,0.73
+dropped_frames,duplicate_frame_pairs,1.0,"(a) found, AUROC >= 0.95",duplicate_frame_pairs,1.0
+gripper_release,gripper_toggles,0.505,"(c) not found, < 0.6",smoothness,0.551
+idle_padding,idle_steps,1.0,"(a) found, AUROC >= 0.95",idle_steps,1.0
+instruction_swap,instruction_mismatch,1.0,"(a) found, AUROC >= 0.95",instruction_mismatch,1.0
+time_shift,smoothness,0.519,"(c) not found, < 0.6",length_steps,0.682

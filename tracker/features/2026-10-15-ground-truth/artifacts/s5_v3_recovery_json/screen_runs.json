@@ -1,0 +1,8 @@
+{
+ "length_steps": "64209ccca87d42f68c0c2d6f57f76115",
+ "idle_steps": "d89712887c9647efa69abcbcfccd319e",
+ "gripper_toggles": "ec25d5f6b2984174a72b8e398b3103e8",
+ "smoothness": "23f28434d4da40378c1d315aa479fb10",
+ "duplicate_frame_pairs": "275239d0ae8a4d478524907a432fb98a",
+ "instruction_mismatch": "6e29593e57d244c3a3ce50c51fd33100"
+}

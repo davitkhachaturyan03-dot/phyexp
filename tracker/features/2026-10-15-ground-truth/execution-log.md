@@ -236,3 +236,45 @@ Owner ruling A (brief.md, 2026-10-17; `dispute-r1.md`): fix `time_shift` only. P
 - So the sum of file sizes is the stable figure: v2 7,346,100,191 bytes = 7.346 GB = 6.842 GiB; v3 7,326,736,215 bytes = 7.327 GB = 6.824 GiB (v0 6.851 GiB, v1 6.849 GiB). "7.3 GB" (decimal) and "6.8 GiB" are the same number; the 7.3G from `du -sh` in GiB units was block slack on a fresh copy. Why the slack disappears with time (APFS reclaiming speculative preallocation) is **inferred**, not tested: I did not observe v3's slack shrink within this session. Disk budgeting should use `df` free-space change instead: v3 cost 86 -> 78 GiB = 8 GiB while the slack was present.
 
 **Notes:** the real `mlflow.db` changed (one more derive run): sha256 before this step `ecd5b4b4...`, see the final entry for the value at the end of round 2. `labels.parquet` of v3 lives in the lineage store as for v2.
+
+### R2 step 3a: S5 on v3 (AC5.1-AC5.8)
+**Files:** `scripts/verify_recovery_s5.py` (`--version`, `--prefix`), `scripts/s5_recovery_table.py` (`--prior-dir`, `--bands-out`, AC5.8 band table and the v2-vs-v3 `time_shift` rows). Commands, all on v3: `scripts/verify_recovery_s5.py --version v3 --prefix s5_v3`; `python -m vlapoc.methods.heuristics --subset v3/candidate --out data/eval/groundtruth/heuristics_v3/`; `python -m vlapoc.groundtruth score --version v3 --scores <h>.parquet --column <h> --out ...` for each of the six; `scripts/s5_recovery_table.py --dir ... --prior-dir artifacts/s5_recovery_json --bands-out artifacts/s5_v3_bands.csv`. Outputs: `artifacts/s5_v3_verify_run.txt`, `s5_v3_recovery_heuristics.csv`, `s5_v3_recovery_table.txt`, `s5_v3_bands.csv`, `s5_v3_recovery_heuristics_time_shift_v2_vs_v3.csv`, `s5_v3_recovery_json/`, `s5_v3_score_runs.txt`, `s5_v3_trace_check.txt`, `s5_v3_boundary_rescan.txt`. The round-1 (v2) S5 files are unchanged.
+
+**Acceptance criteria:**
+- ✅ AC5.1: 26 of 26 fixture comparisons equal the hand-computed values (unchanged code).
+- ✅ AC5.2: per type n = 882 (13 vs 869) and pooled n = 960 (91 vs 869), each with random expectations; 200 random rankers give mean pooled AUROC 0.4987 and recall@k 0.0931 (expected 0.0948).
+- ✅ AC5.3: a v0-keyed table (91 of 960 hashes differ from v3's) and a table missing one candidate are both rejected with `LineageError`.
+- ✅ AC5.4 (regenerated on v3, no expected values set): table below; heuristics read only through `open_for_method` (the S3 static scan re-run: no violations).
+- ✅ AC5.5: leak check: v1 recall@100 = 1.000 (AUROC 1.000); v3 recall@91 = 0.099 (AUROC 0.505; random 0.095).
+- ✅ AC5.6: six `score` runs (ids in `s5_v3_score_runs.txt`), tags `score_table_digest`, `scored_version_id` (v3 `002a68e4caf2...`) and `labels_sha256` (`3e14922a63cf...`); `lineage trace` of each reaches v3 and its screen run (5 runs).
+- ✅ AC5.7: docstrings unchanged and still cite PoC §2.1 item 4 p.3, §2.5 p.5, RoboDrop §5.1 p.7 and Table 7.
+- ✅ AC5.8: per-type statement on v3, with the bands as inferred reporting bands (best of the six heuristics at their a-priori direction; the direction-free value is shown because AUROC below 0.5 means the opposite direction would work):
+
+| type | best heuristic (as scored) | AUROC | band | direction-free best |
+|---|---|---|---|---|
+| `action_noise` | smoothness | 1.000 | (a) | 1.000 |
+| `dropped_frames` | duplicate_frame_pairs | 1.000 | (a) | 1.000 |
+| `idle_padding` | idle_steps | 1.000 | (a) | 1.000 |
+| `instruction_swap` | instruction_mismatch | 1.000 | (a) | 1.000 |
+| `detour` | length_steps | 0.730 | (b) | 0.730 |
+| `time_shift` | smoothness | 0.519 | (c) | length_steps 0.682 (inverted direction) |
+| `gripper_release` | gripper_toggles | 0.505 | (c) | smoothness 0.551 |
+
+  - (a) found by a one-line statistic. `action_noise` (roughness) and `dropped_frames` / `idle_padding` (exact duplicate frames; idle_steps for idle_padding) are **partly inherent, partly construction**: noise raises the step-to-step change by definition; a held or paused frame is a duplicate because we cannot re-render (plan P4, out of scope), so that part is a construction artifact. `instruction_swap` is a **construction artifact of design D1**: the instruction is checked against `task_name` / `episode_id`, which stay true.
+  - (b) `detour` is only partly found (length 0.730, recall@13 0.077 per `s5_v3_recovery_heuristics.csv`): +40 frames with real frames, no other statistic changes.
+  - (c) `gripper_release` is not found by any of the six (best 0.505 as scored). `time_shift` is not found at its a-priori directions.
+  - **`time_shift`, reported openly (owner ruling A):** idle_steps AUROC **0.445** (r1 with the idle tail: **1.000**), i.e. about chance, as AC1.8 predicted (the trimmed child's idle count equals the parent's within a[40:T]). Length (H1) AUROC is **0.318** as scored (long = suspicious) because the trim makes the child 40 steps *shorter*; read in the opposite direction it is 0.682, a partly-found residual signal, **not** hidden here. Smoothness 0.519 (r1 0.337), duplicate frames 0.500, instruction mismatch 0.500, gripper toggles 0.400 (unchanged: the gripper is untouched by the shift apart from the trimmed ends). Side by side (one type vs 869 clean; `..._time_shift_v2_vs_v3.csv`):
+
+| heuristic | AUROC v2 (idle tail) | AUROC v3 (trim) | recall@13 v2 | recall@13 v3 |
+|---|---|---|---|---|
+| length_steps | 0.527 | 0.318 | 0.000 | 0.000 |
+| idle_steps | 1.000 | 0.445 | 1.000 | 0.000 |
+| gripper_toggles | 0.400 | 0.400 | 0.000 | 0.000 |
+| smoothness | 0.337 | 0.519 | 0.000 | 0.077 |
+| duplicate_frame_pairs | 0.500 | 0.500 | 0.015 | 0.015 |
+| instruction_mismatch | 0.500 | 0.500 | 0.015 | 0.015 |
+
+  - Which types test a method beyond one-line statistics: `gripper_release` and `time_shift` (band (c) at the a-priori direction; the length residual makes `time_shift` detectable at 0.68 by a statistic that knows the direction), with `detour` partly. The other four (`action_noise`, `dropped_frames`, `idle_padding`, `instruction_swap`) are saturated by one statistic. Pooled recall@91 on v3: duplicate_frame_pairs 0.335, smoothness 0.242, instruction_mismatch 0.213, idle_steps 0.172, length_steps 0.132, gripper_toggles 0.125 (random 0.095).
+  - Known limitations recorded by the owner (ruling A, not fixed): provenance stays visible (B) and idle/duplicate frames are exact duplicates because they are not re-rendered (C).
+
+**Notes:** the real `mlflow.db` gained 6 `screen` and 6 `score` runs for v3 (sha256 `e5499b65acfc...` after this step).

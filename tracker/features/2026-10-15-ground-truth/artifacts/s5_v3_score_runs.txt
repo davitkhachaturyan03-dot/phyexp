@@ -1,0 +1,12 @@
+== length_steps
+ "score_run_id": "f03a7de5621d40a7ae305b4052f4a8c5",
+== idle_steps
+ "score_run_id": "bb8150888e744753b80b8a8aa9e3eabc",
+== gripper_toggles
+ "score_run_id": "1e4c342ee23d480cbb9a23ac528f7989",
+== smoothness
+ "score_run_id": "4d1fcade64254acbbc47c24ea6fe3dc0",
+== duplicate_frame_pairs
+ "score_run_id": "10a22593f4b34a98be3a5f929ac5a664",
+== instruction_mismatch
+ "score_run_id": "97943e5ac79a4b9b840b01d12cf2d5bd",

@@ -1,0 +1,6 @@
+length_steps tags: {'score_table_digest': '3d07860e195d', 'scored_version_id': '002a68e4caf2', 'labels_sha256': '3e14922a63cf'} git_dirty false | trace runs 5 reaches v3 True | screen run in trace True
+idle_steps tags: {'score_table_digest': 'e461f3b4444e', 'scored_version_id': '002a68e4caf2', 'labels_sha256': '3e14922a63cf'} git_dirty false | trace runs 5 reaches v3 True | screen run in trace True
+gripper_toggles tags: {'score_table_digest': '8179a50f7d4b', 'scored_version_id': '002a68e4caf2', 'labels_sha256': '3e14922a63cf'} git_dirty false | trace runs 5 reaches v3 True | screen run in trace True
+smoothness tags: {'score_table_digest': '14ca998424fc', 'scored_version_id': '002a68e4caf2', 'labels_sha256': '3e14922a63cf'} git_dirty false | trace runs 5 reaches v3 True | screen run in trace True
+duplicate_frame_pairs tags: {'score_table_digest': 'fe42a6be2ca0', 'scored_version_id': '002a68e4caf2', 'labels_sha256': '3e14922a63cf'} git_dirty false | trace runs 5 reaches v3 True | screen run in trace True
+instruction_mismatch tags: {'score_table_digest': '59d16d7f5405', 'scored_version_id': '002a68e4caf2', 'labels_sha256': '3e14922a63cf'} git_dirty false | trace runs 5 reaches v3 True | screen run in trace True

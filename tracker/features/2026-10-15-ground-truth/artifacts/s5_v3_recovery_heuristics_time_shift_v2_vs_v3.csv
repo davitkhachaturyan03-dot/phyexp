@@ -1,0 +1,7 @@
+heuristic,auroc_v2_idle_tail,auroc_v3_trim,recall_at_13_v2,recall_at_13_v3
+length_steps,0.527,0.318,0.0,0.0
+idle_steps,1.0,0.445,1.0,0.0
+gripper_toggles,0.4,0.4,0.0,0.0
+smoothness,0.337,0.519,0.0,0.077
+duplicate_frame_pairs,0.5,0.5,0.015,0.015
+instruction_mismatch,0.5,0.5,0.015,0.015
