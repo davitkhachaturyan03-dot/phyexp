@@ -278,3 +278,23 @@ Owner ruling A (brief.md, 2026-10-17; `dispute-r1.md`): fix `time_shift` only. P
   - Known limitations recorded by the owner (ruling A, not fixed): provenance stays visible (B) and idle/duplicate frames are exact duplicates because they are not re-rendered (C).
 
 **Notes:** the real `mlflow.db` gained 6 `screen` and 6 `score` runs for v3 (sha256 `e5499b65acfc...` after this step).
+
+### R2 step 3b: S6 on v3 and the runbook (AC6.1-AC6.6)
+**Files:** `scripts/verify_consumers_s6.py` (`--version`, `--prefix`), `artifacts/server-runbook.md` rewritten for v3. Command: `.venv/bin/python scripts/verify_consumers_s6.py --version v3 --prefix s6_v3` (`artifacts/s6_v3_run.txt`, `s6_v3_verify.json`, `s6_v3_action_stats_vs_v0.csv`). The round-1 S6 files are kept.
+
+**Acceptance criteria:**
+- ✅ AC6.1: `python -m vlapoc.subset_stats --check v3`: aggregate over all 1000 episodes equals v3's `stats.json`, worst max |diff| 2.60e-10 (tolerance 1e-6). `v3/candidate` digest `168667c2365bf7dd` differs from `v0/candidate`'s `2c62ec3fec3e078f`. Action std ratios v3/candidate over v0/candidate: 0.9986-1.0003; gripper mean shifts from -0.0446 to -0.0423 (the trim removes the episode ends, where the gripper is open: inferred from the construction, the shift itself is measured).
+- ✅ AC6.2: SmolVLA 2-step fine-tune (MPS, smoke) on a 14-episode label-side subset of v3 (one labelled episode of each of the seven types plus seven clean candidates), built in a scratch lineage copy; `data/lineage/subsets` stayed at 15 files; run finished in 15.1 s, `episodes_match` true, `train.subset_stats.sha256` tag `1d2a5e14c68d77c7...` equals the recomputed digest, and the checkpoint's normalizer/unnormalizer equal the subset stats (max |diff| 3.5e-08) while differing from v3's full `stats.json` (up to 0.78). Scratch (lineage copy, HF cache, 1.2 GB checkpoint) removed.
+- ✅ AC6.3: v3's 20 task strings equal v0's; the `data/eval/human_reference/` digest `68c888b1930d66de...` is unchanged before and after (its files date from 2026-10-07).
+- ✅ AC6.4: runbook lists GT-R1 to GT-R6 for v3 with commands, inputs (v3 `002a68e4...`, `v3/candidate` `8d80a5d4731e...` with 192,945 frames), outputs, disk estimates and order.
+- ✅ AC6.5: runbook still states that LIBERO has no ghost-event rule, so the gripper-release "drops" hypothesis can only show up as success, F(tau) or timeouts.
+- ✅ AC6.6: the runbook names v3 in every GT-R command (a text search for "v2" finds only the header sentence that says v2 is superseded), and carries a "Known issue for the attribution feature" section: `train_run` and `eval_run` do not call `open_for_method` or `assert_blind`; correct for this feature's training arms; a later method that trains policies could pass a ground-truth-derived subset without being refused; the attribution feature must route its training inputs through the loader. It also reports the size reconciliation and the detectability bands (four types saturated; `detour` partly; `gripper_release` and `time_shift` not found at the a-priori direction, with the length residual stated).
+
+### R2 step 4 and regression: reconciliation and S2 re-run
+- 7.3G vs 6.8G: reconciled in step 2 above (block slack on a fresh copy, measured per file).
+- Regression: `scripts/verify_derive_gt_s2.py` re-run with the trim in the seven-type derivation (`artifacts/s2_r2_run.txt`): AC2.1-AC2.6 hold (scratch derivation registered `check_blind = []`; tasks.parquet equal to the parent's; `PYTHONHASHSEED` 0 vs 1 identical apart from `meta/stats.json` key order; v1 still `['episode_index']`, fenced). Its `s2_verify.json` was overwritten by that run and restored from git, the r2 evidence being the run text.
+
+### Round 2 end state
+- Real `data/lineage/mlflow.db` sha256: start of round 2 `803a24d3...` (hmm: recorded before step 2's runs; see below), after v3's derive + 12 S5 runs `e5499b65acfc9cb9`, unchanged by S6 and the S2 re-run. (Round 1 ended at `ecd5b4b4...`; the step-2 pre-run reading `803a24d34b319975` was taken after the v3 derive run and before the S5 runs.)
+- Free disk 78 GiB (v3 copy 6.82 GiB of bytes, written as 7.4 GiB allocated); v2's physical copy is untouched (owner cleanup). No process left running. Scratch tidied (`data/scratch/gt_s1*` removed).
+- v2 is fenced in the lineage store: `versions/eaeed043455a.../fence.json`, reason "superseded by v3".

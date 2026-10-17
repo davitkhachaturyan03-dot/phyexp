@@ -1,0 +1,29 @@
+before: mlflow.db sha256 e5499b65acfc9cb9; data/lineage/subsets 15 files; human_reference digest 68c888b1930d66de (2 files, newest mtime 2026-10-07 16:56)
+AC6.1 CLI: AC8.1 aggregate_stats over all 1000 episodes of v3 vs meta/stats.json, max |diff|: observation.state: mean 3.11e-15, std 2.60e-10, min 0.00e+00, max 0.00e+00, count 0.00e+00; action: mean 9.71e-17, std 2.37e-10, min 0.00e+00, max 0.00e+00, count 0.00e+00
+AC6.1 aggregate over all v3 episodes vs v3 stats.json: worst max|diff| 2.60e-10 (tolerance 1e-6); v0/candidate digest 2c62ec3fec3e078f vs v3/candidate digest 168667c2365bf7dd: differ True
+action_dim  mean_v0cand  mean_target_cand   d_mean  std_v0cand  std_target_cand  std_ratio
+       0 x      0.05920           0.05812 -0.00108     0.33368          0.33321    0.99860
+       1 y      0.08093           0.08074 -0.00019     0.35290          0.35292    1.00007
+       2 z     -0.08688          -0.08610  0.00077     0.41364          0.41343    0.99948
+      3 rx      0.00170           0.00168 -0.00002     0.03921          0.03922    1.00034
+      4 ry     -0.00178          -0.00176  0.00002     0.06125          0.06120    0.99916
+      5 rz     -0.01172          -0.01160  0.00012     0.08090          0.08079    0.99860
+ 6 gripper     -0.04461          -0.04229  0.00233     0.99900          0.99911    1.00010
+AC6.3 v3's 20 task strings (task_index -> string) equal v0's: True
+AC6.2 scratch subset 8d317a186cf6: 14 episodes, labelled types ['action_noise', 'detour', 'dropped_frames', 'gripper_release', 'idle_padding', 'instruction_swap', 'time_shift']; saved in data/scratch/gt_s6/lineage
+AC6.2 train run 619111f5d3b3 finished in 15.1s: checkpoint data/scratch/gt_s6/runs/train-smolvla-2step-v3gt-smoke-20261017T194814Z/lerobot/checkpoints/000002/pretrained_model, episodes_match True, n_episodes 14; tag train.subset_stats.sha256 1d2a5e14c68d77c7 == recomputed 1d2a5e14c68d77c7: True
+                          file                   stat  max_abs_vs_subset  max_abs_vs_full_stats_json
+rmalizer_processor.safetensors observation.state.mean       3.519512e-08                    0.780566
+rmalizer_processor.safetensors  observation.state.std       1.683245e-08                    0.487567
+rmalizer_processor.safetensors            action.mean       6.976683e-09                    0.088603
+rmalizer_processor.safetensors             action.std       1.533921e-08                    0.042074
+rmalizer_processor.safetensors observation.state.mean       3.519512e-08                    0.780566
+rmalizer_processor.safetensors  observation.state.std       1.683245e-08                    0.487567
+rmalizer_processor.safetensors            action.mean       6.976683e-09                    0.088603
+rmalizer_processor.safetensors             action.std       1.533921e-08                    0.042074
+scratch removed: True
+AC6.3 human_reference digest before 68c888b1930d66de after 68c888b1930d66de: unchanged True
+real store: mlflow.db sha256 e5499b65acfc9cb9 -> e5499b65acfc9cb9 (unchanged True); data/lineage/subsets 15 -> 15 files
+
+all S6 checks pass: True (27s)
+.venv/bin/python scripts/verify_consumers_s6.py --version v3 --prefix s6_v3  28.98s user 6.44s system 126% cpu 28.040 total
