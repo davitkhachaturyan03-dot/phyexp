@@ -1,10 +1,28 @@
 # Plan: Ground truth (injection experiment)
 
-Round 2, planner, 2026-10-17 (r1: 2026-10-15). Brief: [`brief.md`](brief.md). Inputs for this round:
+Round 3, planner, 2026-10-17 (r1: 2026-10-15, r2: 2026-10-17). Brief: [`brief.md`](brief.md). Round 3 input:
+[`analysis-r2.md`](analysis-r2.md) (REWORK, "Feedback: planner" 1–3). Round 2 inputs:
 [`analysis-r1.md`](analysis-r1.md), [`dispute-r1.md`](dispute-r1.md), and the owner ruling of 2026-10-17 in
 `brief.md` "## Owner rulings": **"A. Fix time_shift only (rec.)"** (final).
 
-## Changes in this revision (r2)
+## Changes in this revision (r3)
+
+1. **AC5.4 and AC5.8: two label-free, task-normalised heuristics added (analysis-r2 planner item 1).**
+   - H7 `length_vs_task`, ranked in both directions.
+   - H8 `post_release_share_vs_task`.
+   - AC5.8's bands now use the best AUROC over all eight heuristics, H1–H8.
+   - Expected values (measured by the analyzer, analysis-r2): `time_shift` about 0.85 (H7, lowest-first),
+     `detour` about 0.96 (H7), `gripper_release` about 0.96 (H8).
+2. **Report headline and risks (analysis-r2 planner item 2).**
+   - New AC5.9 and R13 say plainly that no type is in band (c), and that `time_shift` is the hardest at about 0.86.
+   - Any method's recovery must be compared against these baselines type by type.
+   - This is recorded as an owner-approved limitation under ruling A, next to B and C (new "D" in "Out of
+     scope"). Ruling A is not re-opened: the corruptions stay as built.
+3. **The S5 "Verify by" line names `v3/candidate`** (it still said `v2/candidate`).
+
+Nothing else changed.
+
+## Changes in revision r2
 
 1. **`time_shift` is a trim now (owner ruling A; analysis-r1 planner item 1).**
    - The r1 tail fill (40 steps of arm = 0, gripper held) is gone.
@@ -460,7 +478,14 @@ DemInf, CUPID) -> score table keyed by
     - H3 `gripper_toggles`;
     - H4 `smoothness` (direction per its catalog definition);
     - H5 count of consecutive byte-identical image pairs (frozen-frame detector, Calibra-style);
-    - H6 instruction ≠ the instruction of the episode's `task_name` (D1's provenance cross-check).
+    - H6 instruction ≠ the instruction of the episode's `task_name` (D1's provenance cross-check);
+    - **(r3)** H7 `length_vs_task` = `length_steps / median(length_steps over the candidate subset's episodes with
+      the same task_name)`, ranked both highest-first and lowest-first, and both are reported;
+    - **(r3)** H8 `post_release_share_vs_task` = the share of the episode's steps after its last gripper +1→−1
+      transition (transition index taken as T if there is none, so the share is 0), minus the median of that share
+      over the candidate episodes of the same `task_name`.
+    H7 and H8 read `task_name` and `length_steps` from `MethodView.catalog` and actions through `iter_episodes`. They
+    use no labels.
   - Recorded as MLflow runs: one `screen` stage run per heuristic (real, not stand-in), and one ground-truth
     scoring run (a new stage, e.g. `score`) carrying the score-table digest, the `labels_sha256` and the metrics
     JSON.
@@ -480,8 +505,9 @@ DemInf, CUPID) -> score table keyed by
     k/N, AUROC 0.5) and n. [RoboDrop A.1/§5.1; PoC §2.5 p.5]
   - [ ] AC5.3 Key safety: a v0-keyed score table (same episode_ids, v0 hashes) is rejected by `score_recovery`.
     So is a table missing one candidate. [PoC §9.1 Step 1 p.18; lineage `_check_score_keys`]
-  - [ ] AC5.4 Run heuristics H1–H6 on `v2/candidate` through `open_for_method` and score them. Output: a 6 × 8
-    table (heuristic × {7 types, pooled}) of AUROC and recall@k, saved as `artifacts/s5_recovery_heuristics.csv`
+  - [ ] AC5.4 Run heuristics H1–H6 on `v2/candidate` through `open_for_method` and score them. **(r3)** On
+    `v3/candidate` the set is H1–H8, with H7 scored in both directions. Output: a heuristic × 8 table
+    (heuristic × {7 types, pooled}) of AUROC and recall@k, saved as `artifacts/s5_recovery_heuristics.csv`
     with its command. **No expected values are set.** These are measurements, and the report states which types are
     trivially findable and which are not. [PoC §5 p.11–12; §2.2 p.4]
   - [ ] AC5.5 Positional-leak demonstration (ground-truth side, labelled "leak check, not a method"): score a ranking
@@ -495,6 +521,10 @@ DemInf, CUPID) -> score table keyed by
     tie rule marked inferred. [vla-build]
   - [ ] AC5.8 **(r2, owner ruling A) Per-type detectability statement, on v3.** AC5.4's table is regenerated on
     `v3/candidate`, and each of the seven types gets one line in the report saying which kind it is:
+    - **(r3)** "Best heuristic AUROC" means the maximum over all eight heuristics H1–H8 (both H7 directions)
+      and names the heuristic that attains it. Expected (measured by the analyzer, analysis-r2, deterministic):
+      `time_shift` ≈ 0.85 (H7 lowest-first), `detour` ≈ 0.96 (H7), `gripper_release` ≈ 0.96 (H8). These are
+      expectations to reproduce, not pass thresholds.
     - **(a)** found by a one-line statistic (best heuristic AUROC ≥ 0.95), naming the statistic and whether that is
       inherent to the corruption or a construction artifact;
     - **(b)** partly found (AUROC between 0.6 and 0.95);
@@ -505,8 +535,17 @@ DemInf, CUPID) -> score table keyed by
     (length) AUROC is printed and reported openly, whatever it is: the trim shortens the episode by 40 steps, which
     is a residual signal. The r1 (v2) and r2 (v3) `time_shift` rows are shown side by side.
     [owner ruling A, dispute-r1; CUPID TuckBox point via analysis-r1]
+  - [ ] AC5.9 **(r3) Report headline, written honestly.**
+    - With H1–H8, **no type is in band (c)**: every type is at least partly found by a label-free statistic, and
+      `time_shift` is the hardest at a best AUROC of about 0.86. The headline gives the measured numbers.
+    - Any later method's recovery on this ground truth is meaningful only **per type, against that type's best
+      heuristic AUROC**: the table to beat is AC5.4's v3 table. The report says this in its headline and in its
+      hand-off to the screening and attribution features (runbook GT-R6).
+    - It is labelled an owner-approved limitation under ruling A (with B and C), not a defect to fix in this
+      feature.
+    [owner ruling A; analysis-r2 planner item 2]
 - **Verify by:** `.venv/bin/python scripts/verify_recovery_s5.py` (fixtures, key safety, leak check), then
-  `.venv/bin/python -m vlapoc.methods.heuristics --subset v2/candidate --out data/eval/groundtruth/heuristics/`
+  `.venv/bin/python -m vlapoc.methods.heuristics --subset v3/candidate --out data/eval/groundtruth/heuristics/`
   followed by the scoring CLI for each output.
 - **Demo value:** the first real recovery table in the PoC, "what cheap heuristics already find, per corruption
   type", and the v1-vs-v2 leak check that shows why the fence and loader exist.
@@ -585,7 +624,15 @@ DemInf, CUPID) -> score table keyed by
   - **C.** Idle pauses repeat stored frames (exact duplicate images), with no simulator re-rendering. Re-rendered
     idle is not built.
 
-  The report lists both as owner-approved limitations next to AC5.8's per-type statement.
+  - **D (r3).** No type escapes label-free statistics once task-normalised heuristics are included (H7/H8,
+    analysis-r2):
+    - `time_shift` is the hardest, at a best AUROC of about 0.86 (length relative to its task);
+    - `detour` (≈ 0.96, length relative to its task) and `gripper_release` (≈ 0.96, post-release share) are also
+      findable.
+    Ruling A keeps the corruptions as built. The consequence is that a method's recovery must be compared against
+    the per-type heuristic baselines (AC5.9), not against chance.
+
+  The report lists B, C and D as owner-approved limitations next to AC5.8's per-type statement.
 
 ## Open questions
 
@@ -644,6 +691,10 @@ DemInf, CUPID) -> score table keyed by
   The executor measured 0 files, also on pre-S2 code (analysis-r1). Fix it with a `changelog.md` entry in
   `tracker/features/2026-09-28-data-lineage-layer/` and a correction in that report. The executor or summarizer
   does this; it is not part of this feature's ACs.
+- **R13 (r3)** No type is in band (c) once H7/H8 are included (analysis-r2, measured). `time_shift` ≈ 0.86 is the
+  hardest. Risk: a later screening or attribution result reported against chance (AUROC 0.5) would overstate
+  what the method adds. Mitigation: AC5.9 makes the per-type heuristic baseline the comparison line, and the
+  runbook's GT-R6 hand-off repeats it. An owner-approved limitation under ruling A; not re-opened.
 - **R10** A gripper-release episode whose final release is the only one, at < 0.5 of the episode (min relative
   position 0.367, P7), may not be "near placement". The executor reports how many selected episodes have their
   final release before 0.8T.
