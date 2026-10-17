@@ -1,6 +1,41 @@
 # Plan: Ground truth (injection experiment)
 
-Round 1, planner, 2026-10-15. Brief: [`brief.md`](brief.md).
+Round 2, planner, 2026-10-17 (r1: 2026-10-15). Brief: [`brief.md`](brief.md). Inputs for this round:
+[`analysis-r1.md`](analysis-r1.md), [`dispute-r1.md`](dispute-r1.md), and the owner ruling of 2026-10-17 in
+`brief.md` "## Owner rulings": **"A. Fix time_shift only (rec.)"** (final).
+
+## Changes in this revision (r2)
+
+1. **`time_shift` is a trim now (owner ruling A; analysis-r1 planner item 1).**
+   - The r1 tail fill (40 steps of arm = 0, gripper held) is gone.
+   - New construction: obs[0:T−40] paired with a[40:T], so the child has T−40 frames. Every frame and every action
+     is a real parent value, and nothing is padded.
+   - The label records `length_change = −40`.
+   - New AC1.8: `time_shift` idle_steps equals the parent's idle steps within a[40:T]. Measured over the 960 v0
+     candidates: max 7, 99th percentile 2. So H2 (idle_steps) AUROC on `time_shift` should drop to about chance.
+   - New AC5.8 reports the residual length (H1) AUROC openly.
+   - AC1.4 is updated to T−40 for `time_shift`, R9 is rewritten, and a design-table note explains why.
+2. **AC1.5 amended** as analysis-r1 planner item 2 proposes:
+   - every type is deterministic per (seed, episode_id);
+   - a different seed changes the hash for all `action_noise`, `dropped_frames` and `idle_padding` episodes, and
+     for ≥ 80% of `detour` and `instruction_swap` episodes;
+   - `time_shift` and `gripper_release` have no random draw, by design.
+3. **One re-derivation is budgeted (v3, ~7 GB, ~9 min), and v2 is retired** under the single-record-system rule. See
+   "Disk and version budget" and the new AC4.8. v3 uses the same selection (seed 0, 13 per type), so only the 13
+   `time_shift` episodes differ from v2. v2 gets a `fence.json` with reason "superseded by v3", which
+   `open_for_method` refuses. S4–S6 run on v3.
+4. **Report requirement (owner ruling A):**
+   - new AC5.8 reports per-type recovery against the heuristics, saying plainly which types test anything beyond
+     one-line statistics;
+   - B (hiding provenance, correlated noise) and C (re-rendered idle) are recorded as owner-ruled known limitations,
+     in "Out of scope" and "Open questions".
+5. **Known issue for the attribution feature:** `runs.train_run` bypasses `open_for_method`. Added as R11 and as an
+   S6 runbook line (AC6.6).
+6. **Non-blocking text fixes:**
+   - P7 and AC1.6 now give the candidate-set numbers (907/960 with a final release, 884 eligible).
+   - The stale data+lineage AC4.8 "contrast" figure is noted for that feature's changelog (R12).
+
+Nothing else changed. Unchanged ACs keep their numbers.
 
 ## Request
 
@@ -136,7 +171,7 @@ Scripts: `data/scratch/gt_plan/premises.py`, `premises2.py` (scratch, gitignored
 | P4 | Duplicate frames | measured: **0** of 199,340 consecutive frame pairs have both images byte-identical | A held (stale) frame is an exact duplicate that clean data never has. Dropped frames and idle padding are therefore findable by an exact-duplicate detector. S5 measures this rather than hiding it (Calibra-style detectors exist) |
 | P5 | Identical-action runs | measured: the longest run of identical consecutive action vectors is **21** steps (99th percentile 9) | Any constant pad longer than 21 steps (the time-shift tail) is outside the clean distribution. Idle pauses are sized at ≤ 20 steps each |
 | P6 | Where clean idle frames sit | measured: 436 frames with arm action exactly 0. Relative position quartiles 0.0 / 0.008 / 0.021 / 0.059 / 0.996, so they sit almost all at the episode start | Mid-episode pauses never occur in clean data. Insert pauses inside [0.2T, 0.8T] |
-| P7 | Release geometry | measured: 944/1000 episodes have a final +1→−1 transition, at a median 0.92 of the episode. The closed carry span before it is ≥ 40 steps in 95% of them (median 63). Median steps after release: 14 | Gripper-release eligibility = has a final release with carry span ≥ 30 steps. A 20-step premature release stays inside the carry phase |
+| P7 | Release geometry | measured: 944/1000 episodes have a final +1→−1 transition, at a median 0.92 of the episode. The closed carry span before it is ≥ 40 steps in 95% of them (median 63). Median steps after release: 14. **(r2)** Over the 960 v0 candidates: 907/960 have a final release and 884 are eligible (analyzer- and executor-reproduced, analysis-r1). The 944 above counts all 1000 episodes, references included | Gripper-release eligibility = has a final release with carry span ≥ 30 steps. A 20-step premature release stays inside the carry phase |
 | P8 | Lengths | measured: 75 / 172.5 / 517 steps (min/median/max). fps = 20 (`meta/info.json`) | Two seconds = 40 steps (quoted RoboDrop × measured fps). Every episode (T ≥ 75) can take a 40-step shift |
 | P9 | Episode identity | measured: `episode_id` = `<suite>/<task_name>/demo_N`. The physical order is grouped by task (`episode_index` 0–49 = spatial task 0, …). Task-constant catalog columns: `suite, task_name, libero_task_id, language_instruction, scene, objects, source, operator, collection_date, source_file` | A swapped instruction is always findable by cross-checking provenance (`episode_id`, `task_name`, physical position) against the instruction. See Design decision D1 |
 | P10 | Content hash includes the instruction | quoted `vlapoc/catalog.py:127-148`: `episode_content_hash(task, action, state, image, image2)` hashes `task.encode("utf-8")` | The instruction is already **content** under the repo's own identity scheme. Counting `language_instruction` / `meta/episodes.tasks` as data-derived in `compare_blind` is consistent with that |
@@ -172,7 +207,7 @@ Scripts: `data/scratch/gt_plan/premises.py`, `premises2.py` (scratch, gitignored
 | `corruption_type` | Spec row | Transform | Parameters | Length | Metric hypothesis (only where the PoC states one) |
 |---|---|---|---|---|---|
 | `action_noise` | §2.5 "Noisy ... actions" | a[:, 0:6] += N(0, (0.25·σ_a)²), then clip to [−1, 1]. Gripper untouched | 0.25·σ_a: quoted RoboDrop A.1. σ_a = v0 `stats.json` action std: as v1. Dims 0–5: inferred from P2/P3 (diverges from v1's 7-dim literal reading, recorded) | unchanged | none stated |
-| `time_shift` | §2.5 "time-shifted actions" (teleoperation lag) | a'[t] = a[t + 40] for t < T−40. For the last 40 steps: arm 0, gripper = a[T−1, 6] ("operator stopped commanding") | 40 steps = quoted 2 s × measured 20 fps. Direction (actions lead observations, the logged command takes effect 2 s later) and tail fill: inferred, since RoboDrop states neither | unchanged | none stated |
+| `time_shift` | §2.5 "time-shifted actions" (teleoperation lag) | **(r2, owner ruling A) Trim:** the child is frames t = 0 … T−41, with obs'[t] = obs[t] (state, image, image2) and a'[t] = a[t + 40]. There is no fill: every frame and action is a real parent value | 40 steps = quoted 2 s × measured 20 fps. Direction (actions lead observations, the logged command takes effect 2 s later): inferred, since RoboDrop states none. Trim instead of fill: owner ruling A (dispute-r1), because the r1 idle tail was detectable only as an artifact and put 2 s of idle into a "none stated" group | **−40** (`length_change: -40` in `params`; shortest child 35 frames, measured) | none stated |
 | `instruction_swap` | §2.5 "Swapped or wrong language instructions" | task string := the instruction of another task in the **same suite**, uniform, seeded | Same-suite rule: inferred (keeps the instruction a valid one for the benchmark). The string must already exist in the parent's `tasks.parquet` | unchanged | none stated |
 | `dropped_frames` | §2.5 "dropped frames" | Sample-and-hold of one camera's image: within a burst, frame t shows frame (burst start − 1). State and action are untouched | Burst length 1–10 frames: quoted LeRobot `read_latest(max_age_ms=500)` = 10 frames at 20 fps. One camera per burst, chosen uniformly; bursts until ≈ 20% of frames are held: inferred | unchanged | none stated |
 | `detour` | §2.5 "Low-skill ... corrections" | Pick a constant-gripper window [t, t+20] inside [0.2T, 0.8T]. Play it forward, then backward (frames t+19 … t, arm actions negated), then forward again, then continue. Every frame is a real parent frame, with no consecutive duplicates | m = 20 frames (1 s): inferred. Negated delta actions roughly reverse the motion: inferred (LIBERO OSC_POSE delta control), see R5. Prior art: Bedi 2026 "detour", SCIZOR "Move Back and Forth" | +40 | none stated |
@@ -196,6 +231,24 @@ feature does not score at that level.
   60/1000 × 6.9 GB) and are deleted afterwards.
 - Expected free space after the feature: ≈ 84 GiB, above the 20 GiB floor.
 - No per-type versions (D2). v1 is not rebuilt (owner decision 1).
+- **(r2) One re-derivation is budgeted: v3, ~7 GB, ~9 min** (the analysis-r1 estimate; v2 measured 6.8G in the
+  analyzer's `du -sh`).
+  - Free space is 86 GiB now (measured, `df -h`, 2026-10-17), so about 79 GiB after v3, above the 20 GiB floor.
+  - v3 is derived from **v0**, not v2, with the same `select_injection(per_type=13, seed=0)`. Only the
+    `time_shift` transform changes, so the other 78 labelled episodes get the same content hashes as in v2. The
+    executor checks that against v2's labels.
+- **(r2) v2 is retired** (single-record-system rule: one current ground-truth version, not two in parallel).
+  - v2 is blind and was not leaky, but its `time_shift` group carries the defect the owner ruled to fix. A later
+    feature that picked v2 by accident would test against a known-bad group.
+  - Mechanism: `lineage.write_fence("v2", reason="superseded by v3: time_shift tail-fill defect, owner ruling A
+    2026-10-17 (dispute-r1)", details={"superseded_by": <v3 id>})`. `open_for_method` already refuses any fenced
+    version (AC3.1), so no new mechanism is needed.
+  - The v2 lineage records and its MLflow runs stay, because they are history and S5's r1 heuristic table cites
+    them.
+  - The physical copy `data/lerobot/libero_spatial_10__v2` (6.8G) is **not** deleted by agents. Deleting it is a
+    reversible owner-cleanup item (re-derivable in ~9 min from code at its recorded git SHA), listed with the
+    evaluation feature's N4 leftovers.
+  - `v3` becomes the version that S5/S6, the runbook and later features name.
 
 ### Where things live (consumer contract)
 
@@ -236,22 +289,34 @@ DemInf, CUPID) -> score table keyed by
     test episodes; expect `frac_clipped` around 0.5–1.5% on dims 0–2 (inferred from P3). For the other six types the
     counts are recorded as 0 and are asserted 0. [owner decision 1]
   - [ ] AC1.4 Lengths and content, per type:
-    - `action_noise`, `time_shift`, `instruction_swap`, `dropped_frames` and `gripper_release` keep T.
+    - `action_noise`, `instruction_swap`, `dropped_frames` and `gripper_release` keep T.
     - `detour` and `idle_padding` give T + 40.
+    - **(r2)** `time_shift` gives T − 40. Its state and images equal parent frames 0 … T−41 and its actions equal
+      parent actions 40 … T−1, bit for bit.
     - Every image in a `detour` / `idle_padding` / `dropped_frames` output is byte-identical to some image of the
       same parent episode.
     - `detour` produces no consecutive identical frame pair.
     - `instruction_swap` outputs a task string from the parent's `tasks.parquet`, in the same suite, ≠ the original.
     - Only the declared arrays change (e.g. `dropped_frames` leaves `action` and `state` bit-identical).
     [PoC §2.5 p.5; design table]
-  - [ ] AC1.5 Determinism: the same (seed, episode_id) gives the same output content hash in two fresh processes.
-    A different seed gives a different hash for every type except `instruction_swap` with a single same-suite
-    alternative (not the case here: 9 alternatives). [vla-build]
+  - [ ] AC1.5 **(r2, amended per analysis-r1)** Determinism:
+    - the same (seed, episode_id) gives the same output content hash in two fresh processes, for all seven types;
+    - a different seed changes the hash for the five stochastic types: every `action_noise`, `dropped_frames` and
+      `idle_padding` episode, and ≥ 80% of `detour` and `instruction_swap` episodes (they draw from finite sets:
+      window positions and 9 same-suite alternatives);
+    - `time_shift` and `gripper_release` have no random draw by design (fixed 40-step shift, fixed 20 steps before
+      the final release), so their hashes are seed-independent, and the AC asserts that.
+    [vla-build; analysis-r1 planner item 2]
   - [ ] AC1.6 Eligibility counts printed per type over the 960 v0 candidates. For `gripper_release` it matches P7's
-    measurement (expect ≈ 900+, inferred from 944/1000 with carry ≥ 40 in 95%). Each type has ≥ 13 eligible episodes
-    in ≥ 13 tasks. [design D3]
+    candidate-set measurement: **(r2)** 884 eligible, 907/960 with a final release (analysis-r1). Each type has ≥ 13
+    eligible episodes in ≥ 13 tasks. [design D3]
   - [ ] AC1.7 Grounding docstring cites PoC §2.5 p.5, §8.10 p.17, §4.5 p.11, and RoboDrop App. A.1 p.13 for the two
     types it defines. It states each inferred parameter as inferred, and the dims-0–5 divergence from v1. [vla-build]
+  - [ ] AC1.8 **(r2, owner ruling A)** For every `time_shift` output, `catalog.action_stats(child)["idle_steps"]`
+    equals the count of parent steps in a[40:T] whose six arm dims are all exactly 0. The script prints the
+    distribution over the test episodes. Expected maximum 7 (measured over the 960 v0 candidates by
+    `data/scratch/gt_plan/premise_trim.py`: max 7, 99th percentile 2, 43/960 > 0), inside the clean range (clean
+    max 21). [owner ruling A, dispute-r1; analysis-r1 planner item 1]
 - **Verify by:** `.venv/bin/python scripts/verify_corruptions_s1.py --version v0 --per-type 100 --seed 0`, then the
   same command in a second process with the hash comparison flag.
 - **Demo value:** a seven-panel figure of the action/gripper traces and a filmstrip before and after for one episode
@@ -364,6 +429,16 @@ DemInf, CUPID) -> score table keyed by
     derivation timing from the returned `timing_s`, and the MLflow run id. [brief constraint]
   - [ ] AC4.7 Lineage: `lineage trace <derive run>` reaches v0 and its raw files, and the derive run's tags include
     `labels_sha256`. [PoC §2.1 item 1 p.3]
+  - [ ] AC4.8 **(r2) Re-derivation as v3, with v2 retired.**
+    - v3 is derived from v0 with the r2 `time_shift`, same selection (seed 0, 13 per type), and AC4.1–AC4.7 hold
+      for v3.
+    - v3's labels have the same 91 episode_ids and types as v2's. The 78 non-`time_shift` rows have identical
+      `content_hash`; the 13 `time_shift` rows differ, with `length_change: -40`. Both parts are printed.
+    - `fence_record("v2")` names reason "superseded by v3" and v3's id. `open_for_method("v2/candidate")` raises.
+      `open_for_method("v3/candidate")` opens.
+    - `df -h` after the derivation stays > 20 GiB.
+    - AC1.8 holds on v3's stored bytes.
+    [owner ruling A; single-record-system rule; analysis-r1 planner item 3]
 - **Verify by:** commit first (the `derive` CLI refuses a dirty `vlapoc/`), then run the CLI. Then
   `.venv/bin/python -m vlapoc.lineage version check-blind v2` and `scripts/verify_injection_s4.py` (AC4.4–4.5).
 - **Demo value:** the injected dataset itself, plus a task × type allocation table, a before/after filmstrip of one
@@ -418,6 +493,18 @@ DemInf, CUPID) -> score table keyed by
     item 1 p.3]
   - [ ] AC5.7 Grounding docstrings: PoC §2.1 item 4 p.3, §2.5 p.5, RoboDrop §5.1 p.7 and Table 7 (oracle), and the
     tie rule marked inferred. [vla-build]
+  - [ ] AC5.8 **(r2, owner ruling A) Per-type detectability statement, on v3.** AC5.4's table is regenerated on
+    `v3/candidate`, and each of the seven types gets one line in the report saying which kind it is:
+    - **(a)** found by a one-line statistic (best heuristic AUROC ≥ 0.95), naming the statistic and whether that is
+      inherent to the corruption or a construction artifact;
+    - **(b)** partly found (AUROC between 0.6 and 0.95);
+    - **(c)** not found by any heuristic (best AUROC < 0.6), the only types that test a method beyond heuristics.
+    The bands are inferred reporting bands, not pass thresholds.
+
+    For `time_shift` specifically, H2 (idle_steps) AUROC is printed with the expectation "about 0.5" (AC1.8). H1
+    (length) AUROC is printed and reported openly, whatever it is: the trim shortens the episode by 40 steps, which
+    is a residual signal. The r1 (v2) and r2 (v3) `time_shift` rows are shown side by side.
+    [owner ruling A, dispute-r1; CUPID TuckBox point via analysis-r1]
 - **Verify by:** `.venv/bin/python scripts/verify_recovery_s5.py` (fixtures, key safety, leak check), then
   `.venv/bin/python -m vlapoc.methods.heuristics --subset v2/candidate --out data/eval/groundtruth/heuristics/`
   followed by the scoring CLI for each output.
@@ -462,6 +549,12 @@ DemInf, CUPID) -> score table keyed by
   - [ ] AC6.5 The runbook states plainly that LIBERO has no ghost-event (drop) rule (evaluation decision 6). The
     gripper-release "drops" hypothesis can only show up as success, F(τ) or timeouts there. [PoC §4.5 p.11;
     evaluation report]
+  - [ ] AC6.6 **(r2)** The runbook names **v3** (not v2) in every GT-R command. It also carries a "Known issue for
+    the attribution feature" line: `vlapoc.runs.train_run` (and `eval_run`) do not call `open_for_method` or
+    `assert_blind`. That is correct for this feature's training arms, but a later method that trains policies
+    (datamodels, CUPID) could pass a ground-truth-derived subset to `train_run` without being refused. The
+    attribution feature must route its training inputs through the loader. [analysis-r1 planner item 4; owner
+    decision 3]
 - **Verify by:** `.venv/bin/python scripts/verify_consumers_s6.py`, then read `artifacts/server-runbook.md` against
   AC6.4's list.
 - **Demo value:** "the corrupted dataset trains": normalization shift numbers, the smoke run id, and a runbook a
@@ -485,6 +578,14 @@ DemInf, CUPID) -> score table keyed by
 - **Rebuilding v1.** Owner decision 1. It stays fenced.
 - **Cross-suite instruction swaps** and novel (non-benchmark) instruction strings.
 - **Injection on the PhAIL fine-tuning set** (§10 "Real-robot stage").
+- **(r2) Owner-ruled known limitations (ruling A, 2026-10-17; dispute-r1 options B and C, not built):**
+  - **B.** Swap provenance stays visible: `instruction_swap` is found by the instruction-vs-`task_name` cross-check
+    (H6). `action_noise` stays independent per-step Gaussian (RoboDrop-literal), found by smoothness. Hiding
+    provenance (opaque keys, shuffled order) and correlated (e.g. AR(1)) noise are not built.
+  - **C.** Idle pauses repeat stored frames (exact duplicate images), with no simulator re-rendering. Re-rendered
+    idle is not built.
+
+  The report lists both as owner-approved limitations next to AC5.8's per-type statement.
 
 ## Open questions
 
@@ -493,7 +594,11 @@ DemInf, CUPID) -> score table keyed by
   exceed ±0.9375 (P1, measured). Clipping to [−1, 1] therefore leaves noised values in (0.9375, 1] that are
   impossible *in this data*, though valid for the environment. AC1.3/AC4.5 record that fraction. Switching to
   ±0.9375 is a one-parameter change plus a re-derivation (~9 min) if the owner wants it.
-- Non-blocking, owner question, **swap provenance (D1)**: the default keeps `episode_id`, `task_name` and physical
+- **(r2) Settled by owner ruling A (2026-10-17):** B (hiding provenance, correlated noise) and C (re-rendered idle)
+  stay unbuilt for this feature. They remain open for a later ground-truth revision, if a method's results show
+  the one-line-detectable types are uninformative. The swap-provenance question below is answered by this ruling
+  (default kept).
+- Non-blocking, owner question (answered by ruling A, kept for history), **swap provenance (D1)**: the default keeps `episode_id`, `task_name` and physical
   position true, as in a real mislabelled dataset, so a provenance cross-check finds every swap (S5 H6 measures it).
   The fully hidden alternative needs opaque method-facing episode keys, a label-independent physical shuffle (which
   changes `compare_blind`'s row-order rule) and dropping the provenance columns from the method view. That is roughly
@@ -528,8 +633,17 @@ DemInf, CUPID) -> score table keyed by
   data.
 - **R8** The heuristics module is the first method-side code. If it needs a column the loader does not expose, the
   fix goes in the loader's documented column list (AC3.5), not around it.
-- **R9** The time-shift tail (40 zero-arm steps) raises `idle_steps` to ≥ 40, beyond the clean maximum of 21. That is
-  expected and visible in H2. It is not a leak, because it is content.
+- **R9** **(r2, rewritten)** In r1, the tail fill raised `time_shift` idle_steps to exactly 40 (13/13, analysis-r1),
+  beyond the clean maximum of 21. The type was detectable only through an artifact, and it contaminated the §4.5
+  metric test. The r2 trim removes this (AC1.8). Its residual signal is length: −40 steps, about −23% of the
+  median. AC5.8 reports it rather than hiding it.
+- **R11 (r2) Known issue for the attribution feature:** `vlapoc.runs.train_run` / `eval_run` bypass
+  `open_for_method` (analysis-r1, grep: no `assert_blind` or fence check in `runs.py`). This feature does not fix
+  it; it records it in the runbook (AC6.6) and the report.
+- **R12 (r2) Non-blocking, other feature:** the data+lineage AC4.8 "contrast" figure (60 files / 663 MB) is stale.
+  The executor measured 0 files, also on pre-S2 code (analysis-r1). Fix it with a `changelog.md` entry in
+  `tracker/features/2026-09-28-data-lineage-layer/` and a correction in that report. The executor or summarizer
+  does this; it is not part of this feature's ACs.
 - **R10** A gripper-release episode whose final release is the only one, at < 0.5 of the episode (min relative
   position 0.367, P7), may not be "near placement". The executor reports how many selected episodes have their
   final release before 0.8T.
