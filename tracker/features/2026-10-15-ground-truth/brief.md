@@ -72,4 +72,17 @@ data+lineage feature deferred the full corruption suite to this feature (owner-a
 
 ## Owner rulings
 
-(none yet)
+### 2026-10-17: `dispute-r1.md` (corruption detectability)
+
+- **Question put to the owner:** "Ground truth dispute: 5 of 7 corruption types are found by one-line
+  statistics. Which detectability leaks should be removed in the single re-derivation?"
+- **Owner's decision (verbatim):** "A. Fix time_shift only (rec.)".
+- **Meaning, per the case file's Option A:**
+  - Replace the `time_shift` tail fill (40 steps of arm = 0) with a trim: obs[0:T−40] paired with a[40:T],
+    with the length change recorded in the label.
+  - Keep everything else.
+  - Report recovery per type against the heuristic baselines, saying plainly which types test anything beyond
+    one-line statistics.
+  - B (hiding provenance, correlated noise) and C (re-rendered idle) are not built; record them as open
+    questions or known limitations.
+- **Final and owner-approved.** The analyzer does not re-open it.
