@@ -1,9 +1,10 @@
-"""Verify ground-truth S4 (the full-scale injected version v2) against AC4.1-AC4.7, on the stored bytes.
+"""Verify ground-truth S4 (the full-scale injected version, now v3) against AC4.1-AC4.8, on the stored bytes.
 
 Grounding: PoC §2.5 p.5 ("Inject 5-10% corrupted episodes"), §8.7 p.15 / §8.3 p.14 (clean references),
 §2.1 item 1 p.3 (lineage) and item 4 p.3 (blindness); RoboDrop App. A.1 p.13 ("10% of the episodes for every task").
 
-    .venv/bin/python scripts/verify_injection_s4.py --version v2 --parent v0 --run-id <derive run id>
+    .venv/bin/python scripts/verify_injection_s4.py --version v3 --parent v0 --prefix s4_v3 --prior v2 \
+        --run-id d3dd9fd4dff84d37b5be21fa563fcc57          # the derive run of v3 (AC4.7 reads it from the real store)
 
 Reads only; everything is recomputed from the stored dataset, never from the derivation's in-memory results.
 Writes ``artifacts/s4_verify.json``, ``artifacts/s4_allocation.csv`` and ``artifacts/s4_filmstrip.png``.

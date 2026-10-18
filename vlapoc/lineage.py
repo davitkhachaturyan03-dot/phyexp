@@ -884,7 +884,12 @@ def write_fence(ref: str, reason: str, details: dict, lineage_root: Path | None 
 
 def assert_blind(ref: str, lineage_root: Path | None = None) -> None:
     """Raise ``LineageError`` unless the version may be handed to a method under test: not fenced and
-    ``check_blind`` empty. Screening and attribution entry points call this on their input version."""
+    ``check_blind`` empty. Screening and attribution entry points call this on their input version.
+
+    Two refusal messages: a version whose fence carries ``superseded_by`` and that leaks no column (an injected
+    version replaced by a newer one, see ``vlapoc.groundtruth.retire_version``) is told which version to use
+    instead; any other fence or leaking column (v1) gets the "not blind" message with the offending columns.
+    """
     rep = blind_report(ref, lineage_root)
     fence = rep["fence"]
     if fence is not None and fence.get("superseded_by") and not rep["offending"]:

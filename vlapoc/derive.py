@@ -16,8 +16,9 @@ Grounding
 - RoboDrop App. A.1 (p. 13): "corrupting 10% of the episodes for every task. Action corruption adds
   zero-mean Gaussian noise with standard deviation 0.25σa to the demonstrated actions, where σa is the
   empirical action standard deviation." ``robodrop_action_noise`` implements this literally, as a
-  lineage demo only. The corruption suite (time shift, instruction swap, viewpoint, hesitant demos,
-  gripper-release noise) is a separate, owner-approved later feature (brief.md, 2026-09-29).
+  lineage demo only. The corruption suite (time shift, instruction swap, dropped frames, detour, idle padding,
+  gripper-release noise; viewpoint is out of scope) lives in ``vlapoc.corruptions`` and is driven by
+  ``vlapoc.groundtruth`` (ground-truth feature, brief.md 2026-10-15); this module only applies edits.
 
 Mechanism (LeRobot's own writer, no hand-written parquet surgery)
 ------------------------------------------------------------------
@@ -262,8 +263,9 @@ def derive_version(
     episode (``LeRobotDatasetMetadata.save_episode_tasks``), so ``meta/tasks.parquet`` and every unedited
     episode's ``task_index`` equal the parent's (LeRobot would otherwise number tasks by first appearance, and
     a swapped early episode would reorder them). ``language_instruction`` of the child's tables is refreshed
-    from the stored task. ``modify_tasks`` is not used: it works in place and re-indexes tasks alphabetically. Ground truth lives in ``labels.parquet``, the pre-edit
-    hashes in ``parents.parquet``; both are lineage-only. ``vlapoc.lineage.compare_blind`` checks this
+    from the stored task. ``modify_tasks`` is not used: it works in place and re-indexes tasks alphabetically.
+
+    Ground truth lives in ``labels.parquet``, the pre-edit hashes in ``parents.parquet``; both are lineage-only. ``vlapoc.lineage.compare_blind`` checks this
     before the version is registered and the derivation fails if any bookkeeping column differs.
 
     ``isolate_hf_cache=True`` (default) routes any HF ``datasets`` cache written during the derivation

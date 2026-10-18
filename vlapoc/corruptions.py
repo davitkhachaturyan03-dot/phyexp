@@ -1,5 +1,11 @@
 """The seven injected corruption types, as pure ``EpisodeEdit`` transforms (ground-truth feature, S1).
 
+Where this sits: ``vlapoc.groundtruth`` picks which episodes get which type and calls ``make_edit`` for each; the
+resulting ``EpisodeEdit`` list goes to ``derive.derive_version``, which applies each transform while it writes the new
+dataset version and stores the type, ``params`` and seed in ``labels.parquet`` (the answer key). Nothing here touches
+disk. A newcomer should read ``make_edit``, then one constructor (``time_shift`` is the shortest that changes length,
+``action_noise`` the simplest), then ``clip_actions``.
+
 Grounding
 ---------
 - PoC §2.1 item 4 (p. 3): "Deliberately corrupt known subsets of training data: noisy or shifted actions,
@@ -99,7 +105,7 @@ def _p(value, basis: str, src: str) -> dict:
 # ---------------------------------------------------------------------------------------------
 
 
-def clip_actions(a: np.ndarray, before: np.ndarray | None = None) -> tuple[np.ndarray, dict]:
+def clip_actions(a: np.ndarray) -> tuple[np.ndarray, dict]:
     """Clip actions to [-1, 1] (owner decision 1) and account for how much the clip bit.
 
     ``a`` is the float32/float64 (T, 7) action array to clip. Returns ``(clipped float32, stats)``:
@@ -107,8 +113,8 @@ def clip_actions(a: np.ndarray, before: np.ndarray | None = None) -> tuple[np.nd
     (their ratio), ``n_clipped_dims0_2`` / ``frac_clipped_dims0_2`` (the translation dims, where P3 measured
     0.5-1.5% for 0.25 sigma_a noise), and ``n_beyond_clean_range`` / ``frac_beyond_clean_range``: values on dims 0-2
     with 0.9375 < |a| <= 1 *after* clipping. Clean v0 data has none (``CLEAN_TRANSLATION_MAX``, measured), so
-    these are values valid for the environment but impossible in this dataset. ``before`` is unused (kept so
-    callers can pass the unclipped array for documentation); the stats describe ``a``.
+    these are values valid for the environment but impossible in this dataset. The stats describe ``a``, the
+    array before clipping.
     """
     a64 = np.asarray(a, dtype=np.float64)
     out = np.clip(a64, CLIP_LOW, CLIP_HIGH)
@@ -126,6 +132,11 @@ def clip_actions(a: np.ndarray, before: np.ndarray | None = None) -> tuple[np.nd
         "frac_beyond_clean_range": float(n_beyond / (3 * t)),
     }
     return out.astype(np.float32), stats
+
+
+#: Clip accounting of a type that never touches the actions (same keys, same order, as ``clip_actions`` writes).
+NO_CLIP_STATS = {"n_clipped": 0, "n_clipped_dims0_2": 0, "n_beyond_clean_range": 0,
+                 "frac_clipped": 0.0, "frac_clipped_dims0_2": 0.0, "frac_beyond_clean_range": 0.0}
 
 
 def _ranges(idx: list[tuple[int, int]]) -> list[list[int]]:
@@ -313,10 +324,7 @@ def instruction_swap(episode_id: str, original_task: str, same_suite_tasks: list
         },
         "corrupted_frames": [],  # completed with [[0, T]] by the transform
     }
-    for k in ("n_clipped", "n_clipped_dims0_2", "n_beyond_clean_range"):
-        params[k] = 0
-    for k in ("frac_clipped", "frac_clipped_dims0_2", "frac_beyond_clean_range"):
-        params[k] = 0.0
+    params.update(NO_CLIP_STATS)
 
     def f(ep: dict) -> dict:
         if ep["task"] != original_task:
@@ -348,10 +356,7 @@ def dropped_frames(episode_id: str, seed: int, held_fraction: float = HELD_FRACT
             "rng": _p(_RNG_DESC, "inferred", "per-episode generator"),
         },
     }
-    for k in ("n_clipped", "n_clipped_dims0_2", "n_beyond_clean_range"):
-        params[k] = 0
-    for k in ("frac_clipped", "frac_clipped_dims0_2", "frac_beyond_clean_range"):
-        params[k] = 0.0
+    params.update(NO_CLIP_STATS)
 
     def f(ep: dict) -> dict:
         rng = _rng(seed, "dropped_frames", episode_id)
@@ -459,10 +464,7 @@ def idle_padding(episode_id: str, seed: int, pause_steps: int = PAUSE_STEPS, n_p
             "rng": _p(_RNG_DESC, "inferred", "per-episode generator"),
         },
     }
-    for k in ("n_clipped", "n_clipped_dims0_2", "n_beyond_clean_range"):
-        params[k] = 0
-    for k in ("frac_clipped", "frac_clipped_dims0_2", "frac_beyond_clean_range"):
-        params[k] = 0.0
+    params.update(NO_CLIP_STATS)
 
     def f(ep: dict) -> dict:
         a = ep["action"].astype(np.float64)

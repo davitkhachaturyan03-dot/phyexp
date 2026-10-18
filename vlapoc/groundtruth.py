@@ -1,4 +1,11 @@
-"""Ground-truth side of the injection experiment: the answer key (ground-truth feature S3).
+"""Ground-truth side of the injection experiment: select, derive, score (ground-truth feature S3-S5).
+
+Where this sits (``docs/dataflow.md``, "corrupt 5-10% of a copy"): ``select_injection`` -> ``build_edits`` (uses
+``vlapoc.corruptions``) -> ``derive_injection`` (``derive.derive_version`` writes the new version and the labels)
+-> a method under test screens it through ``vlapoc.method_data`` -> ``score_recovery`` compares the ranking with the
+answer key (recall@k, AUROC). ``retire_version`` fences a superseded injected version. Reading order for a
+newcomer: ``select_injection``, ``build_edits``, ``derive_injection``, then ``recovery_metrics`` and
+``score_recovery``.
 
 Grounding
 ---------
@@ -14,7 +21,13 @@ cross-checks the labels against the lineage-only ``parents.parquet`` (``lineage.
 S4 adds the seeded stratified selection (``select_injection``), the injected-version derivation
 (``derive_injection`` / ``derive_injection_run``) and a CLI::
 
-    .venv/bin/python -m vlapoc.groundtruth derive --parent v0 --name v2 --per-type 13 --seed 0
+    .venv/bin/python -m vlapoc.groundtruth derive --parent v0 --name v3 --per-type 13 --seed 0   # ~9 min, ~7 GB copy
+
+Other commands (run from the repo root; ``derive`` and ``score`` record an MLflow run in the real store unless given
+``--no-track``)::
+
+    .venv/bin/python -m vlapoc.groundtruth score --version v3 --scores <table>.parquet --column <column> [--direction lowest]
+    .venv/bin/python -m vlapoc.groundtruth retire --version v2 --superseded-by v3
 
 Grounding for the selection (S4): PoC §2.5 (p. 5) "Inject 5-10% corrupted episodes" and §10 (p. 20) "Ground
 truth | Injection experiment with 5-10% corrupted episodes, using LIBERO's original demos as clean references";
@@ -385,7 +398,7 @@ def retire_version(old: str, new: str, lineage_root: Path | None = None) -> Path
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI: ``derive`` (S4), ``score`` (S5), ``retire`` (r2)."""
+    """CLI with three subcommands: ``derive`` (S4), ``score`` (S5), ``retire`` (r2); examples in the module docstring."""
     ap = argparse.ArgumentParser(prog="python -m vlapoc.groundtruth")
     sub = ap.add_subparsers(dest="cmd", required=True)
     d = sub.add_parser("derive", help="derive the injected version (all seven types) from a parent")

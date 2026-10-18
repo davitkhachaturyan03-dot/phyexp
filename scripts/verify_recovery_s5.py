@@ -1,11 +1,11 @@
-"""Verify ground-truth S5 scoring (AC5.1, AC5.2 structure, AC5.3, AC5.5) on fixtures and the real v1/v2.
+"""Verify ground-truth S5 scoring (AC5.1, AC5.2 structure, AC5.3, AC5.5) on fixtures and the real v1/v3.
 
 Grounding: PoC §2.1 item 4 p.3 ("recovered 90% of the injected bad episodes"), §2.5 p.5; RoboDrop §5.1 p.7
 (AUROC, best balanced accuracy); evaluation-layer S0 (the v1 positional leak, ``fence.json``).
 
     .venv/bin/python scripts/verify_recovery_s5.py
 
-Reads the real store (v0, v1, v2 episode tables and labels); writes only ``artifacts/s5_verify.json``.
+Reads the real store (v0, v1, v3 episode tables and labels); writes only ``artifacts/s5_verify.json``.
 """
 
 from __future__ import annotations

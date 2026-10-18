@@ -1,4 +1,4 @@
-"""Verify ground-truth S6: v2 is trainable and evaluable locally (AC6.1-AC6.3); the runbook is checked by reading it.
+"""Verify ground-truth S6: the injected version (v3 by default) is trainable and evaluable locally (AC6.1-AC6.3); the runbook is checked by reading it.
 
 Grounding: evaluation-layer owner decision 3 (per-subset normalization) and S8; PoC §8.10 pp. 17-18 ("Verify before
 claiming": policy-level effects need training and rollouts, which are pending server), §2.6 p.5 and §9.1 Step 4 p.19;

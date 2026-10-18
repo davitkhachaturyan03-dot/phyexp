@@ -1,5 +1,9 @@
 """The method-facing loader: the only way method code reads a dataset version (ground-truth feature S3).
 
+Where this sits: between the stored dataset versions and any screening or attribution method (for now
+``vlapoc.methods.heuristics``). ``vlapoc.groundtruth`` is the other side of the boundary: it reads the labels, this
+module never does. Reading order: ``open_for_method`` (the four checks), then ``MethodView.iter_episodes``.
+
 Grounding
 ---------
 - PoC §2.1 item 4 (p. 3): "Deliberately corrupt known subsets of training data ... Then check whether your
