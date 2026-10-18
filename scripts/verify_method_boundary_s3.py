@@ -107,6 +107,11 @@ def main() -> int:
         _, a = attempt("v1/candidate (fenced, real store)", lambda: open_for_method("v1/candidate"), rows, LineageError)
         msg_v1 = rows[-1]["reason"]
         method_data._reset_session()
+        _, a2 = attempt("v2/candidate (superseded by v3, real store)", lambda: open_for_method("v2/candidate"), rows, LineageError)
+        msg_v2 = rows[-1]["reason"]
+        print(f"AC3.1 (r3) v2/candidate refusal says superseded: {'fenced: superseded by v3' in msg_v2}: {msg_v2[:120]}")
+        a = a and a2 and "fenced: superseded by v3" in msg_v2
+        method_data._reset_session()
         v, b = attempt("v0/candidate (real store)", lambda: open_for_method("v0/candidate"), rows, None)
         print(f"AC3.1 v0/candidate view: {len(v.episode_indices)} episodes, {len(v.reference_ids)} reference ids, catalog columns "
               f"== CATALOG_COLUMNS: {list(v.catalog.columns) == CATALOG_COLUMNS}, root {v.lerobot_root.relative_to(REPO_ROOT)}")

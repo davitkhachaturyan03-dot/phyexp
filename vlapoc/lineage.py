@@ -886,6 +886,10 @@ def assert_blind(ref: str, lineage_root: Path | None = None) -> None:
     """Raise ``LineageError`` unless the version may be handed to a method under test: not fenced and
     ``check_blind`` empty. Screening and attribution entry points call this on their input version."""
     rep = blind_report(ref, lineage_root)
+    fence = rep["fence"]
+    if fence is not None and fence.get("superseded_by") and not rep["offending"]:
+        raise LineageError(f"version {rep['name']} ({rep['version'][:12]}) is fenced: {fence.get('reason', 'superseded')} "
+                           f"({str(fence['superseded_by'])[:12]}); use the superseding version (ground-truth feature r3)")
     if rep["fence"] is not None or rep["offending"]:
         raise LineageError(f"version {rep['name']} ({rep['version'][:12]}) is not blind to its edits: fenced="
                            f"{rep['fence'] is not None}, offending={rep['offending']} (PoC §2.1 item 4 p.3)")
