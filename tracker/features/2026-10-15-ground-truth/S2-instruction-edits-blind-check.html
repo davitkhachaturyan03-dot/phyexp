@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S2 Instruction edits and the blind check — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+/* report-specific figure styling: colours come from tracker.css variables only */
+.gt-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+.gt-box.acc{stroke:var(--accent);stroke-width:1.7}
+.gt-box.gt{fill:var(--accent-soft);stroke:var(--accent)}
+.gt-box.warn{stroke:var(--warn);stroke-dasharray:5 3}
+.gt-zone-gt{fill:var(--accent-soft);fill-opacity:.35;stroke:var(--accent);stroke-dasharray:6 4;stroke-width:1}
+.gt-zone-m{fill:var(--surface-2);stroke:var(--border)}
+.gt-zone-l{fill:var(--muted);font:600 10px var(--mono);letter-spacing:.06em}
+.gt-t{fill:var(--text);font:600 12px var(--sans)}
+.gt-m{fill:var(--muted);font:10.5px var(--mono)}
+.gt-mt{fill:var(--text);font:10.5px var(--mono)}
+.gt-arrowhead{fill:var(--muted)}
+.gt-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}
+.gt-dash{stroke-dasharray:5 4}
+.gt-warnline{stroke:var(--warn)}
+.gt-track{fill:var(--surface-2)}
+.gt-bar{fill:var(--accent)}
+.gt-bar2{fill:var(--muted)}
+.gt-bartxt{fill:var(--surface);font:600 11px var(--mono)}
+.gt-chance{stroke:var(--muted);stroke-dasharray:3 3;stroke-width:1.2}
+.gt-cell{fill:var(--surface-2)}
+.gt-cell-best{fill:var(--surface-2);stroke:var(--text);stroke-width:1.5}
+.gt-heat{fill:var(--accent)}
+.gt-heat-on{fill:var(--accent);fill-opacity:.4}
+.gt-line{stroke:var(--muted);stroke-width:1.5;fill:none}
+.gt-line-hot{stroke:var(--accent);stroke-width:3;fill:none}
+.gt-dot{fill:var(--muted)}
+.gt-dot-hot{fill:var(--accent)}
+.gt-dot-new{fill:var(--good)}
+.gt-tick{stroke:var(--border);stroke-width:2}
+.gt-tick-inj{stroke:var(--accent);stroke-width:3.5}
+.gt-cut{stroke:var(--text);stroke-dasharray:4 3;stroke-width:1.4}
+.gt-seg-obs{fill:var(--surface-2);stroke:var(--border)}
+.gt-seg-act{fill:var(--accent-soft);stroke:var(--accent)}
+.gt-seg-new{fill:var(--accent);fill-opacity:.35;stroke:var(--accent)}
+.gt-seg-cut{fill:none;stroke:var(--bad);stroke-dasharray:4 3}
+.scroll figure svg, .scroll > svg{min-width:640px}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:#fff}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.good{border-left-color:var(--good)}
+.note.bad{border-left-color:var(--bad)}
+.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}
+td.mono,th.mono{font-family:var(--mono)}
+code{overflow-wrap:anywhere}
+pre code{overflow-wrap:normal}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Ground truth (injection experiment)</a></p>
+  <h1>S2 · Instruction edits and the blind check</h1>
+  <p class="dek">The derive step can now swap an episode's language instruction, and the blindness check now treats the instruction as content, so a swap passes while a provenance leak is still caught.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">7/7</span></span>
+    <span><b>Depends on</b> <a href="S1-corruption-transforms.html">S1</a></span>
+    <span><b>Code</b> <code>vlapoc/derive.py</code>, <code>vlapoc/lineage.py</code></span>
+  </div>
+</header>
+
+<h2>Why</h2>
+<p>Two blockers stood between the swapped-instruction corruption (§2.5, "annotation errors") and a derived dataset. First, <code>derive_version</code> refused task edits outright. Second, the blind check counted the instruction as bookkeeping, so a swap would have failed it, or worse, an instruction could have become a free side channel that tells a method which episodes were edited. The PoC's rule is that a method must be able to flag the planted episodes on its own.</p>
+<blockquote>Then check whether your attribution method flags exactly those. — §2.1 item 4, p. 3</blockquote>
+<p>The repo already hashes the instruction into every episode's content hash (<code>vlapoc/catalog.py:127-148</code>, read in the plan, premise P10), so counting it as content is consistent with how identity already works.</p>
+
+<h2>What was built</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File / function</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>vlapoc/derive.py::EpisodeEdit.new_task</code> and <code>derive_version</code></td><td>Honours a swap if the target is already in the parent's <code>tasks.parquet</code> (else <code>LineageError</code> before anything is written). Pre-registers the parent's tasks in parent order so LeRobot's writer cannot reorder them.</td></tr>
+    <tr><td><code>derive._derived_episode_table</code></td><td>Refreshes the catalog's <code>language_instruction</code> from the stored task.</td></tr>
+    <tr><td><code>vlapoc/lineage.py</code> (<code>DATA_DERIVED_COLUMNS</code>, <code>_compare_meta</code>)</td><td><code>language_instruction</code> is now content. <code>meta/episodes.tasks</code> must equal the child table's instruction per episode, so the instruction is not a free channel (an extra rule beyond the plan, tested in AC2.6).</td></tr>
+    <tr><td><code>labels.parquet</code></td><td>Gains a <code>hypothesis</code> column (the §4.5 metric hypothesis, or "none stated").</td></tr>
+    <tr><td><code>scripts/verify_derive_gt_s2.py</code> (340 lines)</td><td>Derives a 20-episode scratch version with one edit of each type; run twice under different <code>PYTHONHASHSEED</code>.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Acceptance criteria</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead>
+  <tbody>
+    <tr><td>AC2.1 A scratch derivation with one edit of each of the seven types registers with <code>check_blind == []</code>; labels have the seven required columns</td><td>PoC §2.1 item 4 p.3</td><td>✅</td><td><code>verify_derive_gt_s2.py</code> → "7 edits … registered as dbb9f38a473f in 13.3s; check_blind = []; assert_blind passes: yes"; 7 rows, columns <code>episode_id, parent_content_hash, content_hash, corruption_type, params, seed, hypothesis</code></td></tr>
+    <tr><td>AC2.2 A swap to a string not in the parent's tasks, or any edit of a reference episode, raises before writing</td><td>PoC §8.7 p.15</td><td>✅</td><td><code>LineageError: instruction edit(s) to task string(s) not in small20's tasks.parquet … nothing written</code>; versions in store 2 → 2. Reference: <code>refusing to edit 1 reference-split episode(s) (PoC §8.7 p.15)</code></td></tr>
+    <tr><td>AC2.3 The child's <code>tasks.parquet</code> equals the parent's; the swapped episode's rows carry the target task's index</td><td>P11</td><td>✅</td><td>Tasks equal, 20 tasks, same order. Swapped episode: 137 data rows, task_index 5 → 7; only that one episode differs from the parent</td></tr>
+    <tr><td>AC2.4 <code>PYTHONHASHSEED</code> 0 vs 1 gives the same <code>tasks.parquet</code>, labels digest, content hashes, version id</td><td>brief quirk</td><td>✅</td><td>All five True; <code>dataset_version_id</code> <code>dbb9f38a473f2bb8</code> both. The one differing file is <code>meta/stats.json</code>, in dictionary key order only (parsed JSON equal)</td></tr>
+    <tr><td>AC2.5 No regression: v1 still fenced with <code>['episode_index']</code>, <code>check_blind(v0) == []</code>, older verifiers pass</td><td>evaluation S0 ruling A</td><td>✅</td><td><code>check_blind(v1) = ['episode_index']; check_blind(v0) = []; assert_blind(v1) refused: True</code>. <code>verify_blind_s0.py</code> passes unchanged; <code>verify_derive_s4.py --guard --columns --cache</code> pass (<code>artifacts/s2_regress_*.txt</code>)</td></tr>
+    <tr><td>AC2.6 A deliberate leak (changing <code>task_name</code>) is still caught and named</td><td>PoC §2.1 item 4 p.3</td><td>✅</td><td>Blind-check table below; "AC2.6 provenance leak names task_name: True"</td></tr>
+    <tr><td>AC2.7 Docstrings of <code>derive_version</code> and <code>compare_blind</code> state the reclassification and why</td><td>vla-build</td><td>✅</td><td>Read: instruction is hashed content; provenance stays bookkeeping (design D1)</td></tr>
+  </tbody>
+</table>
+</div>
+<p>The AC2.5 regression run found one expectation that changed for a reason unrelated to this feature: data+lineage's AC4.8 "contrast" (a cache that <code>isolate_hf_cache=False</code> left behind: 60 files / 663 MB) now leaves 0 files, and does so on the pre-S2 code too (re-run with the S2 changes stashed). The order-preserving writer from the evaluation feature no longer produces that cache. That is corrected in the data+lineage feature's changelog and report (2026-10-17), not here.</p>
+
+<h2>Example</h2>
+<p>The swapped episode in the 20-episode scratch version is <code>pick_up_the_black_bowl_on_the_ramekin_an…/demo_0</code>. Before the edit its data rows carried task index 5. After, all 137 rows carry index 7, which is the parent's index for the target instruction, and <code>meta/episodes</code> holds the string "pick up the black bowl on the stove and place it on the plate". The task table itself is untouched, and only this one episode's index differs from the parent's. Nothing else changed: <code>task_name</code>, <code>episode_id</code>, scene and objects stay true, as they would in a real mislabelled dataset.</p>
+<pre><code>AC2.3 swapped episode ...demo_0: parent task_index 5 -> data rows carry [7] (target task's parent index 7)
+AC2.3 episodes whose task_index differs from the parent's: [5] (expected only 5)</code></pre>
+
+<h2>Visual</h2>
+<p>The blind-check table is the demo: what the check accepts (an edit's content) and what it rejects (any bookkeeping that changes with an edit). Real output of <code>verify_derive_gt_s2.py</code> (<code>artifacts/s2_r2_run.txt</code>).</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>Case (scratch child; tamper applied to the stored table, then undone)</th><th><code>check_blind</code> says</th><th>Result</th></tr></thead>
+  <tbody>
+    <tr><td>Derived child as written (swap plus six other edits)</td><td><code>[]</code></td><td><span class="pill good">accepted</span></td></tr>
+    <tr><td><code>task_name</code> changed on the swapped episode (provenance leak)</td><td><code>['task_name']</code></td><td><span class="pill bad">rejected</span></td></tr>
+    <tr><td><code>libero_task_id</code> changed on the swapped episode</td><td><code>['libero_task_id']</code></td><td><span class="pill bad">rejected</span></td></tr>
+    <tr><td><code>source_demo</code> changed on an edited (noise) episode</td><td><code>['source_demo']</code></td><td><span class="pill bad">rejected</span></td></tr>
+    <tr><td><code>language_instruction</code> of an unedited episode changed, <code>meta/episodes</code> not</td><td><code>(meta/episodes does not match the episode table)</code></td><td><span class="pill bad">rejected</span></td></tr>
+    <tr><td>Swapped row's instruction put back to the parent's while <code>meta/episodes</code> keeps the swap</td><td><code>(meta/episodes does not match the episode table)</code></td><td><span class="pill bad">rejected</span></td></tr>
+  </tbody>
+</table>
+</div>
+<p class="note">What to notice: the swap itself is accepted because the instruction is content, while every attempt to hide or signal the edit through bookkeeping (provenance columns, a mismatched meta table) is caught and named.</p>
+
+<h2>Divergences and limitations</h2>
+<ul>
+  <li><b>Extra rule beyond the plan.</b> Moving <code>tasks</code> out of the bookkeeping set alone would have let <code>meta/episodes.tasks</code> drift from the catalog instruction unnoticed, so the consistency rule was added and tested (AC2.6).</li>
+  <li><b>Swaps keep true provenance (design D1).</b> A cross-check of the instruction against <code>task_name</code> finds every swap (AUROC 1.000, S5 heuristic H6). Hiding provenance with opaque keys is option B of the dispute; the owner ruled it out of this feature (ruling A) and it is recorded as limitation B in the report.</li>
+  <li>The v1 labels have no <code>hypothesis</code> column (v1 is not rebuilt).</li>
+  <li>The scratch parent is a 20-episode miniature whose stored content hashes equal v0's for the same episode ids (20/20), so it is faithful, but it is not the full-scale run (that is S4).</li>
+</ul>
+
+</div>
+</body>
+</html>

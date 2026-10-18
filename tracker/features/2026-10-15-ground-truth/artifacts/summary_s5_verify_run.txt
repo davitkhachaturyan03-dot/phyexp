@@ -1,0 +1,43 @@
+AC5.1 fixtures (hand-computed vs recovery_metrics)
+                     case                 metric  expected      got   ok
+                  perfect         recall_at_npos  1.000000 1.000000 True
+                  perfect      precision_at_npos  1.000000 1.000000 True
+                  perfect        recall_at_2npos  1.000000 1.000000 True
+                  perfect                  auroc  1.000000 1.000000 True
+                  perfect      average_precision  1.000000 1.000000 True
+                  perfect best_balanced_accuracy  1.000000 1.000000 True
+perfect, direction lowest         recall_at_npos  1.000000 1.000000 True
+perfect, direction lowest                  auroc  1.000000 1.000000 True
+perfect, direction lowest      average_precision  1.000000 1.000000 True
+                 reversed         recall_at_npos  0.000000 0.000000 True
+                 reversed        recall_at_2npos  0.000000 0.000000 True
+                 reversed                  auroc  0.000000 0.000000 True
+                 reversed      average_precision  0.155556 0.155556 True
+                 reversed best_balanced_accuracy  0.500000 0.500000 True
+                 constant         recall_at_npos  0.200000 0.200000 True
+                 constant      precision_at_npos  0.200000 0.200000 True
+                 constant        recall_at_2npos  0.400000 0.400000 True
+                 constant                  auroc  0.500000 0.500000 True
+                 constant      average_precision  0.200000 0.200000 True
+                 constant best_balanced_accuracy  0.500000 0.500000 True
+                    3-tie         recall_at_npos  0.666667 0.666667 True
+                    3-tie      precision_at_npos  0.666667 0.666667 True
+                    3-tie        recall_at_2npos  1.000000 1.000000 True
+                    3-tie                  auroc  0.875000 0.875000 True
+                    3-tie best_balanced_accuracy  0.750000 0.750000 True
+                    3-tie      average_precision  0.750000 0.750000 True
+AC5.1 all 26 comparisons equal: True
+
+AC5.2 structure: pooled n=960 n_pos=91; per-type n=[882] n_pos=[13]; random_recall_at_npos pooled 0.0948, per type 0.0147; random_auroc 0.5
+AC5.2 200 random rankers: mean pooled AUROC 0.4987 (std 0.0300), mean recall@k 0.0931 (expected 0.0948); mean per-type AUROC {action_noise: 0.489, detour: 0.499, dropped_frames: 0.501, gripper_release: 0.499, idle_padding: 0.508, instruction_swap: 0.503, time_shift: 0.492}
+
+AC5.3 v0-keyed table (91 of 960 hashes differ from v3's, the labelled ones): rejected: True: score table keys != parent subset's episode versions: 91 unknown/stale (e.g. [('libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_0', '9dd5a998a0fddd92e03dcaa74e3105947e279493109d1fedd530bcf861850db8'), ('libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_18', '29dffe353493b03e1a4d91d893e70aad5d7ed15743f075c973d4d8232c163c06'), ('libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_25', '8262f08b70a1944ebad71bd1599a5be0742b4cd34c4cfb81da88a8229fe26284')]), 91 unscored (e.g. [('libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_0', 'b8b40ec73b5e859aea1b65f70ae0c8dbe990417b054b6909a94dfbc85db48ef2'), ('libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_18', '7d43b1fdab70585809f42bdc70129fc4b3768f91f7158a2668d3b124b410613c'), ('libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_25', 'a27e3048c7ed926ed3c35d6b4ed63cf27ad123048c1e1abdf7276551f8b3100c')])
+AC5.3 table missing one candidate: rejected: True: score table keys != parent subset's episode versions: 0 unknown/stale (e.g. []), 1 unscored (e.g. [('libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_0', 'b8b40ec73b5e859aea1b65f70ae0c8dbe990417b054b6909a94dfbc85db48ef2')])
+
+AC5.5 leak check (ranking by episode_index; ground-truth side, not a method)
+version  n_injected  recall_at_npos    auroc  random_recall
+     v1         100        1.000000 1.000000       0.104167
+     v3          91        0.098901 0.504546       0.094792
+
+all S5 verifier checks pass: True
+.venv/bin/python scripts/verify_recovery_s5.py --version v3 --prefix   4.35s user 0.57s system 108% cpu 4.540 total

@@ -1,0 +1,8 @@
+$ .venv/bin/python -m vlapoc.lineage version check-blind v3 | last line
+check_blind(v3) = []; fenced: False
+$ .venv/bin/python -m vlapoc.lineage version check-blind v1 | last line
+check_blind(v1) = ['episode_index']; fenced: True
+$ open_for_method on each version (data/scratch/gt_sum/door.py)
+v1/candidate -> LineageError: version v1 (16076b9c5cb2) is not blind to its edits: fenced=True, offending=['episode_index'] (PoC §2.1 item 4 p.3)
+v2/candidate -> LineageError: version v2 (eaeed043455a) is fenced: superseded by v3 (002a68e4caf2); use the superseding version (ground-truth feature r3)
+v3/candidate -> opened: 960 episodes, 40 reference ids, catalog columns 21

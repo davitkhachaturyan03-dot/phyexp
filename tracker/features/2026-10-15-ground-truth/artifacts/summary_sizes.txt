@@ -1,0 +1,4 @@
+libero_spatial_10: 7,356,193,961 bytes = 7.356 GB = 6.851 GiB
+libero_spatial_10__v1: 7,353,993,717 bytes = 7.354 GB = 6.849 GiB
+libero_spatial_10__v2: 7,346,100,191 bytes = 7.346 GB = 6.842 GiB
+libero_spatial_10__v3: 7,326,736,215 bytes = 7.327 GB = 6.824 GiB

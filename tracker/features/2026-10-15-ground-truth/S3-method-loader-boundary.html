@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S3 Method-facing loader — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+/* report-specific figure styling: colours come from tracker.css variables only */
+.gt-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+.gt-box.acc{stroke:var(--accent);stroke-width:1.7}
+.gt-box.gt{fill:var(--accent-soft);stroke:var(--accent)}
+.gt-box.warn{stroke:var(--warn);stroke-dasharray:5 3}
+.gt-zone-gt{fill:var(--accent-soft);fill-opacity:.35;stroke:var(--accent);stroke-dasharray:6 4;stroke-width:1}
+.gt-zone-m{fill:var(--surface-2);stroke:var(--border)}
+.gt-zone-l{fill:var(--muted);font:600 10px var(--mono);letter-spacing:.06em}
+.gt-t{fill:var(--text);font:600 12px var(--sans)}
+.gt-m{fill:var(--muted);font:10.5px var(--mono)}
+.gt-mt{fill:var(--text);font:10.5px var(--mono)}
+.gt-arrowhead{fill:var(--muted)}
+.gt-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}
+.gt-dash{stroke-dasharray:5 4}
+.gt-warnline{stroke:var(--warn)}
+.gt-track{fill:var(--surface-2)}
+.gt-bar{fill:var(--accent)}
+.gt-bar2{fill:var(--muted)}
+.gt-bartxt{fill:var(--surface);font:600 11px var(--mono)}
+.gt-chance{stroke:var(--muted);stroke-dasharray:3 3;stroke-width:1.2}
+.gt-cell{fill:var(--surface-2)}
+.gt-cell-best{fill:var(--surface-2);stroke:var(--text);stroke-width:1.5}
+.gt-heat{fill:var(--accent)}
+.gt-heat-on{fill:var(--accent);fill-opacity:.4}
+.gt-line{stroke:var(--muted);stroke-width:1.5;fill:none}
+.gt-line-hot{stroke:var(--accent);stroke-width:3;fill:none}
+.gt-dot{fill:var(--muted)}
+.gt-dot-hot{fill:var(--accent)}
+.gt-dot-new{fill:var(--good)}
+.gt-tick{stroke:var(--border);stroke-width:2}
+.gt-tick-inj{stroke:var(--accent);stroke-width:3.5}
+.gt-cut{stroke:var(--text);stroke-dasharray:4 3;stroke-width:1.4}
+.gt-seg-obs{fill:var(--surface-2);stroke:var(--border)}
+.gt-seg-act{fill:var(--accent-soft);stroke:var(--accent)}
+.gt-seg-new{fill:var(--accent);fill-opacity:.35;stroke:var(--accent)}
+.gt-seg-cut{fill:none;stroke:var(--bad);stroke-dasharray:4 3}
+.scroll figure svg, .scroll > svg{min-width:640px}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:#fff}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.good{border-left-color:var(--good)}
+.note.bad{border-left-color:var(--bad)}
+.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}
+td.mono,th.mono{font-family:var(--mono)}
+code{overflow-wrap:anywhere}
+pre code{overflow-wrap:normal}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Ground truth (injection experiment)</a></p>
+  <h1>S3 · The method-facing loader and the answer-key boundary</h1>
+  <p class="dek">One door, <code>open_for_method</code>, that a screening or attribution method must use to read a version. It refuses fenced, tampered, answer-key-derived and diff-able versions, and a source scan proves methods never touch the labels.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">6/6</span></span>
+    <span><b>Depends on</b> <a href="S2-instruction-edits-blind-check.html">S2</a></span>
+    <span><b>Code</b> <code>vlapoc/method_data.py</code> (172 lines), <code>vlapoc/groundtruth.py::load_answer_key</code></span>
+  </div>
+</header>
+
+<h2>Why</h2>
+<p>Owner decision 3 ("Enforce now") asked for a single loader that always calls <code>lineage.assert_blind</code> and respects the v1 fence, so that later screening and attribution features cannot read a leaky or fenced version by accident. This closes a known issue from the evaluation feature: the v1 fence was recorded but nothing enforced it at a method's entry point. The answer key stays readable only through an explicitly ground-truth-side path, <code>groundtruth.load_answer_key</code>, used for scoring recovery@k.</p>
+<blockquote>Then check whether your attribution method flags exactly those. — §2.1 item 4, p. 3 (a method that can read the labels, or a leaky version, would not be flagging them on its own)</blockquote>
+
+<h2>What was built</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File / function</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>vlapoc/method_data.py::open_for_method</code></td><td>The door. Runs the checks below on every call and returns a frozen <code>MethodView</code>.</td></tr>
+    <tr><td><code>MethodView</code></td><td><code>version_id</code>, <code>subset_id</code>, <code>lerobot_root</code>, <code>episode_indices</code>, <code>catalog</code> (the 21 documented columns, no labels), <code>reference_ids</code>, and <code>iter_episodes()</code>.</td></tr>
+    <tr><td><code>_groundtruth_in_chain</code></td><td>Walks the subset's parent chain and refuses anything built by op <code>oracle_drop</code>, an op containing <code>groundtruth</code>, or a <code>groundtruth</code> tag.</td></tr>
+    <tr><td><code>_check_lineage_isolation</code></td><td>One version per lineage per process: opening a second version (an ancestor or descendant) is refused, because comparing the two would name the edited episodes.</td></tr>
+    <tr><td><code>vlapoc/groundtruth.py::load_answer_key</code></td><td>The only label reader for evaluation code; cross-checks the labels against <code>lineage.parent_hashes</code> and the episode table.</td></tr>
+    <tr><td><code>scripts/verify_method_boundary_s3.py</code> (241 lines)</td><td>The refusal table and the AST source scan, with planted violations to prove the scan can fail.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Acceptance criteria</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead>
+  <tbody>
+    <tr><td>AC3.1 Every call runs <code>verify_version</code> and <code>assert_blind</code>; v1 refused naming the fence, v0 opens, tampered version refused</td><td>Owner decision 3; evaluation S0</td><td>✅</td><td><code>verify_method_boundary_s3.py</code> → v1: <code>fenced=True, offending=['episode_index']</code>; v2: "is fenced: superseded by v3 (002a68e4caf2)"; v0/candidate 960 episodes, 40 reference ids; one flipped byte → <code>VersionIntegrityError</code></td></tr>
+    <tr><td>AC3.2 Ground-truth-derived subsets are refused (and anything derived from one)</td><td>Owner decision 3</td><td>✅</td><td>Scratch <code>oracle_drop</code> subset refused; a random-k subset of it refused too (chain recursion)</td></tr>
+    <tr><td>AC3.3 Diff guard: a second version of one lineage in the same process is refused</td><td>Owner decision 3; PoC §2.1 item 4</td><td>✅</td><td>Child then parent refused; parent then child refused; reopening the same version allowed</td></tr>
+    <tr><td>AC3.4 Static boundary: no module under <code>vlapoc/methods/</code> or <code>method_data.py</code> imports the answer-key code or opens <code>labels.parquet</code> / <code>parents.parquet</code> / <code>fence.json</code></td><td>Owner decision 3</td><td>✅</td><td>AST scan of <code>method_data.py</code>, <code>methods/__init__.py</code>, <code>methods/heuristics.py</code> (with H7, H8): violations <code>[]</code>; all 6 planted violations detected</td></tr>
+    <tr><td>AC3.5 The view's catalog columns are documented and pass <code>compare_blind</code></td><td>PoC §2.1 item 4</td><td>✅</td><td>"view columns == CATALOG_COLUMNS and within the compared tables: True; check_blind(scratch child) = []"</td></tr>
+    <tr><td>AC3.6 Grounding docstrings: §2.1 item 4 p.3, owner decision 3, evaluation S0 fence</td><td>vla-build</td><td>✅</td><td>Read in <code>method_data.py</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Example</h2>
+<p>What a method sees when it asks for each version of the real store (<code>artifacts/s3_r3_run.txt</code>, run in round 3):</p>
+<pre><code>open_for_method("v1/candidate")
+  LineageError: version v1 (16076b9c5cb2) is not blind to its edits: fenced=True, offending=['episode_index']
+open_for_method("v2/candidate")
+  LineageError: version v2 (eaeed043455a) is fenced: superseded by v3 (002a68e4caf2); use the superseding version
+open_for_method("v0/candidate")
+  opened: 960 episodes, 40 reference ids; first episode demo_0 action (98, 7) image (98, 128, 128, 3)</code></pre>
+<p>v1 is refused because its edits were the last 100 episodes by position (an edit leaked through <code>episode_index</code>), and v2 because it was replaced. v3, the current ground truth, opens (its catalog never carries a label).</p>
+
+<h2>Visual</h2>
+<figure>
+  <svg viewBox="0 0 700 382" role="img" aria-label="The checks open_for_method runs in order and what each refuses"><defs><marker id="gtarr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="gt-arrowhead"/></marker></defs><rect x="10" y="10" width="250" height="44" rx="6" class="gt-box" /><text x="20" y="29" class="gt-t" text-anchor="start" >Subset.load(ref)</text><text x="20" y="45" class="gt-m" text-anchor="start" >name, id or prefix</text><line x1="135" y1="54" x2="135" y2="72" class="gt-arrow" marker-end="url(#gtarr)"/><rect x="10" y="72" width="250" height="44" rx="6" class="gt-box" /><text x="20" y="91" class="gt-t" text-anchor="start" >verify_version</text><text x="20" y="107" class="gt-m" text-anchor="start" >hash every file of the version</text><line x1="260" y1="94" x2="300" y2="94" class="gt-arrow gt-warnline" marker-end="url(#gtarr)"/><rect x="300" y="79" width="390" height="30" rx="6" class="gt-box warn" /><text x="310" y="98" class="gt-m" text-anchor="start" >VersionIntegrityError: one byte changed</text><line x1="135" y1="116" x2="135" y2="134" class="gt-arrow" marker-end="url(#gtarr)"/><rect x="10" y="134" width="250" height="44" rx="6" class="gt-box" /><text x="20" y="153" class="gt-t" text-anchor="start" >assert_blind</text><text x="20" y="169" class="gt-m" text-anchor="start" >fence.json and check_blind</text><line x1="260" y1="156" x2="300" y2="156" class="gt-arrow gt-warnline" marker-end="url(#gtarr)"/><rect x="300" y="134" width="390" height="44" rx="6" class="gt-box warn" /><text x="310" y="153" class="gt-m" text-anchor="start" >v1: fenced=True, offending=['episode_index']</text><text x="310" y="167" class="gt-m" text-anchor="start" >v2: fenced: superseded by v3</text><line x1="135" y1="178" x2="135" y2="196" class="gt-arrow" marker-end="url(#gtarr)"/><rect x="10" y="196" width="250" height="44" rx="6" class="gt-box" /><text x="20" y="215" class="gt-t" text-anchor="start" >_groundtruth_in_chain</text><text x="20" y="231" class="gt-m" text-anchor="start" >walk parent_subset_id chain</text><line x1="260" y1="218" x2="300" y2="218" class="gt-arrow gt-warnline" marker-end="url(#gtarr)"/><rect x="300" y="203" width="390" height="30" rx="6" class="gt-box warn" /><text x="310" y="222" class="gt-m" text-anchor="start" >oracle_drop subset: ground-truth-derived</text><line x1="135" y1="240" x2="135" y2="258" class="gt-arrow" marker-end="url(#gtarr)"/><rect x="10" y="258" width="250" height="44" rx="6" class="gt-box" /><text x="20" y="277" class="gt-t" text-anchor="start" >_check_lineage_isolation</text><text x="20" y="293" class="gt-m" text-anchor="start" >one version per lineage per process</text><line x1="260" y1="280" x2="300" y2="280" class="gt-arrow gt-warnline" marker-end="url(#gtarr)"/><rect x="300" y="265" width="390" height="30" rx="6" class="gt-box warn" /><text x="310" y="284" class="gt-m" text-anchor="start" >second version of one lineage: refused</text><line x1="135" y1="302" x2="135" y2="320" class="gt-arrow" marker-end="url(#gtarr)"/><rect x="10" y="320" width="250" height="44" rx="6" class="gt-box acc" /><text x="20" y="339" class="gt-t" text-anchor="start" >MethodView</text><text x="20" y="355" class="gt-m" text-anchor="start" >catalog (21 cols), iter_episodes</text></svg>
+  <figcaption><b>The checks <code>open_for_method</code> runs, in order, and what each one refuses.</b> A request reaches a <code>MethodView</code> only if all four checks pass. The right-hand boxes are the real refusal messages from the verification run. Notice that the order matters: the real-store diff-guard case (v0 then v1) is refused by the fence check first, so it cannot demonstrate the guard; only the scratch cases do (recorded in the log).</figcaption>
+</figure>
+<h3>The refusal table</h3>
+<div class="scroll">
+<table>
+  <thead><tr><th>Case</th><th>Result</th><th>Reason (abridged)</th></tr></thead>
+  <tbody>
+    <tr><td>v1/candidate (fenced, real store)</td><td><span class="pill bad">REFUSED</span> LineageError</td><td>not blind to its edits: fenced=True, offending=['episode_index']</td></tr>
+    <tr><td>v2/candidate (superseded by v3)</td><td><span class="pill bad">REFUSED</span> LineageError</td><td>is fenced: superseded by v3 (002a68e4caf2)</td></tr>
+    <tr><td>v0/candidate (real store)</td><td><span class="pill good">opened</span></td><td>960 episodes</td></tr>
+    <tr><td>Scratch derived version (7 edits, blind)</td><td><span class="pill good">opened</span></td><td>20 episodes</td></tr>
+    <tr><td>Scratch child with 1 byte of a data file changed</td><td><span class="pill bad">REFUSED</span> VersionIntegrityError</td><td>dataset copy does not match the registered version</td></tr>
+    <tr><td>Oracle subset (op <code>oracle_drop</code>, labelled episodes removed)</td><td><span class="pill bad">REFUSED</span> LineageError</td><td>is ground-truth-derived; must not be given a subset built from the labels</td></tr>
+    <tr><td>Random-k subset of the oracle subset</td><td><span class="pill bad">REFUSED</span> LineageError</td><td>chain contains <code>oracle_drop</code></td></tr>
+    <tr><td>Open child, then its parent in the same process</td><td><span class="pill bad">REFUSED</span> LineageError</td><td>second version of one lineage</td></tr>
+    <tr><td>Open parent, then its child</td><td><span class="pill bad">REFUSED</span> LineageError</td><td>second version of one lineage</td></tr>
+    <tr><td>Same child again / same version, another subset</td><td><span class="pill good">opened</span></td><td>reopening is allowed</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Divergences and limitations</h2>
+<ul>
+  <li><b>Trainers are not covered.</b> The loader protects methods, not trainers: <code>vlapoc.runs.train_run</code> and <code>eval_run</code> do not call <code>open_for_method</code> or <code>assert_blind</code>. That is correct for this feature's own training arms (they must train on the corrupted data), but a later method that trains policies (datamodels, CUPID) could hand a ground-truth-derived subset to <code>train_run</code> and not be refused, and <code>train_run("v1/candidate", …)</code> would run on the fenced v1. <b>Known issue for the attribution feature</b> (recorded in the runbook, AC6.6): route training inputs through the loader. Not fixed here.</li>
+  <li><b>Cost.</b> Every <code>open_for_method</code> call hashes the whole version (about 20 s for v0). That is what the AC asks for, so a method that opens a version many times pays each time.</li>
+  <li><b>The catalog still shows provenance</b> (<code>task_name</code>, <code>episode_id</code>, position) next to the instruction, by design D1. A swapped instruction is therefore findable by cross-check. Limitation B of ruling A.</li>
+  <li><b>Convention, not a mechanism.</b> A ground-truth-derived subset is recognised by its op name or tag; a later feature that builds one must use <code>oracle_drop</code>, a name containing <code>groundtruth</code>, or a <code>groundtruth</code> tag. The scan checks imports and string literals in method code; it is not a sandbox.</li>
+  <li>Off the shelf: import-linter can forbid imports but not string literals (<code>labels.parquet</code>) or attribute names (<code>parent_hashes</code>), which the AC requires. The analyzer judged the roughly 30-line AST scan worth keeping and noted import-linter could replace its import half.</li>
+</ul>
+
+</div>
+</body>
+</html>

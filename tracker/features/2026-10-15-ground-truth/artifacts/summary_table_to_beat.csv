@@ -1,0 +1,8 @@
+type,best_auroc_heuristic,best_auroc,recall13_of_that,best_recall13_heuristic,best_recall13,auroc_of_that
+action_noise,smoothness,1.0,1.0,smoothness,1.0,1.0
+detour,length_vs_task,0.9595910418695229,0.15384615384615385,length_vs_task,0.15384615384615385,0.9595910418695229
+dropped_frames,duplicate_frame_pairs,1.0,1.0,duplicate_frame_pairs,1.0,1.0
+gripper_release,post_release_share_vs_task,0.9639727361246349,0.0,gripper_toggles,0.016632016632016633,0.504691511020625
+idle_padding,idle_steps,1.0,1.0,idle_steps,1.0,1.0
+instruction_swap,instruction_mismatch,1.0,1.0,instruction_mismatch,1.0,1.0
+time_shift,length_vs_task_lowest,0.8484996016641586,0.46153846153846156,length_vs_task_lowest,0.46153846153846156,0.8484996016641586

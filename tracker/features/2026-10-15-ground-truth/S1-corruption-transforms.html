@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S1 Corruption transforms — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+/* report-specific figure styling: colours come from tracker.css variables only */
+.gt-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+.gt-box.acc{stroke:var(--accent);stroke-width:1.7}
+.gt-box.gt{fill:var(--accent-soft);stroke:var(--accent)}
+.gt-box.warn{stroke:var(--warn);stroke-dasharray:5 3}
+.gt-zone-gt{fill:var(--accent-soft);fill-opacity:.35;stroke:var(--accent);stroke-dasharray:6 4;stroke-width:1}
+.gt-zone-m{fill:var(--surface-2);stroke:var(--border)}
+.gt-zone-l{fill:var(--muted);font:600 10px var(--mono);letter-spacing:.06em}
+.gt-t{fill:var(--text);font:600 12px var(--sans)}
+.gt-m{fill:var(--muted);font:10.5px var(--mono)}
+.gt-mt{fill:var(--text);font:10.5px var(--mono)}
+.gt-arrowhead{fill:var(--muted)}
+.gt-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}
+.gt-dash{stroke-dasharray:5 4}
+.gt-warnline{stroke:var(--warn)}
+.gt-track{fill:var(--surface-2)}
+.gt-bar{fill:var(--accent)}
+.gt-bar2{fill:var(--muted)}
+.gt-bartxt{fill:var(--surface);font:600 11px var(--mono)}
+.gt-chance{stroke:var(--muted);stroke-dasharray:3 3;stroke-width:1.2}
+.gt-cell{fill:var(--surface-2)}
+.gt-cell-best{fill:var(--surface-2);stroke:var(--text);stroke-width:1.5}
+.gt-heat{fill:var(--accent)}
+.gt-heat-on{fill:var(--accent);fill-opacity:.4}
+.gt-line{stroke:var(--muted);stroke-width:1.5;fill:none}
+.gt-line-hot{stroke:var(--accent);stroke-width:3;fill:none}
+.gt-dot{fill:var(--muted)}
+.gt-dot-hot{fill:var(--accent)}
+.gt-dot-new{fill:var(--good)}
+.gt-tick{stroke:var(--border);stroke-width:2}
+.gt-tick-inj{stroke:var(--accent);stroke-width:3.5}
+.gt-cut{stroke:var(--text);stroke-dasharray:4 3;stroke-width:1.4}
+.gt-seg-obs{fill:var(--surface-2);stroke:var(--border)}
+.gt-seg-act{fill:var(--accent-soft);stroke:var(--accent)}
+.gt-seg-new{fill:var(--accent);fill-opacity:.35;stroke:var(--accent)}
+.gt-seg-cut{fill:none;stroke:var(--bad);stroke-dasharray:4 3}
+.scroll figure svg, .scroll > svg{min-width:640px}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:#fff}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.good{border-left-color:var(--good)}
+.note.bad{border-left-color:var(--bad)}
+.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}
+td.mono,th.mono{font-family:var(--mono)}
+code{overflow-wrap:anywhere}
+pre code{overflow-wrap:normal}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Ground truth (injection experiment)</a></p>
+  <h1>S1 · Seven corruption transforms</h1>
+  <p class="dek">Seven pure functions that turn one clean LIBERO demonstration into a labelled bad one, every action kept inside [−1, 1], each checked on 118 real episodes.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">8/8</span></span>
+    <span><b>Depends on</b> —</span>
+    <span><b>Code</b> <code>vlapoc/corruptions.py</code> (558 lines)</span>
+  </div>
+</header>
+
+<h2>Why</h2>
+<p>The PoC's key trick is to plant bad data whose location we know, then ask whether a method finds exactly those episodes. §2.5 lists the corruption types to plant, and §8.10 adds two aimed at specific metrics (idle padding should hurt speed, gripper-release noise should hurt reliability). RoboDrop's appendix fixes the noise level and the shift size. Two owner decisions bind this story: clip every corrupted action to [−1, 1], and build all types except the altered camera viewpoint (that needs simulator re-rendering).</p>
+<blockquote>Deliberately corrupt known subsets of training data: noisy or shifted actions, mismatched language instructions, altered camera viewpoints, or low-quality teleoperation demos. Then check whether your attribution method flags exactly those. — §2.1 item 4, p. 3</blockquote>
+<blockquote>Action corruption adds zero-mean Gaussian noise with standard deviation 0.25σa … Temporal corruption shifts the action sequence by two seconds relative to the observations. — RoboDrop App. A.1, p. 13</blockquote>
+
+<h2>What was built</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File / function</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>vlapoc/corruptions.py::make_edit</code></td><td>The one entry point: type name in, a <code>derive.EpisodeEdit</code> out (a function over the stored episode plus a <code>params</code> record that becomes the label).</td></tr>
+    <tr><td><code>action_noise</code>, <code>time_shift</code>, <code>instruction_swap</code>, <code>dropped_frames</code>, <code>detour</code>, <code>idle_padding</code>, <code>gripper_release</code></td><td>The seven types. Each is one closure with its own source quote and parameter record (every parameter tagged quoted, measured or inferred).</td></tr>
+    <tr><td><code>clip_actions</code></td><td>Owner decision 1: clip to [−1, 1] and count how much it bit (<code>n_clipped</code>, <code>frac_clipped</code>, <code>frac_beyond_clean_range</code>).</td></tr>
+    <tr><td><code>eligible</code>, <code>final_release</code>, <code>constant_gripper_windows</code></td><td>Which episodes can take which corruption (a release needs a carry phase of at least 30 steps).</td></tr>
+    <tr><td><code>scripts/verify_corruptions_s1.py</code> (387 lines)</td><td>Runs every transform in memory on 118 real v0 candidates per type and checks the invariants; second-process hash check for determinism.</td></tr>
+    <tr><td><code>vlapoc/derive.py::EpisodeEdit</code></td><td>Two new fields, <code>new_task</code> and <code>hypothesis</code>, with defaults so older callers still work.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>The seven types</h3>
+<div class="scroll">
+<table>
+  <thead><tr><th>Type</th><th>What it does</th><th>Length</th><th>Metric hypothesis (PoC states only these two)</th></tr></thead>
+  <tbody>
+    <tr><td><code>action_noise</code></td><td>Gaussian noise at 0.25·σa on the six arm dimensions, then clip. The gripper stays binary (dims 0–5, inferred; RoboDrop does not say).</td><td>T</td><td>none stated</td></tr>
+    <tr><td><code>time_shift</code></td><td><b>Trim.</b> Child = frames 0 … T−41; each frame keeps its images and state, its action is the parent's action 40 steps later (a′[t] = a[t+40]). 40 steps = 2 s × 20 fps.</td><td>T − 40</td><td>none stated</td></tr>
+    <tr><td><code>instruction_swap</code></td><td>The task string becomes another task's instruction from the same suite. True provenance (<code>task_name</code>, <code>episode_id</code>) is kept, as in a real annotation error.</td><td>T</td><td>none stated</td></tr>
+    <tr><td><code>dropped_frames</code></td><td>Sample-and-hold of one camera in bursts of 1–10 frames until about 20% of frames are held (LeRobot's <code>read_latest</code> behaviour).</td><td>T</td><td>none stated</td></tr>
+    <tr><td><code>detour</code></td><td>A 21-frame window in [0.2T, 0.8T] is played forward, backward (arm actions negated), then forward again.</td><td>T + 40</td><td>none stated</td></tr>
+    <tr><td><code>idle_padding</code></td><td>Two 20-frame pauses in [0.2T, 0.8T]: observation held, arm action 0, gripper held.</td><td>T + 40</td><td><b>speed, not reliability</b> (§8.10 p.17)</td></tr>
+    <tr><td><code>gripper_release</code></td><td>Gripper forced open for the 20 steps before the episode's final release (a premature drop).</td><td>T</td><td><b>reliability, not speed</b> (§8.10 p.17)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Acceptance criteria</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead>
+  <tbody>
+    <tr><td>AC1.1 Seven types exist; each label's <code>params</code> carries <code>source</code>, tagged parameters, <code>corrupted_frames</code></td><td>PoC §2.5 p.5, §8.10 p.17</td><td>✅</td><td><code>verify_corruptions_s1.py --version v0 --per-type 100 --seed 0</code> → <code>check_params</code> on 118 × 7 outputs, 0 failures (<code>artifacts/s1_r2_run1.txt</code>)</td></tr>
+    <tr><td>AC1.2 Range: all actions in [−1, 1]; gripper exactly {−1, +1}</td><td>Owner decision 1</td><td>✅</td><td><code>invariant_failures</code> = 0 in all seven rows, 118 episodes each</td></tr>
+    <tr><td>AC1.3 Clip accounting for <code>action_noise</code>; other six record 0</td><td>Owner decision 1</td><td>✅</td><td><code>n_clipped</code> 521 of 167,846 values; 0.72% of dims 0–2; 1.69% of dims 0–2 land in (0.9375, 1]</td></tr>
+    <tr><td>AC1.4 Lengths and content per type (time_shift: T−40, parent frames 0…T−41, parent actions 40…T−1, bit for bit)</td><td>PoC §2.5 p.5; ruling A</td><td>✅</td><td>0 invariant failures; images of detour / idle_padding / dropped_frames are byte-identical to some parent image; no consecutive duplicate in detour</td></tr>
+    <tr><td>AC1.5 (amended) Same (seed, episode_id) gives the same hash in a second process for all seven; a different seed changes the five stochastic types</td><td>vla-build; analysis-r1</td><td>✅</td><td>Second process with <code>--check-hashes</code>: all seven True. Seed 0 vs 1 changes: noise, dropped, idle 118/118; detour 112/118 (94.9%); swap 105/118 (89.0%); time_shift and gripper_release 0/118 by design (asserted)</td></tr>
+    <tr><td>AC1.6 Eligibility over the 960 candidates</td><td>Design D3</td><td>✅</td><td>960 for six types, 884 for <code>gripper_release</code> (907/960 have a final release); every type eligible in all 20 tasks</td></tr>
+    <tr><td>AC1.7 Grounding docstring cites §2.5, §8.10, §4.5, RoboDrop A.1; inferred parameters stated</td><td>vla-build</td><td>✅</td><td>Read in the module docstring; the dims 0–5 divergence from v1 is stated</td></tr>
+    <tr><td>AC1.8 (ruling A) A time_shift child's idle steps equal the parent's idle steps within a[40:T]</td><td>Owner ruling A</td><td>✅</td><td>Checked per episode; over 118 episodes max 2, p99 2, above 0 in 6 (clean maximum run is 21)</td></tr>
+  </tbody>
+</table>
+</div>
+<p><b>AC1.5 was wrong as first written, not the code.</b> The plan said a different seed changes every type. <code>time_shift</code> and <code>gripper_release</code> have no random draw (a fixed 40-step shift, a fixed 20 steps before the release), so no seed can change them. The analyzer reproduced this exactly (analysis-r1) and the planner amended the criterion. Measured, not a regression.</p>
+
+<h2>Example</h2>
+<p>Two real <code>time_shift</code> episodes in v3, both from the answer key. The transform is the same; what it leaves behind differs.</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>Episode</th><th class="num">Parent T</th><th class="num">Child T</th><th>Hashes (parent → child)</th><th>Label</th></tr></thead>
+  <tbody>
+    <tr><td><code>libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate/demo_34</code></td><td class="num">167</td><td class="num">127</td><td><code>c9836ec9be16</code> → <code>7b60b2dcf25a</code></td><td><code>length_change</code> −40, <code>corrupted_frames</code> [[0, 127]], hypothesis "none stated"</td></tr>
+    <tr><td><code>libero_spatial/pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate/demo_49</code></td><td class="num">90</td><td class="num">50</td><td><code>07b94b5b7711</code> → <code>8bdb68344bae</code></td><td><code>length_change</code> −40, <code>corrupted_frames</code> [[0, 50]]</td></tr>
+  </tbody>
+</table>
+</div>
+<p>Parent lengths are child length plus 40 (measured child lengths 127 and 50 from <code>artifacts/summary_examples2.txt</code>). The second episode is already short, so the 40-step trim makes it 50 steps, the shortest episode relative to its task among the 882 scored (rank 1 from the short end). The first was an unusually long demo, so even trimmed it stays longer than its task's median, and a length statistic ranks it 864th of 882 from the short end: missed. That spread is why <code>time_shift</code> is the hardest type for the heuristics (S5).</p>
+<p>A real label, the <code>gripper_release</code> on <code>…between_the_plate_and_the_ramekin…/demo_13</code> (<code>artifacts/summary_examples.txt</code> and the answer key):</p>
+<pre><code>corrupted_frames       [[57, 77]]      # 20 steps before the final release
+final_release_index    77              # 0.875 of the way through the episode
+carry_steps            40
+n_clipped              0               # this type never changes arm values
+hypothesis             reliability (drops), not speed (PoC §8.10 p.17; §4.5 p.11)
+parameters.release_steps  value 20, basis inferred ("1 s at 20 fps; stays inside the carry phase")</code></pre>
+
+<h2>Visual</h2>
+<figure>
+  <img class="shot" src="artifacts/s1_traces.png" alt="Seven panels of clean versus corrupted action traces for one episode">
+  <figcaption><b>One real episode, seven corruptions (x-axis in steps, y-axis the x translation command in [−1, 1]; grey = clean, blue = corrupted, orange band = corrupted frames, red dashed = gripper).</b> Notice <code>time_shift</code> (top right): the child is 39 steps long against 79, shaped like the parent's later actions. <code>detour</code> and <code>idle_padding</code> grow from 79 to 119 steps. <code>gripper_release</code> flips the gripper to open 20 steps before the real release. <code>instruction_swap</code> looks identical here because it only changes the text.</figcaption>
+</figure>
+<figure>
+  <svg viewBox="0 0 700 244" role="img" aria-label="Time shift trim: observations 0 to T-41 paired with actions 40 to T-1"><text x="10" y="20" class="gt-m" text-anchor="start" >Illustrative construction, real lengths of demo_34 (parent 167 steps, child 127)</text><text x="82" y="62" class="gt-mt" text-anchor="end" >parent</text><rect x="90" y="46" width="570.0" height="22" rx="3" class="gt-seg-obs" /><text x="96" y="61" class="gt-m" text-anchor="start" >observations 0 .. 166</text><rect x="90" y="76" width="570.0" height="22" rx="3" class="gt-seg-act" /><text x="96" y="91" class="gt-m" text-anchor="start" >actions a[0 .. 166]</text><text x="82" y="148" class="gt-mt" text-anchor="end" >child</text><rect x="90" y="132" width="433.4730538922156" height="22" rx="3" class="gt-seg-obs" /><text x="96" y="147" class="gt-m" text-anchor="start" >observations 0 .. 126 (unchanged)</text><rect x="90" y="162" width="433.4730538922156" height="22" rx="3" class="gt-seg-new" /><text x="96" y="177" class="gt-m" text-anchor="start" >actions a[40 .. 166] -&gt; child steps 0 .. 126</text><line x1="226.5" x2="226.5" y1="72" y2="124" class="gt-arrow gt-dash"/><text x="226.52694610778443" y="118" class="gt-m" text-anchor="middle" >first 40 actions dropped</text><rect x="523.4730538922156" y="132" width="136.5269461077844" height="22" rx="3" class="gt-seg-cut" /><text x="591.7365269461078" y="147" class="gt-m" text-anchor="middle" >last 40 obs dropped</text><text x="90" y="214" class="gt-m" text-anchor="start" >No fill: every frame and action is a real parent value.</text><text x="90" y="230" class="gt-m" text-anchor="start" >The child is 40 steps shorter (length_change = -40).</text></svg>
+  <figcaption><b>How the trim works, with demo_34's real lengths.</b> Observations are kept for the first 127 steps. Actions are taken from step 40 onward. Nothing is padded, which is the point of owner ruling A: round 1 filled the vacated 40 steps with an idle tail, and that tail alone gave a one-line statistic an AUROC of 1.000.</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="artifacts/s1_filmstrip.png" alt="Filmstrips of dropped frames, detour and idle padding against clean frames">
+  <figcaption><b>Corrupted child frames (top row of each pair) against the clean parent frames (bottom).</b> In <code>dropped_frames</code> some child frames repeat the previous image while the clean frames keep moving. In <code>detour</code> the arm goes back along its path. In <code>idle_padding</code> the child frames stay still while the parent moves on. Every image is a real parent frame; none were re-rendered.</figcaption>
+</figure>
+
+<h2>Divergences and limitations</h2>
+<ul>
+  <li><b>Action noise touches dims 0–5, not all seven.</b> Clean gripper values are exactly {−1, +1} in 200,340 of 200,340 frames (measured), so noise on the gripper would make values clean data never has. The older v1 noised all seven. Inferred; recorded in each label.</li>
+  <li><b>Clip leak (measured).</b> Clipping to [−1, 1] is the owner's decision and is satisfied. Clean translation values never exceed ±0.9375, so 1.69% of noised translation values (1.92% in v3's 13 labels) sit in (0.9375, 1], a range clean data never has. A max-absolute-value detector would exploit that (AUROC 0.88 by the analyzer), but smoothness already gives 1.000, so it changes nothing here.</li>
+  <li><b>RoboDrop does not state</b> the shift direction, a fill, gripper handling or clipping. Direction (actions lead observations) is inferred; the trim over a fill is owner ruling A.</li>
+  <li><b><code>detour</code> reverses motion by negating arm deltas</b> (inferred from LIBERO's delta control). It was not replayed in the simulator to confirm the arm really retraces its path.</li>
+  <li><b>Altered camera viewpoint is out of scope</b> (owner decision 2): it needs re-rendering in the simulator. Owner-approved divergence from §2.1 item 4 and §2.5.</li>
+  <li>Paused and dropped frames repeat stored frames (exact duplicates). That is limitation C of ruling A (see the report).</li>
+</ul>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S6 Trainable locally, and the server runbook — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+/* report-specific figure styling: colours come from tracker.css variables only */
+.gt-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+.gt-box.acc{stroke:var(--accent);stroke-width:1.7}
+.gt-box.gt{fill:var(--accent-soft);stroke:var(--accent)}
+.gt-box.warn{stroke:var(--warn);stroke-dasharray:5 3}
+.gt-zone-gt{fill:var(--accent-soft);fill-opacity:.35;stroke:var(--accent);stroke-dasharray:6 4;stroke-width:1}
+.gt-zone-m{fill:var(--surface-2);stroke:var(--border)}
+.gt-zone-l{fill:var(--muted);font:600 10px var(--mono);letter-spacing:.06em}
+.gt-t{fill:var(--text);font:600 12px var(--sans)}
+.gt-m{fill:var(--muted);font:10.5px var(--mono)}
+.gt-mt{fill:var(--text);font:10.5px var(--mono)}
+.gt-arrowhead{fill:var(--muted)}
+.gt-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}
+.gt-dash{stroke-dasharray:5 4}
+.gt-warnline{stroke:var(--warn)}
+.gt-track{fill:var(--surface-2)}
+.gt-bar{fill:var(--accent)}
+.gt-bar2{fill:var(--muted)}
+.gt-bartxt{fill:var(--surface);font:600 11px var(--mono)}
+.gt-chance{stroke:var(--muted);stroke-dasharray:3 3;stroke-width:1.2}
+.gt-cell{fill:var(--surface-2)}
+.gt-cell-best{fill:var(--surface-2);stroke:var(--text);stroke-width:1.5}
+.gt-heat{fill:var(--accent)}
+.gt-heat-on{fill:var(--accent);fill-opacity:.4}
+.gt-line{stroke:var(--muted);stroke-width:1.5;fill:none}
+.gt-line-hot{stroke:var(--accent);stroke-width:3;fill:none}
+.gt-dot{fill:var(--muted)}
+.gt-dot-hot{fill:var(--accent)}
+.gt-dot-new{fill:var(--good)}
+.gt-tick{stroke:var(--border);stroke-width:2}
+.gt-tick-inj{stroke:var(--accent);stroke-width:3.5}
+.gt-cut{stroke:var(--text);stroke-dasharray:4 3;stroke-width:1.4}
+.gt-seg-obs{fill:var(--surface-2);stroke:var(--border)}
+.gt-seg-act{fill:var(--accent-soft);stroke:var(--accent)}
+.gt-seg-new{fill:var(--accent);fill-opacity:.35;stroke:var(--accent)}
+.gt-seg-cut{fill:none;stroke:var(--bad);stroke-dasharray:4 3}
+.scroll figure svg, .scroll > svg{min-width:640px}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:#fff}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.good{border-left-color:var(--good)}
+.note.bad{border-left-color:var(--bad)}
+.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}
+td.mono,th.mono{font-family:var(--mono)}
+code{overflow-wrap:anywhere}
+pre code{overflow-wrap:normal}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Ground truth (injection experiment)</a></p>
+  <h1>S6 · Trainable locally, and the server runbook</h1>
+  <p class="dek">v3 trains and evaluates with the existing pipeline on this Mac (a 2-step SmolVLA smoke run), and everything that needs a server (does the corruption hurt a trained policy?) is written down as a runbook, not claimed.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">6/6</span></span>
+    <span><b>Depends on</b> <a href="S4-injected-version-v3.html">S4</a>, <a href="S5-recovery-scoring-heuristics.html">S5</a></span>
+    <span><b>Pending server</b> <span class="pill warn">GT-R1 to GT-R6</span></span>
+  </div>
+</header>
+
+<h2>Why</h2>
+<p>A ground-truth dataset is only useful if the rest of the pipeline can consume it and if the PoC's causal claim (the corrupted data hurts the policy, and removing the corrupted episodes helps) can eventually be tested. This Mac cannot train SmolVLA at scale or run 1000 rollouts, so this story proves what can be proved locally and writes the rest down so a server operator can run it without guessing. The decision of whether the injection changed the policy belongs to the significance gate, not to eyeballing.</p>
+<blockquote>Verify before claiming. Retrain with the disputed episodes restored and show the speed metric improves significantly … — §8.10, p. 18</blockquote>
+<blockquote>Each of these is a close comparison between two policies, so use the PhAIL significance gate (Section 3.4) to decide whether the change is real before claiming it. — §2.6, p. 5</blockquote>
+
+<h2>What was built</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>scripts/verify_consumers_s6.py</code> (184 lines)</td><td>Per-subset normalisation statistics for v3, a 2-step SmolVLA fine-tune on a scratch label-side subset, task-string and human-reference checks, and a before/after check that the real store is untouched.</td></tr>
+    <tr><td><code>artifacts/server-runbook.md</code></td><td>The six pending-server items GT-R1 to GT-R6 with commands, inputs, outputs, disk estimates and order. A separate file from the evaluation feature's runbook, which it reuses by reference.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Acceptance criteria</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence (<code>artifacts/s6_v3_run.txt</code>)</th></tr></thead>
+  <tbody>
+    <tr><td>AC6.1 Per-subset stats: the aggregate over all episodes equals <code>stats.json</code>; <code>v3/candidate</code> digest differs from <code>v0/candidate</code>'s</td><td>evaluation decision 3</td><td>✅</td><td>Worst max |diff| 2.60e-10 (tolerance 1e-6). Digests <code>168667c2365bf7dd</code> against <code>2c62ec3fec3e078f</code></td></tr>
+    <tr><td>AC6.2 A 2-step SmolVLA fine-tune on a v3 subset holding all seven types runs; the subset is built label-side in a scratch store</td><td>evaluation S8; owner decision 3</td><td>✅</td><td>Run finished in 15.1 s on MPS, <code>episodes_match</code> true, 14 episodes; <code>train.subset_stats.sha256</code> <code>1d2a5e14c68d77c7</code> equals the recomputed digest; normaliser equals the subset stats (max |diff| 3.5e-08) and differs from v3's full stats (up to 0.78). <code>data/lineage/subsets</code> stayed at 15 files</td></tr>
+    <tr><td>AC6.3 v3's 20 task strings equal v0's; the human reference is unchanged</td><td>PoC §3.5 A p.7–8</td><td>✅</td><td>Task strings equal: True. <code>data/eval/human_reference/</code> digest <code>68c888b1930d66de</code> before and after</td></tr>
+    <tr><td>AC6.4 The runbook lists every pending item with command, inputs, outputs, disk estimate and order</td><td>PoC §8.10 p.17–18; §2.6; §9.1 Step 4</td><td>✅</td><td>GT-R1 to GT-R6 in <code>artifacts/server-runbook.md</code>, read against the list</td></tr>
+    <tr><td>AC6.5 The runbook states LIBERO has no ghost-event rule</td><td>PoC §4.5 p.11</td><td>✅</td><td>"What cannot be shown here" section</td></tr>
+    <tr><td>AC6.6 The runbook names v3 in every GT-R command and carries the "known issue for the attribution feature"</td><td>analysis-r1 planner item 4</td><td>✅</td><td>A text search for "v2" finds only the header sentence saying v2 is superseded. The known-issue section is present</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Example</h2>
+<p>How much the injection moves normalisation. Per-dimension action mean and standard deviation of <code>v3/candidate</code> against <code>v0/candidate</code> (<code>artifacts/s6_v3_action_stats_vs_v0.csv</code>). The standard deviations move by under 0.15% and no mean moves by more than 0.003.</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>Action dim</th><th class="num">mean v0</th><th class="num">mean v3</th><th class="num">std v0</th><th class="num">std v3</th><th class="num">std ratio</th></tr></thead>
+  <tbody>
+    <tr><td>0 x</td><td class="num">0.05920</td><td class="num">0.05812</td><td class="num">0.33368</td><td class="num">0.33321</td><td class="num">0.99860</td></tr>
+    <tr><td>1 y</td><td class="num">0.08093</td><td class="num">0.08074</td><td class="num">0.35290</td><td class="num">0.35292</td><td class="num">1.00007</td></tr>
+    <tr><td>2 z</td><td class="num">−0.08688</td><td class="num">−0.08610</td><td class="num">0.41364</td><td class="num">0.41343</td><td class="num">0.99948</td></tr>
+    <tr><td>3 rx</td><td class="num">0.00170</td><td class="num">0.00168</td><td class="num">0.03921</td><td class="num">0.03922</td><td class="num">1.00034</td></tr>
+    <tr><td>4 ry</td><td class="num">−0.00178</td><td class="num">−0.00176</td><td class="num">0.06125</td><td class="num">0.06120</td><td class="num">0.99916</td></tr>
+    <tr><td>5 rz</td><td class="num">−0.01172</td><td class="num">−0.01160</td><td class="num">0.08090</td><td class="num">0.08079</td><td class="num">0.99860</td></tr>
+    <tr><td>6 gripper</td><td class="num">−0.04461</td><td class="num">−0.04229</td><td class="num">0.99900</td><td class="num">0.99911</td><td class="num">1.00010</td></tr>
+  </tbody>
+</table>
+</div>
+<p>The gripper mean moves from −0.0446 to −0.0423 because the trim removes episode ends, where the gripper is open (the shift is measured; the explanation is inferred from the construction).</p>
+
+<h2>Visual</h2>
+<h3>What is pending the server, in order</h3>
+<div class="scroll">
+<table>
+  <thead><tr><th>Order</th><th>Id</th><th>What</th><th>Disk (inferred unless stated)</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>GT-R1</td><td>SmolVLA trained on <code>v3/candidate</code> (960 episodes, 192,945 frames, measured), the evaluation feature's AC8.5 configuration and seeds. Needs a v0/candidate clean control from the same seeds first.</td><td>about 7 GB HF cache; about 1.2 GB per checkpoint (measured on the 2-step run)</td></tr>
+    <tr><td>2</td><td>GT-R2</td><td>Each checkpoint evaluated with the AC5.8 protocol (20 tasks, 50 init states, fixed batch plan equal to the clean arm's, attribution grade).</td><td>11–22 GB of trajectories per seed if recorded</td></tr>
+    <tr><td>3</td><td>GT-R3</td><td>One return per metric per rollout (<code>vlapoc.returns</code>).</td><td>negligible</td></tr>
+    <tr><td>4</td><td>GT-R4</td><td>Verdict <code>v3/candidate</code> against <code>v0/candidate</code>: macro-KS gate first, then per-metric confidence intervals with family W declared (O alongside). <b>A finding, not an acceptance condition.</b></td><td>—</td></tr>
+    <tr><td>5</td><td>GT-R5 (optional)</td><td>Oracle arm: <code>v3/candidate</code> minus the 91 labelled episodes (869 episodes), built label-side with an op the loader refuses (RoboDrop Table 7's "Oracle").</td><td>about 7 GB more cache</td></tr>
+    <tr><td>6</td><td>GT-R6</td><td>Hand-off for later features: send a screening or attribution score table through <code>score_recovery</code>, and compare per type against the table to beat (<a href="S5-recovery-scoring-heuristics.html">S5</a>).</td><td>—</td></tr>
+  </tbody>
+</table>
+</div>
+<p>Total disk for the full set is estimated at about 50–95 GB plus 20 GiB headroom (inferred; the runbook breaks it down). Nothing in the runbook has been run on a server.</p>
+<div class="note">
+  <p><b>What cannot be shown here.</b> (1) Whether any corruption actually hurts a trained policy, which needs SmolVLA training and rollouts: GT-R1 to GT-R5. (2) Per-type harm: one combined version gives one pooled injected arm; seven arms would be needed (design D2). (3) LIBERO has no ghost-event (drop) rule (evaluation decision 6), so the gripper-release "drops" hypothesis can show up only as lower success, a lower F(τ) or more timeouts, never as a drop rate. Do not look for one in the GT-R4 output. (4) The §4.5 metric check (idle padding should move time metrics, gripper release reliability) needs per-metric attribution, which is a later feature; the labels already carry the hypothesis.</p>
+</div>
+
+<h2>Divergences and limitations</h2>
+<ul>
+  <li><b>Known issue for the attribution feature.</b> <code>train_run</code> and <code>eval_run</code> do not call <code>open_for_method</code> or <code>assert_blind</code>. Correct for this feature's injected and oracle training arms; a gap for any later method that trains policies. The attribution feature must route its training inputs through the loader. Not fixed here (R11).</li>
+  <li><b>Smoke scale only.</b> A 2-step fine-tune proves the data reaches the trainer with the right normalisation, not that a policy learns anything from it.</li>
+  <li>The smoke run started from <code>smolvla_base</code> with <code>load_vlm_weights=False</code>, as the evaluation feature's S8 did (the 2.03 GB backbone download was not approved).</li>
+  <li>The runbook's disk and time figures for server steps are inferred (for example about 4 h per seed on one A100, quoted from the LeRobot SmolVLA docs, unmeasured on our server).</li>
+</ul>
+
+</div>
+</body>
+</html>

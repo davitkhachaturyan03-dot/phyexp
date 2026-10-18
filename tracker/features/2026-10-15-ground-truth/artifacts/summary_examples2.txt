@@ -1,0 +1,12 @@
+time_shift pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_ len 127 lc -40 frames [[0, 127]] {'H7': (1.351063829787234, (864, 882)), 'length_steps': (127.0, (247, 882))}
+time_shift pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate/dem len 50 lc -40 frames [[0, 50]] {'H7': (0.5050505050505051, (1, 882)), 'length_steps': (50.0, (1, 882))}
+gripper_release pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_ len 88 lc None frames [[57, 77]] {'H8': (0.22995938769134647, (16, 882))}
+gripper_release pick_up_the_black_bowl_next_to_the_ramekin_and_place_it_on_the_plate/d len 123 lc None frames [[97, 117]] {'H8': (0.1271567600067801, (29, 882))}
+idle_padding pick_up_the_black_bowl_next_to_the_ramekin_and_place_it_on_the_plate/d len 215 lc None frames [[65, 85], [145, 165]] {'idle_steps': (40.0, (3, 882)), 'dup': (80.0, (1, 882))}
+idle_padding pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate/dem len 145 lc None frames [[47, 67], [73, 93]] {'idle_steps': (40.0, (3, 882)), 'dup': (80.0, (1, 882))}
+action_noise pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_ len 93 lc None frames [[0, 93]] {'smoothness': (0.25638918743865075, (1, 882))}
+action_noise pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate/dem len 108 lc None frames [[0, 108]] {'smoothness': (0.21825527005279757, (12, 882))}
+dropped_frames pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_ len 92 lc None frames [[17, 21], [49, 53], [57, 63], [67, 76]] {'dup': (23.0, (13, 882))}
+dropped_frames pick_up_the_black_bowl_next_to_the_ramekin_and_place_it_on_the_plate/d len 112 lc None frames [[5, 11], [21, 26], [32, 33], [40, 46], [98, 104]] {'dup': (24.0, (12, 882))}
+time_shift H7-lowest ranks [1, 2, 3, 4, 5, 6, 17, 57, 70, 78, 124, 571, 864]
+task median length examples:

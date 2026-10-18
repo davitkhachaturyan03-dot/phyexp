@@ -1,0 +1,238 @@
+{
+  "AC5.1": {
+    "rows": [
+      {
+        "case": "perfect",
+        "metric": "recall_at_npos",
+        "expected": 1.0,
+        "got": 1.0,
+        "ok": true
+      },
+      {
+        "case": "perfect",
+        "metric": "precision_at_npos",
+        "expected": 1.0,
+        "got": 1.0,
+        "ok": true
+      },
+      {
+        "case": "perfect",
+        "metric": "recall_at_2npos",
+        "expected": 1.0,
+        "got": 1.0,
+        "ok": true
+      },
+      {
+        "case": "perfect",
+        "metric": "auroc",
+        "expected": 1.0,
+        "got": 1.0,
+        "ok": true
+      },
+      {
+        "case": "perfect",
+        "metric": "average_precision",
+        "expected": 1.0,
+        "got": 1.0,
+        "ok": true
+      },
+      {
+        "case": "perfect",
+        "metric": "best_balanced_accuracy",
+        "expected": 1.0,
+        "got": 1.0,
+        "ok": true
+      },
+      {
+        "case": "perfect, direction lowest",
+        "metric": "recall_at_npos",
+        "expected": 1.0,
+        "got": 1.0,
+        "ok": true
+      },
+      {
+        "case": "perfect, direction lowest",
+        "metric": "auroc",
+        "expected": 1.0,
+        "got": 1.0,
+        "ok": true
+      },
+      {
+        "case": "perfect, direction lowest",
+        "metric": "average_precision",
+        "expected": 1.0,
+        "got": 1.0,
+        "ok": true
+      },
+      {
+        "case": "reversed",
+        "metric": "recall_at_npos",
+        "expected": 0.0,
+        "got": 0.0,
+        "ok": true
+      },
+      {
+        "case": "reversed",
+        "metric": "recall_at_2npos",
+        "expected": 0.0,
+        "got": 0.0,
+        "ok": true
+      },
+      {
+        "case": "reversed",
+        "metric": "auroc",
+        "expected": 0.0,
+        "got": 0.0,
+        "ok": true
+      },
+      {
+        "case": "reversed",
+        "metric": "average_precision",
+        "expected": 0.155556,
+        "got": 0.155556,
+        "ok": true
+      },
+      {
+        "case": "reversed",
+        "metric": "best_balanced_accuracy",
+        "expected": 0.5,
+        "got": 0.5,
+        "ok": true
+      },
+      {
+        "case": "constant",
+        "metric": "recall_at_npos",
+        "expected": 0.2,
+        "got": 0.2,
+        "ok": true
+      },
+      {
+        "case": "constant",
+        "metric": "precision_at_npos",
+        "expected": 0.2,
+        "got": 0.2,
+        "ok": true
+      },
+      {
+        "case": "constant",
+        "metric": "recall_at_2npos",
+        "expected": 0.4,
+        "got": 0.4,
+        "ok": true
+      },
+      {
+        "case": "constant",
+        "metric": "auroc",
+        "expected": 0.5,
+        "got": 0.5,
+        "ok": true
+      },
+      {
+        "case": "constant",
+        "metric": "average_precision",
+        "expected": 0.2,
+        "got": 0.2,
+        "ok": true
+      },
+      {
+        "case": "constant",
+        "metric": "best_balanced_accuracy",
+        "expected": 0.5,
+        "got": 0.5,
+        "ok": true
+      },
+      {
+        "case": "3-tie",
+        "metric": "recall_at_npos",
+        "expected": 0.666667,
+        "got": 0.666667,
+        "ok": true
+      },
+      {
+        "case": "3-tie",
+        "metric": "precision_at_npos",
+        "expected": 0.666667,
+        "got": 0.666667,
+        "ok": true
+      },
+      {
+        "case": "3-tie",
+        "metric": "recall_at_2npos",
+        "expected": 1.0,
+        "got": 1.0,
+        "ok": true
+      },
+      {
+        "case": "3-tie",
+        "metric": "auroc",
+        "expected": 0.875,
+        "got": 0.875,
+        "ok": true
+      },
+      {
+        "case": "3-tie",
+        "metric": "best_balanced_accuracy",
+        "expected": 0.75,
+        "got": 0.75,
+        "ok": true
+      },
+      {
+        "case": "3-tie",
+        "metric": "average_precision",
+        "expected": 0.75,
+        "got": 0.75,
+        "ok": true
+      }
+    ],
+    "pass": true
+  },
+  "AC5.2": {
+    "pooled_n": 960,
+    "per_type_n": [
+      882
+    ],
+    "random_mean_auroc": 0.49870578788300307,
+    "random_mean_recall": 0.09307692307692308,
+    "pass": true
+  },
+  "AC5.3": {
+    "v0_keyed_rejected": "score table keys != parent subset's episode versions: 91 unknown/stale (e.g. [('libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_0', '9dd5a998a0fddd92e03dcaa74e3105947e279493109d1fedd530bcf861850db8'), ('libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_18', '29dffe353493b03e1a4d91d893e70aad5d7ed15743f075c973d4d8232c163c06'), ('libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_25', '8262f08b70a1944ebad71bd1599a5be0742b4cd34c4cfb81da88a8229fe26284')]), 91 unscored (e.g. [('libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_0', 'b8b40ec73b5e859aea1b65f70ae0c8dbe990417b054b6909a94dfbc85db48ef2'), ('libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_18', '7d43b1fdab70585809f42bdc70129fc4b3768f91f7158a2668d3b124b410613c'), ('libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_25', 'a27e3048c7ed926ed3c35d6b4ed63cf27ad123048c1e1abdf7276551f8b3100c')])",
+    "missing_rejected": "score table keys != parent subset's episode versions: 0 unknown/stale (e.g. []), 1 unscored (e.g. [('libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_0', 'b8b40ec73b5e859aea1b65f70ae0c8dbe990417b054b6909a94dfbc85db48ef2')])",
+    "hashes_differing": 91,
+    "pass": true
+  },
+  "AC5.5": {
+    "v1": {
+      "n": 960,
+      "n_pos": 100,
+      "recall_at_npos": 1.0,
+      "precision_at_npos": 1.0,
+      "random_recall_at_npos": 0.10416666666666667,
+      "recall_at_2npos": 1.0,
+      "precision_at_2npos": 0.5,
+      "random_recall_at_2npos": 0.20833333333333334,
+      "auroc": 1.0,
+      "best_balanced_accuracy": 1.0,
+      "average_precision": 1.0,
+      "random_auroc": 0.5,
+      "random_average_precision": 0.10416666666666667
+    },
+    "v3": {
+      "n": 960,
+      "n_pos": 91,
+      "recall_at_npos": 0.0989010989010989,
+      "precision_at_npos": 0.0989010989010989,
+      "random_recall_at_npos": 0.09479166666666666,
+      "recall_at_2npos": 0.1978021978021978,
+      "precision_at_2npos": 0.0989010989010989,
+      "random_recall_at_2npos": 0.18958333333333333,
+      "auroc": 0.5045460868245679,
+      "best_balanced_accuracy": 0.5200875074292796,
+      "average_precision": 0.10080411731958948,
+      "random_auroc": 0.5,
+      "random_average_precision": 0.09479166666666666
+    },
+    "pass": true
+  },
+  "pass": true
+}

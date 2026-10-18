@@ -1,0 +1,19 @@
+answer key columns: ['episode_id', 'parent_content_hash', 'content_hash', 'corruption_type', 'params', 'seed', 'hypothesis'] rows 91
+            type       best_auroc_heuristic  best_auroc  recall13_of_that best_recall13_heuristic  best_recall13  auroc_of_that
+    action_noise                 smoothness      1.0000            1.0000              smoothness         1.0000         1.0000
+          detour             length_vs_task      0.9596            0.1538          length_vs_task         0.1538         0.9596
+  dropped_frames      duplicate_frame_pairs      1.0000            1.0000   duplicate_frame_pairs         1.0000         1.0000
+ gripper_release post_release_share_vs_task      0.9640            0.0000         gripper_toggles         0.0166         0.5047
+    idle_padding                 idle_steps      1.0000            1.0000              idle_steps         1.0000         1.0000
+instruction_swap       instruction_mismatch      1.0000            1.0000    instruction_mismatch         1.0000         1.0000
+      time_shift      length_vs_task_lowest      0.8485            0.4615   length_vs_task_lowest         0.4615         0.8485
+H8 n = 882 ranks of 13 gripper_release: [16, 17, 20, 23, 26, 27, 28, 29, 39, 48, 50, 78, 97]
+clean episodes above the highest injected gripper_release: 15
+injected gripper_release in top 13: 0  in top 100: 13
+EX time_shift: libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate/demo_34 parent c9836ec9be16 child 7b60b2dcf25a length_change -40 corrupted_frames [[0, 127]] hyp none stated
+H7 length_vs_task of it: 1.351063829787234 rank (lowest first) among 882: 864
+{'action_noise': 13, 'detour': 13, 'dropped_frames': 13, 'gripper_release': 13, 'idle_padding': 13, 'instruction_swap': 13, 'time_shift': 13}
+hypotheses: {'action_noise': 'none stated', 'detour': 'none stated', 'dropped_frames': 'none stated', 'gripper_release': 'reliability (drops), not speed (PoC §8.10 p.17; §4.5 p.11)', 'idle_padding': 'speed (time-based metrics), not reliability (PoC §8.10 p.17; §4.5 p.11)', 'instruction_swap': 'none stated', 'time_shift': 'none stated'}
+EX gripper_release libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate/demo_13 length_change None frames [[57, 77]] n_clipped 0 frac_beyond 0.0
+EX idle_padding libero_spatial/pick_up_the_black_bowl_next_to_the_ramekin_and_place_it_on_the_plate/demo_3 length_change None frames [[65, 85], [145, 165]] n_clipped 0 frac_beyond 0.0
+EX action_noise libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate/demo_32 length_change None frames [[0, 93]] n_clipped 13 frac_beyond 0.08960573476702509
