@@ -1,0 +1,3 @@
+length_vs_task direction highest tags {'score_table_digest': '85cd9198f4b9', 'scored_version_id': '002a68e4caf2', 'labels_sha256': '3e14922a63cf'} git_dirty false | trace runs 6 reaches v3 True | screen run in trace True
+length_vs_task_lowest direction lowest tags {'score_table_digest': '85cd9198f4b9', 'scored_version_id': '002a68e4caf2', 'labels_sha256': '3e14922a63cf'} git_dirty false | trace runs 6 reaches v3 True | screen run in trace True
+post_release_share_vs_task direction highest tags {'score_table_digest': 'd111c2b4a180', 'scored_version_id': '002a68e4caf2', 'labels_sha256': '3e14922a63cf'} git_dirty false | trace runs 5 reaches v3 True | screen run in trace True

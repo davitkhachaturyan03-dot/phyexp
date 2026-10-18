@@ -1,0 +1,21 @@
+heuristic,metric,action_noise,detour,dropped_frames,gripper_release,idle_padding,instruction_swap,time_shift,pooled
+length_steps,auroc,0.446,0.7299,0.4758,0.4788,0.6814,0.5369,0.3178,0.5238
+length_steps,recall_at_npos,0.0,0.0769,0.0769,0.0,0.0769,0.0769,0.0,0.1319
+idle_steps,auroc,0.4453,0.4453,0.52,0.4809,1.0,0.4845,0.4453,0.5459
+idle_steps,recall_at_npos,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.1719
+gripper_toggles,auroc,0.4454,0.5836,0.4814,0.5047,0.654,0.4954,0.3998,0.5092
+gripper_toggles,recall_at_npos,0.0,0.1053,0.0,0.0166,0.0473,0.0166,0.0,0.1245
+smoothness,auroc,1.0,0.5429,0.5077,0.4491,0.5015,0.5124,0.5194,0.5761
+smoothness,recall_at_npos,1.0,0.0769,0.0,0.0,0.0,0.0,0.0769,0.2418
+duplicate_frame_pairs,auroc,0.5,0.5,1.0,0.5,1.0,0.5,0.5,0.6429
+duplicate_frame_pairs,recall_at_npos,0.0147,0.0147,1.0,0.0147,1.0,0.0147,0.0147,0.3354
+instruction_mismatch,auroc,0.5,0.5,0.5,0.5,0.5,1.0,0.5,0.5714
+instruction_mismatch,recall_at_npos,0.0147,0.0147,0.0147,0.0147,0.0147,1.0,0.0147,0.2135
+length_vs_task,auroc,0.3849,0.9596,0.4175,0.5038,0.9499,0.5343,0.1515,0.5573
+length_vs_task,recall_at_npos,0.0,0.1538,0.0,0.0,0.3077,0.0,0.0,0.2857
+length_vs_task_lowest,auroc,0.6151,0.0404,0.5825,0.4962,0.0501,0.4657,0.8485,0.4427
+length_vs_task_lowest,recall_at_npos,0.0,0.0,0.0,0.0,0.0,0.0,0.4615,0.1758
+post_release_share_vs_task,auroc,0.5166,0.37,0.4842,0.964,0.2791,0.5829,0.768,0.5664
+post_release_share_vs_task,recall_at_npos,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.2198
+random ranker (expectation),auroc,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5
+random ranker (expectation),recall_at_npos,0.0147,0.0147,0.0147,0.0147,0.0147,0.0147,0.0147,0.0948

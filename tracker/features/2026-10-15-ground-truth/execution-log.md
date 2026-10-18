@@ -298,3 +298,45 @@ Owner ruling A (brief.md, 2026-10-17; `dispute-r1.md`): fix `time_shift` only. P
 - Real `data/lineage/mlflow.db` sha256: `ecd5b4b4...` at the start of round 2 (end of round 1), `803a24d3...` after the v3 derive run, `e5499b65acfc9cb9` after the 12 S5 runs on v3 (6 screen, 6 score); unchanged by S6 and by the S2 re-run. The real store gained those 13 runs (as the ACs require) and v3's version record, three subsets, a split, and v2's `fence.json`.
 - Free disk 78 GiB (v3 copy 6.82 GiB of bytes, written as 7.4 GiB allocated); v2's physical copy is untouched (owner cleanup). No process left running. Scratch tidied (`data/scratch/gt_s1*` removed).
 - v2 is fenced in the lineage store: `versions/eaeed043455a.../fence.json`, reason "superseded by v3".
+
+## Round 3: 2026-10-17
+
+Plan r3 (`c1768bb`), analysis-r2 feedback to the executor. Steps: (1) H7/H8, (2) S3 boundary re-run, (3) runbook, (4) R12, (5) fence wording.
+
+### R3 step 1: H7 and H8 (S5, AC5.4, AC5.8, AC5.9)
+**Files:** `vlapoc/methods/heuristics.py` (+H7 `length_vs_task`, ranked both directions as `length_vs_task` / `length_vs_task_lowest`; +H8 `post_release_share_vs_task`; `DIRECTIONS`; one shared pass `scan_episodes` for H5 and H8; `directions.json` written next to the tables), `scripts/s5_recovery_table.py` (the nine score files). Committed before the run.
+- H7 = `length_steps` / median `length_steps` of the same `task_name` in the subset (catalog columns only). H8 = share of the episode after the final gripper release, (T - i)/T for the last i with gripper > 0 then < 0 (0 if none), minus the task median (actions via `iter_episodes`). Both are label-free; they read only through `open_for_method` (the S3 static scan still passes: `artifacts/s5_r3_boundary_scan.txt`).
+- Directions fixed a priori: H7 both ways (a trim makes episodes shorter than their task's norm, detours and padding longer), H8 highest-first (a premature release moves the final release earlier, so the post-release share grows).
+
+**Commands:** `python -m vlapoc.methods.heuristics --subset v3/candidate --out data/eval/groundtruth/heuristics_v3_r3/ --only length_vs_task length_vs_task_lowest post_release_share_vs_task` (only the three new ones, so H1-H6 are not re-run and no duplicate screen runs are created), then `python -m vlapoc.groundtruth score --version v3 --scores ... --column ... --direction ...` for each, then `scripts/s5_recovery_table.py --dir artifacts/s5_v3_recovery_json --out artifacts/s5_v3_r3_recovery_heuristics.csv --prior-dir artifacts/s5_recovery_json --bands-out artifacts/s5_v3_r3_bands.csv`.
+
+**Real store, not a scratch copy:** the score runs must reach v3 through `lineage trace` (AC5.6), so they were written to the real `data/lineage/mlflow.db`. sha256 before `e5499b65acfc9cb9`, after `306af4123fda7e63` (3 screen + 3 score runs; `artifacts/s5_r3_mlflow_sha.txt`).
+
+**Acceptance criteria:**
+- ✅ AC5.4 (r3): on `v3/candidate` the set is H1-H8 with H7 in both directions; table `artifacts/s5_v3_r3_recovery_heuristics.csv` (per type 13 vs 869, pooled 91 vs 869), command above. H7 and H8 AUROC (recall@13):
+
+| heuristic | action_noise | time_shift | instruction_swap | dropped_frames | detour | idle_padding | gripper_release | pooled |
+|---|---|---|---|---|---|---|---|---|
+| H7 length_vs_task, longest first | 0.385 | 0.152 | 0.534 | 0.418 | **0.960** (0.154) | **0.950** (0.308) | 0.504 | 0.557 |
+| H7 length_vs_task, shortest first | 0.615 | **0.848** (0.462) | 0.466 | 0.582 | 0.040 | 0.050 | 0.496 | 0.443 |
+| H8 post_release_share_vs_task | 0.517 | 0.768 (0.000) | 0.583 | 0.484 | 0.370 | 0.279 | **0.964** (0.000) | 0.566 |
+
+  Recall@13 is low even where AUROC is high (e.g. H8 on `gripper_release`: AUROC 0.964, recall@13 0.000): the injected episodes rank high but not in the very top 13 of 882, because clean episodes with a naturally long post-release tail sit above them.
+- ✅ AC5.6: three more `score` runs (ids in `s5_r3_score_runs.txt`) with tags `score_table_digest`, `scored_version_id` (v3), `labels_sha256`; `lineage trace` reaches v3 and the producing screen run (`s5_r3_trace_check.txt`).
+- ✅ AC5.8 (r3), best of H1-H8 per type (a-priori direction; `artifacts/s5_v3_r3_bands.csv`):
+
+| type | best heuristic | AUROC | band |
+|---|---|---|---|
+| `action_noise` | H4 smoothness | 1.000 | (a) |
+| `dropped_frames` | H5 duplicate_frame_pairs | 1.000 | (a) |
+| `idle_padding` | H2 idle_steps | 1.000 | (a) (H7 longest-first 0.950 also) |
+| `instruction_swap` | H6 instruction_mismatch | 1.000 | (a) |
+| `gripper_release` | H8 post_release_share_vs_task | 0.964 | (a) |
+| `detour` | H7 length_vs_task | 0.960 | (a) |
+| `time_shift` | H7 length_vs_task, shortest first | 0.848 | (b) |
+
+  The analyzer's expected values (about 0.85, 0.96, 0.96) are reproduced exactly: 0.848, 0.960, 0.964. The r2 statement that `gripper_release` and `time_shift` are "not found" (band c) is superseded: they were missed because H1-H6 were not task-normalised.
+- ✅ AC5.9 (headline, written honestly): **with H1-H8 no type is in band (c).** Six of seven types are found at AUROC ≥ 0.95 by a label-free one-line statistic; `time_shift` is the hardest at 0.848 (a residual of the 40-step trim: the child is shorter than its task's norm). Any later method's recovery on this ground truth means something only per type, against that type's best heuristic AUROC in `s5_v3_r3_bands.csv`, and not against chance (0.5). That is the owner-approved limitation under ruling A (with B, provenance stays visible, and C, duplicates not re-rendered), plus D: the length and release-position signals are inherent to how the corruptions change episode structure, not defects fixed here. The three expected-value checks above were not tuned: the directions were fixed before scoring and the numbers match the analyzer's probes (`data/scratch/gt_an3/lenres.py`, `grip.py`).
+- Pooled recall@91 of the new heuristics: H7 longest-first 0.286, H8 0.220, H7 shortest-first 0.176 (random 0.095; best old one H5 0.335).
+
+**Demo artifacts produced:** `artifacts/s5_v3_r3_recovery_heuristics.csv`, `s5_v3_r3_recovery_table.txt`, `s5_v3_r3_bands.csv`, `s5_v3_recovery_json/` (now holding all nine), `s5_r3_score_runs.txt`, `s5_r3_trace_check.txt`, `s5_r3_mlflow_sha.txt`.

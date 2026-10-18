@@ -3,6 +3,7 @@ written by ``python -m vlapoc.groundtruth score`` (ground-truth feature S5, AC5.
 
     .venv/bin/python scripts/s5_recovery_table.py --dir data/eval/groundtruth/heuristics --out <artifacts>/s5_recovery_heuristics.csv
 
+Round 3 adds H7 `length_vs_task` (highest-first and, as `length_vs_task_lowest`, shortest-first) and H8 `post_release_share_vs_task`; AC5.8 bands use the best over all of them (a-priori direction per file).
 Rows: one per (heuristic, metric in {auroc, recall_at_npos}); columns: the seven corruption types (one type vs the
 clean candidates) and ``pooled`` (all 91 vs the 869 clean). Random-ranker expectations are appended as rows.
 """
@@ -15,7 +16,8 @@ from pathlib import Path
 
 import pandas as pd
 
-HEURISTICS = ("length_steps", "idle_steps", "gripper_toggles", "smoothness", "duplicate_frame_pairs", "instruction_mismatch")
+HEURISTICS = ("length_steps", "idle_steps", "gripper_toggles", "smoothness", "duplicate_frame_pairs", "instruction_mismatch",
+              "length_vs_task", "length_vs_task_lowest", "post_release_share_vs_task")  # r3: H7 (both directions) and H8; the lowest file is H7 ranked shortest-first
 
 
 def main() -> int:
@@ -59,7 +61,7 @@ def main() -> int:
         bdf.to_csv(a.bands_out, index=False)
     if a.prior_dir:
         rows2 = []
-        for h in HEURISTICS:
+        for h in [x for x in HEURISTICS if (a.prior_dir / f"recovery_{x}.json").exists()]:
             new_ = json.loads((a.dir / f"recovery_{h}.json").read_text())["per_type"]["time_shift"]
             old_ = json.loads((a.prior_dir / f"recovery_{h}.json").read_text())["per_type"]["time_shift"]
             rows2.append({"heuristic": h, "auroc_v2_idle_tail": round(old_["auroc"], 3), "auroc_v3_trim": round(new_["auroc"], 3),

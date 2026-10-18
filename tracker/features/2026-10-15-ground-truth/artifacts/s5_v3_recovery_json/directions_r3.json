@@ -1,0 +1,14 @@
+{
+ "length_vs_task": {
+  "column": "length_vs_task",
+  "direction": "highest"
+ },
+ "length_vs_task_lowest": {
+  "column": "length_vs_task",
+  "direction": "lowest"
+ },
+ "post_release_share_vs_task": {
+  "column": "post_release_share_vs_task",
+  "direction": "highest"
+ }
+}
