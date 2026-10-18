@@ -1,0 +1,31 @@
+AC3.1 (r3) v2/candidate refusal says superseded: True: version v2 (eaeed043455a) is fenced: superseded by v3 (002a68e4caf2); use the superseding version (ground-truth feature 
+AC3.1 v0/candidate view: 960 episodes, 40 reference ids, catalog columns == CATALOG_COLUMNS: True, root data/lerobot/libero_spatial_10
+AC3.1 iter_episodes first: demo_0 action (98, 7) image (98, 128, 128, 3)
+AC3.1 v1/candidate refusal names the fence: True
+[convert] 20/20 episodes, 4190 frames, 10s elapsed, 432 frames/s
+scratch parent small20: 20 episodes; stored content hash == v0's for the same episode_id: 20/20
+AC3.3 real store: v0/candidate then v1/candidate refused: True
+
+AC3.5 catalog columns documented in the module docstring: True; view columns == CATALOG_COLUMNS and within the compared tables: True; check_blind(scratch child) = []
+
+AC3.4 scanned ['vlapoc/method_data.py', 'vlapoc/methods/__init__.py', 'vlapoc/methods/heuristics.py']: violations []
+AC3.4 planted violations detected: {'import groundtruth': True, 'import module': True, 'load_labels': True, 'parent_hashes attr': True, 'labels path': True, 'fence path': True}
+
+refusal table (can a method open it?)
+                                                             case                        result                                                                                                                                                 reason  as_expected
+                                v1/candidate (fenced, real store)          REFUSED LineageError                                    version v1 (16076b9c5cb2) is not blind to its edits: fenced=True, offending=['episode_index'] (PoC §2.1 item 4 p.3)         True
+                      v2/candidate (superseded by v3, real store)          REFUSED LineageError                            version v2 (eaeed043455a) is fenced: superseded by v3 (002a68e4caf2); use the superseding version (ground-truth feature r3)         True
+                                        v0/candidate (real store)                        opened                                                                                                                                           960 episodes         True
+                      S2 scratch derived version (7 edits, blind)                        opened                                                                                                                                            20 episodes         True
+                 scratch child with 1 byte of a data file changed REFUSED VersionIntegrityError dataset copy at /Users/davit_khachaturyan/Projects/personal/vlaExp/data/scratch/gt_s3/lerobot/small20_gt does not match version small20_gt (dbb9f38a47         True
+        oracle subset (op oracle_drop, labelled episodes removed)          REFUSED LineageError subset 'small20_gt/oracle' is ground-truth-derived (op 'oracle_drop'); a method under test must not be given a subset built from the labels (owner dec         True
+random-k subset of the oracle subset (chain contains oracle_drop)          REFUSED LineageError subset 'small20_gt/oracle_then_random' is ground-truth-derived (op 'oracle_drop'); a method under test must not be given a subset built from the label         True
+                                               (open) child, then                        opened                                                                                                                                            20 episodes         True
+                               ... its PARENT in the same process          REFUSED LineageError refusing to open a second version of one lineage in this process: 'small20_gt/all' (dbb9f38a473f) was opened and bafb211603dd is its ancestor or desce         True
+                                              (open) parent, then                        opened                                                                                                                                            20 episodes         True
+                                ... its CHILD in the same process          REFUSED LineageError refusing to open a second version of one lineage in this process: 'small20/all' (bafb211603dd) was opened and dbb9f38a473f is its ancestor or descenda         True
+                          (open) child, then the same child again                        opened                                                                                                                                            20 episodes         True
+                        ... same version, another subset (reopen)                        opened                                                                                                                                            20 episodes         True
+
+all S3 checks pass: True (48s)
+.venv/bin/python scripts/verify_method_boundary_s3.py  96.62s user 22.17s system 241% cpu 49.282 total

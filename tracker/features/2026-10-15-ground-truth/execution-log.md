@@ -340,3 +340,12 @@ Plan r3 (`c1768bb`), analysis-r2 feedback to the executor. Steps: (1) H7/H8, (2)
 - Pooled recall@91 of the new heuristics: H7 longest-first 0.286, H8 0.220, H7 shortest-first 0.176 (random 0.095; best old one H5 0.335).
 
 **Demo artifacts produced:** `artifacts/s5_v3_r3_recovery_heuristics.csv`, `s5_v3_r3_recovery_table.txt`, `s5_v3_r3_bands.csv`, `s5_v3_recovery_json/` (now holding all nine), `s5_r3_score_runs.txt`, `s5_r3_trace_check.txt`, `s5_r3_mlflow_sha.txt`.
+
+### R3 steps 2 and 5: S3 boundary re-run and the supersession wording
+**Files:** `vlapoc/lineage.py` (`assert_blind`: a version whose fence carries `superseded_by` and that has no offending columns is refused with "version v2 (...) is fenced: superseded by v3 (002a68e4caf2); use the superseding version"; every other fence or leak keeps the old wording, so v1 still says `fenced=True, offending=['episode_index']`), `scripts/verify_method_boundary_s3.py` (the refusal table gains a `v2/candidate` row and asserts the new wording).
+
+**Acceptance criteria** (`.venv/bin/python scripts/verify_method_boundary_s3.py`, 48 s; `artifacts/s3_r3_run.txt`, refreshed `artifacts/s3_verify.json`; the r1 run text is `s3_run.txt`):
+- ✅ AC3.1: `v1/candidate` refused (`fenced=True`), `v2/candidate` refused with "is fenced: superseded by v3", `v0/candidate` opens (960 episodes, 40 reference ids), the scratch derived version opens (its 7-edit derivation now includes the trimmed `time_shift`; child id differs from the committed round-1 one, as the analyzer noted), a one-byte change raises `VersionIntegrityError`.
+- ✅ AC3.2, AC3.3, AC3.5: unchanged results (oracle and oracle-chain subsets refused; diff guard in both orders; catalog columns documented and `check_blind(scratch child) = []`).
+- ✅ AC3.4: the AST scan now covers `vlapoc/method_data.py`, `vlapoc/methods/__init__.py` and `vlapoc/methods/heuristics.py` (with H7 and H8): 0 violations; all six planted violations are still detected.
+- Real store: this script only reads it; `mlflow.db` stays `306af4123fda7e63`.
