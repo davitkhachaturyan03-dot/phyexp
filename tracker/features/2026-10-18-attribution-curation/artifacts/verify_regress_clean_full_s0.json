@@ -1,0 +1,10 @@
+{
+ "pass": true,
+ "checks": [
+  {
+   "name": "R influence_matrix reproduces the October rollout_demo_influence.npy",
+   "pass": true,
+   "detail": "shape (500, 379) vs (500, 379), max rel err 3.19e-13"
+  }
+ ]
+}

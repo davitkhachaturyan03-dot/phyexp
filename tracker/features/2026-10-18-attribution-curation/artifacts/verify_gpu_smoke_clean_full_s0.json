@@ -1,0 +1,35 @@
+{
+ "pass": true,
+ "checks": [
+  {
+   "name": "G1 featurize loads the checkpoint via checkpoint_policy and writes the manifest",
+   "pass": true,
+   "detail": "117 layers, dim 7488"
+  },
+  {
+   "name": "G2 per-episode stride: frames are every 2nd frame_index of each episode",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "G3 featurize == the October code's loader/processors/projector (same samples, draws, parameter dtypes)",
+   "pass": true,
+   "detail": "422 samples, min cos 0.9999999, median rel diff 0.00e+00, max 0.00e+00"
+  },
+  {
+   "name": "G3b (finding) LeRobot from_pretrained keeps the file's bf16 tensors; vlapoc.runs.load_checkpoint upcasts some to fp32 (the eval stage's numerics). Effect on features, recorded",
+   "pass": true,
+   "detail": "225 fp32 params under load_checkpoint; 422 samples, min cos 0.8566966, median rel diff 1.35e-01, max 6.50e-01"
+  },
+  {
+   "name": "G5 (finding) the October code's times differ between processes, so its feature files are not reproducible",
+   "pass": true,
+   "detail": "two fresh processes: [0.9129, 0.6496, 0.6789, 0.8355] vs [0.9839, 0.1616, 0.9213, 0.9577]; October shard0 has 12684 rows, each job drew its own times"
+  },
+  {
+   "name": "G4 seeded draws ignore torch's global RNG: two featurize calls in one process (the second model build advances it) agree",
+   "pass": true,
+   "detail": "times [0.3066, 0.881, 0.8964, 0.8778], max rel diff 0.00e+00"
+  }
+ ]
+}

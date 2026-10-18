@@ -14,6 +14,9 @@ Modules, in the order data flows through them (docs/dataflow.md, "Full flow"):
                       "corrupt 5-10% of a copy" box)
 - ``runs``            every stage as an MLflow run, and the ``trace``/``consumers``/``diff`` queries (S5)
 - ``lerobot_train_entry``  subprocess entry that calls LeRobot's own ``train()`` (S5)
+- ``influence``       projected per-sample gradient features of a checkpoint (Step 3 input)
+- ``attribution``     CUPID influence of every training episode on every family-W return: the
+                      ``attribute`` stage that ``runs.select_run`` consumes for Step 4
 
 ``scripts/lineage_dry_run.py`` runs every stage type end to end (S6).
 """

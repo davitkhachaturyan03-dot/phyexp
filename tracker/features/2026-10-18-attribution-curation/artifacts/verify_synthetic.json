@@ -1,0 +1,85 @@
+{
+ "pass": true,
+ "checks": [
+  {
+   "name": "1 influence_matrix == brute-force double sum (2 shards each)",
+   "pass": true,
+   "detail": "max rel err 6.19e-16"
+  },
+  {
+   "name": "2a center=False is Prop. 1: (1/m) \u03a3 R M",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "2b centred = raw \u2212 R\u0304\u00b7mean_\u03c4 M",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "2c constant return scores 0 when centred",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "3a infl_f30__same_task equals the per-task computation",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "3b harm = \u2212sign\u00b7infl (f30 +1, censored60 \u22121, ft_* \u22121)",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "3c failure-type columns: types with >= 5 rollouts only",
+   "pass": true,
+   "detail": "['infl_ft_timeout']"
+  },
+  {
+   "name": "3d agreement gives Kendall \u03c4 per pair",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "4a zscore_ensemble: affine-rescaled seed averages to the same z",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "4b zscore_ensemble refuses misaligned keys",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "5a drop_top_k_per_task drops k from every task",
+   "pass": true,
+   "detail": "[4, 4, 4, 4, 4, 4]"
+  },
+  {
+   "name": "5b ... and they are each task's 2 highest (ties by episode_id)",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "5c random control: same seed same subset, other seed differs",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "5d curated and random children hold identical per-task counts",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "5e refuses a stale score table",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "5e refuses a k that empties a task",
+   "pass": true,
+   "detail": ""
+  }
+ ]
+}

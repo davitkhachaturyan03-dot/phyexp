@@ -564,6 +564,74 @@ def drop_top_k(
     return child
 
 
+TASK_GROUP = ("suite", "libero_task_id")
+
+
+def _per_task(parent: Subset, k_per_task: int, lineage_root: Path | None) -> list[pd.DataFrame]:
+    """The parent's catalog rows split by task (``TASK_GROUP``), in (suite, libero_task_id) order; every task must keep
+    at least one episode after dropping ``k_per_task``."""
+    if k_per_task < 1:
+        raise ValueError("k_per_task must be >= 1")
+    eps = parent.episodes(lineage_root)
+    groups = [g for _, g in sorted(eps.groupby(list(TASK_GROUP)), key=lambda kv: kv[0])]
+    small = [(g["suite"].iat[0], int(g["libero_task_id"].iat[0]), len(g)) for g in groups if len(g) <= k_per_task]
+    if small:
+        raise ValueError(f"k_per_task={k_per_task} would empty task(s) {small[:3]}")
+    return groups
+
+
+def drop_top_k_per_task(
+    parent: Subset, score_table: pd.DataFrame, metric: str, k_per_task: int, direction: str = "highest",
+    score_source: str | None = None, lineage_root: Path | None = None,
+) -> Subset:
+    """``drop_top_k`` within every task: drop the ``k_per_task`` top-ranked episodes of each (suite, libero_task_id).
+
+    Why per task (inferred design choice, recorded in the derivation): influence on rollouts of one task is on a
+    different scale from another's (different numbers of rollouts and success rates), and a global top-k can empty
+    one task while leaving the rest untouched, which changes the task mixture as well as the data quality. The matched
+    control is ``drop_random_k_per_task`` with the same ``k_per_task``, so curated and control subsets hold identical
+    per-task counts. Ties are broken by ``episode_id`` ascending; the score table must key exactly the parent.
+    """
+    if direction not in ("highest", "lowest"):
+        raise ValueError("direction must be 'highest' or 'lowest'")
+    _check_score_keys(parent, score_table, metric, lineage_root)
+    s = score_table.set_index("episode_id")[metric]
+    dropped = []
+    for g in _per_task(parent, k_per_task, lineage_root):
+        t = pd.DataFrame({"episode_id": g["episode_id"].to_numpy(), "_s": s.loc[g["episode_id"]].to_numpy()})
+        if direction == "highest":
+            t["_s"] = -t["_s"]
+        dropped += t.sort_values(["_s", "episode_id"], kind="mergesort")["episode_id"].head(k_per_task).tolist()
+    dropped = sorted(dropped)
+    deriv = {"op": "drop_top_k_per_task", "parent_subset_id": parent.subset_id, "metric": metric,
+             "k_per_task": k_per_task, "group": list(TASK_GROUP), "direction": direction,
+             "tie_break": "episode_id ascending", "score_table_digest": score_table_digest(score_table, metric),
+             "score_source": score_source, "dropped": dropped}
+    child = Subset(parent.dataset_version_id, tuple(sorted(set(parent.episode_ids) - set(dropped))), deriv)
+    child.save(lineage_root)
+    return child
+
+
+def drop_random_k_per_task(parent: Subset, k_per_task: int, seed: int, lineage_root: Path | None = None) -> Subset:
+    """Random control for ``drop_top_k_per_task`` (PoC §9.1 Step 4 p.19 "remove k random episodes"): within every
+    task, ``default_rng(seed).choice(n_task, k_per_task, replace=False)`` over its sorted episode_ids, one generator
+    consumed in (suite, libero_task_id) order. The dropped ids are recorded."""
+    rng = np.random.default_rng(seed)
+    dropped = []
+    for g in _per_task(parent, k_per_task, lineage_root):
+        ids = sorted(g["episode_id"])
+        dropped += [ids[i] for i in rng.choice(len(ids), size=k_per_task, replace=False)]
+    dropped = sorted(dropped)
+    deriv = {"op": "drop_random_k_per_task", "parent_subset_id": parent.subset_id, "k_per_task": k_per_task,
+             "group": list(TASK_GROUP), "seed": seed,
+             "rng": "numpy.random.default_rng(seed).choice(n_task, k_per_task, replace=False) per task, tasks in "
+                    "(suite, libero_task_id) order, over sorted episode_ids",
+             "numpy_version": np.__version__, "dropped": dropped}
+    child = Subset(parent.dataset_version_id, tuple(sorted(set(parent.episode_ids) - set(dropped))), deriv)
+    child.save(lineage_root)
+    return child
+
+
 def drop_random_k(parent: Subset, k: int, seed: int, lineage_root: Path | None = None) -> Subset:
     """Random-k control (PoC §9.1 Step 4 p.19): ``default_rng(seed).choice(n, k, replace=False)`` over
     the parent's sorted episode_ids. The dropped IDs are recorded too, so the child is reproducible
