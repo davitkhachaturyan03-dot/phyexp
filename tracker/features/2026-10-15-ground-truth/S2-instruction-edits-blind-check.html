@@ -53,6 +53,10 @@ ul,ol{max-width:72ch}
 td.mono,th.mono{font-family:var(--mono)}
 code{overflow-wrap:anywhere}
 pre code{overflow-wrap:normal}
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}
+.plain p:last-child{margin-bottom:0}
+.plain .small{font-size:13px;color:var(--muted)}
 </style>
 
 </head>
@@ -69,6 +73,12 @@ pre code{overflow-wrap:normal}
     <span><b>Code</b> <code>vlapoc/derive.py</code>, <code>vlapoc/lineage.py</code></span>
   </div>
 </header>
+
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>A dataset version must carry no trace of which episodes were edited that a method under test could use; that property is called <b>blindness</b>. This story taught the dataset-writing step to swap an episode's text instruction, and fixed the blindness check so that a swapped instruction counts as ordinary content (a method may see it, and spotting it is the method's job) while a real leak, such as changing the task name that records where an episode came from, is still caught and named. The checks give identical results however Python's random hashing is seeded. This matters because a check that wrongly flags a legitimate swap, or misses a leak, would make the whole experiment untrustworthy.</p>
+  <p class="small">Unfamiliar term? See the <a href="report.html#glossary">glossary</a> in the overall report. Technical detail follows below.</p>
+</div>
 
 <h2>Why</h2>
 <p>Two blockers stood between the swapped-instruction corruption (§2.5, "annotation errors") and a derived dataset. First, <code>derive_version</code> refused task edits outright. Second, the blind check counted the instruction as bookkeeping, so a swap would have failed it, or worse, an instruction could have become a free side channel that tells a method which episodes were edited. The PoC's rule is that a method must be able to flag the planted episodes on its own.</p>

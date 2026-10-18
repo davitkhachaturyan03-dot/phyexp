@@ -53,6 +53,10 @@ ul,ol{max-width:72ch}
 td.mono,th.mono{font-family:var(--mono)}
 code{overflow-wrap:anywhere}
 pre code{overflow-wrap:normal}
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}
+.plain p:last-child{margin-bottom:0}
+.plain .small{font-size:13px;color:var(--muted)}
 </style>
 
 </head>
@@ -69,6 +73,12 @@ pre code{overflow-wrap:normal}
     <span><b>Pending server</b> <span class="pill warn">GT-R1 to GT-R6</span></span>
   </div>
 </header>
+
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>This story checks that the corrupted dataset works with the rest of the pipeline on this Mac (a tiny 2-step training run of the SmolVLA robot model finished in 15.1 s), and it writes down, as a <b>server runbook</b> (a step-by-step list for a powerful machine), the experiments that cannot be run here, chiefly whether the damage actually makes a trained robot worse. Those items are <b>pending server</b>: written down, not run, and nothing on these pages claims their outcome. This matters because it separates what is proven (the data works with the pipeline) from what is still unknown (the damage's effect on a trained robot).</p>
+  <p class="small">Unfamiliar term? See the <a href="report.html#glossary">glossary</a> in the overall report. Technical detail follows below.</p>
+</div>
 
 <h2>Why</h2>
 <p>A ground-truth dataset is only useful if the rest of the pipeline can consume it and if the PoC's causal claim (the corrupted data hurts the policy, and removing the corrupted episodes helps) can eventually be tested. This Mac cannot train SmolVLA at scale or run 1000 rollouts, so this story proves what can be proved locally and writes the rest down so a server operator can run it without guessing. The decision of whether the injection changed the policy belongs to the significance gate, not to eyeballing.</p>

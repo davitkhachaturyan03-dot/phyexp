@@ -53,6 +53,10 @@ ul,ol{max-width:72ch}
 td.mono,th.mono{font-family:var(--mono)}
 code{overflow-wrap:anywhere}
 pre code{overflow-wrap:normal}
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}
+.plain p:last-child{margin-bottom:0}
+.plain .small{font-size:13px;color:var(--muted)}
 </style>
 
 </head>
@@ -69,6 +73,12 @@ pre code{overflow-wrap:normal}
     <span><b>Code</b> <code>vlapoc/method_data.py</code> (172 lines), <code>vlapoc/groundtruth.py::load_answer_key</code></span>
   </div>
 </header>
+
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>A method that is being tested must not be able to peek at the <b>answer key</b> (the record of which episodes we damaged) or at side clues to it. This story built the one entry point, the <b>method-facing loader</b> (<code>open_for_method</code>), that a method must use to read a dataset version. It refuses versions that are <b>fenced</b> (marked off-limits), tampered with, built from the answer key, or that would let a method compare two versions of the same dataset (the difference would name the edited episodes). A scan of the source code finds 0 violations and catches 6 of 6 planted ones, which shows the scan can actually fail. This matters because without the gate, a method's score could come from cheating rather than from skill.</p>
+  <p class="small">Unfamiliar term? See the <a href="report.html#glossary">glossary</a> in the overall report. Technical detail follows below.</p>
+</div>
 
 <h2>Why</h2>
 <p>Owner decision 3 ("Enforce now") asked for a single loader that always calls <code>lineage.assert_blind</code> and respects the v1 fence, so that later screening and attribution features cannot read a leaky or fenced version by accident. This closes a known issue from the evaluation feature: the v1 fence was recorded but nothing enforced it at a method's entry point. The answer key stays readable only through an explicitly ground-truth-side path, <code>groundtruth.load_answer_key</code>, used for scoring recovery@k.</p>

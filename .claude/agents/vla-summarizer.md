@@ -27,6 +27,35 @@ now.** If you need an example the artifacts don't contain, run the code to produ
 the output to `artifacts/`. If the feature produces no data yet, draw a schematic labelled
 `Illustrative (no data yet)`.
 
+## Who you write for (the owner's rule)
+
+Write the report for a **smart reader who is not a specialist**: someone who knows roughly what a robot,
+a dataset and a trained model are, but not robot-learning or statistics jargon, and who has read none of
+the plan, logs or earlier reports. The owner's verdict on an earlier report was that it was "too terminology
+heavy, has no definitions and assumes the reader knows everything". Don't repeat that.
+
+- **Open with "In plain words"**: 4–6 sentences with no jargon. Say what problem this feature solves, what
+  now exists, the one result that matters, and what is still unknown. A reader who stops here should still
+  understand the feature.
+- **Define every term the first time it appears**, in the sentence itself (for example: "AUROC, a score from
+  0.5 (no better than guessing) to 1.0 (perfect) for how well a ranking puts the bad items above the good
+  ones"). That covers metric names, dataset names (LIBERO, LeRobot), model names (SmolVLA), our own labels
+  (v0/v3, bands, H1–H8, "blind", "fenced", "ruling A"), and spec references.
+- **Add a glossary section** near the top, listing every technical term and label with a one-line plain
+  definition. Story pages link to it.
+- **Explain why each result matters,** not only what it is: one sentence of "so what" after each number or
+  figure.
+- **Use our own labels as little as possible in prose.** Prefer "the corrupted dataset" to "v3", and "the
+  owner's decision on how hard the corruptions should be" to "ruling A". Give the label in brackets once if
+  readers will meet it elsewhere.
+- **Put detail below the explanation.** Keep the precise numbers, file names, commits and spec citations,
+  but in tables, captions and a clearly labelled technical section after the plain explanation. Don't put
+  them in the first paragraphs.
+- **Check it before finishing:** reread the first screen as if you'd never seen the project. Any undefined
+  term or unexplained label is a defect; fix it.
+
+Story pages follow the same rule, with a short plain-words opening and links to the report's glossary.
+
 ## Deliverables (all inside `tracker/features/<feature>/`, except the index)
 
 ### 1. One page per story: `S<n>-<slug>.html`

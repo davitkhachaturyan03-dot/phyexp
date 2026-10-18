@@ -53,6 +53,10 @@ ul,ol{max-width:72ch}
 td.mono,th.mono{font-family:var(--mono)}
 code{overflow-wrap:anywhere}
 pre code{overflow-wrap:normal}
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}
+.plain p:last-child{margin-bottom:0}
+.plain .small{font-size:13px;color:var(--muted)}
 </style>
 
 </head>
@@ -69,6 +73,12 @@ pre code{overflow-wrap:normal}
     <span><b>Code</b> <code>vlapoc/groundtruth.py</code>, <code>vlapoc/methods/heuristics.py</code></span>
   </div>
 </header>
+
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>This story built the scorer and the baseline. The scorer takes any method's ranking of episodes from most to least suspicious and reports how many damaged episodes it found. The baseline is eight cheap one-line statistics (for example, "how long is the episode?") that need no learning and no answer key. The key result: they already find all seven kinds of damage, with <b>AUROC</b> (a score from 0.5, no better than guessing, to 1.0, perfect, for how well a ranking puts damaged episodes above clean ones) from 0.848 for <code>time_shift</code>, the hardest, up to 1.000. So a real method must beat them kind by kind, not just beat chance. One caution: <code>gripper_release</code> has an AUROC of 0.964 but a <b>recall@13</b> (the share of the 13 damaged episodes found inside the top 13 ranked) of 0, because its damaged episodes rank high but not at the very top.</p>
+  <p class="small">Unfamiliar term? See the <a href="report.html#glossary">glossary</a> in the overall report. Technical detail follows below.</p>
+</div>
 
 <div class="note bad">
   <p><b>Headline (AC5.9).</b> With eight label-free statistics (H1–H8), <b>no corruption type is in band (c) "not found by any heuristic".</b> Six of seven types are found at AUROC 0.95 or higher. <code>time_shift</code> is the hardest, at <b>0.848</b> (the child is shorter than its task's norm). So a method's recovery number means something only <b>per type, against that type's best heuristic</b>, not against chance (AUROC 0.5). This is an owner-approved limitation under ruling A (with B and C), not a defect fixed here. The round-2 table said <code>gripper_release</code> and <code>time_shift</code> were "not found"; that was an artifact of the first six heuristics lacking task normalisation (analyzer round 2).</p>

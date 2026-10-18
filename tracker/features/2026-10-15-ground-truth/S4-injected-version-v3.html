@@ -53,6 +53,10 @@ ul,ol{max-width:72ch}
 td.mono,th.mono{font-family:var(--mono)}
 code{overflow-wrap:anywhere}
 pre code{overflow-wrap:normal}
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}
+.plain p:last-child{margin-bottom:0}
+.plain .small{font-size:13px;color:var(--muted)}
 </style>
 
 </head>
@@ -69,6 +73,12 @@ pre code{overflow-wrap:normal}
     <span><b>Version</b> <code>002a68e4caf2</code></span>
   </div>
 </header>
+
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>This story produced the actual corrupted dataset: 1000 episodes, of which 91 of the 960 candidates (9.48%) were damaged, 13 of each of the seven kinds, spread across the 20 tasks, with the answer key stored apart from the data. Every episode's <b>content hash</b> (a fingerprint computed from its data) was recomputed from the bytes on disk, and 1000 of 1000 match what was recorded. This dataset, called v3, replaces an earlier attempt (v2), which is now fenced as superseded. This matters because the whole experiment rests on the data on disk being exactly what the answer key says it is.</p>
+  <p class="small">Unfamiliar term? See the <a href="report.html#glossary">glossary</a> in the overall report. Technical detail follows below.</p>
+</div>
 
 <h2>Why</h2>
 <p>This is the "Ground truth" deliverable of the milestone table: an injected dataset with a known answer, built from LIBERO's original demos as clean references. The budget is 5–10% of the training set, and the references stay untouched.</p>

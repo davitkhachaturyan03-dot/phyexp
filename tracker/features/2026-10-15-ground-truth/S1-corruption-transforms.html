@@ -53,6 +53,10 @@ ul,ol{max-width:72ch}
 td.mono,th.mono{font-family:var(--mono)}
 code{overflow-wrap:anywhere}
 pre code{overflow-wrap:normal}
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}
+.plain p:last-child{margin-bottom:0}
+.plain .small{font-size:13px;color:var(--muted)}
 </style>
 
 </head>
@@ -69,6 +73,12 @@ pre code{overflow-wrap:normal}
     <span><b>Code</b> <code>vlapoc/corruptions.py</code> (558 lines)</span>
   </div>
 </header>
+
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>A <b>corruption</b> is a deliberate, recorded way of damaging one <b>episode</b> (one recording of a person guiding a robot arm through a task). This story built the seven kinds of damage: random jitter on the arm commands, a two-second timing shift, a swapped text instruction, frozen camera frames, a hesitant back-and-forth detour, idle pauses, and a gripper (the robot's hand) that opens too early. Each is a small function that takes one clean episode and returns a damaged one plus a note of exactly what was done, with every command kept inside the robot's valid range of −1 to 1. They were run on 118 real episodes per type with 0 broken-rule failures. This matters because every later test of a data-screening method depends on these damaged episodes being realistic and exactly described.</p>
+  <p class="small">Unfamiliar term? See the <a href="report.html#glossary">glossary</a> in the overall report. Technical detail follows below.</p>
+</div>
 
 <h2>Why</h2>
 <p>The PoC's key trick is to plant bad data whose location we know, then ask whether a method finds exactly those episodes. §2.5 lists the corruption types to plant, and §8.10 adds two aimed at specific metrics (idle padding should hurt speed, gripper-release noise should hurt reliability). RoboDrop's appendix fixes the noise level and the shift size. Two owner decisions bind this story: clip every corrupted action to [−1, 1], and build all types except the altered camera viewpoint (that needs simulator re-rendering).</p>
