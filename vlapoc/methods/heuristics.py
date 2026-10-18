@@ -1,5 +1,10 @@
 """Cheap heuristic rankers (screening baselines), run through the method-facing loader (ground-truth feature S5).
 
+Where this sits: the ground-truth pipeline is derive (``vlapoc.groundtruth``) -> screen (this module, a method under
+test that sees only what ``method_data.open_for_method`` allows) -> score (``vlapoc.groundtruth score`` against the
+answer key). These eight heuristics are the baselines a real screening method has to beat (``docs/dataflow.md``,
+step 1, screening).
+
 Grounding
 ---------
 - PoC §5 (p. 11-12), row "Intrinsic quality | Mutual information, redundancy, smoothness | ... | DemInf, SCIZOR,
@@ -39,8 +44,12 @@ Round 3 (plan r3, analysis-r2; both label-free, task-normalised, computed from m
 These two were added after round 2 showed that task-free statistics left ``time_shift``, ``detour`` and ``gripper_release``
 looking undetected; they are baselines to beat, not claims about any method (plan AC5.9).
 
-CLI: ``.venv/bin/python -m vlapoc.methods.heuristics --subset v2/candidate --out data/eval/groundtruth/heuristics/``
-writes ``<name>.parquet`` per heuristic and records one ``screen`` stage run each (``--no-track`` skips MLflow).
+CLI (run from the repo root; ``v3`` is the current injected version, ``v2`` is fenced and would be refused)::
+
+    .venv/bin/python -m vlapoc.methods.heuristics --subset v3/candidate --out data/eval/groundtruth/heuristics_v3/
+
+writes ``<name>.parquet`` per heuristic plus ``directions.json``, and records one ``screen`` stage run each in the
+real MLflow store (``--no-track`` skips MLflow; ``--only <names>`` runs a subset of ``HEURISTICS``).
 """
 
 from __future__ import annotations
@@ -72,6 +81,11 @@ def scan_episodes(view: MethodView) -> pd.DataFrame:
         rows[eid] = {"duplicate_frame_pairs": sum(int((ep[k][1:] == ep[k][:-1]).all(axis=(1, 2, 3)).sum()) for k in ("image", "image2")),
                      "post_release_share": (len(g) - last) / len(g)}
     return pd.DataFrame(rows).T
+
+
+def score_column(table: pd.DataFrame) -> str:
+    """The name of the one score column of a table (``episode_id`` and ``content_hash`` are the keys)."""
+    return [x for x in table.columns if x not in ("episode_id", "content_hash")][0]
 
 
 def minus_task_median(values: pd.Series, task: pd.Series) -> pd.Series:
@@ -114,7 +128,7 @@ def compute(view: MethodView, only: tuple[str, ...] = HEURISTICS) -> dict[str, p
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Open the subset through the loader, compute H1-H6, write score tables, record ``screen`` runs."""
+    """Open the subset through the loader, compute the requested heuristics (default H1-H8), write score tables, record ``screen`` runs."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--subset", required=True)
     ap.add_argument("--out", type=Path, required=True)
@@ -128,7 +142,7 @@ def main(argv: list[str] | None = None) -> int:
     for h, t in tables.items():
         path = a.out / f"{h}.parquet"
         t.to_parquet(path, index=False)
-        col = [x for x in t.columns if x not in ("episode_id", "content_hash")][0]
+        col = score_column(t)
         if not a.no_track:
             from vlapoc.lineage import Subset, score_table_digest
             from vlapoc.runs import stage_run
@@ -143,8 +157,8 @@ def main(argv: list[str] | None = None) -> int:
                 r.output_file("screening_scores", path, kind="score_table", entity_id=score_table_digest(t, col))
                 runs[h] = r.run_id
         print(f"{h}: {len(t)} rows -> {path}")
-    (a.out / "directions.json").write_text(json.dumps({h: {"column": [x for x in t.columns if x not in ("episode_id", "content_hash")][0],
-                                                            "direction": DIRECTIONS[h]} for h, t in tables.items()}, indent=1))
+    (a.out / "directions.json").write_text(json.dumps({h: {"column": score_column(t), "direction": DIRECTIONS[h]}
+                                                       for h, t in tables.items()}, indent=1))
     if runs:
         (a.out / "screen_runs.json").write_text(json.dumps(runs, indent=1))
     return 0
