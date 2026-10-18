@@ -191,3 +191,25 @@ Changes after the first release (2026-10-01), one dated entry per change, added 
     (evaluation is now real).
 - **Evidence:** the 2026-10-08 entry's re-run (`verify_runs_s5.py`, exit 0, HEAD `91f0902`); nothing re-run for this record update.
 - **Divergence:** none.
+
+## 2026-10-17: AC4.8 "contrast" figure corrected (60 files / 663 MB no longer reproduces; now 0 files)
+- **Why:** the ground-truth feature's analyzer (analysis-r1/r2, plan R12) found the data-lineage record still quoting the old
+  un-isolated-cache figure. Request: add the changelog entry and correct `report.html`.
+- **Grounding:** none needed (record correction). Context: analysis-r1 E3 and AC4.8 (r2) of this feature: a derivation leaves the
+  shared HF datasets cache unchanged.
+- **Prior art:** none (our own measurement).
+- **Finding (measured):** `scripts/verify_derive_s4.py --cache` (20-episode parent, one edit with `isolate_hf_cache=False`, cache
+  pointed at a scratch dir) used to leave `60 files / 12 .arrow / 662,758,780 bytes` (2026-09-29, round-1 writer:
+  `delete_episodes` + `merge_datasets`). On 2026-10-15 and 2026-10-17 it leaves `0 files / 0 bytes`, on the current code and on the
+  code just before the ground-truth change, so the cause is the order-preserving one-pass LeRobot writer of 2026-10-02
+  (evaluation-layer S0), not a change of ours today. The isolated path is unchanged: the shared cache listing is identical
+  before and after (134 files / 28,952,405,234 bytes in the 2026-10-15 run).
+- **Files:**
+  - `report.html`: the round-2 analyzer-table sentence now says the 60 files / 663 MB were the round-1 writer's behaviour and are
+    corrected (0 files); a dated line in "Changes since first release".
+  - `S4-derived-versions-labels.html`: the AC4.8 row marks 60 files as the 2026-09-29 round-1 measurement and adds the re-measured 0.
+  - `artifacts/s4_summary.json`: an `AC4.8_note_2026-10-17` key; the old `contrast_unisolated_*` values stay as the historical record.
+- **Evidence:** `.venv/bin/python scripts/verify_derive_s4.py --cache --artifacts <scratch>` → `AC4.8 contrast, isolate_hf_cache=False:
+  0 cache files (0 .arrow, 0 parquet builder entries), 0 bytes left behind by one 20-episode derivation`
+  (`tracker/features/2026-10-15-ground-truth/artifacts/s2_regress_verify_derive_s4.txt`).
+- **Divergence:** none; the isolation guarantee (AC4.8) is met as before. The `isolate_hf_cache` code path itself is kept.

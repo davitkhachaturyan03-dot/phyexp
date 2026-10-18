@@ -1885,7 +1885,7 @@ features.</p>
       helpful" control, group leave-one-out or random subsets; <code>select_run</code> hard-coded "highest" (P3, E1).
       (5) Two scripts hard-coded the session's <code>/private/tmp</code> path; the dry run crashed after recording
       11 runs when it vanished (E4). (6) AC1.2 and AC6.2 wording didn't match what was verifiably built (P2).</td></tr>
-    <tr><td>2 (2026-10-01)</td><td><span class="pill good">PASS</span></td><td>none</td><td>All seven items resolved. E3 was <i>fixed</i>, not just disclosed: the shared cache is byte-identical around a derivation, where it used to gain 60 files / 663 MB per 20-episode derivation. Group leave-one-out was added rather than deferred. Four non-blocking issues remain (Open decisions 4–7).</td></tr>
+    <tr><td>2 (2026-10-01)</td><td><span class="pill good">PASS</span></td><td>none</td><td>All seven items resolved. E3 was <i>fixed</i>, not just disclosed: the shared cache is byte-identical around a derivation, where the round-1 writer (<code>delete_episodes</code> + <code>merge_datasets</code>) used to gain 60 files / 663 MB per 20-episode derivation (measured 2026-09-29). <i>Corrected 2026-10-17:</i> the order-preserving writer introduced on 2026-10-02 no longer creates that cache, so the un-isolated path now leaves 0 files; the isolation stays and the shared cache listing is still identical around a derivation. Group leave-one-out was added rather than deferred. Four non-blocking issues remain (Open decisions 4–7).</td></tr>
     <tr><td>Refactor</td><td>no verdict</td><td>none</td><td>CLI restructured into per-command handlers; <code>derive_version</code> split into named steps; no behaviour change (see Verification).</td></tr>
   </tbody>
 </table>
@@ -1990,6 +1990,10 @@ run while reading.</p>
   (<code>91f0902</code>). Its round-1 mode had failed with <code>KeyError: 'suites'</code> since the evaluation layer replaced <code>eval_standin</code>
   (<code>4448ed2</code>). The S5 page's AC5.3 row and <code>artifacts/s5_summary.json</code>'s AC5.3 entry are refreshed. See
   <a href="changelog.md">changelog.md</a>.</li>
+  <li><b>2026-10-17:</b> AC4.8's "contrast" figure corrected. The old behaviour (60 files / 663 MB left in the shared HF cache by a
+  20-episode derivation without isolation) no longer reproduces: the order-preserving writer of 2026-10-02 leaves 0 files, with
+  and without <code>isolate_hf_cache</code>. The guarantee itself (the shared cache is unchanged around a derivation) still holds.
+  S4 page row and <code>artifacts/s4_summary.json</code> annotated. See <a href="changelog.md">changelog.md</a>.</li>
 </ul>
 <p>Later changes are logged in <a href="changelog.md">changelog.md</a>.</p>
 

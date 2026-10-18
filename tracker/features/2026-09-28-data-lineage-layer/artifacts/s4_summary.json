@@ -169,5 +169,6 @@
         "parent_content_hash"
       ]
     }
-  }
+  },
+  "AC4.8_note_2026-10-17": "contrast_unisolated_* (60 files, 662758780 bytes) were measured on 2026-09-29 with the round-1 writer; the order-preserving writer (2026-10-02) leaves 0 files with isolate_hf_cache=False (re-measured 2026-10-17, also on pre-S2 code). Values above are kept as the historical record."
 }
