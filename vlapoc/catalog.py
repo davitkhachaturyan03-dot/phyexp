@@ -413,7 +413,9 @@ def write_catalog(cat: pd.DataFrame, raw_files: pd.DataFrame, out_dir: Path, roo
     out_dir.mkdir(parents=True, exist_ok=True)
     cat.to_parquet(out_dir / "episodes.parquet", index=False)
     raw_files.to_parquet(out_dir / "raw_files.parquet", index=False)
-    rel_root = Path(root).resolve().relative_to(REPO_ROOT).as_posix()
+    from vlapoc.lineage import rel
+
+    rel_root = rel(root)
     (out_dir / "catalog.json").write_text(
         json.dumps({"lerobot_root": rel_root, "n_episodes": len(cat), "hash_scheme": HASH_DOMAIN.decode().rstrip("\0")}, indent=2)
     )
@@ -458,7 +460,9 @@ def main(argv: list[str] | None = None) -> int:
     raw_files = raw_file_hashes(a.raw, a.workers)
     out = a.out or DEFAULT_CATALOG_ROOT / root.name
     write_catalog(cat, raw_files, out, root)
-    print(f"catalog: {len(cat)} rows x {len(cat.columns)} columns -> {out.resolve().relative_to(REPO_ROOT)} ({time.time() - t0:.0f}s)")
+    from vlapoc.lineage import rel
+
+    print(f"catalog: {len(cat)} rows x {len(cat.columns)} columns -> {rel(out)} ({time.time() - t0:.0f}s)")
     print(f"unique episode_id: {checks['unique_episode_ids']}/{checks['n_episodes']}")
     print(f"{checks['hash_match_raw']}/{checks['n_episodes']} hashes match raw")
     print("checks:", json.dumps(checks))

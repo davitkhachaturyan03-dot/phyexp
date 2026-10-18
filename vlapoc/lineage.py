@@ -129,12 +129,20 @@ def sha256_json(obj) -> str:
 
 
 def rel(path: Path) -> str:
-    """Repo-relative POSIX path; refuses paths outside the repo so no manifest holds an absolute path."""
+    """Repo-relative POSIX path; refuses paths outside the repo so no manifest holds an absolute path.
+
+    ``data/`` may be a symlink onto a scratch disk (the server layout). ``Path.resolve()`` follows it, so
+    a file under ``data/`` is accepted if it sits under that symlink's target and is recorded as ``data/...``.
+    """
     p = Path(path).resolve()
     try:
-        return p.relative_to(REPO_ROOT).as_posix()
-    except ValueError as e:
-        raise LineageError(f"{p} is outside the repository; lineage records only repo-relative paths") from e
+        return p.relative_to(REPO_ROOT.resolve()).as_posix()
+    except ValueError:
+        data = (REPO_ROOT / "data").resolve()
+        try:
+            return (Path("data") / p.relative_to(data)).as_posix()
+        except ValueError as e:
+            raise LineageError(f"{p} is outside the repository; lineage records only repo-relative paths") from e
 
 
 def _root(lineage_root: Path | None) -> Path:
