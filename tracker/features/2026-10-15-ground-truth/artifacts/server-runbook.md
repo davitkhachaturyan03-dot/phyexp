@@ -140,9 +140,30 @@ A screening or attribution method run over `v3/candidate` through `open_for_meth
 ```
 
 It reports recall@k (k = 91, 2 x 91), precision@k, AUROC, best balanced accuracy and average precision, pooled and per type
-(13 injected vs 869 clean), each with the random-ranker expectation, and records an MLflow `score` run. **Compare against the
-heuristic baselines** in `artifacts/s5_v3_recovery_heuristics.csv` and `s5_v3_bands.csv`: four of the seven types are saturated by one-line statistics (`action_noise`, `dropped_frames`, `idle_padding`, `instruction_swap`)
-(measured), `detour` is partly found (AUROC 0.73), and `gripper_release` and `time_shift` are the types no heuristic finds at its a-priori direction. `time_shift` is now a trim: the 40-step shortening leaves a length residual (AUROC 0.68 read in the opposite direction, 0.32 as scored; reported openly, execution-log round 2 step 3a). The PoC §4.5
+(13 injected vs 869 clean), each with the random-ranker expectation, and records an MLflow `score` run.
+
+**The comparison rule (round 3, plan AC5.9): compare per type, against that type's best heuristic, not against chance.**
+With the eight label-free heuristics H1-H8 (`artifacts/s5_v3_r3_recovery_heuristics.csv`, `s5_v3_r3_bands.csv`, measured on
+v3/candidate, a-priori direction per heuristic) **no type is left undetected**: six of the seven types are found at AUROC >= 0.95
+and `time_shift` is the hardest at 0.848.
+
+| type | best heuristic | AUROC to beat |
+|---|---|---|
+| `action_noise` | H4 smoothness | 1.000 |
+| `dropped_frames` | H5 duplicate_frame_pairs | 1.000 |
+| `idle_padding` | H2 idle_steps | 1.000 |
+| `instruction_swap` | H6 instruction_mismatch (instruction vs `task_name`) | 1.000 |
+| `gripper_release` | H8 post_release_share_vs_task | 0.964 |
+| `detour` | H7 length_vs_task | 0.960 |
+| `time_shift` | H7 length_vs_task, shortest first | 0.848 |
+
+A method's AUROC of 0.9 on `detour` or 0.8 on `time_shift` therefore adds nothing over a task-normalised length; a pooled
+recall number is not comparable (best single heuristic pooled recall@91 is 0.335, H5). H7 and H8 were added in round 3
+after the round-2 table (H1-H6, no task normalisation) wrongly suggested `gripper_release` and `time_shift` were undetected.
+This is an owner-approved limitation under ruling A (with B, provenance stays visible, and C, duplicate frames are not
+re-rendered); the corruptions were not changed. The statistics are inherent to how each corruption changes episode structure
+(length, release position), not defects to fix here. A method that beats the table on a type has learned something the cheap
+statistics do not capture; one that does not, has not. The PoC §4.5
 metric check (idle padding should move time-based metrics, gripper release reliability) needs per-metric attribution, which is a
 later feature; the labels already carry the hypothesis in `labels.parquet` (`hypothesis` column).
 
@@ -157,7 +178,7 @@ later feature; the labels already carry the hypothesis in `labels.parquet` (`hyp
 - **Altered viewpoint** is not injected (owner decision 2: it needs simulator re-rendering).
 - **Dropped frames, paused frames and detours reuse stored frames**, so they are exact duplicates or replays; the
   S5 heuristics find held and paused frames (duplicate detector) and swapped instructions (provenance cross-check) with
-  AUROC 1.0 (measured). A policy trained on them sees real frames.
+  AUROC 1.0 (measured). A policy trained on them sees real frames. Length (H7) and the release position (H8) find `detour` / `idle_padding` / `time_shift` and `gripper_release` at 0.85-0.96 (measured, round 3).
 
 ## Expected totals (inferred)
 

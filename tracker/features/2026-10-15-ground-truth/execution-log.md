@@ -349,3 +349,8 @@ Plan r3 (`c1768bb`), analysis-r2 feedback to the executor. Steps: (1) H7/H8, (2)
 - ✅ AC3.2, AC3.3, AC3.5: unchanged results (oracle and oracle-chain subsets refused; diff guard in both orders; catalog columns documented and `check_blind(scratch child) = []`).
 - ✅ AC3.4: the AST scan now covers `vlapoc/method_data.py`, `vlapoc/methods/__init__.py` and `vlapoc/methods/heuristics.py` (with H7 and H8): 0 violations; all six planted violations are still detected.
 - Real store: this script only reads it; `mlflow.db` stays `306af4123fda7e63`.
+
+### R3 step 3: runbook detectability paragraph and GT-R6
+**Files:** `artifacts/server-runbook.md` (GT-R6 and the limitation line in "What cannot be shown here").
+- GT-R6 now states the comparison rule of plan AC5.9: compare per type against that type's best heuristic, not against chance; the table to beat (type, best of H1-H8, AUROC): `action_noise` H4 1.000, `dropped_frames` H5 1.000, `idle_padding` H2 1.000, `instruction_swap` H6 1.000, `gripper_release` H8 0.964, `detour` H7 0.960, `time_shift` H7 shortest-first 0.848; pooled recall is not comparable (best single heuristic 0.335). It says the earlier "no heuristic finds `gripper_release` / `time_shift`" statement was an artifact of H1-H6 lacking task normalisation, and records the limitation as owner-approved under ruling A (with B and C).
+- ✅ AC6.6 still holds (v3 in every GT-R command; known-issue section unchanged).
