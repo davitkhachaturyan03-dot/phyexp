@@ -107,14 +107,14 @@ def main() -> int:
         from vlapoc.runs import scratch_lineage_copy, train_run
 
         lr = scratch_lineage_copy(base / "lineage")
-        v2 = resolve_version(V, lr)
+        ver = resolve_version(V, lr)
         lab = load_answer_key(V, lr)
         ve = version_episodes(V, lr)
         one_each = [g.sort_values("episode_id")["episode_id"].iloc[0] for _, g in lab.groupby("corruption_type")]
         clean = [e for e in cand2.episode_ids if e not in set(lab["episode_id"])]
         clean = list(ve[ve["episode_id"].isin(clean)].drop_duplicates("task_name").sort_values("episode_index")["episode_id"][:7])
         ids = one_each + clean
-        sub = Subset(v2["dataset_version_id"], tuple(ids), {"op": "gt_smoke_subset", "groundtruth": True,
+        sub = Subset(ver["dataset_version_id"], tuple(ids), {"op": "gt_smoke_subset", "groundtruth": True,
                                                             "note": "one labelled episode of each type + 7 clean candidates, built label-side"})
         sub.save(lr)
         types_in = sorted(lab.set_index("episode_id").loc[[i for i in ids if i in set(lab["episode_id"])], "corruption_type"])
@@ -134,7 +134,7 @@ def main() -> int:
         import mlflow
         mlflow.set_tracking_uri(f"sqlite:///{lr / 'mlflow.db'}")
         run = mlflow.tracking.MlflowClient().get_run(res["run_id"])
-        root = REPO_ROOT / v2["lerobot_root"]
+        root = REPO_ROOT / ver["lerobot_root"]
         expect = subset_stats(root, sub.resolve(lr))
         full = json.loads((root / "meta" / "stats.json").read_text())
         files = _ckpt_files(REPO_ROOT / run.data.tags["checkpoint.path"])
