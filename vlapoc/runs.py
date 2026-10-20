@@ -46,8 +46,9 @@ follows: ``build``/``split``/``derive`` are the data preparation before Step 1, 
 ``train`` is the implicit training run between Steps 1 and 2 (dataflow.md, "Training is never
 numbered"), ``eval`` is Step 2, ``returns`` (``vlapoc.returns``) is Step 3's input and ``attribute`` Step 3
 itself, and ``select`` plus the retraining is Step 4, whose gate is ``verify`` (``vlapoc.verdict``).
-``screen`` and ``attribute`` are stand-ins until their features exist; ``eval``, ``returns`` and ``verify``
-are real (evaluation layer). The queries (``trace``, ``consumers``, ``diff``, ``check_scores``) read the
+``screen`` is a stand-in until its feature exists; ``eval``, ``returns`` and ``verify`` are real
+(evaluation layer), and ``attribute`` is real in ``vlapoc.attribution.attribute_run`` (gradient features
+from ``vlapoc.influence``); ``attribute_standin`` below is kept for the dry run. The queries (``trace``, ``consumers``, ``diff``, ``check_scores``) read the
 runs back.
 
 There is no CLI here; ``python -m vlapoc.lineage`` exposes ``build verify``, ``split make --track``,
@@ -88,7 +89,9 @@ from vlapoc.lineage import (  # noqa: E402
     _root,
     drop_group,
     drop_random_k,
+    drop_random_k_per_task,
     drop_top_k,
+    drop_top_k_per_task,
     make_splits,
     recompute_version_id,
     rel,
@@ -587,7 +590,8 @@ def attribute_standin(train_run_id: str, eval_run_id: str, name: str, out_dir: P
                       lineage_root: Path | None = None, chain: str | None = None) -> tuple[str, Path, str]:
     """Stage ``attribute`` stand-in (PoC §9.1 Step 3): an episode x metric table keyed by the training
     subset's (episode_id, content_hash). ``placeholder_score`` is a deterministic hash of the key, used
-    only to exercise drop-top-k downstream; it is not an influence estimate."""
+    only to exercise drop-top-k downstream; it is not an influence estimate. The real stage is
+    ``vlapoc.attribution.attribute_run``."""
     c = client(lineage_root)
     tr, ev = c.get_run(train_run_id), c.get_run(eval_run_id)
     subset = Subset.load(tr.data.tags["subset_id"], lineage_root)
@@ -770,13 +774,13 @@ def eval_run(policy: str, tasks: list[tuple[str, int]], n_init: int, name: str, 
 # ---------------------------------------------------------------------------------------------
 
 
-SELECT_OPS = ("drop_top_k", "drop_random_k", "drop_group")
+SELECT_OPS = ("drop_top_k", "drop_random_k", "drop_group", "drop_top_k_per_task", "drop_random_k_per_task")
 
 
 def select_run(parent: str, name: str, op: str, k: int | None = None, seed: int | None = None,
                score_path: Path | None = None, metric: str | None = None, score_run_id: str | None = None,
                direction: str = "highest", column: str | None = None, value=None,
-               lineage_root: Path | None = None, chain: str | None = None) -> tuple[str, Subset]:
+               lineage_root: Path | None = None, chain: str | None = None, allow_dirty: bool = False) -> tuple[str, Subset]:
     """Stage ``select``: derive a child subset from ``parent`` and record how, as one MLflow run.
 
     Ops (all children are selections recorded in the lineage store, never data rewrites):
@@ -791,6 +795,9 @@ def select_run(parent: str, name: str, op: str, k: int | None = None, seed: int 
     - ``drop_group`` (§2.1 item 5 p.3; §10 p.20 "Group-level leave-one-out ablations"): drop every
       episode whose catalog ``column == value`` (``task_name`` for leave-one-task-out; see
       ``vlapoc.lineage.drop_group``).
+    - ``drop_top_k_per_task`` / ``drop_random_k_per_task`` (attribution feature): the same two ops with ``k``
+      episodes dropped from *every* (suite, libero_task_id), so a curated subset and its random control keep
+      identical per-task counts (``vlapoc.lineage.drop_top_k_per_task``). ``k`` is per task here.
 
     Returns ``(run_id, child Subset)``. The ``select.dropped`` tag holds the dropped ids as JSON cut
     at 7,900 characters (a prefix for large drops); the child's ``derivation["dropped"]`` is the full
@@ -801,17 +808,18 @@ def select_run(parent: str, name: str, op: str, k: int | None = None, seed: int 
     if op == "drop_top_k" and direction not in ("highest", "lowest"):
         raise ValueError("direction must be 'highest' or 'lowest'")
     ps = Subset.load(parent, lineage_root)
-    with stage_run("select", name, lineage_root, chain=chain) as r:
+    with stage_run("select", name, lineage_root, chain=chain, allow_dirty=allow_dirty) as r:
         r.input_subset(ps, "parent", parent if "/" in parent else None)
-        if op == "drop_top_k":
+        if op in ("drop_top_k", "drop_top_k_per_task"):
             table = pd.read_parquet(score_path)
-            child = drop_top_k(ps, table, metric, k, direction, score_source=f"mlflow run {score_run_id}",
-                               lineage_root=lineage_root)
+            fn = drop_top_k if op == "drop_top_k" else drop_top_k_per_task
+            child = fn(ps, table, metric, k, direction, score_source=f"mlflow run {score_run_id}", lineage_root=lineage_root)
             r.input_entity("score_table", child.derivation["score_table_digest"], "scores")
             r.params({"op": op, "k": k, "metric": metric, "direction": direction, "score_run_id": score_run_id})
-        elif op == "drop_random_k":
-            child = drop_random_k(ps, k, seed, lineage_root=lineage_root)
-            r.params({"op": op, "k": k, "seed": seed, "subset_size": len(ps.episode_ids) - k})
+        elif op in ("drop_random_k", "drop_random_k_per_task"):
+            fn = drop_random_k if op == "drop_random_k" else drop_random_k_per_task
+            child = fn(ps, k, seed, lineage_root=lineage_root)
+            r.params({"op": op, "k": k, "seed": seed, "subset_size": len(child.episode_ids)})
         else:
             child = drop_group(ps, column, value, lineage_root=lineage_root)
             r.params({"op": op, "column": column, "value": child.derivation["value"],

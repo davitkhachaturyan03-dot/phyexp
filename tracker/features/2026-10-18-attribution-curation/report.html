@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Attribution, curation and server training</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+</head>
+<body>
+<div class="wrap">
+<header class="doc">
+  <p class="eyebrow"><a href="../../index.html">Build Tracker</a> · 2026-10-18</p>
+  <h1>Attribution, curation and server training</h1>
+  <p class="dek">CUPID influence of every training episode on every family-W return, per-task curation
+  with matched random controls, and a SLURM chain of tracked stages. Ported from
+  <code>VLA-data-curation</code> into <code>vlapoc</code>. vla-build single pass — not an analyzer report.</p>
+</header>
+
+<h2>What now exists</h2>
+<p><code>vlapoc.influence</code> writes Kronecker-projected per-sample gradients of a SmolVLA checkpoint
+(117 trainable Linear layers, 7,488 dims, measured). <code>vlapoc.attribution.attribute_run</code> is the real
+<code>attribute</code> stage: it refuses a fenced training version, requires trajectories and matching
+feature manifests, and writes an episode × metric table keyed by <code>(episode_id, content_hash)</code>.
+<code>drop_top_k_per_task</code> / <code>drop_random_k_per_task</code> keep identical per-task counts.
+<code>scripts/server_pipeline.py --dry-run --tag v0cand</code> builds a 74-job chain
+(train → eval → returns → features → attribute → ensemble → select → retrain → eval → verify).</p>
+
+<h2>Measured</h2>
+<ul>
+  <li>Synthetic estimator = brute-force double sum, max rel err 6.2e-16 (16/16 checks). <code>artifacts/verify_synthetic.json</code></li>
+  <li>Ported <code>influence_matrix</code> reproduces the October <code>rollout_demo_influence.npy</code> (500 × 379), max rel err 3.2e-13. <code>artifacts/verify_regress_clean_full_s0.json</code></li>
+  <li>GPU: <code>featurize</code> through <code>checkpoint_policy</code> matches the cluster projector on the same 422 samples, draws and dtypes (min cos 0.9999999). Seeded draws: two calls in one process, max rel diff 0. <code>artifacts/verify_gpu_smoke_clean_full_s0.json</code></li>
+</ul>
+
+<h2>Recorded divergences</h2>
+<ul>
+  <li><b>Centred returns (inferred).</b> Ψ_R uses (R − R̄); <code>--no-center</code> is CUPID Prop. 1 literally.</li>
+  <li><b>Per-task drops (inferred).</b> A global top-k can empty one task; curated and random arms drop the same k from every (suite, libero_task_id).</li>
+  <li><b>Seeded (noise, time) draws.</b> The cluster code seeded only the noise. Two fresh processes drew different times, so its October feature files are not reproducible. Fixed here.</li>
+  <li><b>Eval-stage numerics.</b> <code>load_checkpoint</code> upcasts 225 of 500 parameters to fp32; LeRobot <code>from_pretrained</code> keeps the file's bf16. Features differ by median 13.5% (min cos 0.857) if dtypes are not matched. Featurize keeps the eval loader on purpose.</li>
+  <li><b>smolvla_base revision.</b> Runbook AC8.5 pins <code>d9f33c94…</code>; the cluster cache is <code>5e8d12a6…</code>.</li>
+</ul>
+
+<h2>Not ported</h2>
+<p>The cluster's rollouts, evaluate, metrics, catalog and corrupt modules. This repo already has
+<code>vlapoc.rollouts</code>, <code>returns</code>, <code>verdict</code>, <code>catalog</code>, <code>lineage</code> and <code>derive</code>.</p>
+
+<h2>Still needed to run the chain</h2>
+<p>Copy v0, the lineage store, human reference and LIBERO assets onto the server (runbook §0). Download
+<code>lerobot/smolvla_base@d9f33c94…</code> into <code>data/hf_models/smolvla_base</code>. Then
+<code>python scripts/server_pipeline.py --tag v0cand</code>.</p>
+
+<p><a href="brief.md">brief</a> · <a href="plan.md">plan</a> · <a href="execution-log.md">execution log</a> · <a href="changelog.md">changelog</a></p>
+</div>
+</body>
+</html>
