@@ -108,6 +108,12 @@ attribution", "Metric-resolved attribution" and "Verification & demo". Defining 
   - **Every other gap is in scope and must be fixed:** code, logic, PoC compliance, blindness, key contracts,
     declared functionals, curation rules, lineage, tests on synthetic data, CPU/MPS smoke checks, the SLURM chain's
     `--dry-run`, config and documentation.
+- **2026-10-20, BLOCKING Q1 (curation unit): "Both, per-task headline (Rec.)".** S4 builds per-task and global
+  top-k (`--curation both`). Per-task is the reported headline; global top-k is the PoC §9.1 Step 4 literal
+  version, reported alongside. Recorded as owner-approved. (It roughly doubles the server's retraining arms later;
+  the owner accepted that.)
+- **Non-blocking default kept:** CUPID's label-free `square` output gradient becomes the default (S2). The report
+  must flag that this changes what the next server run computes.
 
 ## Owner rulings
 
