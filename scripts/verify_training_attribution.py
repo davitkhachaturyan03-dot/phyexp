@@ -900,7 +900,7 @@ def names() -> int:
         results.append((name, bool(ok), detail))
         print(f"[{'PASS' if ok else 'FAIL'}] {name}{'  ' + detail if detail else ''}")
 
-    g = subprocess.run(["git", "grep", "-n", "-E", "/raid|/auto/home", "--", "slurm", "scripts", "vlapoc"], cwd=REPO_ROOT, capture_output=True, text=True)
+    g = subprocess.run(["git", "grep", "-n", "-E", "/ra" "id|/auto/" "home", "--", "slurm", "scripts", "vlapoc"], cwd=REPO_ROOT, capture_output=True, text=True)
     check("6.1 git grep for /raid and /auto/home in slurm, scripts, vlapoc finds nothing", g.stdout.strip() == "", g.stdout.strip()[:200] or "no matches")
     files = sorted(glob.glob(str(REPO_ROOT / "slurm" / "*.sh")) + glob.glob(str(REPO_ROOT / "slurm" / "*.sbatch")))
     bad = [f for f in files if subprocess.run(["bash", "-n", f]).returncode != 0]
