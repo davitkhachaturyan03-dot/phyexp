@@ -326,3 +326,58 @@ be kept as if they were results.
 
 **Notes / divergences:** recall@k uses k = number injected per type (13), as in the ground-truth feature. `recovery_run` skips (and names)
 harm columns containing NaN, since `check_score_keys` refuses NaN scores.
+
+### S6: Make the chain testable and portable (`--lineage-root`, chain-scoped names, site config, scratch dirs)
+**Files:** `scripts/stage.py` (global `--lineage-root` and `--latest`; `run_id(ref, stage, chain_prefix, latest, lineage_root)`;
+`chain_prefix_of`; every tracked-stage call passes `lineage_root=LR`), `slurm/site.env.example` (new, tracked),
+`docs/site-profile-cluster.env` (new: the owner's cluster values, kept as a documented profile), `slurm/env.sh` (sources
+`site.env`, fails naming `site.env.example`), `slurm/gpu.sbatch`/`cpu.sbatch` (no absolute path, no `#SBATCH --partition/--output`),
+`scripts/server_pipeline.py` (`load_site`, `--site`, `--partition` override, `--output=<LOG_DIR>/...` and `--partition=<PARTITION>`
+on every sbatch, the dry run prints the full sbatch argv), `.gitignore` (`slurm/site.env`), `scripts/verify_attribution.py` (cluster
+paths became `--old-python/--old-src/--old-hf-home`, temp dirs under `data/scratch/`), `scripts/verify_training_attribution.py`
+(`--names`).
+
+**Premises checked:** "`#SBATCH --output` cannot expand variables" → true of sbatch (directive lines are not shell-expanded; inferred
+from the sbatch manual, not re-read here), so the pipeline passes the flags on the command line. "`env.sh` can read the site file when
+run inside a spooled sbatch script" → the pipeline exports `PHYEXP_DIR` (already did), so `env.sh` does not rely on its own location;
+`SITE_ENV` is exported when `--site` is given.
+
+**Acceptance criteria** (`.venv/bin/python scripts/verify_training_attribution.py --names`, 12/12):
+- ✅ AC6.1 `git grep -n -E '/raid|/auto/home' -- slurm scripts vlapoc` → no output (rc=1), also checked inside the verifier.
+- ✅ AC6.2 `bash -n` passes on the 4 slurm files; `env.sh` without a site file: `rc=2: [env.sh] missing .../does_not_exist.env: copy
+  slurm/site.env.example to slurm/site.env and edit it ...` (run in a subshell).
+- ✅ AC6.3 scratch store with `train-t-s0` in chains `t-aaaa1111`, `u-bbbb2222`, `t-cccc3333`: scope `u-` → the `u-bbbb2222` run;
+  scope `t-` raises `2 FINISHED train runs named 'train-t-s0' in chains ['t-aaaa1111', 't-cccc3333']; pass --latest ...`; `--latest` →
+  the `t-cccc3333` run; with no chain (hand use) the most recent wins as before.
+- ✅ AC6.4 (first half) static: global `--lineage-root`; no `client()` without it in `stage.py`; every tracked-stage call
+  (`train_run … summary_run`) passes `lineage_root`. The second half, the whole chain on a scratch store, is S8.
+- ✅ AC6.5 the dry run prints 59 sbatch lines (per_task, 1 seed), each with `--partition=gpu` and
+  `--output=/path/to/scratch/phyexp/logs/%x-%j.out` (`%x-%A_%a.out` for array jobs), the values of `site.env.example`.
+- ✅ AC6.6 `TMPDIR` set to an empty dir under `data/scratch/`: `verify_attribution.py` → `pass: True (29/29)`, directory still empty,
+  `tempfile.TemporaryDirectory()` without `dir=` no longer in the file.
+- ✅ real `mlflow.db` sha256 unchanged.
+
+**Notes:** the dry run now needs a site file; without `slurm/site.env` it falls back to `site.env.example` (dry run only), a real
+submission exits with an instruction. The owner's cluster values are `docs/site-profile-cluster.env` (documented, outside the
+grep scope on purpose: the AC asks for no cluster path in code).
+
+#### Owner-visible cost of the Step 4 chain (inferred; flags that shrink it)
+Counts are measured from `server_pipeline.py --tag t --dry-run <flags>` (jobs, and train jobs = base trains + one train per arm and
+seed). GPU-hours use the only figure in the repo, runbook §AC8.5: "≈ 4 h per seed on one A100 (quoted, LeRobot SmolVLA docs, 20k
+steps); unmeasured on our server". Eval, feature and attribute GPU time are **not derivable** from anything recorded, so they are not
+included; training alone is a lower bound.
+
+| Configuration | Arms | Jobs | Train jobs | Training GPU-h (4 h each, inferred) |
+|---|---|---|---|---|
+| Branch before S4 (6 arms: 3 harm, 2 random, AC7.5 gate; 3 seeds) | 6 | 74 | 21 | about 84 |
+| **Default now** (`--curation both`, 4 metrics, 3 seeds, 2 random draws, AC7.5) | 21 | **312** | **66** | about 264 |
+| `--curation per_task` | 11 | 171 | 36 | about 144 |
+| `--curation per_task --metrics f30 hrt60_lin` (keeps the §4.5 head-to-head) | 7 | 111 | 24 | about 96 |
+| the same with `--seeds 0 1` | 7 | 75 | 16 | about 64 |
+| the same with `--seeds 0 1 --random-draws 1 --no-ac75` | 5 | 55 | 12 | about 48 |
+| `--curation per_task --metrics f30 rmst60 auc_expected --no-ac75` (the old metric set plus help arms) | 8 | 129 | 27 | about 108 |
+
+Flags that shrink it: `--curation per_task|global` (halves the arms), `--metrics` (each metric adds a harm and a help arm per mode),
+`--seeds` (the PoC §2.3 allows 2–3), `--random-draws`, `--no-ac75`, `--k-per-task` (each value multiplies arms); `--from select` reuses a
+finished base. The 63-versus-18 retrain count comes from `--curation both` (owner Q1), the help arms (PoC §9.1 Step 4.5) and
+`hrt60_lin` (non-blocking default N3).

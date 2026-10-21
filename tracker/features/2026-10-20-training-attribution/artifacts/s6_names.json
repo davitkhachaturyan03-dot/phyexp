@@ -1,0 +1,65 @@
+{
+ "pass": true,
+ "checks": [
+  {
+   "name": "6.1 no machine-specific cluster path (the two cluster roots) is left in slurm, scripts or vlapoc",
+   "pass": true,
+   "detail": "no matches"
+  },
+  {
+   "name": "6.2 bash -n passes on every slurm/*.sh and *.sbatch",
+   "pass": true,
+   "detail": "4 files"
+  },
+  {
+   "name": "6.2b env.sh without a site.env exits non-zero with a message naming site.env.example",
+   "pass": true,
+   "detail": "rc=2: [env.sh] missing /Users/davit_khachaturyan/Projects/personal/vlaExp/data/scratch/training_attribution/does_not_exist.env: copy slurm/site.en"
+  },
+  {
+   "name": "6.3 run_id with a chain prefix returns the run of that chain only",
+   "pass": true,
+   "detail": "u- scope -> 3e44c553 (u-bbbb2222 is 3e44c553)"
+  },
+  {
+   "name": "6.3b two runs of one name in scope (t-aaaa1111, t-cccc3333) raise without --latest",
+   "pass": true,
+   "detail": "2 FINISHED train runs named 'train-t-s0' in chains ['t-aaaa1111', 't-cccc3333']; pass --latest to take the most recent, or use a r"
+  },
+  {
+   "name": "6.3c ... and --latest takes the most recent of them",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "6.3d without a chain (hand use) the most recent run of the name wins, as before",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "6.3e chain prefixes derive from chain ids",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "6.4 stage.py has a global --lineage-root; no client() call without it; every tracked-stage call passes lineage_root=LR",
+   "pass": true,
+   "detail": "bare client(): []; calls missing lineage_root: []. The whole chain on a scratch store is S8 (--integration)"
+  },
+  {
+   "name": "6.5 the dry run prints the full sbatch argv with --partition=<PARTITION> and --output=<LOG_DIR>/... from site.env.example",
+   "pass": true,
+   "detail": "59 sbatch lines; e.g. sbatch --parsable --job-name=train-t-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch"
+  },
+  {
+   "name": "6.6 verify_attribution.py with TMPDIR set to an empty dir under data/scratch leaves it empty, and uses explicit dir=",
+   "pass": true,
+   "detail": "rc 0, entries left in TMPDIR: []; ['pass: True (29/29)']"
+  },
+  {
+   "name": "R7 real mlflow.db sha256 unchanged",
+   "pass": true,
+   "detail": "306af4123fda7e63... == 306af4123fda7e63..."
+  }
+ ]
+}
