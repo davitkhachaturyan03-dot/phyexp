@@ -20,6 +20,8 @@ Stages (docs/dataflow.md; PoC §9.1 pp. 18-19):
 - ``returns``  AC6.7: ``vlapoc.returns.returns_run``.
 - ``features`` Step 3 input: ``vlapoc.influence.featurize`` of the train run's checkpoint on its training subset
                (``--which train``) or on an eval run's recorded trajectories (``--which rollouts``), one shard.
+               ``--preset cupid`` (default: ℓ_square on both sides, CUPID App. A.1), ``athena`` (loss / square) or
+               ``branch`` (loss / loss, the pre-S2 behaviour); the output function is stored in the manifest.
 - ``attribute``/``ensemble``  Step 3: ``vlapoc.attribution.attribute_run`` / ``ensemble_run``.
 - ``select``   Step 4: ``vlapoc.runs.select_run`` (per-task ops by default). A later ``train --subset
                select:<select run name>`` trains on the child subset that run produced.
@@ -57,6 +59,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from vlapoc.libero_convert import REPO_ROOT  # noqa: E402
 
 PRETRAINED_DIR = REPO_ROOT / "data" / "hf_models" / "smolvla_base"
+# (train-side, rollout-side) output functions per preset: CUPID App. A.1 (square/square, the default), ATHENA App. A.1
+# Eq. 14-15 p. 14 for flow-matching VLAs (loss on the training side, square on rollouts), and the branch's earlier
+# behaviour (loss/loss). Training-attribution S2.
+FEATURE_PRESETS = {"cupid": ("square", "square"), "athena": ("loss", "square"), "branch": ("loss", "loss")}
 PRETRAINED_REF = "lerobot/smolvla_base@d9f33c94a60fb382c90dea2164c96845bd955e28"  # runbook AC8.5
 FEATS_ROOT = REPO_ROOT / "data" / "attribution" / "feats"
 
@@ -159,9 +165,10 @@ def cmd_features(a) -> dict:
         episodes = None
     si, sn = (int(x) for x in a.shard.split("/"))
     stride = a.stride if a.stride is not None else (a.train_stride if a.which == "train" else a.rollout_stride)
+    output_fn = a.output_fn or FEATURE_PRESETS[a.preset][0 if a.which == "train" else 1]
     m = featurize(ckpt, root, feats_prefix(tid, a.which, eid), episodes, a.rank, a.k_draws, stride, a.batch_size,
-                  a.workers, (si, sn), a.seed, a.device)
-    return {k: m[k] for k in ("checkpoint_sha256", "dataset_root", "stride", "shard", "n_samples", "dim")}
+                  a.workers, (si, sn), a.seed, a.device, output_fn=output_fn)
+    return {k: m[k] for k in ("checkpoint_sha256", "dataset_root", "stride", "shard", "n_samples", "dim", "output_fn")}
 
 
 def cmd_attribute(a) -> dict:
@@ -170,7 +177,7 @@ def cmd_attribute(a) -> dict:
     tid, eid = run_id(a.train, "train"), run_id(a.eval, "eval")
     out = attribute_run(tid, eid, run_id(a.returns, "returns"), feats_prefix(tid, "train"),
                         feats_prefix(tid, "rollouts", eid), a.name, damping=a.damping, center=not a.no_center,
-                        device=a.device, chain=a.chain)
+                        device=a.device, chain=a.chain, return_encoding="pm1" if a.cupid_returns else "raw")
     return {k: v for k, v in out.items() if k != "agreement"}
 
 
@@ -244,6 +251,10 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--stride", type=int, default=None)
     s.add_argument("--train-stride", type=int, default=2)
     s.add_argument("--rollout-stride", type=int, default=4)
+    s.add_argument("--preset", choices=sorted(FEATURE_PRESETS), default="cupid",
+                   help="output functions (train side, rollout side): cupid = square/square (default), "
+                        "athena = loss/square, branch = loss/loss")
+    s.add_argument("--output-fn", choices=["loss", "square"], default=None, help="override the preset for this call")
     s.add_argument("--rank", type=int, default=8)
     s.add_argument("--k-draws", type=int, default=4)
     s.add_argument("--seed", type=int, default=0)
@@ -256,6 +267,7 @@ def main(argv: list[str] | None = None) -> int:
         s.add_argument(k, required=True)
     s.add_argument("--damping", type=float, default=1e-3)
     s.add_argument("--no-center", action="store_true")
+    s.add_argument("--cupid-returns", action="store_true", help="CUPID's R = ±1 (uncentred) for the binary return columns")
     s.add_argument("--device", default=None)
 
     s = sub.add_parser("ensemble")

@@ -1,0 +1,150 @@
+{
+ "pass": true,
+ "checks": [
+  {
+   "name": "1 influence_matrix == brute-force double sum (2 shards each)",
+   "pass": true,
+   "detail": "max rel err 7.42e-16"
+  },
+  {
+   "name": "1b the brute-force H, its inverse and both matrices are finite (the matmul warnings hide no overflow)",
+   "pass": true,
+   "detail": "cond(H) = 2.0"
+  },
+  {
+   "name": "2a center=False is Prop. 1: (1/m) \u03a3 R M",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "2b centred = raw \u2212 R\u0304\u00b7mean_\u03c4 M",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "2c constant return scores 0 when centred",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "3a infl_f30__same_task equals the per-task computation",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "3b harm = \u2212sign\u00b7infl (f30 +1, censored60 \u22121, ft_* \u22121)",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "3c failure-type columns: types with >= 5 rollouts only",
+   "pass": true,
+   "detail": "['infl_ft_timeout']"
+  },
+  {
+   "name": "3d agreement gives Kendall \u03c4 per pair",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "4a zscore_ensemble: affine-rescaled seed averages to the same z",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "4b zscore_ensemble refuses misaligned keys",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "5a drop_top_k_per_task drops k from every task",
+   "pass": true,
+   "detail": "[4, 4, 4, 4, 4, 4]"
+  },
+  {
+   "name": "5b ... and they are each task's 2 highest (ties by episode_id)",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "5c random control: same seed same subset, other seed differs",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "5d curated and random children hold identical per-task counts",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "5e refuses a stale score table",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "5e refuses a k that empties a task",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "6a toy module: 'square' features == brute-force projected per-sample gradient (masked, K=2, B=5)",
+   "pass": true,
+   "detail": "max per-sample rel err 8.58e-08, dim 18 = 2 layers x 3\u00b2"
+  },
+  {
+   "name": "6b square_objective == the definition (mean of v\u00b2 over valid steps x action dims)",
+   "pass": true,
+   "detail": "max abs diff 0.0e+00"
+  },
+  {
+   "name": "6a toy module: 'loss' features == brute-force projected per-sample gradient (masked, K=2, B=5)",
+   "pass": true,
+   "detail": "max per-sample rel err 1.18e-07, dim 18 = 2 layers x 3\u00b2"
+  },
+  {
+   "name": "6c OutputCapture raises when the captured module ran twice (premise P1 guard)",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "7a CUPID parity: performance_influence(M, \u00b11, center=False)\u00b7m == compute_demo_quality_scores(.., 'net') (vendored 2941eba9)",
+   "pass": true,
+   "detail": "max abs err 2.84e-14"
+  },
+  {
+   "name": "7c ... but at p = 0.3 the two rankings differ (counterexample)",
+   "pass": true,
+   "detail": "p=0.3, identity err 3.6e-15, Kendall tau 0.667"
+  },
+  {
+   "name": "7b centring algebra and p = 1/2: centred = p(1-p)\u00b7m\u00b7(ms-mf), net = m\u00b7[p\u00b7ms-(1-p)\u00b7mf], same ranking",
+   "pass": true,
+   "detail": "p=0.5, identity err 2.7e-15, Kendall tau 1.000"
+  },
+  {
+   "name": "7d refuses pm1 with centring",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "7d refuses pm1 on a non-binary return",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "8a check_compatible accepts one output function per side (incl. ATHENA loss/square, legacy manifests = loss)",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "8b check_compatible refuses shards that mix train-side output functions",
+   "pass": true,
+   "detail": "manifest list 0: shards mix output functions ['loss', 'square']"
+  },
+  {
+   "name": "8c DIVERGENCES names every departure listed in the plan",
+   "pass": true,
+   "detail": ""
+  }
+ ]
+}

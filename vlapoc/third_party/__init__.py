@@ -13,4 +13,10 @@
     Greenwood variance, KM median, RMST, KS distance, and the episode-clustered pooled-resample
     bootstrap for (macro-)KS. ``vlapoc.evaluation`` builds on it. Do not edit it: changes go into
     ``vlapoc.evaluation``, so this copy can always be re-checked against upstream with sha256.
+
+``cupid_quality.py``
+    ``sum_of_sum_influence`` and ``compute_demo_quality_scores`` from https://github.com/agiachris/cupid at commit
+    ``2941eba9427a3398d3cbe26b10c01e3ece56bd18`` (``diffusion_policy/common/error_util.py``), function bodies verbatim.
+    Copyright (c) 2025 Christopher Agia, MIT License, full text in ``LICENSE-cupid``. It is only the parity reference
+    for ``vlapoc.attribution.performance_influence`` (training-attribution S2); no pipeline code imports it.
 """

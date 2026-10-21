@@ -26,13 +26,26 @@ The estimator, and how this implementation evaluates it
 M[τ, ξ] = (Σ_{j∈τ} φ_j)ᵀ H⁻¹ (Σ_{i∈ξ} φ_i), one Cholesky solve for all pairs. Then for a return column R,
 Ψ_R(ξ) = (1/m) Σ_τ (R(τ) − R̄) M[τ, ξ].
 
-Two choices, both recorded in every run's params:
-- **Centred returns (divergence from Prop. 1's raw R; inferred).** Subtracting R̄ removes the part of every episode's
-  score that is the same for all rollouts (the influence on the average rollout), so a metric's scores rank
-  episodes by how they move that metric, not by how much they move the policy at all. For a binary return it is
-  CUPID's success-minus-failure contrast scaled by p(1−p). ``center=False`` gives Prop. 1 literally.
-- **1/H.** CUPID divides by the horizon H; a rollout's sum over its own steps is kept (``rollout_mean=False``), since
-  family-W returns are already whole-rollout quantities and long timeouts are exactly the rollouts that matter.
+What is CUPID's (training-attribution S2; each line checked against the paper or the released code):
+- **Sum over steps, no 1/H.** CUPID's Prop. 1 divides by the horizon H only "from the assumption that all
+  trajectories have equal length" (§5.1 p. 5, footnote); the variable-length case, §D.2 p. 27 Prop. 2, is
+  Ψ_π-inf(ξ) = E_τ[R(τ) Σ_{(s',a')∈τ} Σ_{(s,a)∈ξ} Ψ_a-inf] with no 1/H. A rollout's sum over its own steps
+  (``rollout_mean=False``) is therefore CUPID's own variable-length form, not a departure from it.
+- **The output function** is ℓ_square = E‖v_θ‖² on both sides by default (``vlapoc.influence`` docstring), with H the
+  Gauss-Newton matrix of the training-side features (Eq. 9; ΦᵀΦ/N is its 1/(|D|H) normalisation).
+- ``performance_influence(M, 2·r01 − 1, center=False) · m`` equals CUPID's released
+  ``compute_demo_quality_scores(sum_of_sum, success_mask, "net")`` (AC2.2, against the vendored copy).
+
+What differs (``DIVERGENCES`` below, logged in every run's params), notably:
+- **Centred returns (inferred baseline subtraction; not CUPID's).** CUPID uses R = ±1 with no centring (App. A.2 p. 19;
+  code ``net`` = Σ_succ M − Σ_fail M). With p the success fraction over m rollouts and ms, mf the mean of M over
+  successful and failed rollouts: centred Σ(R−R̄)M = p(1−p)·m·(ms − mf), whereas CUPID's net = m·[p·ms − (1−p)·mf]
+  = m·[p(ms − mf) + (2p − 1)·mf]. The two rank episodes alike only when p = ½ or mf is constant across episodes;
+  otherwise net also ranks by how much an episode moves the average *failed* rollout (AC2.3 demonstrates a
+  counterexample). The earlier statement that centring "is CUPID's contrast scaled by p(1−p)" holds for a difference
+  of *means*; CUPID's code takes a difference of *sums*. ``return_encoding="pm1"`` (``--cupid-returns``) gives CUPID's
+  encoding for the binary returns.
+- Fewer draws, a Kronecker projection, damping and sample strides (see ``DIVERGENCES``).
 
 Sign convention: Ψ_R(ξ) > 0 means episode ξ pushes return R up. Every family-W return is "higher is better" except
 ``ret_censored60`` (1 = timed out) and the per-failure-type indicators, where positive means harmful
@@ -73,7 +86,34 @@ RETURN_COLUMNS = return_columns("W")  # ret_f30, ret_auc_expected, ret_auc_sampl
 GOOD_SIGN = {**{c: 1.0 for c in RETURN_COLUMNS}, "ret_censored60": -1.0}  # +1: higher return is better
 TASK_KEY = ("suite", "libero_task_id")
 DEFAULT_OUT = REPO_ROOT / "data" / "attribution"
-MIN_FAILURE_TYPE_ROLLOUTS = 5  # a failure type needs this many rollouts to get its own return column
+MIN_FAILURE_TYPE_ROLLOUTS = 5  # inferred (not from CUPID or the PoC): a failure type needs this many rollouts to get its own column
+RETURN_ENCODINGS = ("raw", "pm1")  # pm1: binary returns {0,1} -> {-1,+1}, uncentred (CUPID App. A.2 p. 19)
+
+# Every remaining departure from CUPID (Agia et al. 2025, docs/papers/CUPID_Influence_Functions_arXiv-2506.19121.pdf,
+# and the released code agiachris/cupid @ 2941eba9). Logged as a run param by ``attribute_run`` so each score table
+# carries its own list of caveats (PoC §3.4 p. 7: say which functional a result explains).
+DIVERGENCES = {
+    "centred_returns": "ours: Ψ uses R − mean(R) by default (inferred baseline subtraction); CUPID: R = ±1, no centring "
+                       "(App. A.2 p. 19; error_util.compute_demo_quality_scores 'net' = Σ_succ M − Σ_fail M). centred = "
+                       "p(1−p)·m·(ms − mf) vs net = m·[p·ms − (1−p)·mf]; same ranking only at p = ½ (module docstring). "
+                       "--cupid-returns / return_encoding='pm1' gives CUPID's.",
+    "continuous_returns": "ours: one return per PoC metric, mostly continuous (RMST, AUC, HRT), per §4.3 p. 10; CUPID: binary "
+                          "success/failure only. pm1 applies to binary columns only; the rest stay raw.",
+    "draws": "ours: K = 4 shared (noise, time) draws averaged into each feature; CUPID: B = 64 (ε, i) samples (App. A.2 p. 19).",
+    "projection": "ours: Kronecker per-layer projection, rank 8 per side, 7,488 dims over the trainable action-expert Linear "
+                  "layers (LoGra/ATHENA §4.1 route); CUPID: dense TRAK projection d = 4000 over all parameters "
+                  "(train_trak.sh proj_dim=4000).",
+    "damping": "ours: λ = 1e-3 × mean diag(ΦᵀΦ/N); CUPID: lambda_reg = 0.0 (train_trak.sh).",
+    "strides": "ours: train frames every 2nd, rollout frames every 4th (stage.py defaults, stored in the manifest); CUPID: "
+               "every sample.",
+    "numerics": "ours: features use vlapoc.runs.load_checkpoint's upcast-to-fp32 weights, the eval stage's numerics "
+                "(G3b: median 13.5% feature difference from LeRobot's bf16 loader, attribution-curation log).",
+    "model_family": "ours: SmolVLA flow matching (v_θ = action_out_proj); CUPID: diffusion-policy ε-prediction "
+                    "(modelout_functions.py 'square' = pred² on ε_θ). ATHENA Eq. 14-15 p. 14 gives the flow-matching form.",
+    "failure_type_returns": "ours: 1[failure_type = t] over all rollouts, only types with ≥ MIN_FAILURE_TYPE_ROLLOUTS (inferred "
+                            "threshold); PoC §9.1 Step 3 says 'only rollouts with a specific failure type', which is the "
+                            "__same_task-style subset of rollouts, not an indicator return.",
+}
 
 
 # ---------------------------------------------------------------------------------------------
@@ -99,11 +139,26 @@ def load_features(prefix: Path) -> tuple[list[np.ndarray], dict, list[dict]]:
     n = [m["shard"][1] for m in manifests]
     if len(set(n)) != 1 or n[0] != len(stems):
         raise ValueError(f"{prefix}: found {len(stems)} shard files, manifests say {sorted(set(n))}")
+    output_fn_of(manifests, str(prefix))
     return feats, meta, manifests
 
 
+def output_fn_of(manifests: list[dict], where: str = "feature set") -> str:
+    """The one output function of a set of shard manifests (``"loss"`` for a v1 manifest without the key);
+    ``ValueError`` if the shards mix two (CUPID's Eq. 9 Hessian is the Gauss-Newton matrix of *one* output function)."""
+    fns = {m.get("output_fn", "loss") for m in manifests}
+    if len(fns) != 1:
+        raise ValueError(f"{where}: shards mix output functions {sorted(fns)}")
+    return fns.pop()
+
+
 def check_compatible(*manifest_lists: list[dict]) -> dict:
-    """Raise unless every manifest shares checkpoint, projection seed, rank, K and layer list; return the shared part."""
+    """Raise unless every manifest shares checkpoint, projection seed, rank, K and layer list, and each list (one
+    side: train, or rollouts) uses a single output function; return the shared part plus ``output_fns`` (one per list).
+
+    The train side and the rollout side may use different output functions (ATHENA's ``loss``/``square``), but within
+    a side the Hessian must come from one (training-attribution S2).
+    """
     keys = ("checkpoint_sha256", "seed", "rank", "k_draws", "dim", "layers")
     first = manifest_lists[0][0]
     for ms in manifest_lists:
@@ -111,7 +166,8 @@ def check_compatible(*manifest_lists: list[dict]) -> dict:
             bad = [k for k in keys if m[k] != first[k]]
             if bad:
                 raise ValueError(f"feature manifests disagree on {bad} ({m['dataset_root']} vs {first['dataset_root']})")
-    return {k: first[k] for k in keys if k != "layers"} | {"n_layers": len(first["layers"])}
+    fns = [output_fn_of(ms, f"manifest list {i}") for i, ms in enumerate(manifest_lists)]
+    return {k: first[k] for k in keys if k != "layers"} | {"n_layers": len(first["layers"]), "output_fns": fns}
 
 
 def _torch_device(device: str | None):
@@ -175,8 +231,42 @@ def influence_matrix(train_feats: list[np.ndarray], train_groups: np.ndarray, n_
 # ---------------------------------------------------------------------------------------------
 
 
-def performance_influence(m: np.ndarray, r: np.ndarray, mask: np.ndarray | None = None, center: bool = True) -> np.ndarray:
-    """Ψ_R(ξ) = (1/m) Σ_τ (R(τ) − R̄) M[τ, ξ] over the rollouts in ``mask`` (all by default); one value per column of M."""
+def is_binary(r: np.ndarray) -> bool:
+    """True if every value of ``r`` is 0 or 1 (a success/failure or failure-type indicator return)."""
+    return bool(np.isin(np.unique(r), (0.0, 1.0)).all())
+
+
+def column_plan(returns: dict[str, np.ndarray], center: bool = True, return_encoding: str = "raw") -> dict[str, dict]:
+    """Per return column: the ``encoding`` actually applied (``raw`` or ``pm1``) and whether it is ``centred``.
+
+    ``pm1`` (CUPID's R ∈ {+1, −1}, uncentred) applies to binary columns; every other column stays raw and is centred
+    iff ``center``. Used by ``score_table`` and by ``column_declarations`` so the declared and the applied agree.
+    """
+    if return_encoding not in RETURN_ENCODINGS:
+        raise ValueError(f"return_encoding must be one of {RETURN_ENCODINGS}, got {return_encoding!r}")
+    out = {}
+    for name, r in returns.items():
+        enc = "pm1" if return_encoding == "pm1" and is_binary(r) else "raw"
+        out[name] = {"encoding": enc, "centred": bool(center) and enc == "raw"}
+    return out
+
+
+def performance_influence(m: np.ndarray, r: np.ndarray, mask: np.ndarray | None = None, center: bool = True,
+                          return_encoding: str = "raw") -> np.ndarray:
+    """Ψ_R(ξ) = (1/m) Σ_τ (R(τ) − R̄) M[τ, ξ] over the rollouts in ``mask`` (all by default); one value per column of M.
+
+    ``return_encoding="pm1"`` is CUPID's R(τ) = +1 if the rollout succeeds and −1 otherwise (App. A.2 p. 19; Prop. 1
+    with raw R, no centring): ``r`` must be binary {0, 1} and ``center`` False (``ValueError`` otherwise). Then
+    ``Ψ · m`` is CUPID's ``compute_demo_quality_scores(sum_of_sum, success_mask, "net")`` (AC2.2).
+    """
+    if return_encoding not in RETURN_ENCODINGS:
+        raise ValueError(f"return_encoding must be one of {RETURN_ENCODINGS}, got {return_encoding!r}")
+    if return_encoding == "pm1":
+        if center:
+            raise ValueError("return_encoding='pm1' is CUPID's uncentred ±1 return; pass center=False")
+        if not is_binary(r):
+            raise ValueError("return_encoding='pm1' needs a binary {0, 1} return")
+        r = 2.0 * np.asarray(r, float) - 1.0
     if mask is not None:
         m, r = m[mask], r[mask]
     if len(r) == 0:
@@ -192,27 +282,31 @@ def failure_type_returns(ret: pd.DataFrame, min_rollouts: int = MIN_FAILURE_TYPE
             if t != "success" and counts[t] >= min_rollouts}
 
 
-def score_table(m: np.ndarray, episodes: pd.DataFrame, ret: pd.DataFrame, center: bool = True) -> pd.DataFrame:
+def score_table(m: np.ndarray, episodes: pd.DataFrame, ret: pd.DataFrame, center: bool = True,
+                return_encoding: str = "raw") -> pd.DataFrame:
     """The episode × metric table. ``episodes`` (rows of M's columns, in order) carries ``episode_id``,
     ``content_hash`` and the task key; ``ret`` (rows of M's rows, in order) is the returns table.
 
     Columns: ``infl_<ret col>`` over all rollouts and ``infl_<ret col>__same_task`` over rollouts of the episode's own
     task, for every family-W return and every per-failure-type return; ``harm_<...>`` = −GOOD_SIGN × infl (most
-    harmful = largest).
+    harmful = largest). ``return_encoding="pm1"`` applies CUPID's ±1 uncentred return to the binary columns
+    (``column_plan``); the others stay raw.
     """
     returns = {c: ret[c].to_numpy(float) for c in RETURN_COLUMNS}
     returns.update(failure_type_returns(ret))
+    plan = column_plan(returns, center, return_encoding)
     out = episodes[["episode_id", "content_hash", "episode_index", *TASK_KEY, "task_name"]].reset_index(drop=True).copy()
     task_of_rollout = list(zip(ret["suite"], ret["libero_task_id"].astype(int)))
     task_of_episode = list(zip(out["suite"], out["libero_task_id"].astype(int)))
     for name, r in returns.items():
         col = f"infl_{name.removeprefix('ret_')}"
-        out[col] = performance_influence(m, r, center=center)
+        enc, cen = plan[name]["encoding"], plan[name]["centred"]
+        out[col] = performance_influence(m, r, center=cen, return_encoding=enc)
         same = np.full(len(out), np.nan)
         for task in sorted(set(task_of_episode)):
             cols = np.array([t == task for t in task_of_episode])
             rows = np.array([t == task for t in task_of_rollout])
-            same[cols] = performance_influence(m[:, cols], r, rows, center=center)
+            same[cols] = performance_influence(m[:, cols], r, rows, center=cen, return_encoding=enc)
         out[f"{col}__same_task"] = same
     for col in [c for c in out.columns if c.startswith("infl_")]:
         base = col.removeprefix("infl_").split("__")[0]
@@ -273,7 +367,7 @@ def _artifact_table(run, tag: str, lineage_root: Path | None) -> pd.DataFrame:
 
 def attribute(train_feats_prefix: Path, rollout_feats_prefix: Path, episodes: pd.DataFrame, rollouts: pd.DataFrame,
               ret: pd.DataFrame, damping: float = 1e-3, center: bool = True, rollout_mean: bool = False,
-              device: str | None = None) -> tuple[pd.DataFrame, np.ndarray, dict]:
+              device: str | None = None, return_encoding: str = "raw") -> tuple[pd.DataFrame, np.ndarray, dict]:
     """The untracked core of ``attribute_run``: features + keys → (score table, M, shared feature manifest).
 
     ``episodes`` are the training subset's catalog rows; ``rollouts`` the eval run's record (``traj_episode_index``
@@ -302,7 +396,7 @@ def attribute(train_feats_prefix: Path, rollout_feats_prefix: Path, episodes: pd
     m = influence_matrix(tf, np.array([row_of_ep[int(e)] for e in tmeta["episode_index"]]), len(episodes),
                          rf, np.array([row_of_traj[int(e)] for e in rmeta["episode_index"]]), len(ro),
                          damping, rollout_mean, device)
-    table = score_table(m, episodes, ret, center)
+    table = score_table(m, episodes, ret, center, return_encoding)
     shared |= {"n_train_samples": int(len(tmeta["episode_index"])), "n_rollout_samples": int(len(rmeta["episode_index"])),
                "train_stride": tman[0]["stride"], "rollout_stride": rman[0]["stride"],
                "train_features": [m_["dataset_root"] for m_ in tman][:1], "rollout_features": [m_["dataset_root"] for m_ in rman][:1]}
@@ -312,7 +406,7 @@ def attribute(train_feats_prefix: Path, rollout_feats_prefix: Path, episodes: pd
 def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, train_features: Path, rollout_features: Path,
                   name: str, out_dir: Path | None = None, damping: float = 1e-3, center: bool = True,
                   rollout_mean: bool = False, device: str | None = None, lineage_root: Path | None = None,
-                  chain: str | None = None, allow_dirty: bool = False) -> dict:
+                  chain: str | None = None, allow_dirty: bool = False, return_encoding: str = "raw") -> dict:
     """Stage ``attribute`` (PoC §9.1 Step 3 p. 19): CUPID influence of every training episode version on every
     family-W return (and per-failure-type return) of one eval run, recorded as one MLflow run.
 
@@ -351,7 +445,7 @@ def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, trai
     rollouts, _ = load_eval_rollouts(eval_run_id, lineage_root, make_out_dir=False)
     ret = _artifact_table(rr, "returns", lineage_root)
     table, m, shared = attribute(train_features, rollout_features, episodes, rollouts, ret, damping, center,
-                                 rollout_mean, device)
+                                 rollout_mean, device, return_encoding)
     check_scores(table, train_run_id, lineage_root)
     cols = [f"infl_{c.removeprefix('ret_')}__same_task" for c in RETURN_COLUMNS]
     agree = agreement(table, cols)
@@ -369,7 +463,10 @@ def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, trai
         r.input_entity("returns", rr.data.tags["output.returns.sha256"], "returns")
         r.params({"method": "CUPID influence on returns (TRAK action influence, Kronecker-projected gradients)",
                   "train_run_id": train_run_id, "eval_run_id": eval_run_id, "returns_run_id": returns_run_id,
-                  "damping": damping, "center_returns": center, "rollout_mean": rollout_mean,
+                  "damping": damping, "center_returns": center, "return_encoding": return_encoding,
+                  "rollout_mean": rollout_mean,
+                  "train_output_fn": shared["output_fns"][0], "rollout_output_fn": shared["output_fns"][1],
+                  "divergences_from_cupid": DIVERGENCES, "min_failure_type_rollouts_inferred": MIN_FAILURE_TYPE_ROLLOUTS,
                   "return_columns": RETURN_COLUMNS, "good_sign": GOOD_SIGN,
                   "features": {k: v for k, v in shared.items() if k not in ("train_features", "rollout_features")},
                   "train_features": rel(Path(train_features)), "rollout_features": rel(Path(rollout_features)),
@@ -438,10 +535,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--name", required=True)
     p.add_argument("--damping", type=float, default=1e-3)
     p.add_argument("--no-center", action="store_true", help="CUPID Prop. 1 with raw returns")
+    p.add_argument("--cupid-returns", action="store_true",
+                   help="CUPID's R = ±1, uncentred, for the binary return columns (return_encoding='pm1')")
     p.add_argument("--device", default=None)
     a = p.parse_args(argv)
     out = attribute_run(a.train_run, a.eval_run, a.returns_run, a.train_features, a.rollout_features, a.name,
-                        damping=a.damping, center=not a.no_center, device=a.device)
+                        damping=a.damping, center=not a.no_center, device=a.device,
+                        return_encoding="pm1" if a.cupid_returns else "raw")
     print(json.dumps({k: v for k, v in out.items() if k != "agreement"}, indent=1))
     return 0
 

@@ -1,0 +1,94 @@
+{
+ "episodes": [
+  31,
+  41
+ ],
+ "n_samples": 13,
+ "seconds": {
+  "smoke_square_0": 307.3,
+  "smoke_loss_1": 301.0,
+  "smoke_square_2": 302.7
+ },
+ "cosine_square_vs_loss": [
+  0.8130162358283997,
+  0.9037233591079712,
+  0.8567667007446289,
+  0.9527938365936279,
+  0.882777214050293,
+  0.8656784296035767,
+  0.8726482391357422,
+  0.40199801325798035,
+  0.5948520302772522,
+  0.8713786005973816,
+  0.869606077671051,
+  0.8045086860656738,
+  0.8830852508544922
+ ],
+ "objective_square": [
+  1.697422742843628,
+  1.8002327680587769,
+  2.0347511768341064,
+  2.1237688064575195,
+  2.2640130519866943,
+  2.4952900409698486,
+  2.9065935611724854,
+  2.047647714614868,
+  1.743214726448059,
+  2.0483415126800537,
+  2.616861343383789,
+  2.2906806468963623,
+  2.252671003341675
+ ],
+ "objective_loss": [
+  2.371274709701538,
+  2.7726829051971436,
+  2.9599883556365967,
+  2.812286853790283,
+  3.1571662425994873,
+  3.9472203254699707,
+  4.508179664611816,
+  1.6576037406921387,
+  2.3897480964660645,
+  2.9763851165771484,
+  3.423330545425415,
+  3.2190020084381104,
+  2.7315797805786133
+ ],
+ "device": "mps",
+ "checkpoint": "data/runs/train-smolvla-2step-persubset-v0ref-20261005T012854Z/lerobot/checkpoints/000002/pretrained_model",
+ "dim": 7488,
+ "n_layers": 117,
+ "checks": [
+  {
+   "name": "S1 featurize(output_fn=square) writes features, dim 7,488 = 117 layers x 8\u00b2",
+   "pass": true,
+   "detail": "shape (13, 7488), n_layers 117, device mps"
+  },
+  {
+   "name": "S2 the manifest records the output function",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "S3 no NaN/inf in either feature set",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "S4 two square calls agree bit-for-bit (seeded draws)",
+   "pass": true,
+   "detail": "max abs diff 0.0e+00"
+  },
+  {
+   "name": "S5 square vs loss features of the same samples (how much the output function changes the gradient)",
+   "pass": true,
+   "detail": "cosine min 0.402 median 0.870 max 0.953 over 13 samples; norm ratio |square|/|loss| median 0.976"
+  },
+  {
+   "name": "S6 wall time recorded",
+   "pass": true,
+   "detail": "{'smoke_square_0': 307.3, 'smoke_loss_1': 301.0, 'smoke_square_2': 302.7} (s, incl. model load) for 13 samples on mps"
+  }
+ ],
+ "pass": true
+}

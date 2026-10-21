@@ -13,6 +13,17 @@ Default (CPU, seconds, no data needed):
    top-k are the k most harmful (ties by episode_id), the same seed reproduces the same subset, curated and random
    children have identical per-task counts, a stale score table and an emptying k are refused.
 
+6. (training-attribution S2, AC2.1) the ``square`` and ``loss`` output functions on a toy torch module: features from
+   ``influence.batch_features`` equal the brute-force per-sample gradient, projected with the same P_in/P_out; the
+   ``OutputCapture`` call-count guard (premise P1) raises when the captured module runs twice.
+7. (AC2.2, AC2.3) CUPID parity against the vendored released functions (``vlapoc/third_party/cupid_quality.py``,
+   commit 2941eba9) and the centring algebra with its counterexample.
+8. (AC2.5) ``check_compatible`` refuses shards that mix train-side output functions; ``return_encoding`` guards.
+
+``--cpu-smoke <pretrained_model> <dataset root> [--device mps|cpu]`` (AC2.4): ``featurize`` ≤ 2 episodes of ``v0/reference``
+on this Mac with ``output_fn=square`` and ``loss``: dimension, manifest, finite, bit-for-bit repeat, wall time, and the
+cosine between the two feature sets.
+
 ``--regress <old attribution dir> <old feats dir> <old rollouts dir>``: recompute M from the October
 VLA-data-curation features (``outputs/feats/<run>``) with this ``influence_matrix`` and compare with the
 ``rollout_demo_influence.npy`` that code wrote (same estimator, ported).
@@ -71,6 +82,10 @@ def synthetic_m() -> None:
             brute[rg[j], tg[i]] += psi[j] @ hinv @ phi[i]
     err = np.abs(m - brute).max() / np.abs(brute).max()
     check("1 influence_matrix == brute-force double sum (2 shards each)", err < 1e-9, f"max rel err {err:.2e}")
+    # plan P5: numpy matmul RuntimeWarnings were seen on this Mac while checks pass; make sure nothing is non-finite
+    check("1b the brute-force H, its inverse and both matrices are finite (the matmul warnings hide no overflow)",
+          bool(np.isfinite(h).all() and np.isfinite(hinv).all() and np.isfinite(m).all() and np.isfinite(brute).all()),
+          f"cond(H) = {np.linalg.cond(h):.1f}")
 
     r = rng.normal(size=n_ro)
     raw = at.performance_influence(m, r, center=False)
@@ -164,6 +179,181 @@ def synthetic_select() -> None:
                     check(f"5e refuses a {label}", True)
         finally:
             lin.resolve_version = orig
+
+
+def toy_output_functions() -> None:
+    """AC2.1: ``batch_features`` on a toy module vs brute-force per-sample gradients (both output functions)."""
+    import torch
+    from torch import nn
+
+    from vlapoc import influence as inf
+
+    torch.manual_seed(0)
+    b, t, din, dh, dout, act_dim, rank, k = 5, 4, 6, 10, 5, 4, 3, 2
+
+    class Toy(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.body = nn.Linear(din, dh)
+            self.action_out_proj = nn.Linear(dh, dout)
+
+        def forward(self, x):
+            return self.action_out_proj(torch.relu(self.body(x)))
+
+    model = Toy()
+    x = torch.randn(b, t, din)
+    target = torch.randn(b, t, dout)
+    pad = torch.zeros(b, t, dtype=torch.bool)
+    pad[1, 2:] = True
+    pad[3, 3] = True
+    draws = [(torch.randn(b, t, din), 0.5), (torch.randn(b, t, din), 0.7)][:k]
+    proj = inf.KroneckerProjector(model, rank, seed=0, device="cpu")
+    capture = inf.OutputCapture(model.action_out_proj)
+
+    def sample_obj(v, target, pad_row, fn):  # one sample, written out from the definition
+        valid = ~pad_row
+        nv = max(int(valid.sum()) * act_dim, 1)
+        e = (v - target) ** 2 if fn == "loss" else v**2
+        return (e[:, :act_dim] * valid[:, None]).sum() / nv
+
+    def forward(noise, _t):
+        v = model(x + noise)
+        return torch.stack([sample_obj(v[i], target[i], pad[i], "loss") for i in range(b)])
+
+    for fn in ("square", "loss"):
+        capture.reset()  # the brute-force reference below calls the module outside the measured pass, which also
+        proj.feats = {}  # fires the projector's backward hooks, so both are cleared before each measured pass
+        got, loss, obj = inf.batch_features(forward, lambda: model.zero_grad(set_to_none=True), proj, capture, draws, fn, b,
+                                            pad, act_dim)
+        want = torch.zeros_like(got)
+        for noise, _ in draws:
+            for i in range(b):
+                v = model(x[i:i + 1] + noise[i:i + 1])[0]
+                o = sample_obj(v, target[i], pad[i], fn)
+                gs = torch.autograd.grad(o, [m_.weight for _, m_ in proj.layers])
+                f = [(proj.p_out[n].T @ g @ proj.p_in[n]).flatten() for (n, _), g in zip(proj.layers, gs)]
+                want[i] += torch.cat(f) / len(draws)
+        rel = ((got - want).norm(dim=1) / want.norm(dim=1)).max().item()
+        check(f"6a toy module: '{fn}' features == brute-force projected per-sample gradient (masked, K=2, B=5)", rel < 1e-5,
+              f"max per-sample rel err {rel:.2e}, dim {got.shape[1]} = {len(proj.layers)} layers x {rank}²")
+        if fn == "square":
+            ref = torch.stack([sample_obj(model(x[i:i + 1] + draws[0][0][i:i + 1])[0], target[i], pad[i], "square")
+                               for i in range(b)])
+            direct = inf.square_objective(model(x + draws[0][0]), pad, act_dim)
+            check("6b square_objective == the definition (mean of v² over valid steps x action dims)",
+                  bool(torch.allclose(ref, direct, atol=1e-6)), f"max abs diff {(ref - direct).abs().max().item():.1e}")
+    capture.reset()
+    model.action_out_proj(torch.randn(1, 1, dh))
+    model.action_out_proj(torch.randn(1, 1, dh))
+    try:
+        capture.pop()
+        check("6c OutputCapture raises when the captured module ran twice (premise P1 guard)", False)
+    except RuntimeError as e:
+        check("6c OutputCapture raises when the captured module ran twice (premise P1 guard)", "2 times" in str(e))
+    proj.remove()
+    capture.remove()
+
+
+def cupid_parity() -> None:
+    """AC2.2 and AC2.3: ``performance_influence`` vs CUPID's released ``net`` score; the centring algebra."""
+    from scipy.stats import kendalltau
+
+    from vlapoc.third_party.cupid_quality import compute_demo_quality_scores, sum_of_sum_influence
+
+    rng = np.random.default_rng(7)
+    n_ro, n_ep, n_rs, n_ts = 11, 9, 60, 80
+    rg = np.concatenate([np.arange(n_ro), rng.integers(0, n_ro, n_rs - n_ro)])  # rollout row of each rollout sample
+    tg = np.concatenate([np.arange(n_ep), rng.integers(0, n_ep, n_ts - n_ep)])  # episode row of each train sample
+    pair = rng.normal(size=(n_rs, n_ts))  # Ψ_a-inf for every (rollout sample, train sample) pair
+    m_ours = np.zeros((n_ro, n_ep))
+    for i in range(n_rs):
+        np.add.at(m_ours[rg[i]], tg, pair[i])  # Σ over steps and training samples = "sum_of_sum"
+    succ = np.array([True, False, True, True, False, False, True, False, False, True, False])
+    traj = np.array([[sum_of_sum_influence(pair[np.ix_(rg == j, tg == e)], bool(succ[j])) for e in range(n_ep)]
+                     for j in range(n_ro)])
+    cupid = compute_demo_quality_scores(traj, succ, "net")
+    ours = at.performance_influence(m_ours, succ.astype(float), center=False, return_encoding="pm1") * n_ro
+    ours2 = at.performance_influence(m_ours, 2 * succ.astype(float) - 1, center=False) * n_ro
+    err = max(np.abs(ours - cupid).max(), np.abs(ours2 - cupid).max())
+    check("7a CUPID parity: performance_influence(M, ±1, center=False)·m == compute_demo_quality_scores(.., 'net') "
+          "(vendored 2941eba9)", err < 1e-9 and np.abs(m_ours - traj).max() < 1e-9, f"max abs err {err:.2e}")
+
+    m = rng.normal(size=(40, 25))
+    for p in (0.3, 0.5):
+        s = np.zeros(40)
+        s[: int(round(p * 40))] = 1
+        pp = s.mean()
+        ms, mf = m[s == 1].mean(0), m[s == 0].mean(0)
+        centred = at.performance_influence(m, s) * 40
+        net = at.performance_influence(m, s, center=False, return_encoding="pm1") * 40
+        id1 = np.abs(centred - pp * (1 - pp) * 40 * (ms - mf)).max()
+        id2 = np.abs(net - 40 * (pp * ms - (1 - pp) * mf)).max()
+        tau = kendalltau(centred, net).statistic
+        if p == 0.5:
+            check("7b centring algebra and p = 1/2: centred = p(1-p)·m·(ms-mf), net = m·[p·ms-(1-p)·mf], same ranking",
+                  id1 < 1e-9 and id2 < 1e-9 and abs(tau - 1) < 1e-12, f"p={pp}, identity err {max(id1, id2):.1e}, Kendall tau {tau:.3f}")
+        else:
+            check("7c ... but at p = 0.3 the two rankings differ (counterexample)", id1 < 1e-9 and id2 < 1e-9 and tau < 0.999,
+                  f"p={pp}, identity err {max(id1, id2):.1e}, Kendall tau {tau:.3f}")
+    for label, fn in (("pm1 with centring", lambda: at.performance_influence(m, np.ones(40), return_encoding="pm1")),
+                      ("pm1 on a non-binary return", lambda: at.performance_influence(m, np.linspace(0, 2, 40), center=False,
+                                                                                       return_encoding="pm1"))):
+        try:
+            fn()
+            check(f"7d refuses {label}", False)
+        except ValueError:
+            check(f"7d refuses {label}", True)
+
+
+def output_fn_guards() -> None:
+    """AC2.5 (part): manifests with mixed train-side output functions are refused; one side may differ from the other."""
+    base = {"checkpoint_sha256": "a", "seed": 0, "rank": 8, "k_draws": 4, "dim": 4, "layers": ["l"], "dataset_root": "d"}
+    sq, lo = [{**base, "output_fn": "square"}], [{**base, "output_fn": "loss"}]
+    ok = at.check_compatible(sq, sq)["output_fns"] == ["square", "square"]
+    ok &= at.check_compatible(lo, sq)["output_fns"] == ["loss", "square"]  # ATHENA's mixed form is allowed across sides
+    ok &= at.check_compatible([{**base}], sq)["output_fns"] == ["loss", "square"]  # a v1 manifest without the key means loss
+    check("8a check_compatible accepts one output function per side (incl. ATHENA loss/square, legacy manifests = loss)", ok)
+    try:
+        at.check_compatible(sq + lo, sq)
+        check("8b check_compatible refuses shards that mix train-side output functions", False)
+    except ValueError as e:
+        check("8b check_compatible refuses shards that mix train-side output functions", "mix output functions" in str(e), str(e)[:90])
+    check("8c DIVERGENCES names every departure listed in the plan",
+          {"centred_returns", "draws", "projection", "damping", "strides", "numerics"} <= set(at.DIVERGENCES))
+
+
+def cpu_smoke(ckpt: Path, root: Path, device: str, scratch: Path) -> None:
+    """AC2.4: ``featurize`` on the local SmolVLA checkpoint, ≤ 2 episodes of v0/reference, stride 20, both output functions."""
+    import time
+
+    from vlapoc import influence
+    from vlapoc.method_data import open_for_method
+
+    view = open_for_method("v0/reference")  # the smoke reads data through the method loader too
+    episodes = list(view.episode_indices)[:2]
+    scratch.mkdir(parents=True, exist_ok=True)
+    feats, secs = {}, {}
+    for fn in ("square", "loss", "square"):
+        prefix = scratch / f"smoke_{fn}_{len(feats)}"
+        t0 = time.time()
+        man = influence.featurize(ckpt, root, prefix, episodes=episodes, stride=20, batch_size=4, workers=0, device=device,
+                                  output_fn=fn)
+        secs[prefix.name] = round(time.time() - t0, 1)
+        feats[prefix.name] = (np.load(f"{prefix}.npy").astype(np.float32), man, np.load(f"{prefix}.meta.npz"))
+    (sq0, m0, meta0), (lo, m1, meta1), (sq1, m2, _) = feats.values()
+    check("S1 featurize(output_fn=square) writes features, dim 7,488 = 117 layers x 8²", sq0.shape[1] == 7488 and m0["dim"] == 7488,
+          f"shape {sq0.shape}, n_layers {m0['n_layers']}, device {device}")
+    check("S2 the manifest records the output function", m0["output_fn"] == "square" and m1["output_fn"] == "loss")
+    check("S3 no NaN/inf in either feature set", bool(np.isfinite(sq0).all() and np.isfinite(lo).all()))
+    check("S4 two square calls agree bit-for-bit (seeded draws)", bool(np.array_equal(sq0, sq1)),
+          f"max abs diff {np.abs(sq0 - sq1).max():.1e}")
+    cos = (sq0 * lo).sum(1) / (np.linalg.norm(sq0, axis=1) * np.linalg.norm(lo, axis=1))
+    check("S5 square vs loss features of the same samples (how much the output function changes the gradient)", True,
+          f"cosine min {cos.min():.3f} median {np.median(cos):.3f} max {cos.max():.3f} over {len(cos)} samples; "
+          f"norm ratio |square|/|loss| median {np.median(np.linalg.norm(sq0, axis=1) / np.linalg.norm(lo, axis=1)):.3g}")
+    check("S6 wall time recorded", True, f"{secs} (s, incl. model load) for {len(cos)} samples on {device}")
+    print(json.dumps({"episodes": episodes, "n_samples": int(len(cos)), "seconds": secs, "cosine_square_vs_loss": cos.tolist(),
+                      "objective_square": meta0["objective"].tolist(), "objective_loss": meta1["objective"].tolist()}, indent=1))
 
 
 def regress(attr_dir: Path, feats_dir: Path, rollouts_dir: Path) -> None:
@@ -300,6 +490,8 @@ def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--regress", nargs=3, type=Path, metavar=("ATTR_DIR", "FEATS_DIR", "ROLLOUTS_DIR"))
     p.add_argument("--gpu-smoke", nargs=3, type=Path, metavar=("CKPT", "DATASET_ROOT", "OLD_TRAIN_PREFIX"))
+    p.add_argument("--cpu-smoke", nargs=2, type=Path, metavar=("CKPT", "DATASET_ROOT"), help="AC2.4 (S2)")
+    p.add_argument("--device", default="cpu", help="device for --cpu-smoke (mps or cpu)")
     p.add_argument("--episodes", type=int, nargs="+", default=[0, 1, 2])
     p.add_argument("--scratch", type=Path, default=Path("data/scratch/verify_attribution"))
     p.add_argument("--out", type=Path, default=None, help="write the results JSON here")
@@ -308,10 +500,15 @@ def main() -> int:
         regress(*a.regress)
     elif a.gpu_smoke:
         gpu_smoke(*a.gpu_smoke, a.episodes, a.scratch)
+    elif a.cpu_smoke:
+        cpu_smoke(*a.cpu_smoke, a.device, a.scratch)
     else:
         synthetic_m()
         synthetic_table()
         synthetic_select()
+        toy_output_functions()
+        cupid_parity()
+        output_fn_guards()
     ok = all(r[1] for r in RESULTS)
     if a.out:
         a.out.parent.mkdir(parents=True, exist_ok=True)
