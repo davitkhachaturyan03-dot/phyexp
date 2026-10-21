@@ -1278,6 +1278,85 @@ def integration() -> int:
     return 0 if ok_all else 1
 
 
+def local_smoke(device: str, train_ref: str = "0a33bc75bb71433ca2def5220014dde0") -> int:
+    """S8(b), AC8.3: the chain on real objects at toy scale, on this Mac: the tracked SmolVLA train run ``train_ref`` (2 steps on
+    v0/reference, checkpoint on disk), a smoke eval (1 task x 2 init states, trajectories recorded), returns, features (one sample per
+    training episode, a few per rollout), attribute and select, all through ``stage.py --lineage-root`` on a scratch copy of the store.
+    NOT attribution-grade: a 2-step checkpoint, 2 rollouts, 1 sample per episode. The first failing stage is recorded verbatim."""
+    import subprocess
+
+    from vlapoc.runs import scratch_lineage_copy
+
+    t0 = time.time()
+    sha0 = db_sha()
+    dirty = subprocess.run(["git", "status", "--porcelain", "--", "vlapoc", "scripts"], cwd=REPO_ROOT, capture_output=True, text=True).stdout.strip()
+    if dirty:
+        print(f"commit first: the stage CLI refuses a dirty tree:\n{dirty}")
+        return 2
+    shutil.rmtree(SCRATCH / "smoke", ignore_errors=True)
+    base = SCRATCH / "smoke"
+    base.mkdir(parents=True)
+    CH, T = "ts-smoke0", "ts-smoke"
+    lr = scratch_lineage_copy(base / "lineage")
+    feats = base / "feats"
+    log: list[dict] = []
+    outs: dict = {}
+    failed = None
+    steps = [
+        ("eval", ["eval", "--train", train_ref, "--name", f"eval-{T}", "--smoke", "--tasks", "libero_spatial:0", "--n", "2", "--batch-size", "2", "--device", device]),
+        ("returns", ["returns", "--eval", f"eval-{T}", "--name", f"returns-{T}"]),
+        ("features-train", ["features", "--train", train_ref, "--which", "train", "--train-stride", "100000", "--batch-size", "8", "--workers", "0", "--device", device]),
+        ("features-rollouts", ["features", "--train", train_ref, "--which", "rollouts", "--eval", f"eval-{T}", "--rollout-stride", "150", "--batch-size", "8", "--workers", "0", "--device", device]),
+        ("attribute", ["attribute", "--train", train_ref, "--eval", f"eval-{T}", "--returns", f"returns-{T}", "--name", f"attribute-{T}", "--device", "cpu"]),
+        ("select", ["select", "--parent", "v0/reference", "--name", f"select-{T}", "--op", "drop_top_k", "--k", "2", "--metric", "harm_f30", "--scores", f"attribute-{T}", "--pipeline-curation", "global"]),
+    ]
+    try:
+        for name, args in steps:
+            t1 = time.time()
+            try:
+                outs[name] = stage_cli(args, lr, feats, CH)
+                log.append({"stage": name, "ok": True, "seconds": round(time.time() - t1, 1), "output": {k: v for k, v in outs[name].items() if k != "agreement"}})
+                print(f"[ok] {name} {time.time() - t1:.0f}s {json.dumps(log[-1]['output'])[:300]}", flush=True)
+            except Exception as e:  # noqa: BLE001
+                failed = {"stage": name, "error": str(e)[-1800:]}
+                log.append({"stage": name, "ok": False, "seconds": round(time.time() - t1, 1), "error": str(e)[-1800:]})
+                print(f"[FAILED] {name}: {str(e)[-1200:]}", flush=True)
+                break
+        report: dict = {"label": "smoke (not attribution-grade): 2-step SmolVLA checkpoint, 2 rollouts, 1 train sample per episode", "device": device,
+                        "train_run": train_ref, "stages": log, "failed": failed}
+        if failed is None:
+            import numpy as np
+
+            from vlapoc import attribution as at
+            from vlapoc.runs import client
+
+            c = client(lr)
+            att = c.get_run(outs["attribute"]["run_id"])
+            tab = at._artifact_table(att, "attribution_scores", lr)
+            agree = json.loads((REPO_ROOT / "data" / "attribution" / f"attribute-{T}" / "agreement.json").read_text())
+            fin = tab[[c_ for c_ in tab.columns if c_.startswith("harm_") and "__" not in c_]]
+            sel = c.get_run(outs["select"]["run_id"])
+            prm = att.data.params
+            report |= {"n_rollouts": outs["attribute"]["n_rollouts"], "n_episodes": outs["attribute"]["n_episodes"], "score_table_shape": list(tab.shape),
+                       "tau_agreement": {k: v for k, v in agree.items()}, "all_finite_harm_columns": bool(np.isfinite(fin.to_numpy()).all()),
+                       "train_output_fn": prm["train_output_fn"], "rollout_output_fn": prm["rollout_output_fn"],
+                       "feature_files_recorded": int(prm["n_feature_files"]), "select_declared_functional": json.loads(sel.data.params["metric_declaration"])["functional"],
+                       "select_child_episodes": outs["select"]["n_episodes"]}
+            print(f"smoke (not attribution-grade): n_rollouts {report['n_rollouts']}, n_episodes {report['n_episodes']}, score table {report['score_table_shape']}, "
+                  f"finite harm columns {report['all_finite_harm_columns']}, tau agreement pairs {len(agree)} (values: {[round(v['tau'], 3) if v['tau'] == v['tau'] else None for v in agree.values()][:4]} ... n per pair {[v['n'] for v in agree.values()][:4]})")
+        report["mlflow_db_sha256_before"], report["mlflow_db_sha256_after"] = sha0, db_sha()
+        report["seconds"] = round(time.time() - t0)
+        ARTIFACTS.mkdir(parents=True, exist_ok=True)
+        (ARTIFACTS / "s8_local_smoke.json").write_text(json.dumps(report, indent=1, default=str))
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+        for d in (REPO_ROOT / "data" / "eval" / f"eval-{T}", REPO_ROOT / "data" / "attribution" / f"attribute-{T}", REPO_ROOT / "data" / "eval" / f"returns-{T}"):
+            shutil.rmtree(d, ignore_errors=True)
+    unchanged = db_sha() == sha0
+    print(f"real mlflow.db unchanged: {unchanged}; failed: {failed['stage'] if failed else None} ({time.time() - t0:.0f}s)")
+    return 0 if (failed is None and unchanged) else 1
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--blind", action="store_true", help="S1")
@@ -1288,6 +1367,8 @@ def main() -> int:
     ap.add_argument("--names", action="store_true", help="S6 AC6.1-6.6: site config, chain-scoped names, no /tmp")
     ap.add_argument("--groups", action="store_true", help="S7 AC7.1-7.4: four groups, aggregation, figures (SYNTHETIC)")
     ap.add_argument("--integration", action="store_true", help="S8(a): the chain through stage.py on a scratch store (SYNTHETIC data; clean tree)")
+    ap.add_argument("--local-smoke", action="store_true", help="S8(b): real SmolVLA checkpoint, toy-scale chain on this Mac (needs --device)")
+    ap.add_argument("--device", default="mps")
     ap.add_argument("--step4", action="store_true", help="S4 AC4.4-4.5: step4-summary on synthetic verdicts, select arm counts")
     ap.add_argument("--manifest", type=Path, default=None, help="S3 AC3.2: a manifest written by influence.featurize")
     a = ap.parse_args()
@@ -1307,6 +1388,8 @@ def main() -> int:
         return groups()
     if a.integration:
         return integration()
+    if a.local_smoke:
+        return local_smoke(a.device)
     ap.print_help()
     return 2
 
