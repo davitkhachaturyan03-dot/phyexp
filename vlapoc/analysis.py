@@ -133,9 +133,9 @@ def plot_heatmap(table: pd.DataFrame, columns: list[str], groups: pd.Series, dec
     bounds = np.cumsum([sum(groups.iloc[i] == g for i in range(len(table))) for g in GROUPS])
     for b in bounds[:-1]:
         ax.axhline(b - 0.5, color="black", lw=0.6)
-    for g, lo, hi in zip(GROUPS, np.r_[0, bounds[:-1]], bounds):
-        if hi > lo:
-            ax.text(len(columns) - 0.45, (lo + hi) / 2, g.replace("_", " "), va="center", fontsize=6)
+    spans = [(g, lo, hi) for g, lo, hi in zip(GROUPS, np.r_[0, bounds[:-1]], bounds) if hi > lo]
+    ax.set_yticks([(lo + hi - 1) / 2 for _, lo, hi in spans])
+    ax.set_yticklabels([f"{g.replace('_', ' ')} (n={hi - lo})" for g, lo, hi in spans], fontsize=7)
     fig.colorbar(im, ax=ax, label="z-scored harm score (positive = harmful)")
     ax.set_title(txt["title"], fontsize=8)
     fig.tight_layout()

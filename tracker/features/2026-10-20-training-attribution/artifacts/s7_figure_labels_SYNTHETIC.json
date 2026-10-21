@@ -1,0 +1,17 @@
+{
+ "heatmap": {
+  "title": "SYNTHETIC DATA — not a result about any policy\nEpisode x metric attribution heatmap (PoC §4.2, §4.5)\ngroup labels: descriptive, unverified",
+  "xticklabels": [
+   "harm_f30: F(30) = P(T <= 30 s) [τ 30 s, all, good_sign +1]",
+   "harm_rmst60: RMST(60) = ∫_0^60 (1 - F(t)) dt [τ 60 s = τ_episode, all, good_sign +1]",
+   "harm_auc_expected: AUC_h = P(T < T_h) + ½ P(T = T_h) (Mann-Whitney; ties ½ because model and human share the 20 Hz grid) [τ none (humans all < 60 s), all, good_sign +1]",
+   "harm_hrt60_lin: HRT(60) = (1/J) Σ_o RMST_h,o(60) / RMST_m,o(60) [τ 60 s, all, good_sign +1]",
+   "harm_censored60: 1 - F(60) (no ghosts on LIBERO) [τ 60 s = τ_episode, all, good_sign -1]"
+  ]
+ },
+ "tradeoff": {
+  "title": "SYNTHETIC DATA — not a result about any policy\nThroughput vs reliability influence, positive = harmful (PoC §4.5)\ngroup labels: descriptive, unverified",
+  "xlabel": "harm_rmst60: RMST(60) = ∫_0^60 (1 - F(t)) dt [τ 60 s = τ_episode, all, good_sign +1]\n(throughput)",
+  "ylabel": "harm_f30: F(30) = P(T <= 30 s) [τ 30 s, all, good_sign +1]\n(reliability)"
+ }
+}

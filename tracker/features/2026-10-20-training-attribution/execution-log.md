@@ -381,3 +381,34 @@ Flags that shrink it: `--curation per_task|global` (halves the arms), `--metrics
 `--seeds` (the PoC §2.3 allows 2–3), `--random-draws`, `--no-ac75`, `--k-per-task` (each value multiplies arms); `--from select` reuses a
 finished base. The 63-versus-18 retrain count comes from `--curation both` (owner Q1), the help arms (PoC §9.1 Step 4.5) and
 `hrt60_lin` (non-blocking default N3).
+
+### S7: Metric-resolved outputs (four groups, heatmap, throughput-vs-reliability scatter, aggregation by catalog column)
+**Files:** `vlapoc/analysis.py` (new, method side: `metric_groups`, `aggregate_by`, `plot_heatmap`, `plot_tradeoff`, `axis_label`,
+`heatmap_text`/`tradeoff_text`, `analyze_run`), `scripts/stage.py` (`analyze`), `scripts/server_pipeline.py` (an `analyze` job after the
+ensemble), `scripts/verify_training_attribution.py` (`--groups`).
+
+**Divergences / decisions:**
+- The plan placed `metric_groups`, `aggregate_by` and the plots in `attribution.py`; they live in `vlapoc/analysis.py` instead, so the
+  estimator module stays about estimation (same grounding, same boundary scan).
+- Group labels are **descriptive and unverified** (PoC §4.4 asks for Holm before calling an episode a trade-off; per-episode tests are not
+  available from 2-3 seeds). The threshold |z| >= 1 is an **inferred**, declared parameter. Both are in the analyze run's params and on
+  every figure title; the verified claim stays at intervention level (`vlapoc.step4`).
+- The analyze run is recorded under stage `summarize`; its outputs include `figure_labels.json` (the exact titles and axis labels drawn).
+- Adding the `analyze` job makes the default dry run 313 jobs (S4 and S6 logged 312 before it existed).
+
+**Acceptance criteria** (`.venv/bin/python scripts/verify_training_attribution.py --groups`; SYNTHETIC inputs, 9/9):
+- ✅ AC7.1 planted table (240 episodes, 5 per group): `20/20 planted correct; counts {'neutral': 220, 'consistent_helper': 5,
+  'consistent_harmer': 5, 'trade_off': 5, 'metric_specific': 5}`; the 220 noise episodes are all neutral.
+- ✅ AC7.2 `aggregate_by(task_name)`: 6 rows, n sums to 240, each mean inside its bootstrap CI; refuses `not_a_column` and
+  `episode_id`.
+- ✅ AC7.3 heatmap and scatter PNGs written (55-99 kB); the axis labels name the declared functional and τ, e.g. `harm_rmst60: RMST(60) =
+  ∫_0^60 (1 - F(t)) dt [τ 60 s = τ_episode, all, good_sign +1]` and `harm_f30: F(30) = P(T <= 30 s) [τ 30 s, all, good_sign +1]`; both titles
+  start `SYNTHETIC DATA — not a result about any policy`. Run on a fixture attribute run on a scratch store.
+- ✅ AC7.4 analyze run params: `group_z_threshold 1.0`, `group_status descriptive, unverified ...`, `score_run_id` = the attribute run,
+  `synthetic True`.
+- ✅ boundary scan clean on `vlapoc/analysis.py`; real `mlflow.db` sha256 unchanged.
+
+**Demo artifacts (all labelled SYNTHETIC):** `artifacts/s7_heatmap_planted_SYNTHETIC.png`, `artifacts/s7_tradeoff_planted_SYNTHETIC.png` (planted
+240-episode table; viewed after rendering: legend and group labels do not overlap the data), `artifacts/s7_heatmap_SYNTHETIC.png`,
+`artifacts/s7_tradeoff_SYNTHETIC.png` (15-episode fixture run through the stage), `artifacts/s7_figure_labels_SYNTHETIC.json`,
+`artifacts/s7_groups.json`.

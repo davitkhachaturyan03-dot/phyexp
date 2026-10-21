@@ -1,0 +1,51 @@
+{
+ "SYNTHETIC": true,
+ "pass": true,
+ "checks": [
+  {
+   "name": "7.1 every planted helper, harmer, trade-off and metric-specific episode gets its label (4/4 groups, 20/20 episodes)",
+   "pass": true,
+   "detail": "20/20 planted correct; counts {'neutral': 220, 'consistent_helper': 5, 'consistent_harmer': 5, 'trade_off': 5, 'metric_specific': 5}"
+  },
+  {
+   "name": "7.1b the unplanted noise episodes are neutral",
+   "pass": true,
+   "detail": "220/220"
+  },
+  {
+   "name": "7.2 aggregate_by(task_name): one row per task, n sums to the table's rows, mean inside its CI",
+   "pass": true,
+   "detail": "6 rows, n sum 240"
+  },
+  {
+   "name": "7.2b aggregate_by refuses a non-catalog column and a per-episode identifier",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "7.3 the heatmap and scatter PNGs are written",
+   "pass": true,
+   "detail": "{'tradeoff.png': 54457, 'heatmap.png': 100759}"
+  },
+  {
+   "name": "7.3b each axis label names the column's functional and \u03c4 from functionals.json, and the titles say SYNTHETIC",
+   "pass": true,
+   "detail": "x: harm_rmst60: RMST(60) = \u222b_0^60 (1 - F(t)) dt [\u03c4 60 s = \u03c4_episode, all, good_sign +1] | y: harm_f30: F(30) = P(T <= 30 s) [\u03c4 30 s, all, good_sign +1]"
+  },
+  {
+   "name": "7.4 the analyze run's params carry the group threshold and the descriptive-unverified status, and link the score run",
+   "pass": true,
+   "detail": "z=1.0, counts {\"consistent_harmer\": 5, \"consistent_helper\": 3, \"metric_specific\": 4, \"neutral\": 2, \"trade_off\": 1}"
+  },
+  {
+   "name": "7.5 the group module passes the ground-truth boundary scan (no groundtruth import, no label files)",
+   "pass": true,
+   "detail": "violations []"
+  },
+  {
+   "name": "R7 real mlflow.db sha256 unchanged",
+   "pass": true,
+   "detail": "306af4123fda7e63... == 306af4123fda7e63..."
+  }
+ ]
+}
