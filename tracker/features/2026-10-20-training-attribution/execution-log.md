@@ -269,3 +269,15 @@ it explains; **SYNTHETIC** fixture data, labelled in the file), `artifacts/s3_en
   verdict exists (harm removed: treated better; help removed: treated worse; HRT arm wins hrt60, F30 arm wins f30).
 - The headline flag is set only on per-task arms and only when `--curation both`; with a single mode nothing is flagged.
 - `docs/dataflow.md` was not changed (no stage was added to the diagram; `summarize` is bookkeeping after Step 4).
+
+### Batch 1 regression run (after S4's commit, clean tree)
+`verify_runs_s5.py --r2` rc=0 (3 s), `verify_verdict_s7.py` rc=0 (1 s), `verify_lineage_s3.py` rc=0 (66 s),
+`verify_consumers_s6.py` rc=0 (30 s), `verify_method_boundary_s3.py` rc=0 (40 s), `verify_blind_s0.py` rc=0 (31 s). Also
+`verify_attribution.py` 29/29 and the S1/S3/S4 verifiers above. Real `data/lineage/mlflow.db` sha256 `306af4123fda7e63…` unchanged.
+Tracked artifacts these verifiers rewrote, diffed and restored with `git checkout` (not committed):
+- `2026-09-28-data-lineage-layer/artifacts/s5_r2_summary.json`, `2026-10-01-evaluation-layer/artifacts/s0_verify_blind.json`,
+  `2026-10-15-ground-truth/artifacts/s6_v3_verify.json`: only run ids and timings differ.
+- `2026-09-28-data-lineage-layer/artifacts/s3_summary.json`: **structural** difference (new keys such as `isolated_cache_gb`,
+  `AC3.8`, `files_scanned` 15 -> 193, a `names` block removed). Not caused by this batch: `verify_lineage_s3.py` was last
+  changed by earlier features (`84e166a`, `91f0902`), the planner measured the same rewrite before any change here
+  (plan risk P4), and the script exits 0. The tracked file is stale relative to its own verifier; restored, not committed.
