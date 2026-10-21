@@ -832,6 +832,9 @@ def select_run(parent: str, name: str, op: str, k: int | None = None, seed: int 
             fn = drop_top_k if op == "drop_top_k" else drop_top_k_per_task
             child = fn(ps, table, metric, k, direction, score_source=f"mlflow run {score_run_id}", lineage_root=lineage_root)
             r.input_entity("score_table", child.derivation["score_table_digest"], "scores")
+            src = client(lineage_root).get_run(score_run_id).data.tags.get("output.attribution_scores.sha256") if score_run_id else None
+            if src:  # the score run's own output entity, so ``trace`` follows the ranking back to the attribute / ensemble run
+                r.input_entity("score_table", src, "score_run_table")
             r.params({"op": op, "k": k, "metric": metric, "direction": direction, "score_run_id": score_run_id,
                       "metric_declaration": decl if decl is not None else "undeclared"})
         elif op in ("drop_random_k", "drop_random_k_per_task"):

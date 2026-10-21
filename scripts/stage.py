@@ -71,7 +71,7 @@ PRETRAINED_DIR = REPO_ROOT / "data" / "hf_models" / "smolvla_base"
 # behaviour (loss/loss). Training-attribution S2.
 FEATURE_PRESETS = {"cupid": ("square", "square"), "athena": ("loss", "square"), "branch": ("loss", "loss")}
 PRETRAINED_REF = "lerobot/smolvla_base@d9f33c94a60fb382c90dea2164c96845bd955e28"  # runbook AC8.5
-FEATS_ROOT = REPO_ROOT / "data" / "attribution" / "feats"
+FEATS_ROOT = REPO_ROOT / "data" / "attribution" / "feats"  # ``--feats-root`` overrides (tests use a scratch directory)
 
 
 # Per-invocation context set by ``main`` from the global options: the lineage store every call reads and writes
@@ -123,7 +123,7 @@ def run_name(run: str) -> str:
 
 def feats_prefix(train_rid: str, which: str, eval_rid: str | None = None) -> Path:
     """``data/attribution/feats/<train run name>/train`` or ``.../rollouts-<eval run name>``."""
-    base = FEATS_ROOT / run_name(train_rid)
+    base = Path(FEATS_ROOT) / run_name(train_rid)
     return base / "train" if which == "train" else base / f"rollouts-{run_name(eval_rid)}"
 
 
@@ -293,6 +293,7 @@ def main(argv: list[str] | None = None) -> int:
                    "resolved only among runs of chains starting with its <tag>-")
     p.add_argument("--lineage-root", type=Path, default=None,
                    help="a lineage store other than data/lineage (e.g. runs.scratch_lineage_copy, for tests); every stage reads and writes it")
+    p.add_argument("--feats-root", type=Path, default=None, help="where feature files live (default data/attribution/feats)")
     p.add_argument("--latest", action="store_true", help="when two FINISHED runs in the chain scope share a name, take the most recent")
     sub = p.add_subparsers(dest="cmd", required=True)
 
@@ -396,8 +397,10 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--chain-id", default=None, help="full chain id <tag>-<sha8> if the tag matches several chains")
 
     a = p.parse_args(argv)
-    global LR, CHAIN_PREFIX, LATEST
+    global LR, CHAIN_PREFIX, LATEST, FEATS_ROOT
     LR, CHAIN_PREFIX, LATEST = a.lineage_root, chain_prefix_of(a.chain), a.latest
+    if a.feats_root is not None:
+        FEATS_ROOT = a.feats_root
     out = globals()[f"cmd_{a.cmd.replace('-', '_')}"](a)
     print(json.dumps(out, indent=1, default=str))
     return 0

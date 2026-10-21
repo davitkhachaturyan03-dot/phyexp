@@ -51,17 +51,18 @@ def n_runs(lr: Path) -> int:
     return len(client(lr).search_runs([experiment_id(lr)], max_results=10000))
 
 
-def fake_train_run(lr: Path, name: str, subset, ckpt_sha: str = "0" * 64) -> str:
-    """A FINISHED ``train`` run in the scratch store whose training input is ``subset`` (no model involved)."""
+def fake_train_run(lr: Path, name: str, subset, ckpt_sha: str = "0" * 64, chain: str | None = None) -> str:
+    """A FINISHED ``train`` run in the scratch store whose training input is ``subset`` and which produces the checkpoint entity
+    ``ckpt_sha`` (no model involved)."""
     import mlflow
 
     from vlapoc.runs import stage_run
 
-    with stage_run("train", name, lr, allow_dirty=True) as r:
+    with stage_run("train", name, lr, allow_dirty=True, chain=chain) as r:
         r.input_subset(subset, "training", None)
         mlflow.set_tag("checkpoint.weights.sha256", ckpt_sha)
+        r.produced("checkpoint", ckpt_sha, "checkpoint")
         return r.run_id
-
 
 
 # ---------------------------------------------------------------------------------------------
@@ -86,9 +87,52 @@ def write_features(prefix: Path, rows: "np.ndarray", episode_index: "np.ndarray"
         Path(f"{stem}.manifest.json").write_text(json.dumps({**base, "shard": [i, n_shards], "n_samples": int(len(idx))}))
 
 
-def make_fixture(base: Path, tasks: int = 5, per_task: int = 3, seed: int = 0) -> dict:
-    """A scratch copy of the real lineage store with: a training subset of ``tasks`` x ``per_task`` clean v0/candidate
-    episodes, a FINISHED fake ``train`` run on it, and synthetic train features (2 shards). SYNTHETIC: no model involved."""
+def pick_covering(lr: Path, parent, min_per_task: int = 3):
+    """Episodes of ``parent`` (a v3 subset) forming a small, stratified training subset: greedily choose tasks until every
+    corruption type is present, then take each chosen task's labelled episodes plus clean ones up to ``min_per_task``.
+    Ground-truth side (reads the answer key): only the SYNTHETIC test fixture does this, never a method."""
+    from vlapoc.groundtruth import load_answer_key
+
+    cat = parent.episodes(lr).sort_values(["suite", "libero_task_id", "episode_index"])
+    labels = dict(zip(*(load_answer_key("v3", lr)[c] for c in ("episode_id", "corruption_type"))))
+    cat = cat.assign(_t=cat["episode_id"].map(labels).fillna(""))
+    tasks = {k: g for k, g in cat.groupby(["suite", "libero_task_id"], sort=True)}
+    need, chosen = set(labels.values()), []
+    while need:
+        k = max(tasks, key=lambda k: (len(need & set(tasks[k]["_t"])), -len(tasks[k])))
+        if not need & set(tasks[k]["_t"]):
+            break
+        chosen.append(k)
+        need -= set(tasks[k]["_t"])
+    rows = []
+    for k in chosen:
+        g = tasks[k]
+        lab, clean = g[g["_t"] != ""], g[g["_t"] == ""]
+        rows.append(pd.concat([lab, clean.head(max(min_per_task - len(lab), 2))]))
+    return pd.concat(rows)
+
+
+def make_train(fx: dict, name: str, subset, sha: str, seed: int = 0, n_shards: int = 2) -> dict:
+    """A fake train run on ``subset`` with checkpoint ``sha``, plus synthetic train features (``feats/<name>/train``)."""
+    import numpy as np
+
+    lr = fx["lr"]
+    eps = subset.episodes(lr).sort_values("episode_index").reset_index(drop=True)
+    tid = fake_train_run(lr, name, subset, sha, fx.get("chain"))
+    ep_idx = np.repeat(eps["episode_index"].to_numpy(), 3)
+    man = {"scheme": "vlapoc.features.v2", "checkpoint": "data/scratch/fake", "checkpoint_sha256": sha, "checkpoint_weights_sha256_recheck": True,
+           "dataset_root": "data/lerobot/libero_spatial_10", "dataset_fps": 20, "stride": 2, "rank": 4, "k_draws": 4, "seed": 0, "dim": FEATURE_DIM,
+           "n_layers": 1, "layers": ["l0"], "rename": None, "chunk_size": 50, "output_fn": "square", "episodes": [int(e) for e in subset.resolve(lr)]}
+    prefix = fx["base"] / "feats" / name / "train"
+    write_features(prefix, np.random.default_rng(seed + 100).normal(size=(len(ep_idx), FEATURE_DIM)), ep_idx, man, n_shards)
+    return {"train_id": tid, "name": name, "sha": sha, "prefix": prefix, "manifest": man, "subset": subset}
+
+
+def make_fixture(base: Path, tasks: int = 5, per_task: int = 3, seed: int = 0, parent: str = "v0/candidate", chain: str | None = None,
+                 train_name: str = "fake-train-fixture", cover_types: bool = False) -> dict:
+    """A scratch copy of the real lineage store with a small training subset of ``parent`` (``tasks`` x ``per_task`` episodes, or, with
+    ``cover_types`` on a v3 parent, a type-covering stratified subset), a FINISHED fake ``train`` run on it and synthetic train features
+    (2 shards). SYNTHETIC: no model involved. The subset is bound as ``fixture/train`` (and ``v3/fixture20`` for a v3 parent)."""
     import numpy as np
 
     from vlapoc.lineage import Subset, _bind_name
@@ -96,33 +140,31 @@ def make_fixture(base: Path, tasks: int = 5, per_task: int = 3, seed: int = 0) -
 
     rng = np.random.default_rng(seed)
     lr = scratch_lineage_copy(base / "lineage")
-    v0c = Subset.load("v0/candidate", lr)
-    cat = v0c.episodes(lr).sort_values(["suite", "libero_task_id", "episode_index"])
-    pick = pd.concat([g.head(per_task) for _, g in cat.groupby(["suite", "libero_task_id"], sort=True)][:tasks])
-    sub = Subset(v0c.dataset_version_id, tuple(pick["episode_id"]), {"op": "synthetic_fixture", "parent_subset_id": v0c.subset_id})
+    par = Subset.load(parent, lr)
+    if cover_types:
+        pick = pick_covering(lr, par)
+    else:
+        cat = par.episodes(lr).sort_values(["suite", "libero_task_id", "episode_index"])
+        pick = pd.concat([g.head(per_task) for _, g in cat.groupby(["suite", "libero_task_id"], sort=True)][:tasks])
+    sub = Subset(par.dataset_version_id, tuple(pick["episode_id"]), {"op": "synthetic_fixture", "parent_subset_id": par.subset_id})
     sub.save(lr)
     _bind_name("subsets", "fixture/train", sub.subset_id, lr)
-    episodes = sub.episodes(lr).sort_values("episode_index").reset_index(drop=True)
-    train_id = fake_train_run(lr, "fake-train-fixture", sub, FAKE_CKPT_SHA)
-    n_per = 3
-    ep_idx = np.repeat(episodes["episode_index"].to_numpy(), n_per)
-    manifest = {"scheme": "vlapoc.features.v2", "checkpoint": "data/scratch/fake", "checkpoint_sha256": FAKE_CKPT_SHA,
-                "checkpoint_weights_sha256_recheck": True, "dataset_root": "data/lerobot/libero_spatial_10",
-                "dataset_fps": 20, "stride": 2, "rank": 4, "k_draws": 4, "seed": 0, "dim": FEATURE_DIM, "n_layers": 1,
-                "layers": ["l0"], "rename": None, "chunk_size": 50, "output_fn": "square",
-                "episodes": [int(e) for e in sub.resolve(lr)]}
-    train_prefix = base / "feats" / "train"
-    write_features(train_prefix, rng.normal(size=(len(ep_idx), FEATURE_DIM)), ep_idx, manifest, 2)
-    return {"lr": lr, "subset": sub, "episodes": episodes, "train_id": train_id, "train_prefix": train_prefix,
-            "manifest": manifest, "base": base, "rng": rng}
+    if parent.startswith("v3"):
+        _bind_name("subsets", "v3/fixture20", sub.subset_id, lr)
+    fx = {"lr": lr, "subset": sub, "episodes": sub.episodes(lr).sort_values("episode_index").reset_index(drop=True), "base": base,
+          "rng": rng, "chain": chain}
+    tr = make_train(fx, train_name, sub, FAKE_CKPT_SHA, seed)
+    fx |= {"train": tr, "train_id": tr["train_id"], "train_prefix": tr["prefix"], "manifest": tr["manifest"]}
+    return fx
 
 
 def add_eval(fx: dict, tag: str, per_task: int = 6, drop_traj: int | None = None, extra_failure_type: bool = False,
-             seed: int = 1) -> dict:
+             seed: int = 1, train: dict | None = None, eval_name: str | None = None, returns_name: str | None = None) -> dict:
     """An eval run (rollouts parquet with trajectory indices), its returns run, and rollout features, all synthetic.
 
-    ``drop_traj``: that rollout (row number) has no recorded trajectory and no features. ``extra_failure_type``: rollouts
-    get one more failure type with enough members for its own column (so a seed can have columns another lacks).
+    ``train``: the fake train run it evaluates (default the fixture's primary). ``drop_traj``: that rollout (row number) has no
+    recorded trajectory and no features. ``extra_failure_type``: rollouts get one more failure type with enough members for its
+    own column. Rollout features go to ``feats/<train name>/rollouts-<eval name>`` (where ``stage.py`` looks).
     """
     import mlflow
     import numpy as np
@@ -131,14 +173,11 @@ def add_eval(fx: dict, tag: str, per_task: int = 6, drop_traj: int | None = None
     from vlapoc.metrics_registry import return_columns
     from vlapoc.runs import stage_run
 
+    tr = train or fx["train"]
     lr, rng = fx["lr"], np.random.default_rng(seed)
     eps = fx["episodes"]
     tasks = eps[["suite", "libero_task_id"]].drop_duplicates().to_records(index=False).tolist()
-    rows = []
-    for suite, tid in tasks:
-        for j in range(per_task):
-            rows.append({"suite": suite, "libero_task_id": int(tid)})
-    ro = pd.DataFrame(rows)
+    ro = pd.DataFrame([{"suite": suite, "libero_task_id": int(tid)} for suite, tid in tasks for _ in range(per_task)])
     n = len(ro)
     ro["rollout_id"] = [f"{tag}/{i}" for i in range(n)]
     ro["traj_episode_index"] = np.arange(5000, 5000 + n, dtype=float)
@@ -157,30 +196,34 @@ def add_eval(fx: dict, tag: str, per_task: int = 6, drop_traj: int | None = None
     out.mkdir(parents=True, exist_ok=True)
     ro.to_parquet(out / "rollouts.parquet", index=False)
     ret.to_parquet(out / "returns.parquet", index=False)
-    with stage_run("eval", f"fake-eval-{tag}", lr, allow_dirty=True) as r:
-        r.params({"train_run_id": fx["train_id"], "checkpoint_sha256": FAKE_CKPT_SHA})
+    ename = eval_name or f"fake-eval-{tag}"
+    with stage_run("eval", ename, lr, allow_dirty=True, chain=fx.get("chain")) as r:
+        r.params({"train_run_id": tr["train_id"], "checkpoint_sha256": tr["sha"]})
         r.output_file("rollouts", out / "rollouts.parquet", kind="rollouts")
         mlflow.set_tag("output.trajectories", "trajectories:synthetic")
         eval_id = r.run_id
     sha = sha256_file(out / "rollouts.parquet")
-    with stage_run("returns", f"fake-returns-{tag}", lr, allow_dirty=True) as r:
+    with stage_run("returns", returns_name or f"fake-returns-{tag}", lr, allow_dirty=True, chain=fx.get("chain")) as r:
         r.input_entity("rollouts", sha, "rollouts")
         r.output_file("returns", out / "returns.parquet", kind="returns")
         returns_id = r.run_id
     has = ro["traj_episode_index"].notna().to_numpy()
     traj = np.repeat(ro.loc[has, "traj_episode_index"].to_numpy().astype(int), 2)
-    man = {**fx["manifest"], "episodes": None, "stride": 4}
-    prefix = fx["base"] / "feats" / f"rollouts-{tag}"
+    man = {**tr["manifest"], "episodes": None, "stride": 4}
+    prefix = fx["base"] / "feats" / tr["name"] / f"rollouts-{ename}"
     write_features(prefix, rng.normal(size=(len(traj), FEATURE_DIM)), traj, man, 1)
-    return {"eval_id": eval_id, "returns_id": returns_id, "rollout_prefix": prefix, "n_rollouts": n}
+    return {"eval_id": eval_id, "returns_id": returns_id, "rollout_prefix": prefix, "n_rollouts": n, "train": tr, "name": ename}
 
 
 def run_attribute(fx: dict, ev: dict, name: str, **kw) -> dict:
     """``attribute_run`` on the fixture (CPU, scratch store, allow_dirty)."""
     from vlapoc.attribution import attribute_run
 
-    return attribute_run(fx["train_id"], ev["eval_id"], ev["returns_id"], fx["train_prefix"], ev["rollout_prefix"], name,
-                         out_dir=fx["base"] / "out" / name, device="cpu", lineage_root=fx["lr"], allow_dirty=True, **kw)
+    tr = ev.get("train") or fx["train"]
+    return attribute_run(tr["train_id"], ev["eval_id"], ev["returns_id"], tr["prefix"], ev["rollout_prefix"], name,
+                         out_dir=fx["base"] / "out" / name, device="cpu", lineage_root=fx["lr"], allow_dirty=True,
+                         chain=fx.get("chain"), **kw)
+
 
 # ---------------------------------------------------------------------------------------------
 # S1: blindness
