@@ -1,0 +1,91 @@
+{
+ "pass": true,
+ "checks": [
+  {
+   "name": "3.1 every infl_/harm_ column has exactly one functionals row, and its tau is the metrics_registry tau",
+   "pass": true,
+   "detail": "32 columns, 32 rows; tau_s by return: {'ret_f30': 30.0, 'ret_rmst60': 60.0, 'ret_auc_expected': None, 'ret_auc_sampled': None, 'ret_hrt60_lin': 60.0, 'ret_censored60': 60.0, 'ft_drop': 60.0, 'ft_timeout': 60.0}"
+  },
+  {
+   "name": "3.1b the declared encoding/centring is what column_plan applied (pm1 on binary columns, centred on the rest)",
+   "pass": true,
+   "detail": "{'ret_f30': ('pm1', False), 'ret_rmst60': ('raw', True), 'ret_auc_expected': ('raw', True), 'ret_auc_sampled': ('raw', True), 'ret_hrt60_lin': ('raw', True), 'ret_censored60': ('pm1', False), 'ft_drop': ('pm1', False), 'ft_timeout': ('pm1', False)}"
+  },
+  {
+   "name": "3.1c harm columns state their sign (good_sign) and subset",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "2.5 attribute run params carry output functions, encoding, centring and DIVERGENCES",
+   "pass": true,
+   "detail": "{'train_output_fn': 'square', 'rollout_output_fn': 'square', 'return_encoding': 'raw', 'center_returns': 'True', 'min_failure_type_rollouts_inferred': '5'}, divergences keys ['centred_returns', 'continuous_returns', 'damping', 'draws', 'failure_type_returns', 'model_family', 'numerics', 'projection', 'strides']"
+  },
+  {
+   "name": "3.3 the attribute run lists one `features` input per .npy / .meta.npz file with its sha256",
+   "pass": true,
+   "detail": "6 features inputs for 6 files: ['features.rollouts.meta.npz', 'features.rollouts.npy', 'features.train.shard0.meta.npz', 'features.train.shard0.npy', 'features.train.shard1.meta.npz', 'features.train.shard1.npy']"
+  },
+  {
+   "name": "3.3b flipping one byte of one feature file changes exactly that file's recorded digest",
+   "pass": true,
+   "detail": "['input.features.train.shard1.npy']"
+  },
+  {
+   "name": "3.4 attribute raises when one rollout lacks a trajectory",
+   "pass": true,
+   "detail": "1 of 30 rollouts of eval run c1d2f285ecbb have no recorded trajectory, so they would be dropped from the attribution silently; pass allow_partial=True to accept"
+  },
+  {
+   "name": "3.4b --allow-partial passes and records n_rollouts_without_trajectory",
+   "pass": true,
+   "detail": "n_rollouts 29 of 30, recorded 1"
+  },
+  {
+   "name": "3.1d functionals.json of the attribute run has one row per score column",
+   "pass": true,
+   "detail": "28 rows"
+  },
+  {
+   "name": "3.5 ensemble_run raises on [id, id] duplicates",
+   "pass": true,
+   "detail": "ensemble inputs contain duplicate runs: ['7348a4068427446399f39812ad93ab87', '7348a4068427446399f39812ad93ab87']"
+  },
+  {
+   "name": "3.5b ensemble_run raises on mixed center_returns",
+   "pass": true,
+   "detail": "ensemble inputs differ in 'center_returns': ['False', 'True']; their columns explain different functionals"
+  },
+  {
+   "name": "3.5c ensemble records n_models per column (a failure-type column exists in only one seed)",
+   "pass": true,
+   "detail": "columns with n_models=1: ['harm_ft_drop', 'harm_ft_drop__same_task', 'infl_ft_drop', 'infl_ft_drop__same_task']; others 2"
+  },
+  {
+   "name": "3.6 the select run's params carry the ranked column's declaration",
+   "pass": true,
+   "detail": "harm_f30__same_task: F(30) = P(T <= 30 s) | tau 30 s | subset same_task | good_sign 1.0"
+  },
+  {
+   "name": "3.6b select refuses (require_declaration) a score run that recorded no functionals.json",
+   "pass": true,
+   "detail": "score run 8ac2f4b0fe8d recorded no functionals.json, so the functional that 'harm_f30__same_task' explains is undeclared (PoC \u00a73.4 p. 7); re-run the attribute s"
+  },
+  {
+   "name": "3.6c select refuses a column the score run does not declare",
+   "pass": true,
+   "detail": "run bc8a1bbf3dad declares 0 functionals for column 'harm_nonexistent', expected exactly 1"
+  },
+  {
+   "name": "3.2 featurize manifests hold repo-relative checkpoint and dataset_root (rel() round-trips to an existing path)",
+   "pass": true,
+   "detail": "{'checkpoint': 'data/runs/train-smolvla-2step-persubset-v0ref-20261005T012854Z/lerobot/checkpoints/000002/pretrained_model', 'dataset_root': 'data/lerobot/libero_spatial_10'}"
+  },
+  {
+   "name": "R7 real mlflow.db sha256 unchanged",
+   "pass": true,
+   "detail": "306af4123fda7e63... == 306af4123fda7e63..."
+  }
+ ],
+ "seconds": 17
+}

@@ -51,6 +51,11 @@ Sign convention: Ψ_R(ξ) > 0 means episode ξ pushes return R up. Every family-
 ``ret_censored60`` (1 = timed out) and the per-failure-type indicators, where positive means harmful
 (``GOOD_SIGN``). ``harm_score`` folds that in, so "most harmful" is always the most negative harm score.
 
+Declared functionals (training-attribution S3; PoC §3.4 p. 7 "Every attribution result states which functional it explains",
+§4.4 p. 10 "Label every claim with its metric and time cap τ"): ``column_declarations`` writes one row per score column
+(return, family, τ, rollout subset, sign, centring, encoding, output functions) as ``functionals.json``, logged by
+``attribute_run`` and ``ensemble_run`` and copied into the ranked column's declaration by ``select_run``.
+
 Where it sits (docs/dataflow.md): Step 3 (Attribution), item 2. Inputs: a train run (its training subset, the rows,
 and its checkpoint), the eval run of that checkpoint with ``record_trajectories`` (the rollouts' (s', a')), and the
 returns run of that eval (Step 3, item 1). Output: ``attribution_scores.parquet`` keyed by (``episode_id``,
@@ -275,6 +280,13 @@ def performance_influence(m: np.ndarray, r: np.ndarray, mask: np.ndarray | None 
     return adv @ m / len(r)
 
 
+def returns_of(ret: pd.DataFrame) -> dict[str, np.ndarray]:
+    """The per-rollout return vectors that get a score column: every family-W return and every ``ft_<type>`` indicator."""
+    returns = {c: ret[c].to_numpy(float) for c in RETURN_COLUMNS}
+    returns.update(failure_type_returns(ret))
+    return returns
+
+
 def failure_type_returns(ret: pd.DataFrame, min_rollouts: int = MIN_FAILURE_TYPE_ROLLOUTS) -> dict[str, np.ndarray]:
     """``ft_<type>`` = 1[failure_type == type] for every non-success type with at least ``min_rollouts`` rollouts."""
     counts = ret["failure_type"].value_counts()
@@ -292,8 +304,7 @@ def score_table(m: np.ndarray, episodes: pd.DataFrame, ret: pd.DataFrame, center
     harmful = largest). ``return_encoding="pm1"`` applies CUPID's ±1 uncentred return to the binary columns
     (``column_plan``); the others stay raw.
     """
-    returns = {c: ret[c].to_numpy(float) for c in RETURN_COLUMNS}
-    returns.update(failure_type_returns(ret))
+    returns = returns_of(ret)
     plan = column_plan(returns, center, return_encoding)
     out = episodes[["episode_id", "content_hash", "episode_index", *TASK_KEY, "task_name"]].reset_index(drop=True).copy()
     task_of_rollout = list(zip(ret["suite"], ret["libero_task_id"].astype(int)))
@@ -328,19 +339,81 @@ def agreement(table: pd.DataFrame, columns: list[str]) -> dict:
     return res
 
 
+def score_columns(table: pd.DataFrame) -> list[str]:
+    """The ``infl_``/``harm_`` columns of a score table, in table order."""
+    return [c for c in table.columns if c.startswith(("infl_", "harm_"))]
+
+
 def zscore_ensemble(tables: list[pd.DataFrame]) -> pd.DataFrame:
     """Average of per-table z-scores for every ``infl_``/``harm_`` column (one table per training seed of the same
-    subset). z-scoring puts seeds on one scale before averaging; the rows must be the same episode versions."""
+    subset). z-scoring puts seeds on one scale before averaging; the rows must be the same episode versions.
+
+    The columns are the union over the tables (a failure type can have enough rollouts to get a column in one seed and
+    not in another); a column is averaged over the tables that have it, and ``n_models_per_column`` says how many.
+    """
     keys = tables[0][["episode_id", "content_hash"]]
     for t in tables[1:]:
         if not t[["episode_id", "content_hash"]].equals(keys):
             raise ValueError("ensemble tables do not key the same episode versions in the same order")
-    cols = [c for c in tables[0].columns if c.startswith(("infl_", "harm_"))]
-    out = tables[0].drop(columns=cols).copy()
+    cols = list(dict.fromkeys(c for t in tables for c in score_columns(t)))
+    out = tables[0].drop(columns=score_columns(tables[0])).copy()
     for c in cols:
         z = [(t[c] - t[c].mean()) / t[c].std() for t in tables if c in t]
         out[c] = sum(z) / len(z)
     return out
+
+
+def n_models_per_column(tables: list[pd.DataFrame]) -> dict[str, int]:
+    """How many of the ensemble's tables contain each ``infl_``/``harm_`` column."""
+    cols = list(dict.fromkeys(c for t in tables for c in score_columns(t)))
+    return {c: sum(c in t for t in tables) for c in cols}
+
+
+def _tau_s(tau: str, default: float | None) -> float | None:
+    """The numeric time cap in a registry ``tau`` string (``"30 s"`` → 30.0, ``"60 s = τ_episode"`` → 60.0), else ``default``."""
+    import re
+
+    m = re.match(r"\s*(\d+(?:\.\d+)?)\s*s", tau)
+    return float(m.group(1)) if m else default
+
+
+def column_declarations(table: pd.DataFrame, ret: pd.DataFrame, center: bool = True, return_encoding: str = "raw",
+                        output_fns: tuple[str, str] = ("square", "square")) -> list[dict]:
+    """One row per ``infl_``/``harm_`` column of ``table``: which functional the column explains (PoC §3.4 p. 7, §4.4 p. 10).
+
+    Fields: ``column``; ``kind`` (``infl``: positive = the episode pushes the return up; ``harm``: positive = harmful,
+    i.e. ``-good_sign`` × infl); ``return_column`` and ``return_definition``; ``metric_key``, ``family``,
+    ``functional``, ``tau`` (the metric registry's string) and ``tau_s``; ``rollout_subset`` (``all`` rollouts, or
+    ``same_task`` = the episode's own task, ATHENA §4.2 Eq. 7); ``good_sign``; ``centred`` and ``return_encoding``
+    (what ``column_plan`` applied to this column); ``output_fns`` (train side, rollout side). A per-failure-type
+    column's return is the indicator 1[failure_type = t] over the rollouts, family W, τ_episode.
+    """
+    from vlapoc.metrics_registry import FAMILY_TAU_S, entry, ENTRIES
+
+    plan = column_plan(returns_of(ret), center, return_encoding)
+    by_col = {c: e for e in ENTRIES if e["family"] == "W" and e["verdict"] is not None for c in e["return_columns"]}
+    rows = []
+    for col in score_columns(table):
+        kind, _, rest = col.partition("_")
+        base, _, suffix = rest.partition("__")
+        name = base if base.startswith("ft_") else f"ret_{base}"
+        if name not in plan:
+            raise ValueError(f"column {col!r} has no return {name!r} in the returns table (cannot declare its functional)")
+        if name.startswith("ft_"):
+            e = entry("failure_type")
+            row = {"return_definition": f"1[failure_type == {name.removeprefix('ft_')!r}] over the rollouts",
+                   "metric_key": "failure_type", "functional": f"share of rollouts failing as {name.removeprefix('ft_')!r}",
+                   "tau": e["tau"], "tau_s": FAMILY_TAU_S["W"]}
+        else:
+            e = by_col[name]
+            row = {"return_definition": f"per-rollout return {name} (metrics_registry: {e['identity']})",
+                   "metric_key": e["key"], "functional": e["functional"], "tau": e["tau"],
+                   "tau_s": _tau_s(e["tau"], None)}
+        rows.append({"column": col, "kind": kind, "return_column": name, **row, "family": e["family"],
+                     "rollout_subset": "same_task" if suffix == "same_task" else "all",
+                     "good_sign": GOOD_SIGN.get(name, -1.0), "centred": plan[name]["centred"],
+                     "return_encoding": plan[name]["encoding"], "output_fns": list(output_fns)})
+    return rows
 
 
 # ---------------------------------------------------------------------------------------------
@@ -363,6 +436,60 @@ def _artifact_table(run, tag: str, lineage_root: Path | None) -> pd.DataFrame:
         if sha256_file(path) != run.data.tags[f"output.{tag}.sha256"]:
             raise ValueError(f"run {run.info.run_id}: artifact {name} differs from its recorded sha256")
         return pd.read_parquet(path)
+
+
+def feature_file_digests(prefix: Path, role: str) -> dict[str, str]:
+    """``{input role: sha256}`` for every ``.npy`` and ``.meta.npz`` file of a feature prefix (single file or shards).
+
+    The role is ``features.<role>.<suffix>`` (e.g. ``features.train.shard0.npy``), so the attribute run lists one
+    ``features`` input per file and a regenerated or altered feature file changes a recorded digest (PoC §2.1 item 1
+    p. 3; the feature files are intermediate, not produced by a recorded stage, so ``trace`` shows them as leaf inputs).
+    """
+    from vlapoc.catalog import sha256_file
+
+    prefix = Path(prefix)
+    out = {}
+    for f in sorted(prefix.parent.glob(f"{prefix.name}*")):
+        suffix = f.name[len(prefix.name):].lstrip(".")
+        if f.name.endswith((".npy", ".meta.npz")):
+            out[f"features.{role}.{suffix}"] = sha256_file(f)
+    if not out:
+        raise FileNotFoundError(f"no feature files at {prefix}")
+    return out
+
+
+def _artifact_json(run, tag: str, lineage_root: Path | None):
+    """A run's JSON output ``tag`` (MLflow artifact), checked against its recorded sha256."""
+    import tempfile
+
+    from vlapoc.catalog import sha256_file
+    from vlapoc.runs import client
+
+    c = client(lineage_root)
+    if f"output.{tag}.artifact" not in run.data.tags:
+        raise ValueError(f"run {run.info.run_id[:12]} has no recorded output {tag!r} "
+                         "(it predates training-attribution S3, or is not an attribute run); re-run the attribute stage")
+    name = run.data.tags[f"output.{tag}.artifact"]
+    (REPO_ROOT / "data" / "scratch").mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="attr_", dir=REPO_ROOT / "data" / "scratch") as tmp:
+        path = Path(c.download_artifacts(run.info.run_id, name, tmp))
+        if sha256_file(path) != run.data.tags[f"output.{tag}.sha256"]:
+            raise ValueError(f"run {run.info.run_id}: artifact {name} differs from its recorded sha256")
+        return json.loads(path.read_text())
+
+
+def declaration_of(score_run_id: str, column: str, lineage_root: Path | None = None) -> dict | None:
+    """The ``functionals.json`` row of ``column`` in an attribute run, or ``None`` if that run recorded no declarations
+    (a stand-in or pre-S3 run). ``ValueError`` if the run declares functionals but not this column."""
+    from vlapoc.runs import client
+
+    run = client(lineage_root).get_run(score_run_id)
+    if "output.functionals.artifact" not in run.data.tags:
+        return None
+    rows = [r for r in _artifact_json(run, "functionals", lineage_root) if r["column"] == column]
+    if len(rows) != 1:
+        raise ValueError(f"run {score_run_id[:12]} declares {len(rows)} functionals for column {column!r}, expected exactly 1")
+    return rows[0]
 
 
 def attribute(train_feats_prefix: Path, rollout_feats_prefix: Path, episodes: pd.DataFrame, rollouts: pd.DataFrame,
@@ -406,7 +533,8 @@ def attribute(train_feats_prefix: Path, rollout_feats_prefix: Path, episodes: pd
 def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, train_features: Path, rollout_features: Path,
                   name: str, out_dir: Path | None = None, damping: float = 1e-3, center: bool = True,
                   rollout_mean: bool = False, device: str | None = None, lineage_root: Path | None = None,
-                  chain: str | None = None, allow_dirty: bool = False, return_encoding: str = "raw") -> dict:
+                  chain: str | None = None, allow_dirty: bool = False, return_encoding: str = "raw",
+                  allow_partial: bool = False) -> dict:
     """Stage ``attribute`` (PoC §9.1 Step 3 p. 19): CUPID influence of every training episode version on every
     family-W return (and per-failure-type return) of one eval run, recorded as one MLflow run.
 
@@ -414,7 +542,13 @@ def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, trai
     subset opens through ``open_for_method`` (intact, not fenced, blind, not ground-truth-derived; PoC §2.1 item 4
     p. 3, owner decision 3); the eval run evaluated this train run's checkpoint and recorded trajectories; the returns run
     consumed that eval's rollouts; both feature sets were computed from this checkpoint with one projection; the train
-    features cover exactly the training subset and the rollout features exactly the recorded trajectories.
+    features cover exactly the training subset and the rollout features exactly the recorded trajectories; and every
+    rollout of the eval run has a recorded trajectory, unless ``allow_partial`` (then the count is recorded as param
+    ``n_rollouts_without_trajectory``; PoC §2.1 item 1 p. 3 "Every eval rollout should be tied back to that checkpoint").
+
+    Records (training-attribution S3, PoC §2.1 item 1 p. 3 and §3.4 p. 7): the sha256 of every feature ``.npy`` and
+    ``.meta.npz`` file it read as inputs of kind ``features`` (so a regenerated feature file is distinguishable), the
+    estimator's settings and ``DIVERGENCES`` as params, and ``functionals.json`` (``column_declarations``) as an output.
     Returns ``{"run_id", "scores", "n_episodes", "n_rollouts", "agreement"}``.
     """
     from vlapoc.lineage import rel
@@ -443,7 +577,12 @@ def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, trai
         raise ValueError("train features were not computed on exactly the training subset's episodes")
     episodes = subset.episodes(lineage_root)
     rollouts, _ = load_eval_rollouts(eval_run_id, lineage_root, make_out_dir=False)
+    n_no_traj = int(rollouts["traj_episode_index"].isna().sum())
+    if n_no_traj and not allow_partial:
+        raise ValueError(f"{n_no_traj} of {len(rollouts)} rollouts of eval run {eval_run_id[:12]} have no recorded trajectory, so "
+                         "they would be dropped from the attribution silently; pass allow_partial=True to accept and record it")
     ret = _artifact_table(rr, "returns", lineage_root)
+    feature_digests = {**feature_file_digests(train_features, "train"), **feature_file_digests(rollout_features, "rollouts")}
     table, m, shared = attribute(train_features, rollout_features, episodes, rollouts, ret, damping, center,
                                  rollout_mean, device, return_encoding)
     check_scores(table, train_run_id, lineage_root)
@@ -452,15 +591,19 @@ def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, trai
     out_dir = Path(out_dir) if out_dir is not None else DEFAULT_OUT / name
     out_dir.mkdir(parents=True, exist_ok=True)
     paths = {"attribution_scores": out_dir / "attribution_scores.parquet", "agreement": out_dir / "agreement.json",
-             "influence_matrix": out_dir / "rollout_episode_influence.npy"}
+             "influence_matrix": out_dir / "rollout_episode_influence.npy", "functionals": out_dir / "functionals.json"}
     table.to_parquet(paths["attribution_scores"], index=False)
     paths["agreement"].write_text(json.dumps(agree, indent=1))
     np.save(paths["influence_matrix"], m)
+    decls = column_declarations(table, ret, center, return_encoding, tuple(shared["output_fns"]))
+    paths["functionals"].write_text(json.dumps(decls, indent=1, ensure_ascii=False))
     with stage_run("attribute", name, lineage_root, chain=chain, allow_dirty=allow_dirty) as r:
         r.input_subset(subset, "training", None)
         r.input_entity("checkpoint", ckpt_sha, "checkpoint")
         r.input_entity("rollouts", ev.data.tags["output.rollouts.sha256"], "rollouts")
         r.input_entity("returns", rr.data.tags["output.returns.sha256"], "returns")
+        for role, sha in feature_digests.items():
+            r.input_entity("features", sha, role)
         r.params({"method": "CUPID influence on returns (TRAK action influence, Kronecker-projected gradients)",
                   "train_run_id": train_run_id, "eval_run_id": eval_run_id, "returns_run_id": returns_run_id,
                   "damping": damping, "center_returns": center, "return_encoding": return_encoding,
@@ -470,7 +613,8 @@ def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, trai
                   "return_columns": RETURN_COLUMNS, "good_sign": GOOD_SIGN,
                   "features": {k: v for k, v in shared.items() if k not in ("train_features", "rollout_features")},
                   "train_features": rel(Path(train_features)), "rollout_features": rel(Path(rollout_features)),
-                  "n_rows": len(table), "n_rollouts": int(m.shape[0])})
+                  "n_rows": len(table), "n_rollouts": int(m.shape[0]), "allow_partial": allow_partial,
+                  "n_rollouts_without_trajectory": n_no_traj, "n_feature_files": len(feature_digests)})
         for prefix, role in ((train_features, "train"), (rollout_features, "rollouts")):
             for mf in sorted(Path(prefix).parent.glob(f"{Path(prefix).name}*.manifest.json")):
                 import mlflow
@@ -478,9 +622,13 @@ def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, trai
                 mlflow.log_artifact(str(mf), artifact_path=f"features/{role}")
         r.output_file("attribution_scores", paths["attribution_scores"], kind="score_table")
         r.output_file("agreement", paths["agreement"], kind="agreement")
+        r.output_file("functionals", paths["functionals"], kind="functionals")
         r.tags({"attribute.n_rollouts": int(m.shape[0]), "attribute.n_episodes": len(table)})
         return {"run_id": r.run_id, "scores": rel(paths["attribution_scores"]), "n_episodes": len(table),
                 "n_rollouts": int(m.shape[0]), "agreement": agree}
+
+
+ENSEMBLE_SAME_PARAMS = ("damping", "center_returns", "return_encoding", "train_output_fn", "rollout_output_fn")
 
 
 def ensemble_run(attribute_run_ids: list[str], name: str, out_dir: Path | None = None, lineage_root: Path | None = None,
@@ -489,30 +637,59 @@ def ensemble_run(attribute_run_ids: list[str], name: str, out_dir: Path | None =
 
     Grounding: PoC §2.3 p. 4 "2–3 seeds per data configuration", so the selection for Step 4 does not rest on one
     seed's noise (averaging influence over independently trained models is TRAK's ensembling, inferred to transfer).
-    Every input must come from a train run on the same subset. Returns ``{"run_id", "scores", "n_models"}``.
+    Refuses (``ValueError``, before any run) duplicate input runs, inputs that are themselves ensembles, inputs trained on
+    different subsets, inputs whose ``damping`` / ``center_returns`` / ``return_encoding`` / output functions differ
+    (their columns would not be the same functional), inputs without ``functionals.json``, and inputs that declare one
+    column differently (PoC §3.4 p. 7). Records ``functionals.json`` for the ensemble with ``n_models`` per column
+    (a failure-type column can exist in only some seeds). Returns ``{"run_id", "scores", "n_models"}``.
     """
     from vlapoc.lineage import Subset, rel
     from vlapoc.runs import client, stage_run
 
+    if len(set(attribute_run_ids)) != len(attribute_run_ids):
+        raise ValueError(f"ensemble inputs contain duplicate runs: {attribute_run_ids}")
     c = client(lineage_root)
     runs = [c.get_run(i) for i in attribute_run_ids]
+    for r_ in runs:
+        if r_.data.tags.get("stage") != "attribute" or "output.attribution_scores.sha256" not in r_.data.tags:
+            raise ValueError(f"run {r_.info.run_id[:12]} is not an attribute run with a score table")
+        if "attribute_run_ids" in r_.data.params:
+            raise ValueError(f"run {r_.info.run_id[:12]} is itself an ensemble; ensembling z-scores twice would double-count seeds")
     subsets = {r.data.tags["input.training"] for r in runs}
     if len(subsets) != 1:
         raise ValueError(f"ensemble inputs were trained on different subsets: {sorted(subsets)}")
-    tables = [_artifact_table(r, "attribution_scores", lineage_root) for r in runs]
+    for key in ENSEMBLE_SAME_PARAMS:
+        vals = {r_.data.params.get(key) for r_ in runs}
+        if len(vals) != 1:
+            raise ValueError(f"ensemble inputs differ in {key!r}: {sorted(map(str, vals))}; their columns explain different functionals")
+    decls = [_artifact_json(r_, "functionals", lineage_root) for r_ in runs]
+    tables = [_artifact_table(r_, "attribution_scores", lineage_root) for r_ in runs]
+    by_col: dict[str, dict] = {}
+    for d in decls:
+        for row in d:
+            if by_col.setdefault(row["column"], row) != row:
+                raise ValueError(f"ensemble inputs declare column {row['column']!r} differently")
     ens = zscore_ensemble(tables)
+    n_models = n_models_per_column(tables)
+    declared = [{**row, "n_models": n_models[col], "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"}
+                for col, row in by_col.items()]
     out_dir = Path(out_dir) if out_dir is not None else DEFAULT_OUT / name
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / "attribution_scores.parquet"
     ens.to_parquet(path, index=False)
+    fpath = out_dir / "functionals.json"
+    fpath.write_text(json.dumps(declared, indent=1, ensure_ascii=False))
     subset = Subset.load(subsets.pop().split(":", 1)[1], lineage_root)
     with stage_run("attribute", name, lineage_root, chain=chain, allow_dirty=allow_dirty) as r:
         r.input_subset(subset, "training", None)
         for i, run in enumerate(runs):
             r.input_entity("score_table", run.data.tags["output.attribution_scores.sha256"], f"seed_table_{i}")
         r.params({"method": "ensemble: mean over seeds of per-seed z-scored influence columns",
-                  "attribute_run_ids": attribute_run_ids, "n_models": len(runs), "n_rows": len(ens)})
+                  "attribute_run_ids": attribute_run_ids, "n_models": len(runs), "n_rows": len(ens),
+                  "n_models_per_column": n_models,
+                  **{k: runs[0].data.params.get(k) for k in ENSEMBLE_SAME_PARAMS}})
         r.output_file("attribution_scores", path, kind="score_table")
+        r.output_file("functionals", fpath, kind="functionals")
         return {"run_id": r.run_id, "scores": rel(path), "n_models": len(runs)}
 
 
@@ -537,11 +714,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--no-center", action="store_true", help="CUPID Prop. 1 with raw returns")
     p.add_argument("--cupid-returns", action="store_true",
                    help="CUPID's R = ±1, uncentred, for the binary return columns (return_encoding='pm1')")
+    p.add_argument("--allow-partial", action="store_true",
+                   help="accept rollouts that have no recorded trajectory (recorded as a count)")
     p.add_argument("--device", default=None)
     a = p.parse_args(argv)
     out = attribute_run(a.train_run, a.eval_run, a.returns_run, a.train_features, a.rollout_features, a.name,
                         damping=a.damping, center=not a.no_center, device=a.device,
-                        return_encoding="pm1" if a.cupid_returns else "raw")
+                        return_encoding="pm1" if a.cupid_returns else "raw", allow_partial=a.allow_partial)
     print(json.dumps({k: v for k, v in out.items() if k != "agreement"}, indent=1))
     return 0
 

@@ -780,7 +780,8 @@ SELECT_OPS = ("drop_top_k", "drop_random_k", "drop_group", "drop_top_k_per_task"
 def select_run(parent: str, name: str, op: str, k: int | None = None, seed: int | None = None,
                score_path: Path | None = None, metric: str | None = None, score_run_id: str | None = None,
                direction: str = "highest", column: str | None = None, value=None,
-               lineage_root: Path | None = None, chain: str | None = None, allow_dirty: bool = False) -> tuple[str, Subset]:
+               lineage_root: Path | None = None, chain: str | None = None, allow_dirty: bool = False,
+               require_declaration: bool = False) -> tuple[str, Subset]:
     """Stage ``select``: derive a child subset from ``parent`` and record how, as one MLflow run.
 
     Ops (all children are selections recorded in the lineage store, never data rewrites):
@@ -799,6 +800,12 @@ def select_run(parent: str, name: str, op: str, k: int | None = None, seed: int 
       episodes dropped from *every* (suite, libero_task_id), so a curated subset and its random control keep
       identical per-task counts (``vlapoc.lineage.drop_top_k_per_task``). ``k`` is per task here.
 
+    Ranking ops record which functional the ranked column explains (PoC §3.4 p. 7 "Every attribution result states which
+    functional it explains"): param ``metric_declaration`` is the ``functionals.json`` row of ``metric`` in the score run
+    (``vlapoc.attribution.declaration_of``). A score run that declares functionals but not this column is refused; one
+    that declares none (a stand-in, or older than the declarations) records ``"undeclared"`` unless
+    ``require_declaration`` (the attribution chain's ``stage.py select`` sets it), which refuses it.
+
     Returns ``(run_id, child Subset)``. The ``select.dropped`` tag holds the dropped ids as JSON cut
     at 7,900 characters (a prefix for large drops); the child's ``derivation["dropped"]`` is the full
     record.
@@ -808,6 +815,14 @@ def select_run(parent: str, name: str, op: str, k: int | None = None, seed: int 
     if op == "drop_top_k" and direction not in ("highest", "lowest"):
         raise ValueError("direction must be 'highest' or 'lowest'")
     ps = Subset.load(parent, lineage_root)
+    decl = None
+    if op in ("drop_top_k", "drop_top_k_per_task") and score_run_id:
+        from vlapoc.attribution import declaration_of
+
+        decl = declaration_of(score_run_id, metric, lineage_root)
+        if decl is None and require_declaration:
+            raise ValueError(f"score run {score_run_id[:12]} recorded no functionals.json, so the functional that "
+                             f"{metric!r} explains is undeclared (PoC §3.4 p. 7); re-run the attribute stage")
     with stage_run("select", name, lineage_root, chain=chain, allow_dirty=allow_dirty) as r:
         r.input_subset(ps, "parent", parent if "/" in parent else None)
         if op in ("drop_top_k", "drop_top_k_per_task"):
@@ -815,7 +830,8 @@ def select_run(parent: str, name: str, op: str, k: int | None = None, seed: int 
             fn = drop_top_k if op == "drop_top_k" else drop_top_k_per_task
             child = fn(ps, table, metric, k, direction, score_source=f"mlflow run {score_run_id}", lineage_root=lineage_root)
             r.input_entity("score_table", child.derivation["score_table_digest"], "scores")
-            r.params({"op": op, "k": k, "metric": metric, "direction": direction, "score_run_id": score_run_id})
+            r.params({"op": op, "k": k, "metric": metric, "direction": direction, "score_run_id": score_run_id,
+                      "metric_declaration": decl if decl is not None else "undeclared"})
         elif op in ("drop_random_k", "drop_random_k_per_task"):
             fn = drop_random_k if op == "drop_random_k" else drop_random_k_per_task
             child = fn(ps, k, seed, lineage_root=lineage_root)

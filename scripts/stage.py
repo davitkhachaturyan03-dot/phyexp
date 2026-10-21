@@ -177,7 +177,8 @@ def cmd_attribute(a) -> dict:
     tid, eid = run_id(a.train, "train"), run_id(a.eval, "eval")
     out = attribute_run(tid, eid, run_id(a.returns, "returns"), feats_prefix(tid, "train"),
                         feats_prefix(tid, "rollouts", eid), a.name, damping=a.damping, center=not a.no_center,
-                        device=a.device, chain=a.chain, return_encoding="pm1" if a.cupid_returns else "raw")
+                        device=a.device, chain=a.chain, return_encoding="pm1" if a.cupid_returns else "raw",
+                        allow_partial=a.allow_partial)
     return {k: v for k, v in out.items() if k != "agreement"}
 
 
@@ -202,7 +203,8 @@ def cmd_select(a) -> dict:
         score_path = Path(tmp) / "attribution_scores.parquet"
         _artifact_table(client().get_run(sid), "attribution_scores", None).to_parquet(score_path, index=False)
     rid, child = select_run(subset_ref(a.parent), a.name, a.op, k=a.k, seed=a.seed, score_path=score_path,
-                            metric=a.metric, score_run_id=sid, direction=a.direction, chain=a.chain)
+                            metric=a.metric, score_run_id=sid, direction=a.direction, chain=a.chain,
+                            require_declaration=a.op.startswith("drop_top_k"))
     return {"run_id": rid, "subset_id": child.subset_id, "n_episodes": len(child.episode_ids)}
 
 
@@ -268,6 +270,8 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--damping", type=float, default=1e-3)
     s.add_argument("--no-center", action="store_true")
     s.add_argument("--cupid-returns", action="store_true", help="CUPID's R = ±1 (uncentred) for the binary return columns")
+    s.add_argument("--allow-partial", action="store_true",
+                   help="accept eval rollouts that have no recorded trajectory (the count is recorded)")
     s.add_argument("--device", default=None)
 
     s = sub.add_parser("ensemble")

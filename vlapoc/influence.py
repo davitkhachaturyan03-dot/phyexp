@@ -48,7 +48,9 @@ What is computed
 
 Outputs (one prefix, possibly sharded): ``<prefix>[.shard<i>].npy`` (float16 memmap, samples × dim),
 ``<prefix>[.shard<i>].meta.npz`` (``episode_index``, ``frame_index``, ``loss`` per sample) and
-``<prefix>[.shard<i>].manifest.json`` (checkpoint sha256, dataset root, episodes, projection seed/rank, K, stride).
+``<prefix>[.shard<i>].manifest.json`` (checkpoint sha256, dataset root, episodes, projection seed/rank, K, stride,
+output function). ``checkpoint`` and ``dataset_root`` are repo-relative (``vlapoc.lineage.rel``; PoC §2.1 item 1 p. 3,
+no absolute path in a recorded manifest).
 ``vlapoc.attribution`` refuses to combine features whose manifests disagree on checkpoint, seed, rank or K.
 
 Where it sits (docs/dataflow.md): Step 3 (Attribution), between the eval stage's trajectories and the influence
@@ -277,6 +279,7 @@ def featurize(checkpoint: Path, root: Path, out: Path, episodes: list[int] | Non
     from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata
 
     from vlapoc.catalog import sha256_file
+    from vlapoc.lineage import rel
 
     policy, pre, ckpt_sha = load_policy(checkpoint, device, rename)
     cfg = policy.config
@@ -320,9 +323,9 @@ def featurize(checkpoint: Path, root: Path, out: Path, episodes: list[int] | Non
     proj.remove()
     capture.remove()
     np.savez(f"{out}{suffix}.meta.npz", **{k: np.concatenate(v) for k, v in rec.items()})
-    manifest = {"scheme": FEATURE_SCHEME, "checkpoint": str(checkpoint), "checkpoint_sha256": ckpt_sha,
+    manifest = {"scheme": FEATURE_SCHEME, "checkpoint": rel(Path(checkpoint)), "checkpoint_sha256": ckpt_sha,
                 "checkpoint_weights_sha256_recheck": sha256_file(Path(checkpoint) / "model.safetensors") == ckpt_sha,
-                "dataset_root": str(root), "dataset_fps": meta.fps, "episodes": episodes, "stride": stride,
+                "dataset_root": rel(Path(root)), "dataset_fps": meta.fps, "episodes": episodes, "stride": stride,
                 "rank": rank, "k_draws": k_draws, "seed": seed, "dim": proj.dim, "n_layers": len(proj.layers),
                 "layers": [n for n, _ in proj.layers], "shard": [si, sn], "n_samples": int(row), "rename": rename,
                 "chunk_size": cfg.chunk_size, "output_fn": output_fn}

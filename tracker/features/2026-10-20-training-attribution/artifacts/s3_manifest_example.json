@@ -1,0 +1,11 @@
+{
+ "scheme": "vlapoc.features.v2",
+ "checkpoint": "data/runs/train-smolvla-2step-persubset-v0ref-20261005T012854Z/lerobot/checkpoints/000002/pretrained_model",
+ "dataset_root": "data/lerobot/libero_spatial_10",
+ "output_fn": "square",
+ "dim": 7488,
+ "n_layers": 117,
+ "stride": 60,
+ "k_draws": 4,
+ "rank": 8
+}

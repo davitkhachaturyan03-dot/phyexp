@@ -115,8 +115,7 @@ refusal table: 4 entry points x {fenced v1, fenced v2, oracle subset, oracle des
   (`manifest list 0: shards mix output functions ['loss', 'square']`); `8c` `DIVERGENCES` has every key the plan lists.
   **The `attribute_run` *params* part (the run actually carrying `train_output_fn`, `rollout_output_fn`,
   `return_encoding`, `center_returns`, `DIVERGENCES`) needs a tracked run; it is checked in S3's synthetic integration
-  fixture, and the result is logged there.** Until then this half is by static read only (`grep -n train_output_fn
-  vlapoc/attribution.py`).
+  fixture** (S3 AC2.5 line below: ✅, added when S3 landed; at the S2 commit this half was by static read only).
 - ✅ AC2.6 `.venv/bin/python scripts/verify_attribution.py` → `pass: True (29/29)`; the original checks 1-5 account for 16 of
   them (all PASS), 13 are new (1b, 6a x2, 6b, 6c, 7a-7c, 7d x2, 8a-8c).
 
@@ -136,3 +135,69 @@ cosines, objectives, timings). The divergence table is `vlapoc.attribution.DIVER
   indicators); continuous returns (RMST, AUC, HRT) stay raw and are centred iff `center`. CUPID has only binary returns.
 - Square-objective averaging follows SmolVLA's own loss reduction (valid steps x action dims); CUPID's code averages over all
   entries including masked ones. Equal when no step is padded (documented in `square_objective`).
+
+### S3: Declare the functional of every column, and close the attribute run's provenance gaps
+**Files:**
+- `vlapoc/attribution.py` (`returns_of`, `score_columns`, `n_models_per_column`, `column_declarations`, `declaration_of`,
+  `feature_file_digests`, `_artifact_json`; `attribute_run` records `functionals.json`, one `features` input per feature
+  `.npy`/`.meta.npz`, `allow_partial` and `n_rollouts_without_trajectory`, `n_feature_files`; `ensemble_run` refuses
+  duplicates, ensembles-of-ensembles, differing `damping`/`center_returns`/`return_encoding`/output functions, inputs
+  without declarations and inputs that declare a column differently, and records `n_models_per_column` and its own
+  `functionals.json`; `zscore_ensemble` now takes the *union* of columns; CLI `--allow-partial`).
+- `vlapoc/runs.py` (`select_run(..., require_declaration=False)`: ranking ops record param `metric_declaration`).
+- `vlapoc/influence.py` (manifest `checkpoint` and `dataset_root` via `lineage.rel()`).
+- `scripts/stage.py` (`attribute --allow-partial`; `select` passes `require_declaration` for ranking ops).
+- `scripts/verify_training_attribution.py` (`--functionals`; the synthetic fixture `make_fixture`/`add_eval`/`run_attribute`,
+  reused by S4 and later).
+
+**Premises checked:**
+- "failure-type columns can exist in only some seeds" (plan S3) → true, and worse: `zscore_ensemble` built its column list
+  from `tables[0]` only, so a failure-type column that table 0 lacked was **silently dropped** from the ensemble. Measured in
+  the new check 3.5c (a `drop` failure type present in one seed's returns): fixed by taking the union, and `n_models` records
+  it (`columns with n_models=1: ['harm_ft_drop', 'harm_ft_drop__same_task', 'infl_ft_drop', 'infl_ft_drop__same_task']`).
+- "rollouts that lack trajectories are dropped silently (C15 e)" → read `attribute()`: `rollouts.dropna(subset=
+  ["traj_episode_index"])` with no count → holds; now refused without `allow_partial`.
+- "`MIN_FAILURE_TYPE_ROLLOUTS` is absent from params" → `grep` of the old `attribute_run` params → holds; now logged as
+  `min_failure_type_rollouts_inferred` (done with S2's params block).
+
+**Acceptance criteria:**
+- ✅ AC3.1 `.venv/bin/python scripts/verify_training_attribution.py --functionals` → `[PASS] 3.1 every infl_/harm_ column has
+  exactly one functionals row, and its tau is the metrics_registry tau  32 columns, 32 rows; tau_s by return: {'ret_f30':
+  30.0, 'ret_rmst60': 60.0, 'ret_auc_expected': None, 'ret_auc_sampled': None, 'ret_hrt60_lin': 60.0, 'ret_censored60': 60.0,
+  'ft_drop': 60.0, 'ft_timeout': 60.0}`; 3.1b (declared encoding/centring equals what `column_plan` applied), 3.1c (sign and
+  subset), 3.1d (a real attribute run's `functionals.json` has one row per column: 28 rows) also PASS.
+- ✅ AC3.2 `--manifest <a manifest written by a new featurize call on the real SmolVLA checkpoint, MPS, 3 samples>` →
+  `{'checkpoint': 'data/runs/train-smolvla-2step-persubset-v0ref-20261005T012854Z/lerobot/checkpoints/000002/pretrained_model',
+  'dataset_root': 'data/lerobot/libero_spatial_10'}`: no leading `/`, both exist under the repo root.
+- ✅ AC3.3 `[PASS] 3.3 ... 6 features inputs for 6 files: ['features.rollouts.meta.npz', 'features.rollouts.npy',
+  'features.train.shard0.meta.npz', 'features.train.shard0.npy', 'features.train.shard1.meta.npz', 'features.train.shard1.npy']`
+  and the digests equal `sha256_file` of each file; 3.3b: flipping one byte of `train.shard1.npy` changes exactly
+  `['input.features.train.shard1.npy']`. Run on a scratch copy of the real store with synthetic features (the real SmolVLA
+  chain is S8).
+- ✅ AC3.4 `[PASS] 3.4 attribute raises when one rollout lacks a trajectory  1 of 30 rollouts ... have no recorded trajectory`
+  and `[PASS] 3.4b --allow-partial passes and records n_rollouts_without_trajectory  n_rollouts 29 of 30, recorded 1`.
+- ✅ AC3.5 `3.5` `ensemble inputs contain duplicate runs`, `3.5b` `ensemble inputs differ in 'center_returns': ['False', 'True']`,
+  `3.5c` n_models per column recorded in params and in the ensemble's `functionals.json`.
+- ✅ AC3.6 `[PASS] 3.6 the select run's params carry the ranked column's declaration  harm_f30__same_task: F(30) = P(T <= 30 s)
+  | tau 30 s | subset same_task | good_sign 1.0`; 3.6b refuses (with `require_declaration`) a score run without
+  `functionals.json`; 3.6c refuses a column the score run does not declare.
+- ✅ AC2.5 (params half, deferred from S2): `[PASS] 2.5 attribute run params carry output functions, encoding, centring and
+  DIVERGENCES  {'train_output_fn': 'square', 'rollout_output_fn': 'square', 'return_encoding': 'raw', 'center_returns': 'True',
+  'min_failure_type_rollouts_inferred': '5'}, divergences keys [centred_returns, continuous_returns, damping, draws,
+  failure_type_returns, model_family, numerics, projection, strides]`.
+- ✅ Real `mlflow.db` sha256 before and after the run: `306af4123fda7e63…` both. Total: 17/17 checks.
+
+**Demo artifacts produced:** `artifacts/s3_functionals_example.json` (one line per attribution column stating which functional
+it explains; **SYNTHETIC** fixture data, labelled in the file), `artifacts/s3_ensemble_functionals_example.json` (with
+`n_models`), `artifacts/s3_manifest_example.json`, `artifacts/s3_functionals.json` (the 17 checks).
+
+**Notes / divergences from plan or spec:**
+- `rollout_subset` takes the values `all` / `same_task` only. The plan listed `failure_type=<t>` as a third value; that would
+  misdescribe the columns: a failure-type column is the indicator return 1[failure_type = t] over *all* (or the same-task)
+  rollouts (plan C2). The indicator is stated in `return_definition` instead.
+- `select_run` records `"undeclared"` rather than failing for score runs without declarations (the stand-in attribute runs that
+  `verify_runs_s5.py` and `lineage_dry_run.py` use); only the attribution chain (`stage.py select`) passes
+  `require_declaration`, which refuses.
+- A run produced before S3 has no `functionals.json`, so `ensemble_run` refuses it with a message to re-run the attribute stage.
+  October's cluster attribute runs are not in this repo's MLflow store, so nothing local is affected.
+- `n_feature_files` and `allow_partial` are also logged as params.
