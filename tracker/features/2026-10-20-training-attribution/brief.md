@@ -100,7 +100,14 @@ attribution", "Metric-resolved attribution" and "Verification & demo". Defining 
 
 ## Owner answers to plan questions
 
-(none yet)
+- **2026-10-20, scope: "Just dismiss the parts that need the server and fix everything else".**
+  - Anything that can only be checked or fixed on the server (GPU training, rollouts, feature extraction on
+    real checkpoints, running the SLURM chain for real, verdicts on retrained arms) is **out of scope** for this
+    feature. List it once, briefly, under "Out of scope (needs the server)" so the report stays honest. Write no
+    stories, acceptance criteria or new runbook work for it.
+  - **Every other gap is in scope and must be fixed:** code, logic, PoC compliance, blindness, key contracts,
+    declared functionals, curation rules, lineage, tests on synthetic data, CPU/MPS smoke checks, the SLURM chain's
+    `--dry-run`, config and documentation.
 
 ## Owner rulings
 
