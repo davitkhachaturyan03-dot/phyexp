@@ -27,6 +27,8 @@ Stages (docs/dataflow.md; PoC §9.1 pp. 18-19):
                select:<select run name>`` trains on the child subset that run produced.
 - ``verify``   Step 4 gate: ``vlapoc.verdict.verify_run`` between two eval runs; ``--comparison`` tags it as a Step 4
                comparison (``vs_base`` | ``curated_vs_random`` | ``head_to_head``).
+- ``score``    ground-truth recovery (``vlapoc.recovery``): AUROC / recall@k per corruption type and harm column next to
+               each type's best simple heuristic; only for a version with an answer key (v3), after attribution exists.
 - ``step4-summary``  one table over a chain's verify runs: per arm and comparison, how many seeds went each way per
                metric (``vlapoc.step4``; PoC §9.1 Step 4, §2.6, §4.5).
 
@@ -232,6 +234,14 @@ def cmd_verify(a) -> dict:
     return {k: v[k] for k in ("run_id", "label", "attribution_grade") if k in v}
 
 
+def cmd_score(a) -> dict:
+    """Ground-truth side: recovery of the planted corruptions by an attribute run's scores (``vlapoc.recovery``)."""
+    from vlapoc.recovery import recovery_run
+
+    sid = run_id(a.scores, "attribute")
+    return recovery_run(sid, a.version, a.name, subset=a.subset, chain=a.chain)
+
+
 def cmd_step4_summary(a) -> dict:
     """Step 4's table over the chain's verify runs (``vlapoc.step4``): seed consistency per arm and comparison."""
     from vlapoc.step4 import summary_run
@@ -326,6 +336,12 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--treated", default=None, help="arm B (bare arm name, e.g. harm-f30-k5)")
     s.add_argument("--control", default=None, help="arm A (bare arm name, or 'base')")
     s.add_argument("--seed-id", default=None, help="the training seed both arms share")
+
+    s = sub.add_parser("score")
+    s.add_argument("--scores", required=True, help="the attribute run (name or id) whose score table to score")
+    s.add_argument("--version", required=True, help="a version with an answer key (e.g. v3)")
+    s.add_argument("--subset", default="candidate", help="subset of that version the table must key exactly")
+    s.add_argument("--name", required=True)
 
     s = sub.add_parser("step4-summary")
     s.add_argument("--tag", required=True, help="the chain's tag (runs are named <stage>-<tag>-...)")

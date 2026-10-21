@@ -23,6 +23,9 @@ Each job runs one ``scripts/stage.py`` subcommand (one MLflow stage run), in the
               curated_vs_random  each harm/help arm vs each random control of its family (PoC §2.6: improve more /
                                  degrade more than after random removal), family W
               head_to_head       harm-hrt60_lin vs harm-f30 (PoC §4.5 "same dataset, opposite curations"), family W
+    score   (only when the base subset's version has an answer key, e.g. ``--subset v3/candidate``) one CPU job after the
+            ensemble: ``stage.py score`` = recovery of the planted corruptions per type and metric, next to each type's best
+            heuristic (``vlapoc.recovery``; PoC §2.1 item 4, §4.5). The injection run is ``--subset v3/candidate``.
     summary one CPU job after every verify: ``stage.py step4-summary`` (seed-consistency table, ``vlapoc.step4``)
 
 Grounding: PoC §9.1 Steps 3-4 (p. 19): "Rank training episodes by harmful influence ... Retrain without the
@@ -85,6 +88,19 @@ class Chain:
         job = job.split(";")[0]
         print(f"[{job}] {name}  deps={','.join(deps) or '-'}  :: {cmd}")
         return job
+
+
+def has_answer_key(subset: str) -> bool:
+    """Does the base subset's version carry an answer key (``labels.parquet``, i.e. an injected version such as v3)?
+    The pipeline only schedules the ground-truth ``score`` stage then (PoC §2.1 item 4 p.3). Existence check only."""
+    sys.path.insert(0, str(REPO))
+    from vlapoc.lineage import _root, resolve_version
+
+    try:
+        vid = resolve_version(subset.split("/")[0])["dataset_version_id"]
+    except Exception:  # noqa: BLE001 - no lineage store here (e.g. a fresh clone): no key
+        return False
+    return (_root(None) / "versions" / vid / "labels.parquet").exists()
 
 
 def arms(a) -> list[dict]:
@@ -180,6 +196,10 @@ def main(argv: list[str] | None = None) -> int:
     if "rank" in on:
         runs = " ".join(f"attribute-{t}-s{s}" for s in a.seeds)
         ens = ch.submit("cpu.sbatch", f"{PY} ensemble --runs {runs} --name attribute-{t}-ens", f"ensemble-{t}", attr_jobs)
+        if has_answer_key(a.subset):  # injection run (e.g. --subset v3/candidate): score the ranking against the planted truth
+            vname, _, sname = a.subset.partition("/")
+            ch.submit("cpu.sbatch", f"{PY} score --scores attribute-{t}-ens --version {vname} --subset {sname} --name score-{t}",
+                      f"score-{t}", [ens])
     sel = ""
     plan = arms(a)
     if "select" in on:

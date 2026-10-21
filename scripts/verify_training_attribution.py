@@ -769,12 +769,123 @@ def step4_synthetic() -> int:
     return 0 if ok_all else 1
 
 
+# ---------------------------------------------------------------------------------------------
+# S5: recovery of planted corruptions (SYNTHETIC score tables)
+# ---------------------------------------------------------------------------------------------
+
+
+def recovery() -> int:
+    """S5, AC5.1-AC5.6, on SYNTHETIC score tables over the real v3 answer key (no attribution has been run on v3)."""
+    import subprocess
+
+    import numpy as np
+
+    from vlapoc import recovery as rec
+    from vlapoc.groundtruth import load_answer_key
+    from vlapoc.lineage import LineageError, Subset
+    from vlapoc.runs import client, scratch_lineage_copy, stage_run
+    from verify_method_boundary_s3 import method_sources, scan_boundary
+
+    t0 = time.time()
+    sha0 = db_sha()
+    results: list[tuple[str, bool, str]] = []
+
+    def check(name: str, ok: bool, detail: str = "") -> None:
+        results.append((name, bool(ok), detail))
+        print(f"[{'PASS' if ok else 'FAIL'}] {name}{'  ' + detail if detail else ''}")
+
+    shutil.rmtree(SCRATCH / "recovery", ignore_errors=True)
+    base = SCRATCH / "recovery"
+    base.mkdir(parents=True)
+    try:
+        lr = scratch_lineage_copy(base / "lineage")
+        sub = Subset.load("v3/candidate", lr)
+        keys = sub.keys(lr).reset_index(drop=True)
+        labels = load_answer_key("v3", lr)
+        typ = keys["episode_id"].map(dict(zip(labels["episode_id"], labels["corruption_type"]))).fillna("").to_numpy()
+        rng = np.random.default_rng(11)
+        tab = keys.copy()
+        for m in ("f30", "rmst60", "auc_expected", "hrt60_lin", "censored60"):
+            tab[f"harm_{m}"] = rng.normal(size=len(tab))
+        tab["harm_rmst60__same_task"] = rng.normal(size=len(tab))
+        tab["harm_rmst60"] = np.where(typ == "idle_padding", 10.0, 0.0) + rng.normal(size=len(tab)) * 0.1  # PLANTED
+        tab["harm_f30"] = np.where(typ == "gripper_release", 10.0, 0.0) + rng.normal(size=len(tab)) * 0.1  # PLANTED
+        pq_path = base / "attribution_scores.parquet"
+        tab.to_parquet(pq_path, index=False)
+        with stage_run("attribute", "fake-attribute-v3", lr, allow_dirty=True) as r:
+            r.output_file("attribution_scores", pq_path, kind="score_table")
+            rid = r.run_id
+        n_before = n_runs(lr)
+        res = rec.recovery_run(rid, "v3", "score-synthetic-v3", out_dir=base / "out", lineage_root=lr, allow_dirty=True, synthetic=True)
+        m = pd.read_csv(base / "out" / "recovery_matrix.csv")
+        sm = pd.read_csv(base / "out" / "recovery_summary.csv").set_index("type")
+        au = lambda ty, c: float(m[(m["type"] == ty) & (m["column"] == c)]["auroc"].iloc[0])  # noqa: E731
+        pooled_rand = au("pooled", "harm_hrt60_lin")
+        check("5.1 planted columns: idle_padding AUROC 1.0 in harm_rmst60 and gripper_release 1.0 in harm_f30", au("idle_padding", "harm_rmst60") == 1.0
+              and au("gripper_release", "harm_f30") == 1.0, f"{au('idle_padding', 'harm_rmst60')}, {au('gripper_release', 'harm_f30')}")
+        check("5.1b a random column's pooled AUROC is in [0.4, 0.6] (inferred band: 91 positives of 960)", 0.4 <= pooled_rand <= 0.6, f"{pooled_rand:.3f}")
+        cols = sorted(c for c in tab.columns if c.startswith("harm_"))
+        check("5.2 recovery_matrix.csv has one row per (type or pooled, harm column)",
+              len(m) == 8 * len(cols) and not m.duplicated(["type", "column"]).any(), f"{len(m)} rows = 8 x {len(cols)} columns")
+        b = pd.read_csv(rec.BANDS_CSV).set_index("type")
+        eq = [ty for ty in b.index if np.allclose(m[m["type"] == ty]["best_heuristic_auroc"].unique(), b.loc[ty, "best_auroc_as_scored"])]
+        check("5.2b best_heuristic_auroc equals the ground-truth bands CSV for every type", len(eq) == 7, f"{len(eq)}/7")
+        check("5.3 matches_hypothesis is True for the two planted types and None where the PoC states no mapping",
+              bool(sm.loc["idle_padding", "matches_hypothesis"]) and bool(sm.loc["gripper_release", "matches_hypothesis"])
+              and sm.drop(["idle_padding", "gripper_release"])["matches_hypothesis"].isna().all(),
+              f"idle_padding best {sm.loc['idle_padding', 'best_column']}; gripper_release best {sm.loc['gripper_release', 'best_column']} (SYNTHETIC, planted)")
+        first = subprocess.run(["git", "log", "--format=%h", "--", "vlapoc/recovery.py"], cwd=REPO_ROOT, capture_output=True, text=True).stdout.split()[-1]
+        old = subprocess.run(["git", "show", f"{first}:vlapoc/recovery.py"], cwd=REPO_ROOT, capture_output=True, text=True).stdout
+        check("5.3b the hypothesis map was committed before any scoring code existed", "EXPECTED_METRICS" in old and "def recovery_matrix" not in old
+              and "def recovery_run" not in old, f"first commit of vlapoc/recovery.py: {first}")
+        check("5.3c the run records synthetic=True and a tracked score run exists", client(lr).get_run(res["run_id"]).data.params["synthetic"] == "True"
+              and n_runs(lr) == n_before + 1)
+        # 5.5: a table keyed to another version is refused
+        v0keys = Subset.load("v0/candidate", lr).keys(lr).reset_index(drop=True)
+        t0_ = v0keys.copy()
+        t0_["harm_f30"] = rng.normal(size=len(t0_))
+        p0 = base / "v0scores.parquet"
+        t0_.to_parquet(p0, index=False)
+        with stage_run("attribute", "fake-attribute-v0", lr, allow_dirty=True) as r:
+            r.output_file("attribution_scores", p0, kind="score_table")
+            rid0 = r.run_id
+        try:
+            rec.recovery_run(rid0, "v3", "score-wrong", out_dir=base / "out0", lineage_root=lr, allow_dirty=True)
+            check("5.5 score refuses a score table keyed to another version", False)
+        except LineageError as e:
+            check("5.5 score refuses a score table keyed to another version", "keys" in str(e), str(e)[:120])
+        # 5.4 dry run
+        v3 = subprocess.run([sys.executable, "scripts/server_pipeline.py", "--tag", "t", "--dry-run", "--subset", "v3/candidate"], cwd=REPO_ROOT, capture_output=True, text=True, check=True).stdout
+        v0 = subprocess.run([sys.executable, "scripts/server_pipeline.py", "--tag", "t", "--dry-run"], cwd=REPO_ROOT, capture_output=True, text=True, check=True).stdout
+        j3, j0 = parse_dry_run(v3), parse_dry_run(v0)
+        s3 = [j for j in j3 if j["name"].startswith("score-")]
+        check("5.4 dry run with --subset v3/candidate has one score job depending on the ensemble job; with v0/candidate none",
+              len(s3) == 1 and s3[0]["dep_names"] == ["ensemble-t"] and not [j for j in j0 if j["name"].startswith("score-")], f"{s3[0]['cmd'] if s3 else None}")
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+    # 5.6 boundary
+    srcs = [REPO_ROOT / "vlapoc" / "influence.py", REPO_ROOT / "vlapoc" / "attribution.py"]
+    mention = [p.name for p in srcs if "recovery" in p.read_text().replace("recovery_", "").replace("# ", "") and "vlapoc.recovery" in p.read_text()]
+    tree = ast.parse((REPO_ROOT / "scripts" / "stage.py").read_text())
+    top = [n for n in tree.body if isinstance(n, (ast.Import, ast.ImportFrom)) and "recovery" in ast.dump(n)]
+    check("5.6 the scoring code is imported only inside stage.py's score command, never by influence.py / attribution.py (boundary scan clean)",
+          scan_boundary(srcs) == [] and not mention and not top and "vlapoc.recovery" not in " ".join(str(p) for p in method_sources()), f"mentions {mention}, top-level imports {len(top)}")
+    sha1 = db_sha()
+    check("R7 real mlflow.db sha256 unchanged", sha0 == sha1, f"{sha0[:16]}... == {sha1[:16]}...")
+    ok_all = all(r[1] for r in results)
+    ARTIFACTS.mkdir(parents=True, exist_ok=True)
+    (ARTIFACTS / "s5_recovery.json").write_text(json.dumps({"SYNTHETIC": "planted score tables over the real v3 answer key", "pass": ok_all, "checks": [{"name": n, "pass": p_, "detail": d} for n, p_, d in results]}, indent=1))
+    print(f"S5 pass: {ok_all} ({sum(r[1] for r in results)}/{len(results)}, {time.time() - t0:.0f}s)")
+    return 0 if ok_all else 1
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--blind", action="store_true", help="S1")
     ap.add_argument("--functionals", action="store_true", help="S3")
     ap.add_argument("--pipeline", type=Path, nargs="?", const=Path("data/scratch/dry.txt"), default=None,
                     help="S4 AC4.1-4.3, 4.6: parse server_pipeline.py --dry-run (writes the parsed jobs to this path)")
+    ap.add_argument("--recovery", action="store_true", help="S5 AC5.1-5.6: recovery matrix on SYNTHETIC planted scores")
     ap.add_argument("--step4", action="store_true", help="S4 AC4.4-4.5: step4-summary on synthetic verdicts, select arm counts")
     ap.add_argument("--manifest", type=Path, default=None, help="S3 AC3.2: a manifest written by influence.featurize")
     a = ap.parse_args()
@@ -786,6 +897,8 @@ def main() -> int:
         return pipeline(a.pipeline)
     if a.step4:
         return step4_synthetic()
+    if a.recovery:
+        return recovery()
     ap.print_help()
     return 2
 
