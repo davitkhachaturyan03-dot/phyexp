@@ -281,3 +281,48 @@ Tracked artifacts these verifiers rewrote, diffed and restored with `git checkou
   `AC3.8`, `files_scanned` 15 -> 193, a `names` block removed). Not caused by this batch: `verify_lineage_s3.py` was last
   changed by earlier features (`84e166a`, `91f0902`), the planner measured the same rewrite before any change here
   (plan risk P4), and the script exits 0. The tracked file is stale relative to its own verifier; restored, not committed.
+
+## Round 1 / Batch 2 (S5–S8): 2026-10-20
+
+Real `data/lineage/mlflow.db` sha256 at the start of batch 2: `306af4123fda7e635892d459a2e34008ba1cb62f6c4fce152c546e0da7bdde79`.
+
+### S5: Score attribution against the planted ground truth (recovery per corruption type x metric)
+**Files:** `vlapoc/recovery.py` (new; ground-truth side: `EXPECTED_METRICS`, `recovery_matrix`, `recovery_run`), `scripts/stage.py`
+(`score` subcommand), `scripts/server_pipeline.py` (`has_answer_key`, a `score` job after the ensemble when the base subset's version
+has labels; docstring recommends `--subset v3/candidate` for the injection run), `scripts/verify_training_attribution.py`
+(`--recovery`).
+
+**Order of work (as the coordinator asked):** the PoC §4.5 type-to-metric hypotheses were committed alone in `b4790ee`
+(`vlapoc/recovery.py` containing only `EXPECTED_METRICS` and its grounding), before any scoring code or any score table existed;
+check 5.3b reads that commit back from git.
+
+**Premises checked:**
+- "the PoC states the expected metric per type" → quoted PoC §4.5 p.11: only two mappings are named ("idle or hesitant segments aimed at
+  time-based metrics", "noisy gripper release near placement aimed at drops"). The plan's map "idle_padding → rmst60/hrt60_lin;
+  gripper_release → f30/censored60" holds; the other five types have no PoC mapping, so none was invented (`None`).
+- "`groundtruth.score_run` exists but is not wired" → it scores one column per run; for a whole table it would create one MLflow run per
+  column (28+), so `recovery_run` wraps `groundtruth.score_recovery` and records one `score` run per table instead (a design choice).
+- Heuristic numbers: `s5_v3_r3_bands.csv` best-heuristic names all exist in `s5_v3_r3_recovery_heuristics.csv` (7/7 looked up, incl.
+  `length_vs_task_lowest`) → holds.
+
+**Acceptance criteria** (all on SYNTHETIC planted score tables over the real v3 answer key; nothing here is a result about any policy):
+- ✅ AC5.1 `.venv/bin/python scripts/verify_training_attribution.py --recovery` → `idle_padding AUROC 1.0 in harm_rmst60 and
+  gripper_release 1.0 in harm_f30  1.0, 1.0`; a random column's pooled AUROC `0.527` (band [0.4, 0.6] is the plan's inferred band for 91 of
+  960; per type, with 13 positives, the random AUROC's s.d. is about 0.08, so the band is applied to the pooled value only); real db unchanged.
+- ✅ AC5.2 `48 rows = 8 x 6 columns` (7 types + pooled); `best_heuristic_auroc` equals the bands CSV `7/7`.
+- ✅ AC5.3 `matches_hypothesis` True for idle_padding (best `harm_rmst60`) and gripper_release (best `harm_f30`), `None` for the five
+  types without a PoC mapping; 5.3b hypotheses committed first (`b4790ee`); 5.3c run records `synthetic=True`.
+- ✅ AC5.4 dry run `--subset v3/candidate`: one job `score-t` with dependency `ensemble-t`
+  (`python scripts/stage.py --chain t-... score --scores attribute-t-ens --version v3 --subset candidate --name score-t`); with the default
+  `v0/candidate` no score job.
+- ✅ AC5.5 a table keyed to v0/candidate is refused: `score table keys != parent subset's episode versions: 91 unknown/stale ...`.
+- ✅ AC5.6 `scan_boundary` clean on `influence.py`/`attribution.py`; no mention of `vlapoc.recovery` there; the only import of the scoring
+  module is inside `stage.py`'s `cmd_score` (0 top-level imports).
+- ✅ real `mlflow.db` sha256 unchanged (`306af4123fda7e63…` before and after).
+
+**Demo artifacts:** `artifacts/s5_recovery.json` (11 checks). The recovery table layout (type x harm column, AUROC and recall@13 beside the
+best heuristic) is `recovery_matrix.csv` as written by the check; it is deleted with the scratch store, because synthetic numbers must not
+be kept as if they were results.
+
+**Notes / divergences:** recall@k uses k = number injected per type (13), as in the ground-truth feature. `recovery_run` skips (and names)
+harm columns containing NaN, since `check_score_keys` refuses NaN scores.
