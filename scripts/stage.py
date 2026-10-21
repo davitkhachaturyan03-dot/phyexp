@@ -72,23 +72,51 @@ PRETRAINED_REF = "lerobot/smolvla_base@d9f33c94a60fb382c90dea2164c96845bd955e28"
 FEATS_ROOT = REPO_ROOT / "data" / "attribution" / "feats"
 
 
-def run_id(ref: str, stage: str) -> str:
-    """``ref`` itself if it is a run id, else the latest FINISHED ``stage`` run named ``ref``."""
+# Per-invocation context set by ``main`` from the global options: the lineage store every call reads and writes
+# (``--lineage-root``, e.g. a ``runs.scratch_lineage_copy``), the chain prefix names are resolved within, and ``--latest``.
+LR: Path | None = None
+CHAIN_PREFIX: str | None = None
+LATEST = False
+
+
+def chain_prefix_of(chain: str | None) -> str | None:
+    """``"<tag>-"`` for a chain id ``"<tag>-<sha8>"`` (``server_pipeline.py`` builds ``f"{tag}-{sha[:8]}"``), else ``None``."""
+    return chain.rsplit("-", 1)[0] + "-" if chain and "-" in chain else None
+
+
+def run_id(ref: str, stage: str, chain_prefix: str | None = None, latest: bool = False, lineage_root: Path | None = None) -> str:
+    """``ref`` itself if it is a run id, else the FINISHED ``stage`` run named ``ref``.
+
+    With ``chain_prefix`` (``"<tag>-"``), only runs whose ``vlapoc.chain`` tag starts with it are candidates, so a
+    re-submitted or partly re-run chain cannot silently pick up another chain's run of the same name (PoC §2.1 item 1
+    p. 3: every run tied to what it consumed). Two or more candidates raise ``ValueError`` unless ``latest``, which takes
+    the most recent. Without ``chain_prefix`` (hand use) the most recent run of that name wins, as before.
+    """
     from vlapoc.runs import client, experiment_id
 
     if re.fullmatch(r"[0-9a-f]{32}", ref):
         return ref
-    runs = client().search_runs([experiment_id()], f"tags.mlflow.runName = '{ref}' and tags.stage = '{stage}' "
-                                "and attributes.status = 'FINISHED'", order_by=["attributes.start_time DESC"], max_results=1)
+    runs = client(lineage_root).search_runs([experiment_id(lineage_root)], f"tags.mlflow.runName = '{ref}' and tags.stage = '{stage}' "
+                                            "and attributes.status = 'FINISHED'", order_by=["attributes.start_time DESC"], max_results=1000)
+    if chain_prefix:
+        runs = [r for r in runs if r.data.tags.get("vlapoc.chain", "").startswith(chain_prefix)]
+        if len(runs) > 1 and not latest:
+            raise ValueError(f"{len(runs)} FINISHED {stage} runs named {ref!r} in chains {sorted({r.data.tags['vlapoc.chain'] for r in runs})}; "
+                             "pass --latest to take the most recent, or use a run id")
     if not runs:
-        raise SystemExit(f"no FINISHED {stage} run named {ref!r}")
+        raise SystemExit(f"no FINISHED {stage} run named {ref!r}" + (f" in a chain starting {chain_prefix!r}" if chain_prefix else ""))
     return runs[0].info.run_id
 
 
-def run_name(rid: str) -> str:
+def rid(ref: str, stage: str) -> str:
+    """``run_id`` with this invocation's lineage root, chain prefix and ``--latest``."""
+    return run_id(ref, stage, CHAIN_PREFIX, LATEST, LR)
+
+
+def run_name(run: str) -> str:
     from vlapoc.runs import client
 
-    return client().get_run(rid).info.run_name
+    return client(LR).get_run(run).info.run_name
 
 
 def feats_prefix(train_rid: str, which: str, eval_rid: str | None = None) -> Path:
@@ -103,7 +131,7 @@ def subset_ref(ref: str) -> str:
 
     if not ref.startswith("select:"):
         return ref
-    return client().get_run(run_id(ref.split(":", 1)[1], "select")).data.tags["output.subset"].split(":", 1)[1]
+    return client(LR).get_run(rid(ref.split(":", 1)[1], "select")).data.tags["output.subset"].split(":", 1)[1]
 
 
 def method_view(ref: str, lineage_root: Path | None = None):
@@ -118,7 +146,7 @@ def method_view(ref: str, lineage_root: Path | None = None):
     """
     from vlapoc.method_data import open_for_method
 
-    return open_for_method(subset_ref(ref), lineage_root)
+    return open_for_method(subset_ref(ref), lineage_root if lineage_root is not None else LR)
 
 
 def cmd_train(a) -> dict:
@@ -127,7 +155,7 @@ def cmd_train(a) -> dict:
     method_view(a.subset)
     return train_run(subset_ref(a.subset), a.name, seed=a.seed, steps=a.steps, batch_size=a.batch_size, policy_type="smolvla",
                      policy_overrides={"load_vlm_weights": False}, device=a.device, pretrained_path=PRETRAINED_DIR,
-                     pretrained_ref=a.pretrained_ref, smoke=a.smoke, chain=a.chain)
+                     pretrained_ref=a.pretrained_ref, smoke=a.smoke, chain=a.chain, lineage_root=LR)
 
 
 def cmd_eval(a) -> dict:
@@ -137,15 +165,15 @@ def cmd_eval(a) -> dict:
     out_dir = REPO_ROOT / "data" / "eval" / a.name
     if out_dir.exists() and any(out_dir.iterdir()):
         raise SystemExit(f"{out_dir} is not empty (a previous attempt?); move it aside before re-running")
-    return eval_run(f"train:{run_id(a.train, 'train')}", tasks, a.n, a.name, out_dir=out_dir, batch_size=a.batch_size,
+    return eval_run(f"train:{rid(a.train, 'train')}", tasks, a.n, a.name, out_dir=out_dir, batch_size=a.batch_size,
                     device=a.device, record_trajectories=not a.no_trajectories, chain=a.chain,
-                    attribution_grade=not a.smoke, smoke=a.smoke)
+                    attribution_grade=not a.smoke, smoke=a.smoke, lineage_root=LR)
 
 
 def cmd_returns(a) -> dict:
     from vlapoc.returns import returns_run
 
-    return returns_run(run_id(a.eval, "eval"), a.name, chain=a.chain)
+    return returns_run(rid(a.eval, "eval"), a.name, chain=a.chain, lineage_root=LR)
 
 
 def cmd_features(a) -> dict:
@@ -153,15 +181,15 @@ def cmd_features(a) -> dict:
     from vlapoc.lineage import file_digests, sha256_json
     from vlapoc.runs import _training_subset, client
 
-    c = client()
-    tid = run_id(a.train, "train")
+    c = client(LR)
+    tid = rid(a.train, "train")
     tr = c.get_run(tid)
     ckpt = REPO_ROOT / tr.data.tags["checkpoint.path"]
     if a.which == "train":
-        view = method_view(_training_subset(tr, None).subset_id)  # S1: root and episodes come from the MethodView
+        view = method_view(_training_subset(tr, LR).subset_id)  # S1: root and episodes come from the MethodView
         root, episodes, eid = view.lerobot_root, list(view.episode_indices), None
     else:
-        eid = run_id(a.eval, "eval")
+        eid = rid(a.eval, "eval")
         ev = c.get_run(eid)
         root = Path(a.root) if a.root else REPO_ROOT / "data" / "eval" / ev.info.run_name / "trajectories"
         recorded = ev.data.tags.get("output.trajectories", "").split(":", 1)[-1]
@@ -179,18 +207,18 @@ def cmd_features(a) -> dict:
 def cmd_attribute(a) -> dict:
     from vlapoc.attribution import attribute_run
 
-    tid, eid = run_id(a.train, "train"), run_id(a.eval, "eval")
-    out = attribute_run(tid, eid, run_id(a.returns, "returns"), feats_prefix(tid, "train"),
+    tid, eid = rid(a.train, "train"), rid(a.eval, "eval")
+    out = attribute_run(tid, eid, rid(a.returns, "returns"), feats_prefix(tid, "train"),
                         feats_prefix(tid, "rollouts", eid), a.name, damping=a.damping, center=not a.no_center,
                         device=a.device, chain=a.chain, return_encoding="pm1" if a.cupid_returns else "raw",
-                        allow_partial=a.allow_partial)
+                        allow_partial=a.allow_partial, lineage_root=LR)
     return {k: v for k, v in out.items() if k != "agreement"}
 
 
 def cmd_ensemble(a) -> dict:
     from vlapoc.attribution import ensemble_run
 
-    return ensemble_run([run_id(r, "attribute") for r in a.runs], a.name, chain=a.chain)
+    return ensemble_run([rid(r, "attribute") for r in a.runs], a.name, chain=a.chain, lineage_root=LR)
 
 
 def select_params(op: str, headline: bool = False, pipeline_curation: str | None = None) -> dict:
@@ -210,16 +238,16 @@ def cmd_select(a) -> dict:
     method_view(a.parent)  # S1: the parent opens through the method loader (fence / integrity / ground-truth chain)
     score_path, sid = None, None
     if a.op.startswith("drop_top_k"):
-        sid = run_id(a.scores, "attribute")
+        sid = rid(a.scores, "attribute")
         (REPO_ROOT / "data" / "scratch").mkdir(parents=True, exist_ok=True)
         tmp = tempfile.mkdtemp(prefix="select_", dir=REPO_ROOT / "data" / "scratch")
         score_path = Path(tmp) / "attribution_scores.parquet"
-        _artifact_table(client().get_run(sid), "attribution_scores", None).to_parquet(score_path, index=False)
+        _artifact_table(client(LR).get_run(sid), "attribution_scores", LR).to_parquet(score_path, index=False)
     extra = select_params(a.op, a.headline, a.pipeline_curation)
-    rid, child = select_run(subset_ref(a.parent), a.name, a.op, k=a.k, seed=a.seed, score_path=score_path,
+    sel_id, child = select_run(subset_ref(a.parent), a.name, a.op, k=a.k, seed=a.seed, score_path=score_path,
                             metric=a.metric, score_run_id=sid, direction=a.direction, chain=a.chain,
-                            require_declaration=a.op.startswith("drop_top_k"), extra_params=extra)
-    return {"run_id": rid, "subset_id": child.subset_id, "n_episodes": len(child.episode_ids)}
+                            require_declaration=a.op.startswith("drop_top_k"), extra_params=extra, lineage_root=LR)
+    return {"run_id": sel_id, "subset_id": child.subset_id, "n_episodes": len(child.episode_ids)}
 
 
 def cmd_verify(a) -> dict:
@@ -230,7 +258,7 @@ def cmd_verify(a) -> dict:
         raise SystemExit("--comparison needs --treated, --control and --seed-id")
     if a.comparison:  # Step 4 pipeline: which comparison this verdict is (read back by ``step4-summary``)
         tags = {"step4.kind": a.comparison, "step4.treated": a.treated, "step4.control": a.control, "step4.seed": a.seed_id}
-    v = verify_run(run_id(a.a, "eval"), run_id(a.b, "eval"), a.name, family=a.family, chain=a.chain, extra_tags=tags)
+    v = verify_run(rid(a.a, "eval"), rid(a.b, "eval"), a.name, family=a.family, chain=a.chain, extra_tags=tags, lineage_root=LR)
     return {k: v[k] for k in ("run_id", "label", "attribution_grade") if k in v}
 
 
@@ -238,21 +266,25 @@ def cmd_score(a) -> dict:
     """Ground-truth side: recovery of the planted corruptions by an attribute run's scores (``vlapoc.recovery``)."""
     from vlapoc.recovery import recovery_run
 
-    sid = run_id(a.scores, "attribute")
-    return recovery_run(sid, a.version, a.name, subset=a.subset, chain=a.chain)
+    sid = rid(a.scores, "attribute")
+    return recovery_run(sid, a.version, a.name, subset=a.subset, chain=a.chain, lineage_root=LR)
 
 
 def cmd_step4_summary(a) -> dict:
     """Step 4's table over the chain's verify runs (``vlapoc.step4``): seed consistency per arm and comparison."""
     from vlapoc.step4 import summary_run
 
-    out = summary_run(a.tag, a.name, chain=a.chain_id, run_chain=a.chain)
+    out = summary_run(a.tag, a.name, chain=a.chain_id, run_chain=a.chain, lineage_root=LR)
     return out
 
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="scripts/stage.py", description=__doc__.split("\n\n")[0])
-    p.add_argument("--chain", default=None, help="tag vlapoc.chain on the run (groups one experiment)")
+    p.add_argument("--chain", default=None, help="tag vlapoc.chain on the run (groups one experiment); run names are "
+                   "resolved only among runs of chains starting with its <tag>-")
+    p.add_argument("--lineage-root", type=Path, default=None,
+                   help="a lineage store other than data/lineage (e.g. runs.scratch_lineage_copy, for tests); every stage reads and writes it")
+    p.add_argument("--latest", action="store_true", help="when two FINISHED runs in the chain scope share a name, take the most recent")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     s = sub.add_parser("train")
@@ -349,6 +381,8 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--chain-id", default=None, help="full chain id <tag>-<sha8> if the tag matches several chains")
 
     a = p.parse_args(argv)
+    global LR, CHAIN_PREFIX, LATEST
+    LR, CHAIN_PREFIX, LATEST = a.lineage_root, chain_prefix_of(a.chain), a.latest
     out = globals()[f"cmd_{a.cmd.replace('-', '_')}"](a)
     print(json.dumps(out, indent=1, default=str))
     return 0

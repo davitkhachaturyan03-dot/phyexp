@@ -33,8 +33,12 @@ episodes through ``checkpoint_policy`` and compare with the cluster code's own l
 draws. The October feature *files* are not the reference: that code left flow-matching times unseeded.
 
     .venv/bin/python scripts/verify_attribution.py
-    .venv/bin/python scripts/verify_attribution.py --regress /raid/chem/gor/vla-curation/outputs/attribution/clean_full_s0 \\
-        /raid/chem/gor/vla-curation/outputs/feats/clean_full_s0 /raid/chem/gor/vla-curation/outputs/rollouts/clean_full_s0_attrib
+    .venv/bin/python scripts/verify_attribution.py --regress <old>/outputs/attribution/clean_full_s0 \\
+        <old>/outputs/feats/clean_full_s0 <old>/outputs/rollouts/clean_full_s0_attrib
+    .venv/bin/python scripts/verify_attribution.py --gpu-smoke <pretrained_model> <dataset root> <old train feature prefix> \\
+        --old-python <old env>/bin/python --old-src <old VLA-data-curation>/src --old-hf-home <old hf cache>
+(``<old>`` is the cluster project VLA-data-curation's directory; its paths are arguments, not constants, so this file holds
+no machine-specific path. Server-side evidence only.)
 """
 
 from __future__ import annotations
@@ -135,7 +139,9 @@ def synthetic_table() -> None:
 
 
 def synthetic_select() -> None:
-    with tempfile.TemporaryDirectory() as tmp:
+    scratch = Path(__file__).resolve().parents[1] / "data" / "scratch"
+    scratch.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="verify_attr_", dir=scratch) as tmp:  # never /tmp (CLAUDE.md scratch rule)
         root = Path(tmp)
         vid = "f" * 64
         n_task = 6
@@ -373,8 +379,7 @@ def regress(attr_dir: Path, feats_dir: Path, rollouts_dir: Path) -> None:
           f"shape {m.shape} vs {old.shape}, max rel err {err:.2e}")
 
 
-OLD_PY = "/raid/chem/gor/vla-curation/envs/lerobot/bin/python"
-OLD_SRC = "/auto/home/gor/projects/VLA-data-curation/src"
+OLD = {"python": None, "src": None, "hf_home": None}  # set from --old-python/--old-src/--old-hf-home (server-side checks only)
 OLD_REPLAY = """
 import json, sys, torch
 from lerobot.policies.factory import make_pre_post_processors
@@ -392,8 +397,8 @@ def old_times(ckpt: Path, k: int) -> list[float]:
     import os
     import subprocess
 
-    env = {**os.environ, "PYTHONPATH": OLD_SRC, "HF_HOME": "/raid/chem/gor/vla-curation/hf_cache", "HF_HUB_OFFLINE": "1"}
-    out = subprocess.run([OLD_PY, "-c", OLD_REPLAY, str(ckpt), str(k)], env=env, check=True, capture_output=True, text=True)
+    env = {**os.environ, "PYTHONPATH": OLD["src"], "HF_HOME": OLD["hf_home"], "HF_HUB_OFFLINE": "1"}
+    out = subprocess.run([OLD["python"], "-c", OLD_REPLAY, str(ckpt), str(k)], env=env, check=True, capture_output=True, text=True)
     return json.loads(out.stdout.strip().splitlines()[-1])
 
 
@@ -404,7 +409,7 @@ def _old_reference(ckpt: Path, root: Path, ep: np.ndarray, fr: np.ndarray, draws
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
     from lerobot.policies.factory import make_pre_post_processors
 
-    sys.path.insert(0, OLD_SRC)
+    sys.path.insert(0, OLD["src"])
     from vlacur.influence import KroneckerProjector, load_policy
 
     policy, cfg = load_policy(str(ckpt), "cuda")
@@ -490,6 +495,9 @@ def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--regress", nargs=3, type=Path, metavar=("ATTR_DIR", "FEATS_DIR", "ROLLOUTS_DIR"))
     p.add_argument("--gpu-smoke", nargs=3, type=Path, metavar=("CKPT", "DATASET_ROOT", "OLD_TRAIN_PREFIX"))
+    p.add_argument("--old-python", help="--gpu-smoke only: the cluster project's python")
+    p.add_argument("--old-src", help="--gpu-smoke only: the cluster project's src directory")
+    p.add_argument("--old-hf-home", help="--gpu-smoke only: the cluster project's HF cache")
     p.add_argument("--cpu-smoke", nargs=2, type=Path, metavar=("CKPT", "DATASET_ROOT"), help="AC2.4 (S2)")
     p.add_argument("--device", default="cpu", help="device for --cpu-smoke (mps or cpu)")
     p.add_argument("--episodes", type=int, nargs="+", default=[0, 1, 2])
@@ -499,6 +507,9 @@ def main() -> int:
     if a.regress:
         regress(*a.regress)
     elif a.gpu_smoke:
+        if not (a.old_python and a.old_src and a.old_hf_home):
+            p.error("--gpu-smoke needs --old-python, --old-src and --old-hf-home")
+        OLD.update(python=a.old_python, src=a.old_src, hf_home=a.old_hf_home)
         gpu_smoke(*a.gpu_smoke, a.episodes, a.scratch)
     elif a.cpu_smoke:
         cpu_smoke(*a.cpu_smoke, a.device, a.scratch)

@@ -36,13 +36,18 @@ its own metric"; PoC §2.3 (p. 4): 2-3 seeds per data configuration; every arm u
 data is the only variable). Per-task top-k is grounded in ATHENA §3.2 p. 3 and §4.2 Eq. 7 p. 5 (not in the PoC), global
 top-k is the PoC's literal Step 4.1; the owner approved building both (training-attribution brief, Q1).
 
+Cost (inferred, see the batch-2 log): the default is large because ``--curation both`` doubles the arms. Shrink it with
+``--curation per_task``, fewer ``--metrics`` / ``--seeds`` / ``--random-draws``, or ``--no-ac75``; every arm costs
+(seeds) x (one train + one eval + its verifies).
+
 Run names are ``<stage>-<tag>[-<arm>]-s<S>``; ``stage.py`` resolves them to run ids when each job starts, so the
 chain can be submitted before any run exists. The chain refuses to submit from a dirty tree and every job refuses
 to start on a commit other than the one it was submitted from (``slurm/guard.sh``).
 
 Usage::
 
-    .venv/bin/python scripts/server_pipeline.py --tag v0cand --dry-run       # print the sbatch commands
+    cp slurm/site.env.example slurm/site.env                                   # once per machine; edit it
+    .venv/bin/python scripts/server_pipeline.py --tag v0cand --dry-run       # print every job with its full sbatch argv
     .venv/bin/python scripts/server_pipeline.py --tag v0cand                  # submit everything
     .venv/bin/python scripts/server_pipeline.py --tag v0cand --from select    # base already done: arms only
 """
@@ -61,15 +66,36 @@ PY = "python scripts/stage.py"
 PHASES = ("base", "rank", "select", "arms")
 
 
+def load_site(path: Path) -> dict[str, str]:
+    """Parse a site file (``slurm/site.env``; format of ``slurm/site.env.example``): ``KEY=VALUE`` lines, ``${KEY}`` expands
+    to an earlier key, ``#`` comments. Raises ``SystemExit`` naming the missing keys (SCRATCH_ROOT, PARTITION, LOG_DIR)."""
+    site: dict[str, str] = {}
+    for ln in Path(path).read_text().splitlines():
+        ln = ln.strip()
+        if not ln or ln.startswith("#") or "=" not in ln:
+            continue
+        k, _, v = ln.removeprefix("export ").partition("=")
+        for key, val in site.items():
+            v = v.replace("${" + key + "}", val)
+        site[k.strip()] = v.strip().strip('"')
+    site.setdefault("LOG_DIR", f"{site['SCRATCH_ROOT']}/logs" if "SCRATCH_ROOT" in site else "")
+    missing = [k for k in ("SCRATCH_ROOT", "PARTITION", "LOG_DIR") if not site.get(k)]
+    if missing:
+        sys.exit(f"{path}: missing {missing}; see slurm/site.env.example")
+    return site
+
+
 class Chain:
-    def __init__(self, dry: bool, after: list[str], sha: str, chain: str, partition: str):
+    def __init__(self, dry: bool, after: list[str], sha: str, chain: str, partition: str, log_dir: str = "", site_file: str = ""):
         self.dry, self.after, self.sha, self.chain, self.partition = dry, after, sha, chain, partition
+        self.log_dir, self.site_file = log_dir, site_file
         self.n = 0
 
     def submit(self, script: str, cmd: str, name: str, deps: list[str] = (), array: int | None = None,
                time: str | None = None) -> str:
         """sbatch ``slurm/<script>`` with CMD; returns the job id (or a placeholder in a dry run)."""
-        args = ["sbatch", "--parsable", f"--job-name={name}", f"--partition={self.partition}"]
+        args = ["sbatch", "--parsable", f"--job-name={name}", f"--partition={self.partition}",
+                f"--output={self.log_dir}/{'%x-%A_%a.out' if array else '%x-%j.out'}"]
         if array:
             args.append(f"--array=0-{array - 1}")
         if time:
@@ -79,10 +105,10 @@ class Chain:
             args.append("--dependency=afterok:" + ":".join(deps))
         args.append(str(REPO / "slurm" / script))
         cmd = cmd.replace(PY, f"{PY} --chain {shlex.quote(self.chain)}")
-        env = {"CMD": cmd, "EXPECT_SHA": self.sha, "PHYEXP_DIR": str(REPO)}
+        env = {"CMD": cmd, "EXPECT_SHA": self.sha, "PHYEXP_DIR": str(REPO), **({"SITE_ENV": self.site_file} if self.site_file else {})}
         self.n += 1
         if self.dry:
-            print(f"[dry {self.n}] {name}  deps={','.join(deps) or '-'}\n    {cmd}")
+            print(f"[dry {self.n}] {name}  deps={','.join(deps) or '-'}\n    {cmd}\n    {shlex.join(args)}")
             return f"J{self.n}"
         job = subprocess.run(args, env={**os.environ, **env}, check=True, capture_output=True, text=True).stdout.strip()
         job = job.split(";")[0]
@@ -159,7 +185,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--train-shards", type=int, default=4)
     p.add_argument("--rollout-shards", type=int, default=4)
     p.add_argument("--eval-batch", type=int, default=50, help="AC5.8: 50, or one smaller divisor of 50 for every arm")
-    p.add_argument("--partition", default="a100")
+    p.add_argument("--site", type=Path, default=None,
+                   help="site file with SCRATCH_ROOT, PARTITION, LOG_DIR (default slurm/site.env; a dry run falls back to "
+                        "slurm/site.env.example, the cluster's values are in docs/site-profile-cluster.env)")
+    p.add_argument("--partition", default=None, help="override the site file's PARTITION")
     p.add_argument("--from", dest="start", choices=PHASES, default="base", help="first phase to submit")
     p.add_argument("--to", dest="stop", choices=PHASES, default="arms", help="last phase to submit")
     p.add_argument("--after", default="", help="comma-separated job ids every submitted job waits for")
@@ -171,7 +200,14 @@ def main(argv: list[str] | None = None) -> int:
                            check=True, capture_output=True, text=True).stdout.strip()
     if dirty and not a.dry_run:
         sys.exit(f"uncommitted changes under vlapoc/, scripts/ or slurm/; commit first:\n{dirty}")
-    ch = Chain(a.dry_run, [x for x in a.after.split(",") if x], sha, f"{a.tag}-{sha[:8]}", a.partition)
+    site_path = a.site or (REPO / "slurm" / "site.env")
+    if not site_path.exists():
+        if not a.dry_run:
+            sys.exit(f"{site_path} not found: copy slurm/site.env.example to slurm/site.env and edit it (docs/site-profile-cluster.env)")
+        site_path = REPO / "slurm" / "site.env.example"
+    site = load_site(site_path)
+    ch = Chain(a.dry_run, [x for x in a.after.split(",") if x], sha, f"{a.tag}-{sha[:8]}", a.partition or site["PARTITION"],
+               site["LOG_DIR"], str(a.site) if a.site else "")
     on = set(PHASES[PHASES.index(a.start): PHASES.index(a.stop) + 1])
     t, eb = a.tag, a.eval_batch
 

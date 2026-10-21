@@ -36,3 +36,4 @@ docs/papers/
 calls/*
 !calls/README.md
 !calls/instructions/
+slurm/site.env

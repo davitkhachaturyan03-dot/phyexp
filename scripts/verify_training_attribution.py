@@ -879,6 +879,97 @@ def recovery() -> int:
     return 0 if ok_all else 1
 
 
+# ---------------------------------------------------------------------------------------------
+# S6: testable and portable chain
+# ---------------------------------------------------------------------------------------------
+
+
+def names() -> int:
+    """S6, AC6.1-AC6.6 (AC6.4's second half, the whole chain on a scratch store, is S8's ``--integration``)."""
+    import glob
+    import subprocess
+
+    from vlapoc.runs import scratch_lineage_copy, stage_run
+    import stage as stage_mod
+
+    t0 = time.time()
+    sha0 = db_sha()
+    results: list[tuple[str, bool, str]] = []
+
+    def check(name: str, ok: bool, detail: str = "") -> None:
+        results.append((name, bool(ok), detail))
+        print(f"[{'PASS' if ok else 'FAIL'}] {name}{'  ' + detail if detail else ''}")
+
+    g = subprocess.run(["git", "grep", "-n", "-E", "/raid|/auto/home", "--", "slurm", "scripts", "vlapoc"], cwd=REPO_ROOT, capture_output=True, text=True)
+    check("6.1 git grep for /raid and /auto/home in slurm, scripts, vlapoc finds nothing", g.stdout.strip() == "", g.stdout.strip()[:200] or "no matches")
+    files = sorted(glob.glob(str(REPO_ROOT / "slurm" / "*.sh")) + glob.glob(str(REPO_ROOT / "slurm" / "*.sbatch")))
+    bad = [f for f in files if subprocess.run(["bash", "-n", f]).returncode != 0]
+    check("6.2 bash -n passes on every slurm/*.sh and *.sbatch", not bad and len(files) == 4, f"{len(files)} files")
+    r = subprocess.run(["bash", "-c", f"cd {REPO_ROOT} && SITE_ENV={SCRATCH}/does_not_exist.env && export SITE_ENV && source slurm/env.sh"], capture_output=True, text=True)
+    check("6.2b env.sh without a site.env exits non-zero with a message naming site.env.example", r.returncode != 0 and "site.env.example" in r.stderr, f"rc={r.returncode}: {r.stderr.strip()[:140]}")
+    # 6.3 chain-scoped names on a scratch store
+    shutil.rmtree(SCRATCH / "names", ignore_errors=True)
+    base = SCRATCH / "names"
+    base.mkdir(parents=True)
+    try:
+        lr = scratch_lineage_copy(base / "lineage", mlflow_db=False)
+        ids = {}
+        for chain in ("t-aaaa1111", "u-bbbb2222", "t-cccc3333"):
+            with stage_run("train", "train-t-s0", lr, chain=chain, allow_dirty=True) as r_:
+                ids[chain] = r_.run_id
+        got = stage_mod.run_id("train-t-s0", "train", "u-", False, lr)
+        check("6.3 run_id with a chain prefix returns the run of that chain only", got == ids["u-bbbb2222"], f"u- scope -> {got[:8]} (u-bbbb2222 is {ids['u-bbbb2222'][:8]})")
+        try:
+            stage_mod.run_id("train-t-s0", "train", "t-", False, lr)
+            check("6.3b two runs of one name in scope (t-aaaa1111, t-cccc3333) raise without --latest", False)
+        except ValueError as e:
+            check("6.3b two runs of one name in scope (t-aaaa1111, t-cccc3333) raise without --latest", "--latest" in str(e), str(e)[:130])
+        got = stage_mod.run_id("train-t-s0", "train", "t-", True, lr)
+        check("6.3c ... and --latest takes the most recent of them", got == ids["t-cccc3333"])
+        check("6.3d without a chain (hand use) the most recent run of the name wins, as before",
+              stage_mod.run_id("train-t-s0", "train", None, False, lr) == ids["t-cccc3333"])
+        check("6.3e chain prefixes derive from chain ids", stage_mod.chain_prefix_of("v0cand-1a2b3c4d") == "v0cand-" and stage_mod.chain_prefix_of(None) is None)
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+    # 6.4 every stage call is threaded with the lineage root
+    src = (REPO_ROOT / "scripts" / "stage.py").read_text()
+    tree = ast.parse(src)
+    bare = [n.lineno for n in ast.walk(tree) if isinstance(n, ast.Call) and getattr(n.func, "id", "") == "client" and not n.args]
+    bare_lr = [n.lineno for fn in tree.body if isinstance(fn, ast.FunctionDef) and fn.name.startswith("cmd_") for n in ast.walk(fn)
+               if isinstance(n, ast.Call) and getattr(n.func, "id", "") in ("train_run", "eval_run", "returns_run", "attribute_run", "ensemble_run", "select_run", "verify_run", "recovery_run", "summary_run")
+               and not any(k.arg == "lineage_root" for k in n.keywords)]
+    p = subprocess.run([sys.executable, "scripts/stage.py", "--help"], cwd=REPO_ROOT, capture_output=True, text=True)
+    check("6.4 stage.py has a global --lineage-root; no client() call without it; every tracked-stage call passes lineage_root=LR",
+          "--lineage-root" in p.stdout and not bare and not bare_lr, f"bare client(): {bare}; calls missing lineage_root: {bare_lr}. The whole chain on a scratch store is S8 (--integration)")
+    # 6.5 dry run flags
+    out = subprocess.run([sys.executable, "scripts/server_pipeline.py", "--tag", "t", "--dry-run", "--curation", "per_task", "--seeds", "0"], cwd=REPO_ROOT, capture_output=True, text=True, check=True).stdout
+    ex = {k: v for k, v in (ln.split("=", 1) for ln in (REPO_ROOT / "slurm" / "site.env.example").read_text().splitlines() if "=" in ln and not ln.startswith("#"))}
+    argv = [ln.strip() for ln in out.splitlines() if ln.strip().startswith("sbatch ")]
+    want_log = ex["LOG_DIR"].replace("${SCRATCH_ROOT}", ex["SCRATCH_ROOT"])
+    arr = [a_ for a_ in argv if "--array" in a_]
+    check("6.5 the dry run prints the full sbatch argv with --partition=<PARTITION> and --output=<LOG_DIR>/... from site.env.example",
+          len(argv) > 10 and all(f"--partition={ex['PARTITION']}" in a_ and f"--output={want_log}/" in a_ for a_ in argv) and all("%A_%a" in a_ for a_ in arr) and arr,
+          f"{len(argv)} sbatch lines; e.g. {argv[0][:200]}")
+    # 6.6 verify_attribution leaves nothing outside data/scratch
+    tmp = REPO_ROOT / "data" / "scratch" / "tmpdir_probe"
+    shutil.rmtree(tmp, ignore_errors=True)
+    tmp.mkdir(parents=True)
+    env = {**os.environ, "TMPDIR": str(tmp)}
+    rr = subprocess.run([sys.executable, "scripts/verify_attribution.py"], cwd=REPO_ROOT, capture_output=True, text=True, env=env)
+    left = list(tmp.iterdir())
+    pat = "tempfile.TemporaryDirectory()" in (REPO_ROOT / "scripts" / "verify_attribution.py").read_text()
+    check("6.6 verify_attribution.py with TMPDIR set to an empty dir under data/scratch leaves it empty, and uses explicit dir=",
+          rr.returncode == 0 and not left and not pat, f"rc {rr.returncode}, entries left in TMPDIR: {[p_.name for p_ in left]}; "
+          f"{[ln for ln in rr.stdout.splitlines() if ln.startswith('pass:')]}")
+    shutil.rmtree(tmp, ignore_errors=True)
+    sha1 = db_sha()
+    check("R7 real mlflow.db sha256 unchanged", sha0 == sha1, f"{sha0[:16]}... == {sha1[:16]}...")
+    ok_all = all(r_[1] for r_ in results)
+    (ARTIFACTS / "s6_names.json").write_text(json.dumps({"pass": ok_all, "checks": [{"name": n, "pass": p_, "detail": d} for n, p_, d in results]}, indent=1))
+    print(f"S6 pass: {ok_all} ({sum(r_[1] for r_ in results)}/{len(results)}, {time.time() - t0:.0f}s)")
+    return 0 if ok_all else 1
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--blind", action="store_true", help="S1")
@@ -886,6 +977,7 @@ def main() -> int:
     ap.add_argument("--pipeline", type=Path, nargs="?", const=Path("data/scratch/dry.txt"), default=None,
                     help="S4 AC4.1-4.3, 4.6: parse server_pipeline.py --dry-run (writes the parsed jobs to this path)")
     ap.add_argument("--recovery", action="store_true", help="S5 AC5.1-5.6: recovery matrix on SYNTHETIC planted scores")
+    ap.add_argument("--names", action="store_true", help="S6 AC6.1-6.6: site config, chain-scoped names, no /tmp")
     ap.add_argument("--step4", action="store_true", help="S4 AC4.4-4.5: step4-summary on synthetic verdicts, select arm counts")
     ap.add_argument("--manifest", type=Path, default=None, help="S3 AC3.2: a manifest written by influence.featurize")
     a = ap.parse_args()
@@ -899,6 +991,8 @@ def main() -> int:
         return step4_synthetic()
     if a.recovery:
         return recovery()
+    if a.names:
+        return names()
     ap.print_help()
     return 2
 

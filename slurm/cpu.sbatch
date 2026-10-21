@@ -1,16 +1,16 @@
 #!/bin/bash
 #SBATCH --job-name=phyexp-cpu
-#SBATCH --partition=a100
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
 #SBATCH --time=06:00:00
-#SBATCH --output=/raid/chem/gor/phyexp/logs/%x-%j.out
 #
+# Partition and log directory come from slurm/site.env, passed by scripts/server_pipeline.py as --partition / --output=<LOG_DIR>/%x-%j.out
+# (#SBATCH lines cannot expand variables); for a hand submission add them yourself.
 # Tracked stages that need no GPU (returns, ensemble, select, verify); CMD may chain several with `&&`:
 #   CMD="python scripts/stage.py returns --eval eval-x-s0 --name returns-x-s0" sbatch slurm/cpu.sbatch
 
 set -euo pipefail
-source "${PHYEXP_DIR:-/auto/home/gor/projects/phyexp}/slurm/env.sh"
+source "${PHYEXP_DIR:?set PHYEXP_DIR (scripts/server_pipeline.py exports it)}/slurm/env.sh"
 source slurm/guard.sh
 export CUDA_VISIBLE_DEVICES=
 : "${CMD:?set CMD}"
