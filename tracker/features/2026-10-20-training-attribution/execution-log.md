@@ -201,3 +201,71 @@ it explains; **SYNTHETIC** fixture data, labelled in the file), `artifacts/s3_en
 - A run produced before S3 has no `functionals.json`, so `ensemble_run` refuses it with a message to re-run the attribute stage.
   October's cluster attribute runs are not in this repo's MLflow store, so nothing local is affected.
 - `n_feature_files` and `allow_partial` are also logged as params.
+
+### S4: Complete Step 4 (helpful arms, curated-vs-random verdicts, opposite curations, curation switch, seed summary)
+**Files:**
+- `scripts/server_pipeline.py` (arms: `help-*` (the k most helpful, `--direction lowest`), `hrt60_lin` in the default metrics,
+  `--curation {per_task,global,both}` (default `both`, owner answer Q1) with global arms `gharm-/ghelp-/grandom<r>-n<N>`
+  where N = k x `--n-tasks` (20) = 100; per-arm `controls`; verify jobs `curated_vs_random` (each harm/help arm vs each
+  random control of its family, family W) and `head_to_head` (harm-hrt60_lin as B vs harm-f30 as A); every verify is tagged;
+  a final `step4-summary` job depending on all verifies; docstring rewritten with the PoC sentence each arm tests).
+- `vlapoc/step4.py` (new: `collect`, `summarize`, `summary_run`, `call`, `expected_direction`; stage `summarize`).
+- `scripts/stage.py` (`verify --comparison/--treated/--control/--seed-id`; `step4-summary`; `select --headline
+  --pipeline-curation`; `select_params()`).
+- `vlapoc/verdict.py` (`verify_run(extra_tags=)`), `vlapoc/runs.py` (`select_run(extra_params=)`, stage `summarize`).
+- `scripts/verify_training_attribution.py` (`--pipeline`, `--step4`).
+
+**Premises checked:**
+- "the default dry-run gives 74 jobs and arms harm-{f30,rmst60,auc_expected}-k5, random{0,1}-k5, drop-random-20" (plan C8) → ran
+  the unchanged pipeline at S3's commit: `would submit 74 jobs` (planner's measure, `data/scratch/dryrun.txt`) → holds; after S4
+  the default dry run is 312 jobs.
+- "`__same_task` columns are on per-task scales and cannot be ranked globally" (plan S4, inferred) → the global arms rank the
+  all-rollout `harm_<m>` column instead, and are size-matched to the per-task arms (N = 5 x 20 = 100, so 860 of 960 kept in
+  both families). Not a measured claim about the scales; it is a design reason, kept as inferred.
+- "v0/candidate has 20 tasks x 48 episodes" → measured in 4.5: `20 tasks, counts [48]` → holds.
+
+**Acceptance criteria:**
+- ✅ AC4.1 `.venv/bin/python scripts/verify_training_attribution.py --pipeline` (parses `server_pipeline.py --tag t --dry-run`) →
+  `[PASS] 4.1 every harm and help arm has a verify job vs each random control of its family, per seed, depending on exactly both
+  arms' eval jobs  96 jobs checked, 8 help arms, mismatches []`; `4.1b` both `harm-f30-k5` and `help-f30-k5` have their
+  `verify-t-<arm>-vs-random0-k5-s{0,1,2}` jobs.
+- ✅ AC4.2 `[PASS] 4.2 a harm-hrt60_lin arm and per seed a head-to-head verify (hrt60_lin arm B vs f30 arm A), depending on both evals`.
+- ✅ AC4.3 `4.3` (global: `8 drop_top_k arms (k ['100']), 2 random controls (k ['100'])`, metrics `harm_<m>` without `__same_task`);
+  `4.3b` per_task only per-task ops (plus AC7.5's k=20 gate); `4.3c` `--curation both` emits `{'drop_random_k': 3,
+  'drop_random_k_per_task': 2, 'drop_top_k': 8, 'drop_top_k_per_task': 8}` (21 selects), is identical to the default, carries
+  `--pipeline-curation both` on each, `--headline` only on per-task arms. The default follows the owner's answer (Q1: both,
+  per-task headline); 4.5b shows the select run's params record it.
+- ✅ AC4.4 `.venv/bin/python scripts/verify_training_attribution.py --step4` (SYNTHETIC verdicts, labelled; 12 verify runs in a
+  scratch store, 3 seeds): `4.4b ... T,T,0 | treated better in 2/3 seeds, control better in 0/3; expectation (treated_better) met
+  in 2/3`; `4.4c` helpful removal `C,C,0`; `4.4d` head-to-head `hrt60 T,T,T` and `f30 C,C,C`; `4.4e` each row carries the declared
+  functional; `4.4g` the summary is a tracked `summarize` run. Chain refusal: `4.4 ... tag 't' matches verify runs of several
+  chains ['t-aaaa1111', 't-bbbb2222']; pass the chain id to summarize one`; with a chain id only that chain's verdicts are used
+  (4.4f).
+- ✅ AC4.5 `4.5 every per-task arm keeps exactly 43 of 48 episodes in each of the 20 tasks (860 total); global arms keep 860 too
+  (960 - 100)  21 arms: [('ac75', 940), ('global', 860), ('per_task', 860)]`, run through `select_run` with the arms'
+  parsed arguments on a scratch copy of the real store with a **synthetic** score table; `4.5b` the select run records
+  `curation=per_task headline=True pipeline_curation=both`.
+- ✅ AC4.6 default dry run: **312 jobs** (before S4: 74): `{'train': 66, 'eval': 66, 'returns': 3, 'feat': 6, 'attribute': 3,
+  'ensemble': 1, 'select': 1, 'verify': 165, 'step4': 1}`. 21 arms, 63 retraining runs (21 arms x 3 seeds):
+  per-task `harm-/help-{f30,rmst60,auc_expected,hrt60_lin}-k5` (8), `random0-k5`, `random1-k5`; global `gharm-/ghelp-...-n100`
+  (8), `grandom0-n100`, `grandom1-n100`; `drop-random-20`. The full list is in `artifacts/s4_pipeline.json` and the parsed
+  dry run in `artifacts/s4_dry_run_default.txt`.
+- ✅ Real `mlflow.db` sha256 before and after `--step4`: `306af4123fda7e63…` both.
+
+**Demo artifacts produced:** `artifacts/s4_dry_run_default.txt` (every job with its dependencies and command),
+`artifacts/s4_pipeline.json`, `artifacts/s4_step4_summary_SYNTHETIC.csv` (the table layout, from planted verdicts),
+`artifacts/s4_select_counts_SYNTHETIC_SCORES.csv` (episodes kept per arm on the real v0/candidate manifests),
+`artifacts/s4_summary_and_selects.json`.
+
+**Notes / divergences from plan or spec:**
+- **The server's next run is much bigger**: 312 jobs and 63 retraining runs (it was 74 jobs and 18 retrains: 6 arms x 3
+  seeds), because of `--curation both` (owner accepted, Q1), the help arms and `hrt60_lin` (non-blocking N3). `--curation
+  per_task` plus `--metrics f30 rmst60 auc_expected` reproduces a smaller chain.
+- `curated_vs_random` compares each treated arm against **every** random draw of its family (2 draws), not a single
+  "matched" one: one random draw would make the control's own variability invisible. Each is a separate row in the summary.
+- The `vs_base` verifies keep both families W and O (as before); the new comparisons use family W only (the declared family).
+- The per-metric call (`T`/`C`/`0`) uses the verdict's own Holm-corrected p and α = 0.05; `step4-summary` aggregates and does
+  not re-test (the two-step verdict is `vlapoc.verdict`'s). Expected directions are written in `vlapoc/step4.py` before any real
+  verdict exists (harm removed: treated better; help removed: treated worse; HRT arm wins hrt60, F30 arm wins f30).
+- The headline flag is set only on per-task arms and only when `--curation both`; with a single mode nothing is flagged.
+- `docs/dataflow.md` was not changed (no stage was added to the diagram; `summarize` is bookkeeping after Step 4).

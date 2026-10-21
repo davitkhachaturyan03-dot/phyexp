@@ -1,0 +1,22 @@
+arm,mode,episodes_kept,per_task_counts,curation_param,headline
+harm-f30-k5,per_task,860,[43],per_task,True
+help-f30-k5,per_task,860,[43],per_task,True
+harm-rmst60-k5,per_task,860,[43],per_task,True
+help-rmst60-k5,per_task,860,[43],per_task,True
+harm-auc_expected-k5,per_task,860,[43],per_task,True
+help-auc_expected-k5,per_task,860,[43],per_task,True
+harm-hrt60_lin-k5,per_task,860,[43],per_task,True
+help-hrt60_lin-k5,per_task,860,[43],per_task,True
+random0-k5,per_task,860,[43],per_task,True
+random1-k5,per_task,860,[43],per_task,True
+gharm-f30-n100,global,860,"[38, 40, 41, 42, 43, 44, 45, 46]",global,False
+ghelp-f30-n100,global,860,"[40, 41, 42, 43, 44, 45, 46, 47]",global,False
+gharm-rmst60-n100,global,860,"[38, 39, 40, 42, 43, 44, 45, 46]",global,False
+ghelp-rmst60-n100,global,860,"[37, 40, 41, 42, 43, 44, 45, 46, 47]",global,False
+gharm-auc_expected-n100,global,860,"[40, 41, 42, 43, 44, 45, 46]",global,False
+ghelp-auc_expected-n100,global,860,"[39, 41, 42, 43, 44, 45, 46]",global,False
+gharm-hrt60_lin-n100,global,860,"[39, 41, 42, 43, 44, 45, 46]",global,False
+ghelp-hrt60_lin-n100,global,860,"[39, 40, 41, 42, 43, 44, 45, 46, 47]",global,False
+grandom0-n100,global,860,"[39, 40, 42, 43, 44, 46]",global,False
+grandom1-n100,global,860,"[40, 41, 42, 43, 44, 45, 46]",global,False
+drop-random-20,ac75,940,"[44, 46, 47, 48]",global,False

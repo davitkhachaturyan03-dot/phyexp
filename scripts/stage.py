@@ -25,7 +25,10 @@ Stages (docs/dataflow.md; PoC §9.1 pp. 18-19):
 - ``attribute``/``ensemble``  Step 3: ``vlapoc.attribution.attribute_run`` / ``ensemble_run``.
 - ``select``   Step 4: ``vlapoc.runs.select_run`` (per-task ops by default). A later ``train --subset
                select:<select run name>`` trains on the child subset that run produced.
-- ``verify``   Step 4 gate: ``vlapoc.verdict.verify_run`` between two eval runs.
+- ``verify``   Step 4 gate: ``vlapoc.verdict.verify_run`` between two eval runs; ``--comparison`` tags it as a Step 4
+               comparison (``vs_base`` | ``curated_vs_random`` | ``head_to_head``).
+- ``step4-summary``  one table over a chain's verify runs: per arm and comparison, how many seeds went each way per
+               metric (``vlapoc.step4``; PoC §9.1 Step 4, §2.6, §4.5).
 
 Usage::
 
@@ -188,6 +191,14 @@ def cmd_ensemble(a) -> dict:
     return ensemble_run([run_id(r, "attribute") for r in a.runs], a.name, chain=a.chain)
 
 
+def select_params(op: str, headline: bool = False, pipeline_curation: str | None = None) -> dict:
+    """Params every select run of the chain records besides the op's own: the curation unit of the arm (``per_task`` for
+    the ``*_per_task`` ops, ``global`` for ``drop_top_k``/``drop_random_k``), whether it is a headline arm, and the pipeline's
+    ``--curation`` setting (owner answer Q1, 2026-10-20: both, per-task headline; PoC §9.1 Step 4.1 p.19)."""
+    mode = "per_task" if op.endswith("_per_task") else ("global" if op in ("drop_top_k", "drop_random_k") else "group")
+    return {"curation": mode, "headline": bool(headline), "pipeline_curation": pipeline_curation or "unspecified"}
+
+
 def cmd_select(a) -> dict:
     import tempfile
 
@@ -202,17 +213,31 @@ def cmd_select(a) -> dict:
         tmp = tempfile.mkdtemp(prefix="select_", dir=REPO_ROOT / "data" / "scratch")
         score_path = Path(tmp) / "attribution_scores.parquet"
         _artifact_table(client().get_run(sid), "attribution_scores", None).to_parquet(score_path, index=False)
+    extra = select_params(a.op, a.headline, a.pipeline_curation)
     rid, child = select_run(subset_ref(a.parent), a.name, a.op, k=a.k, seed=a.seed, score_path=score_path,
                             metric=a.metric, score_run_id=sid, direction=a.direction, chain=a.chain,
-                            require_declaration=a.op.startswith("drop_top_k"))
+                            require_declaration=a.op.startswith("drop_top_k"), extra_params=extra)
     return {"run_id": rid, "subset_id": child.subset_id, "n_episodes": len(child.episode_ids)}
 
 
 def cmd_verify(a) -> dict:
     from vlapoc.verdict import verify_run
 
-    v = verify_run(run_id(a.a, "eval"), run_id(a.b, "eval"), a.name, family=a.family, chain=a.chain)
+    tags = {}
+    if a.comparison and not (a.treated and a.control and a.seed_id is not None):
+        raise SystemExit("--comparison needs --treated, --control and --seed-id")
+    if a.comparison:  # Step 4 pipeline: which comparison this verdict is (read back by ``step4-summary``)
+        tags = {"step4.kind": a.comparison, "step4.treated": a.treated, "step4.control": a.control, "step4.seed": a.seed_id}
+    v = verify_run(run_id(a.a, "eval"), run_id(a.b, "eval"), a.name, family=a.family, chain=a.chain, extra_tags=tags)
     return {k: v[k] for k in ("run_id", "label", "attribution_grade") if k in v}
+
+
+def cmd_step4_summary(a) -> dict:
+    """Step 4's table over the chain's verify runs (``vlapoc.step4``): seed consistency per arm and comparison."""
+    from vlapoc.step4 import summary_run
+
+    out = summary_run(a.tag, a.name, chain=a.chain_id, run_chain=a.chain)
+    return out
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -287,15 +312,28 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--metric", default=None)
     s.add_argument("--direction", default="highest")
     s.add_argument("--seed", type=int, default=None)
+    s.add_argument("--headline", action="store_true", help="record that this arm is a headline arm (per-task arms; owner Q1)")
+    s.add_argument("--pipeline-curation", default=None, choices=["per_task", "global", "both"],
+                   help="the pipeline's --curation setting, recorded with the arm (PoC §9.1 Step 4.1; owner Q1)")
 
     s = sub.add_parser("verify")
     s.add_argument("--a", required=True)
     s.add_argument("--b", required=True)
     s.add_argument("--name", required=True)
     s.add_argument("--family", default="W", choices=["W", "O"])
+    s.add_argument("--comparison", default=None, choices=["vs_base", "curated_vs_random", "head_to_head"],
+                   help="Step 4 comparison kind; with --treated/--control/--seed-id tags the verify run for step4-summary")
+    s.add_argument("--treated", default=None, help="arm B (bare arm name, e.g. harm-f30-k5)")
+    s.add_argument("--control", default=None, help="arm A (bare arm name, or 'base')")
+    s.add_argument("--seed-id", default=None, help="the training seed both arms share")
+
+    s = sub.add_parser("step4-summary")
+    s.add_argument("--tag", required=True, help="the chain's tag (runs are named <stage>-<tag>-...)")
+    s.add_argument("--name", required=True)
+    s.add_argument("--chain-id", default=None, help="full chain id <tag>-<sha8> if the tag matches several chains")
 
     a = p.parse_args(argv)
-    out = globals()[f"cmd_{a.cmd}"](a)
+    out = globals()[f"cmd_{a.cmd.replace('-', '_')}"](a)
     print(json.dumps(out, indent=1, default=str))
     return 0
 

@@ -508,16 +508,284 @@ def functionals(manifest: Path | None) -> int:
     return 0 if ok_all else 1
 
 
+# ---------------------------------------------------------------------------------------------
+# S4: Step 4 completeness (arms, comparisons, curation modes, seed summary)
+# ---------------------------------------------------------------------------------------------
+
+
+def parse_dry_run(text: str) -> list[dict]:
+    """Parse ``server_pipeline.py --dry-run`` output into jobs: ``id`` (J<n>), ``name``, ``deps`` (job ids), ``dep_names``, ``cmd``."""
+    import re
+
+    jobs = []
+    lines = text.splitlines()
+    for i, ln in enumerate(lines):
+        m = re.match(r"\[dry (\d+)\] (\S+)\s+deps=(\S*)", ln)
+        if m:
+            deps = [] if m.group(3) == "-" else m.group(3).split(",")
+            jobs.append({"id": f"J{m.group(1)}", "name": m.group(2), "deps": deps, "cmd": lines[i + 1].strip()})
+    names = {j["id"]: j["name"] for j in jobs}
+    for j in jobs:
+        j["dep_names"] = [names[d] for d in j["deps"]]
+    return jobs
+
+
+def dry_run(*args: str) -> tuple[list[dict], str]:
+    """Run ``scripts/server_pipeline.py --tag t --dry-run <args>``; return (parsed jobs, last summary line)."""
+    import subprocess
+
+    out = subprocess.run([sys.executable, str(REPO_ROOT / "scripts" / "server_pipeline.py"), "--tag", "t", "--dry-run", *args],
+                         check=True, capture_output=True, text=True, cwd=REPO_ROOT).stdout
+    return parse_dry_run(out), out.strip().splitlines()[-1]
+
+
+def pipeline(dry_path: Path | None) -> int:
+    """S4, AC4.1-AC4.3 and AC4.6: parse the dry-run of the Step 4 chain (not eyeballed)."""
+    import re
+    import shlex
+
+    t0 = time.time()
+    results: list[tuple[str, bool, str]] = []
+
+    def check(name: str, ok: bool, detail: str = "") -> None:
+        results.append((name, bool(ok), detail))
+        print(f"[{'PASS' if ok else 'FAIL'}] {name}{'  ' + detail if detail else ''}")
+
+    jobs, summary = dry_run()
+    if dry_path is not None:
+        dry_path.parent.mkdir(parents=True, exist_ok=True)
+        dry_path.write_text("\n".join(f"{j['id']} {j['name']} deps={','.join(j['dep_names'])} :: {j['cmd']}" for j in jobs))
+    by_name = {j["name"]: j for j in jobs}
+    arm_names = re.search(r"arms: (\[.*\])", summary).group(1)
+    arm_list = eval(arm_names)  # a printed list of str
+    seeds = (0, 1, 2)
+    harm_help = [a for a in arm_list if re.match(r"g?(harm|help)-", a)]
+    ctrl_of = {a: [b for b in arm_list if re.match(rf"{'g' if a.startswith('g') else ''}random\d+-", b)] for a in harm_help}
+    bad, n_checked = [], 0
+    for a in harm_help:
+        for c in ctrl_of[a]:
+            for s in seeds:
+                j = by_name.get(f"verify-t-{a}-vs-{c}-s{s}")
+                n_checked += 1
+                want = {f"eval-t-{a}-s{s}", f"eval-t-{c}-s{s}"}
+                if j is None or set(j["dep_names"]) != want or "--comparison curated_vs_random" not in j["cmd"] or "--family W" not in j["cmd"]:
+                    bad.append((a, c, s))
+    helps = [a for a in arm_list if "help-" in a]
+    check("4.1 every harm and help arm has a verify job vs each random control of its family, per seed, depending on exactly "
+          "both arms' eval jobs", not bad and n_checked > 0 and len(helps) > 0, f"{n_checked} jobs checked, {len(helps)} help arms, mismatches {bad[:3]}")
+    two_arms = [a for a in ("harm-f30-k5", "help-f30-k5") if a in arm_list]
+    check("4.1b both a harm-vs-random and a help-vs-random job exist for f30 (per-task) in every seed",
+          len(two_arms) == 2 and all(f"verify-t-{a}-vs-random0-k5-s{s}" in by_name for a in two_arms for s in seeds))
+    hh = [(s, by_name.get(f"verify-t-harm-hrt60_lin-k5-vs-harm-f30-k5-s{s}")) for s in seeds]
+    check("4.2 a harm-hrt60_lin arm and per seed a head-to-head verify (hrt60_lin arm B vs f30 arm A), depending on both evals",
+          "harm-hrt60_lin-k5" in arm_list and all(j and set(j["dep_names"]) == {f"eval-t-harm-hrt60_lin-k5-s{s}", "eval-t-harm-f30-k5-s" + str(s)}
+                                                  and "--comparison head_to_head" in j["cmd"] for s, j in hh))
+    # AC4.3 curation modes: parse the select commands
+    def selects(*args: str) -> list[dict]:
+        js, _ = dry_run(*args)
+        cmd = next(j for j in js if j["name"] == "select-t")["cmd"]
+        out = []
+        for part in cmd.split(" && "):
+            toks = shlex.split(part)
+            d = {toks[i].lstrip("-"): toks[i + 1] for i in range(len(toks) - 1) if toks[i].startswith("--") and not toks[i + 1].startswith("--")}
+            d["headline"] = "--headline" in toks
+            out.append(d)
+        return out
+
+    g = selects("--curation", "global")
+    pt = selects("--curation", "per_task")
+    both = selects("--curation", "both")
+    default = selects()
+    g_top = [d for d in g if d["op"] == "drop_top_k"]
+    g_rand = [d for d in g if d["op"] == "drop_random_k" and d["k"] != "20"]  # k = 20 is AC7.5's own gate arm
+    ok_g = (all("__same_task" not in d["metric"] and d["metric"].startswith("harm_") for d in g_top)
+            and {d["k"] for d in g_rand} == {d["k"] for d in g_top} == {"100"} and len(g_rand) == 2
+            and not any("per_task" in d["op"] for d in g))
+    check("4.3 --curation global emits drop_top_k on harm_<m> (no __same_task) and drop_random_k with the same k (N = 5 x 20 = 100)", ok_g,
+          f"{len(g_top)} drop_top_k arms (k {sorted({d['k'] for d in g_top})}), {len(g_rand)} random controls (k {sorted({d['k'] for d in g_rand})})")
+    ok_pt = all("__same_task" in d["metric"] for d in pt if d["op"] == "drop_top_k_per_task") and not any(d["op"] in ("drop_top_k", "drop_random_k") and d.get("k") != "20" for d in pt)
+    check("4.3b --curation per_task emits only the per-task family (plus the k=20 AC7.5 gate)", ok_pt)
+    ops_both = {d["op"] for d in both}
+    check("4.3c --curation both emits both families, and is the default (owner answer Q1); each select records --pipeline-curation both, "
+          "per-task arms --headline",
+          {"drop_top_k_per_task", "drop_top_k", "drop_random_k_per_task", "drop_random_k"} <= ops_both and both == default
+          and all(d.get("pipeline-curation") == "both" for d in both if d["op"] != "drop_random_k" or d["k"] != "20")
+          and all(d["headline"] for d in both if d["op"].endswith("_per_task")) and not any(d["headline"] for d in both if not d["op"].endswith("_per_task")),
+          f"{len(both)} select runs: " + str({o: sum(d['op'] == o for d in both) for o in sorted(ops_both)}))
+    # step4-summary job last, depending on every verify job
+    verifies = [j["name"] for j in jobs if j["name"].startswith("verify-")]
+    last = jobs[-1]
+    check("4.3d a step4-summary job runs last and depends on every verify job", last["name"] == "step4-summary-t" and sorted(last["dep_names"]) == sorted(verifies),
+          f"{len(verifies)} verify jobs")
+    n_by = {}
+    for j in jobs:
+        key = re.sub(r"-(s\d|t-.*)$", "", j["name"].split("-")[0])
+        n_by[key] = n_by.get(key, 0) + 1
+    check("4.6 job count and arm list of the default dry run recorded", True, f"{len(jobs)} jobs ({n_by}); arms ({len(arm_list)}): {arm_list}")
+    ARTIFACTS.mkdir(parents=True, exist_ok=True)
+    (ARTIFACTS / "s4_dry_run_default.txt").write_text("\n".join(f"{j['id']} {j['name']} deps={','.join(j['dep_names'])} :: {j['cmd']}" for j in jobs) + "\n" + summary + "\n")
+    ok_all = all(r[1] for r in results)
+    (ARTIFACTS / "s4_pipeline.json").write_text(json.dumps({"pass": ok_all, "n_jobs": len(jobs), "arms": arm_list, "checks": [{"name": n, "pass": p_, "detail": d} for n, p_, d in results]}, indent=1))
+    print(f"S4 pipeline pass: {ok_all} ({sum(r[1] for r in results)}/{len(results)}, {time.time() - t0:.0f}s)")
+    return 0 if ok_all else 1
+
+
+def synthetic_verdict(treated_better: bool | None, gate: bool = True, metric_keys=("f30", "auc_h", "rmst60", "hrt60", "censored60"),
+                      only: dict | None = None) -> dict:
+    """A SYNTHETIC ``verdict.json`` (only the fields ``vlapoc.step4`` reads). ``treated_better``: True/False/None = not significant,
+    for every metric except where ``only`` overrides per metric key."""
+    def row(v):
+        if v is None:
+            return {"p_holm": 0.4, "diff_better": 0.01}
+        return {"p_holm": 0.004, "diff_better": -0.1 if v else 0.1}  # diff_better > 0: arm A (the control) better
+    m = {k: row((only or {}).get(k, treated_better)) for k in metric_keys}
+    return {"SYNTHETIC": True, "family": "W", "alpha": 0.05, "gate": {"fires": gate, "p": 0.01 if gate else 0.6}, "metrics": m,
+            "outcome": "i" if gate else "iii"}
+
+
+def step4_synthetic() -> int:
+    """S4, AC4.4 and AC4.5: ``step4-summary`` on synthetic verdicts, and the per-task counts of every select arm on the real v0/candidate."""
+    import shlex
+
+    import mlflow
+    import numpy as np
+
+    from vlapoc import step4
+    from vlapoc.lineage import Subset
+    from vlapoc.runs import client, scratch_lineage_copy, select_run, stage_run
+
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+    import server_pipeline as sp
+    import stage as stage_mod
+
+    t0 = time.time()
+    sha0 = db_sha()
+    results: list[tuple[str, bool, str]] = []
+
+    def check(name: str, ok: bool, detail: str = "") -> None:
+        results.append((name, bool(ok), detail))
+        print(f"[{'PASS' if ok else 'FAIL'}] {name}{'  ' + detail if detail else ''}")
+
+    shutil.rmtree(SCRATCH / "step4", ignore_errors=True)
+    base = SCRATCH / "step4"
+    base.mkdir(parents=True)
+    try:
+        # ---- AC4.4: synthetic verdicts in a scratch store -----------------------------------------------------------
+        lr = scratch_lineage_copy(base / "lineage_summary", mlflow_db=False)
+        chain, other = "t-aaaa1111", "t-bbbb2222"
+
+        def verify(name, kind, treated, control, seed, verdict, ch):
+            p = base / "verdicts" / f"{name}.json"
+            p.parent.mkdir(exist_ok=True)
+            p.write_text(json.dumps(verdict))
+            with stage_run("verify", name, lr, chain=ch, allow_dirty=True,
+                           extra_tags={"step4.kind": kind, "step4.treated": treated, "step4.control": control, "step4.seed": seed}) as r:
+                r.output_file("verdict", p, kind="verdict")
+
+        decl = {"column": "harm_f30__same_task", "functional": "F(30) = P(T <= 30 s)", "tau": "30 s", "rollout_subset": "same_task", "good_sign": 1.0}
+        for arm, direction in (("harm-f30-k5", "highest"), ("help-f30-k5", "lowest"), ("harm-hrt60_lin-k5", "highest")):
+            with stage_run("select", f"select-t-{arm}", lr, chain=chain, allow_dirty=True) as r:
+                r.params({"op": "drop_top_k_per_task", "direction": direction, "metric": decl["column"], "curation": "per_task",
+                          "metric_declaration": json.dumps(decl)})
+        planted = {0: True, 1: True, 2: None}  # harm-f30 beats random0 on every metric in seeds 0 and 1, not significant in seed 2
+        for sd in range(3):
+            verify(f"v-harm-s{sd}", "curated_vs_random", "harm-f30-k5", "random0-k5", sd, synthetic_verdict(planted[sd]), chain)
+            verify(f"v-help-s{sd}", "curated_vs_random", "help-f30-k5", "random0-k5", sd, synthetic_verdict(False if sd < 2 else None), chain)
+            verify(f"v-h2h-s{sd}", "head_to_head", "harm-hrt60_lin-k5", "harm-f30-k5", sd,
+                   synthetic_verdict(None, only={"hrt60": True, "f30": False}), chain)
+            verify(f"v-base-s{sd}", "vs_base", "harm-f30-k5", "base", sd, synthetic_verdict(True), chain)
+        verify("v-other-s0", "curated_vs_random", "harm-f30-k5", "random0-k5", 0, synthetic_verdict(False), other)
+        try:
+            step4.collect("t", None, lr)
+            check("4.4 refuses a tag whose verify runs span two chains unless one is named", False)
+        except ValueError as e:
+            check("4.4 refuses a tag whose verify runs span two chains unless one is named", "several chains" in str(e), str(e)[:120])
+        res = step4.summary_run("t", "step4-summary-t", chain=chain, out_dir=base / "out", lineage_root=lr, allow_dirty=True)
+        tbl = pd.read_csv(base / "out" / "step4_summary.csv")
+        harm = tbl[(tbl["arm"] == "harm-f30-k5") & (tbl["comparison"] == "curated_vs_random")].iloc[0]
+        help_ = tbl[(tbl["arm"] == "help-f30-k5") & (tbl["comparison"] == "curated_vs_random")].iloc[0]
+        h2h = tbl[tbl["comparison"] == "head_to_head"].iloc[0]
+        check("4.4b planted case: curated beats random on f30 in 2/3 seeds, with the by-seed calls and the expectation counted",
+              harm["f30__by_seed"] == "T,T,0" and harm["f30__T"] == 2 and harm["f30__supports"] == 2 and "2/3" in harm["f30__consistency"]
+              and harm["gate_fires"] == "3/3" and harm["n_seeds"] == 3, f"{harm['f30__by_seed']} | {harm['f30__consistency']}")
+        check("4.4c helpful removal: control better in 2/3 seeds meets the 'treated worse' expectation twice",
+              help_["f30__by_seed"] == "C,C,0" and help_["f30__expected"] == "treated_worse" and help_["f30__supports"] == 2)
+        check("4.4d head-to-head: HRT arm wins hrt60 and the F30 arm wins f30 in 3/3 seeds, as the PoC §4.5 expects",
+              h2h["hrt60__by_seed"] == "T,T,T" and h2h["f30__by_seed"] == "C,C,C" and h2h["hrt60__supports"] == 3 and h2h["f30__supports"] == 3)
+        check("4.4e each row carries the declared functional of its treated arm",
+              harm["functional"] == decl["functional"] and harm["tau"] == "30 s" and harm["rollout_subset"] == "same_task" and harm["direction"] == "highest")
+        check("4.4f the other chain's verdict is not in the table (a chain is summarized alone)", int(harm["n_seeds"]) == 3)
+        run = client(lr).get_run(res["run_id"])
+        check("4.4g the summary is a tracked run (stage summarize) with the table as an output",
+              run.data.tags["stage"] == "summarize" and "output.step4_summary_csv.sha256" in run.data.tags, f"{res['rows']} rows from {res['n_verify_runs']} verify runs")
+        ARTIFACTS.mkdir(parents=True, exist_ok=True)
+        tbl.to_csv(ARTIFACTS / "s4_step4_summary_SYNTHETIC.csv", index=False)
+
+        # ---- AC4.5: every select arm of the chain on the real v0/candidate manifests ---------------------------------
+        lr2 = scratch_lineage_copy(base / "lineage_select")
+        parent = Subset.load("v0/candidate", lr2)
+        cat = parent.episodes(lr2)
+        per_task_parent = cat.groupby(["suite", "libero_task_id"]).size()
+        check("4.5 premise: v0/candidate has 20 tasks x 48 episodes", len(per_task_parent) == 20 and set(per_task_parent) == {48}, f"{len(per_task_parent)} tasks, counts {sorted(set(per_task_parent))}")
+        rng = np.random.default_rng(5)
+        scores = parent.keys(lr2).reset_index(drop=True)
+        for m in ("f30", "rmst60", "auc_expected", "hrt60_lin"):
+            scores[f"harm_{m}"] = rng.normal(size=len(scores))
+            scores[f"harm_{m}__same_task"] = rng.normal(size=len(scores))
+        spath = base / "scores.parquet"
+        scores.to_parquet(spath, index=False)
+        ns = argparse.Namespace(tag="t", subset="v0/candidate", metrics=["f30", "rmst60", "auc_expected", "hrt60_lin"], k_per_task=[5],
+                                curation="both", n_tasks=20, random_draws=2, ac75=True)
+        plan = sp.arms(ns)
+        ok_counts, kept, rows = True, {}, []
+        for x in plan:
+            toks = shlex.split(x["args"])
+            d = {toks[i].lstrip("-"): toks[i + 1] for i in range(len(toks) - 1) if toks[i].startswith("--") and not toks[i + 1].startswith("--")}
+            extra = stage_mod.select_params(d["op"], "--headline" in toks, d.get("pipeline-curation"))
+            kw = {"metric": d.get("metric"), "direction": d.get("direction", "highest"), "seed": int(d["seed"]) if "seed" in d else None,
+                  "score_path": spath if d["op"].startswith("drop_top_k") else None}
+            _, child = select_run("v0/candidate", f"select-t-{x['arm']}", d["op"], k=int(d["k"]), lineage_root=lr2, allow_dirty=True,
+                                  extra_params=extra, **kw)
+            counts = cat[cat["episode_id"].isin(child.episode_ids)].groupby(["suite", "libero_task_id"]).size()
+            kept[x["arm"]] = (len(child.episode_ids), sorted(set(counts)), extra)
+            if x["mode"] == "per_task":
+                ok_counts &= sorted(set(counts)) == [43] and len(counts) == 20 and len(child.episode_ids) == 860
+            elif x["mode"] == "global":
+                ok_counts &= len(child.episode_ids) == 860  # 960 - 100
+            rows.append({"arm": x["arm"], "mode": x["mode"], "episodes_kept": len(child.episode_ids), "per_task_counts": sorted(set(counts)), "curation_param": extra["curation"], "headline": extra["headline"]})
+        check("4.5 every per-task arm keeps exactly 43 of 48 episodes in each of the 20 tasks (860 total); global arms keep 860 too (960 - 100)",
+              ok_counts, f"{len(plan)} arms: {sorted({(r['mode'], r['episodes_kept']) for r in rows})}")
+        sel = client(lr2).search_runs([client(lr2).get_experiment_by_name("vlapoc-lineage").experiment_id], "tags.mlflow.runName = 'select-t-harm-f30-k5'")[0].data.params
+        check("4.5b the select run records the curation mode, headline flag and pipeline setting (owner Q1)",
+              sel["curation"] == "per_task" and sel["headline"] == "True" and sel["pipeline_curation"] == "both", str({k: sel[k] for k in ("curation", "headline", "pipeline_curation", "op", "k", "direction")}))
+        pd.DataFrame(rows).to_csv(ARTIFACTS / "s4_select_counts_SYNTHETIC_SCORES.csv", index=False)
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+    sha1 = db_sha()
+    check("R7 real mlflow.db sha256 unchanged", sha0 == sha1, f"{sha0[:16]}... == {sha1[:16]}...")
+    ok_all = all(r[1] for r in results)
+    (ARTIFACTS / "s4_summary_and_selects.json").write_text(json.dumps({"pass": ok_all, "checks": [{"name": n, "pass": p_, "detail": d} for n, p_, d in results]}, indent=1))
+    print(f"S4 summary/selects pass: {ok_all} ({sum(r[1] for r in results)}/{len(results)}, {time.time() - t0:.0f}s)")
+    return 0 if ok_all else 1
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--blind", action="store_true", help="S1")
     ap.add_argument("--functionals", action="store_true", help="S3")
+    ap.add_argument("--pipeline", type=Path, nargs="?", const=Path("data/scratch/dry.txt"), default=None,
+                    help="S4 AC4.1-4.3, 4.6: parse server_pipeline.py --dry-run (writes the parsed jobs to this path)")
+    ap.add_argument("--step4", action="store_true", help="S4 AC4.4-4.5: step4-summary on synthetic verdicts, select arm counts")
     ap.add_argument("--manifest", type=Path, default=None, help="S3 AC3.2: a manifest written by influence.featurize")
     a = ap.parse_args()
     if a.blind:
         return blind()
     if a.functionals:
         return functionals(a.manifest)
+    if a.pipeline is not None:
+        return pipeline(a.pipeline)
+    if a.step4:
+        return step4_synthetic()
     ap.print_help()
     return 2
 

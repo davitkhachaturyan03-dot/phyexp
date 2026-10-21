@@ -1,0 +1,60 @@
+{
+ "pass": true,
+ "checks": [
+  {
+   "name": "4.4 refuses a tag whose verify runs span two chains unless one is named",
+   "pass": true,
+   "detail": "tag 't' matches verify runs of several chains ['t-aaaa1111', 't-bbbb2222']; pass the chain id to summarize one"
+  },
+  {
+   "name": "4.4b planted case: curated beats random on f30 in 2/3 seeds, with the by-seed calls and the expectation counted",
+   "pass": true,
+   "detail": "T,T,0 | treated better in 2/3 seeds, control better in 0/3; expectation (treated_better) met in 2/3"
+  },
+  {
+   "name": "4.4c helpful removal: control better in 2/3 seeds meets the 'treated worse' expectation twice",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "4.4d head-to-head: HRT arm wins hrt60 and the F30 arm wins f30 in 3/3 seeds, as the PoC \u00a74.5 expects",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "4.4e each row carries the declared functional of its treated arm",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "4.4f the other chain's verdict is not in the table (a chain is summarized alone)",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "4.4g the summary is a tracked run (stage summarize) with the table as an output",
+   "pass": true,
+   "detail": "4 rows from 12 verify runs"
+  },
+  {
+   "name": "4.5 premise: v0/candidate has 20 tasks x 48 episodes",
+   "pass": true,
+   "detail": "20 tasks, counts [48]"
+  },
+  {
+   "name": "4.5 every per-task arm keeps exactly 43 of 48 episodes in each of the 20 tasks (860 total); global arms keep 860 too (960 - 100)",
+   "pass": true,
+   "detail": "21 arms: [('ac75', 940), ('global', 860), ('per_task', 860)]"
+  },
+  {
+   "name": "4.5b the select run records the curation mode, headline flag and pipeline setting (owner Q1)",
+   "pass": true,
+   "detail": "{'curation': 'per_task', 'headline': 'True', 'pipeline_curation': 'both', 'op': 'drop_top_k_per_task', 'k': '5', 'direction': 'highest'}"
+  },
+  {
+   "name": "R7 real mlflow.db sha256 unchanged",
+   "pass": true,
+   "detail": "306af4123fda7e63... == 306af4123fda7e63..."
+  }
+ ]
+}

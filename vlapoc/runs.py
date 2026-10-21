@@ -103,7 +103,8 @@ from vlapoc.lineage import (  # noqa: E402
 )
 
 STAGES = ("build", "split", "derive", "screen", "select", "train", "eval", "returns", "verify", "attribute",
-          "score")  # returns: S6; verify: S7 gate; score: ground-truth recovery scoring (ground-truth feature S5)
+          "score", "summarize")  # returns: S6; verify: S7 gate; score: ground-truth recovery scoring (ground-truth feature S5);
+# summarize: Step 4's seed-consistency table over a chain's verify runs (training-attribution S4, ``vlapoc.step4``)
 EXPERIMENT = "vlapoc-lineage"
 SOURCE_DIRS = ("vlapoc", "scripts")
 DIGEST_LEN = 32  # MLflow MAX_DATASET_DIGEST_SIZE = 36
@@ -781,7 +782,7 @@ def select_run(parent: str, name: str, op: str, k: int | None = None, seed: int 
                score_path: Path | None = None, metric: str | None = None, score_run_id: str | None = None,
                direction: str = "highest", column: str | None = None, value=None,
                lineage_root: Path | None = None, chain: str | None = None, allow_dirty: bool = False,
-               require_declaration: bool = False) -> tuple[str, Subset]:
+               require_declaration: bool = False, extra_params: dict | None = None) -> tuple[str, Subset]:
     """Stage ``select``: derive a child subset from ``parent`` and record how, as one MLflow run.
 
     Ops (all children are selections recorded in the lineage store, never data rewrites):
@@ -804,7 +805,8 @@ def select_run(parent: str, name: str, op: str, k: int | None = None, seed: int 
     functional it explains"): param ``metric_declaration`` is the ``functionals.json`` row of ``metric`` in the score run
     (``vlapoc.attribution.declaration_of``). A score run that declares functionals but not this column is refused; one
     that declares none (a stand-in, or older than the declarations) records ``"undeclared"`` unless
-    ``require_declaration`` (the attribution chain's ``stage.py select`` sets it), which refuses it.
+    ``require_declaration`` (the attribution chain's ``stage.py select`` sets it), which refuses it. ``extra_params`` are
+    logged on the run as given (the chain records ``curation`` and ``headline`` this way).
 
     Returns ``(run_id, child Subset)``. The ``select.dropped`` tag holds the dropped ids as JSON cut
     at 7,900 characters (a prefix for large drops); the child's ``derivation["dropped"]`` is the full
@@ -840,7 +842,7 @@ def select_run(parent: str, name: str, op: str, k: int | None = None, seed: int 
             child = drop_group(ps, column, value, lineage_root=lineage_root)
             r.params({"op": op, "column": column, "value": child.derivation["value"],
                       "n_dropped": len(child.derivation["dropped"])})
-        r.params({"parent_subset_id": ps.subset_id, "child_n_episodes": len(child.episode_ids)})
+        r.params({"parent_subset_id": ps.subset_id, "child_n_episodes": len(child.episode_ids), **(extra_params or {})})
         r.tags({"select.dropped": json.dumps(child.derivation["dropped"])[:7900]})
         r.produced("subset", child.subset_id, "subset")
         return r.run_id, child

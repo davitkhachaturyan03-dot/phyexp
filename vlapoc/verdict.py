@@ -270,7 +270,8 @@ def eval_rollouts(run_id: str, lineage_root: Path | None = None):
 
 def verify_run(eval_a: str, eval_b: str, name: str, family: str = "W", n_boot: int = 1000, n_boot_ks: int = 2000,
                seed: int = 0, tau: float | None = None, out_dir: Path | None = None, chain: str | None = None,
-               lineage_root: Path | None = None, allow_plan_mismatch: bool = False) -> dict:
+               lineage_root: Path | None = None, allow_plan_mismatch: bool = False,
+               extra_tags: dict | None = None) -> dict:
     """Stage ``verify`` (PoC §9.1 Step 4 p. 19): the two-step verdict between two eval runs' rollouts in a declared
     family, as one MLflow run whose inputs are both eval runs' ``rollouts`` entities (so ``trace`` reaches each
     policy's checkpoint and, for trained policies, the dataset version and raw files). Writes ``verdict.json``.
@@ -279,6 +280,9 @@ def verify_run(eval_a: str, eval_b: str, name: str, family: str = "W", n_boot: i
     (``eval.attribution_grade.asserted=true``, set by ``vlapoc.runs.eval_run`` only after its protocol check, plan r2
     AC5.9/AC7.9); every other verdict is labelled "smoke (not attribution-grade)". Round-1 runs tagged
     ``eval.attribution_grade=true`` without the asserted tag meant only "has a train run" and do not count.
+
+    ``extra_tags`` are set on the verify run as given (the Step 4 pipeline tags each comparison ``step4.kind``,
+    ``step4.treated``, ``step4.control``, ``step4.seed``, which ``vlapoc.step4`` reads back).
     """
     from vlapoc.runs import batch_plan_of, client, stage_run
 
@@ -299,7 +303,7 @@ def verify_run(eval_a: str, eval_b: str, name: str, family: str = "W", n_boot: i
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / "verdict.json"
     path.write_text(json.dumps(v, indent=1, default=str))
-    with stage_run("verify", name, lineage_root, chain=chain) as r:
+    with stage_run("verify", name, lineage_root, chain=chain, extra_tags=extra_tags) as r:
         for role, run in (("rollouts_a", ra), ("rollouts_b", rb)):
             r.input_entity("rollouts", run.data.tags["output.rollouts.sha256"], role)
         r.params({"eval_a": eval_a, "eval_b": eval_b, "family": family, "tau_s": mr.FAMILY_TAU_S[family], "n_boot": n_boot,
