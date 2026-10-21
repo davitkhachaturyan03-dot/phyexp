@@ -169,10 +169,10 @@ def plot_tradeoff(table: pd.DataFrame, groups: pd.Series, decls: dict[str, dict]
     txt = tradeoff_text(x, y, decls, synthetic)
     ax.set_xlabel(txt["xlabel"], fontsize=7)
     ax.set_ylabel(txt["ylabel"], fontsize=7)
-    ax.legend(fontsize=7, loc="lower right")
+    ax.legend(fontsize=7, loc="upper center", bbox_to_anchor=(0.5, -0.14), ncol=3, frameon=False)
     ax.set_title(txt["title"], fontsize=8)
     fig.tight_layout()
-    fig.savefig(path, dpi=130)
+    fig.savefig(path, dpi=130, bbox_inches="tight")
     plt.close(fig)
     return Path(path)
 

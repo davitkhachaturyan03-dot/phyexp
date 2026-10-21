@@ -1058,8 +1058,10 @@ def groups() -> int:
     decls_p = {c: {"column": c, "functional": f"({c} functional)", "tau": "60 s", "rollout_subset": "all", "good_sign": 1.0} for c in cols}
     an.plot_heatmap(tab, cols, lab, decls_p, ARTIFACTS / "s7_heatmap_planted_SYNTHETIC.png", True)
     an.plot_tradeoff(tab, lab, decls_p, ARTIFACTS / "s7_tradeoff_planted_SYNTHETIC.png", "harm_rmst60", "harm_f30", True)
-    check("7.5 the group module imports nothing from the ground-truth side", "groundtruth" not in (REPO_ROOT / "vlapoc" / "analysis.py").read_text().replace("vlapoc.groundtruth`` ", ""),
-          "no `groundtruth` import")
+    from verify_method_boundary_s3 import scan_boundary
+
+    viol = scan_boundary([REPO_ROOT / "vlapoc" / "analysis.py"])
+    check("7.5 the group module passes the ground-truth boundary scan (no groundtruth import, no label files)", viol == [], f"violations {viol}")
     sha1 = db_sha()
     check("R7 real mlflow.db sha256 unchanged", sha0 == sha1, f"{sha0[:16]}... == {sha1[:16]}...")
     ok_all = all(r_[1] for r_ in results)
