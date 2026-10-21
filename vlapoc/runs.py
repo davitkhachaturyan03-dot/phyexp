@@ -817,6 +817,17 @@ def select_run(parent: str, name: str, op: str, k: int | None = None, seed: int 
     if op == "drop_top_k" and direction not in ("highest", "lowest"):
         raise ValueError("direction must be 'highest' or 'lowest'")
     ps = Subset.load(parent, lineage_root)
+    # Refusals before any run exists (a refused select leaves nothing in the store): the key contract (PoC §9.2 p.19) and k's bounds.
+    if op in ("drop_top_k", "drop_top_k_per_task"):
+        from vlapoc.lineage import check_score_keys
+
+        check_score_keys(ps, pd.read_parquet(score_path), metric, lineage_root)
+    if op.endswith("_per_task"):
+        from vlapoc.lineage import _per_task
+
+        _per_task(ps, k, lineage_root)
+    elif op in ("drop_top_k", "drop_random_k") and not 0 < k < len(ps.episode_ids):
+        raise ValueError(f"k={k} out of range for a parent of {len(ps.episode_ids)} episodes")
     decl = None
     if op in ("drop_top_k", "drop_top_k_per_task") and score_run_id:
         from vlapoc.attribution import declaration_of
