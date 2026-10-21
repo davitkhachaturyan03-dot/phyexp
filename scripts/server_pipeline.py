@@ -23,6 +23,8 @@ Each job runs one ``scripts/stage.py`` subcommand (one MLflow stage run), in the
               curated_vs_random  each harm/help arm vs each random control of its family (PoC §2.6: improve more /
                                  degrade more than after random removal), family W
               head_to_head       harm-hrt60_lin vs harm-f30 (PoC §4.5 "same dataset, opposite curations"), family W
+    analyze one CPU job after the ensemble: ``stage.py analyze`` = the PoC §4.2/§4.5 groups, aggregation by task, episode x
+            metric heatmap and throughput-vs-reliability scatter (``vlapoc.analysis``)
     score   (only when the base subset's version has an answer key, e.g. ``--subset v3/candidate``) one CPU job after the
             ensemble: ``stage.py score`` = recovery of the planted corruptions per type and metric, next to each type's best
             heuristic (``vlapoc.recovery``; PoC §2.1 item 4, §4.5). The injection run is ``--subset v3/candidate``.
@@ -232,6 +234,7 @@ def main(argv: list[str] | None = None) -> int:
     if "rank" in on:
         runs = " ".join(f"attribute-{t}-s{s}" for s in a.seeds)
         ens = ch.submit("cpu.sbatch", f"{PY} ensemble --runs {runs} --name attribute-{t}-ens", f"ensemble-{t}", attr_jobs)
+        ch.submit("cpu.sbatch", f"{PY} analyze --scores attribute-{t}-ens --name analyze-{t}", f"analyze-{t}", [ens])  # PoC §4.2, §4.5 outputs
         if has_answer_key(a.subset):  # injection run (e.g. --subset v3/candidate): score the ranking against the planted truth
             vname, _, sname = a.subset.partition("/")
             ch.submit("cpu.sbatch", f"{PY} score --scores attribute-{t}-ens --version {vname} --subset {sname} --name score-{t}",

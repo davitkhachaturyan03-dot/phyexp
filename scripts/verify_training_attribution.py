@@ -970,6 +970,112 @@ def names() -> int:
     return 0 if ok_all else 1
 
 
+# ---------------------------------------------------------------------------------------------
+# S7: metric-resolved outputs (SYNTHETIC inputs)
+# ---------------------------------------------------------------------------------------------
+
+
+def groups() -> int:
+    """S7, AC7.1-AC7.4 on SYNTHETIC tables (planted groups; a fixture attribute run for the stage)."""
+    import numpy as np
+
+    from vlapoc import analysis as an
+    from vlapoc.runs import client
+
+    t0 = time.time()
+    sha0 = db_sha()
+    results: list[tuple[str, bool, str]] = []
+
+    def check(name: str, ok: bool, detail: str = "") -> None:
+        results.append((name, bool(ok), detail))
+        print(f"[{'PASS' if ok else 'FAIL'}] {name}{'  ' + detail if detail else ''}")
+
+    rng = np.random.default_rng(21)
+    n = 240
+    cols = [f"harm_{m}" for m in an.DEFAULT_METRICS]
+    tab = pd.DataFrame({"episode_id": [f"e{i}" for i in range(n)], "content_hash": [f"h{i}" for i in range(n)],
+                        "episode_index": range(n), "suite": "s", "libero_task_id": [i % 6 for i in range(n)],
+                        "task_name": [f"task{i % 6}" for i in range(n)]})
+    for c in cols:
+        tab[c] = rng.normal(scale=0.3, size=n)
+    plant = {"consistent_helper": {c: -5 for c in cols}, "consistent_harmer": {c: 5 for c in cols},
+             "trade_off": {"harm_f30": 5, "harm_rmst60": -5}, "metric_specific": {"harm_hrt60_lin": 5}}
+    expect = pd.Series("neutral", index=tab.index, dtype=object)
+    for k, (g, spec) in enumerate(plant.items()):
+        for j in range(5):
+            i = 10 * k + j
+            for c, v in spec.items():
+                tab.loc[i, c] = v
+            expect[i] = g
+    lab = an.metric_groups(tab, cols)
+    planted = expect != "neutral"
+    ok = bool((lab[planted] == expect[planted]).all())
+    check("7.1 every planted helper, harmer, trade-off and metric-specific episode gets its label (4/4 groups, 20/20 episodes)", ok,
+          f"{int((lab[planted] == expect[planted]).sum())}/{int(planted.sum())} planted correct; counts {lab.value_counts().to_dict()}")
+    check("7.1b the unplanted noise episodes are neutral", bool((lab[~planted] == "neutral").all()), f"{int((lab[~planted] == 'neutral').sum())}/{int((~planted).sum())}")
+    agg = an.aggregate_by(tab, "task_name", cols, n_boot=200)
+    check("7.2 aggregate_by(task_name): one row per task, n sums to the table's rows, mean inside its CI",
+          len(agg) == 6 and agg["n"].sum() == n and bool(((agg["harm_f30__lo"] <= agg["harm_f30__mean"]) & (agg["harm_f30__mean"] <= agg["harm_f30__hi"])).all()),
+          f"{len(agg)} rows, n sum {agg['n'].sum()}")
+    errs = []
+    for bad in ("not_a_column", "episode_id"):
+        try:
+            an.aggregate_by(tab, bad, cols)
+            errs.append(False)
+        except ValueError as e:
+            errs.append(True)
+    check("7.2b aggregate_by refuses a non-catalog column and a per-episode identifier", all(errs))
+
+    shutil.rmtree(SCRATCH / "groups", ignore_errors=True)
+    base = SCRATCH / "groups"
+    base.mkdir(parents=True)
+    try:
+        fx = make_fixture(base)
+        ev = add_eval(fx, "a")
+        ra = run_attribute(fx, ev, "attribute-fixture-groups")
+        res = an.analyze_run(ra["run_id"], "analyze-fixture", out_dir=base / "analysis", lineage_root=fx["lr"], allow_dirty=True, synthetic=True)
+        out = base / "analysis"
+        pngs = {p_.name: p_.stat().st_size for p_ in out.glob("*.png")}
+        check("7.3 the heatmap and scatter PNGs are written", set(pngs) == {"heatmap.png", "tradeoff.png"} and all(v > 5000 for v in pngs.values()), str(pngs))
+        lab_json = json.loads((out / "figure_labels.json").read_text())
+        decl = {r["column"]: r for r in json.loads((out / "figure_labels.json").read_text()) and at_decls(fx, ra, base)}
+        xl, yl = lab_json["tradeoff"]["xlabel"], lab_json["tradeoff"]["ylabel"]
+        check("7.3b each axis label names the column's functional and τ from functionals.json, and the titles say SYNTHETIC",
+              decl["harm_rmst60"]["functional"] in xl and f"τ {decl['harm_rmst60']['tau']}" in xl and decl["harm_f30"]["functional"] in yl
+              and f"τ {decl['harm_f30']['tau']}" in yl and "SYNTHETIC" in lab_json["heatmap"]["title"] and "SYNTHETIC" in lab_json["tradeoff"]["title"]
+              and all("τ " in t for t in lab_json["heatmap"]["xticklabels"]), f"x: {xl.splitlines()[0]} | y: {yl.splitlines()[0]}")
+        prm = client(fx["lr"]).get_run(res["run_id"]).data.params
+        check("7.4 the analyze run's params carry the group threshold and the descriptive-unverified status, and link the score run",
+              prm["group_z_threshold"] == "1.0" and prm["group_status"].startswith("descriptive, unverified") and prm["score_run_id"] == ra["run_id"]
+              and prm["synthetic"] == "True", f"z={prm['group_z_threshold']}, counts {prm['group_counts']}")
+        ARTIFACTS.mkdir(parents=True, exist_ok=True)
+        for f in ("heatmap.png", "tradeoff.png"):
+            shutil.copy(out / f, ARTIFACTS / f"s7_{f.removesuffix('.png')}_SYNTHETIC.png")
+        shutil.copy(out / "figure_labels.json", ARTIFACTS / "s7_figure_labels_SYNTHETIC.json")
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+    # the planted table too, as figures (clearer than the 15-episode fixture)
+    decls_p = {c: {"column": c, "functional": f"({c} functional)", "tau": "60 s", "rollout_subset": "all", "good_sign": 1.0} for c in cols}
+    an.plot_heatmap(tab, cols, lab, decls_p, ARTIFACTS / "s7_heatmap_planted_SYNTHETIC.png", True)
+    an.plot_tradeoff(tab, lab, decls_p, ARTIFACTS / "s7_tradeoff_planted_SYNTHETIC.png", "harm_rmst60", "harm_f30", True)
+    check("7.5 the group module imports nothing from the ground-truth side", "groundtruth" not in (REPO_ROOT / "vlapoc" / "analysis.py").read_text().replace("vlapoc.groundtruth`` ", ""),
+          "no `groundtruth` import")
+    sha1 = db_sha()
+    check("R7 real mlflow.db sha256 unchanged", sha0 == sha1, f"{sha0[:16]}... == {sha1[:16]}...")
+    ok_all = all(r_[1] for r_ in results)
+    (ARTIFACTS / "s7_groups.json").write_text(json.dumps({"SYNTHETIC": True, "pass": ok_all, "checks": [{"name": n_, "pass": p_, "detail": d} for n_, p_, d in results]}, indent=1))
+    print(f"S7 pass: {ok_all} ({sum(r_[1] for r_ in results)}/{len(results)}, {time.time() - t0:.0f}s)")
+    return 0 if ok_all else 1
+
+
+def at_decls(fx: dict, ra: dict, base: Path) -> list[dict]:
+    """The ``functionals.json`` rows of a fixture attribute run."""
+    from vlapoc import attribution as at
+    from vlapoc.runs import client
+
+    return at._artifact_json(client(fx["lr"]).get_run(ra["run_id"]), "functionals", fx["lr"])
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--blind", action="store_true", help="S1")
@@ -978,6 +1084,7 @@ def main() -> int:
                     help="S4 AC4.1-4.3, 4.6: parse server_pipeline.py --dry-run (writes the parsed jobs to this path)")
     ap.add_argument("--recovery", action="store_true", help="S5 AC5.1-5.6: recovery matrix on SYNTHETIC planted scores")
     ap.add_argument("--names", action="store_true", help="S6 AC6.1-6.6: site config, chain-scoped names, no /tmp")
+    ap.add_argument("--groups", action="store_true", help="S7 AC7.1-7.4: four groups, aggregation, figures (SYNTHETIC)")
     ap.add_argument("--step4", action="store_true", help="S4 AC4.4-4.5: step4-summary on synthetic verdicts, select arm counts")
     ap.add_argument("--manifest", type=Path, default=None, help="S3 AC3.2: a manifest written by influence.featurize")
     a = ap.parse_args()
@@ -993,6 +1100,8 @@ def main() -> int:
         return recovery()
     if a.names:
         return names()
+    if a.groups:
+        return groups()
     ap.print_help()
     return 2
 
