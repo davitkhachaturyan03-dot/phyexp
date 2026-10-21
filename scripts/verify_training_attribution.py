@@ -1121,6 +1121,163 @@ def at_decls(fx: dict, ra: dict, base: Path) -> list[dict]:
     return at._artifact_json(client(fx["lr"]).get_run(ra["run_id"]), "functionals", fx["lr"])
 
 
+# ---------------------------------------------------------------------------------------------
+# S8: the chain end to end on this Mac
+# ---------------------------------------------------------------------------------------------
+
+
+def stage_cli(args: list[str], lr: Path, feats: Path, chain: str) -> dict:
+    """``scripts/stage.py`` as a subprocess on a scratch store; returns the JSON it prints (raises with stderr on failure)."""
+    import subprocess
+
+    p = subprocess.run([sys.executable, "scripts/stage.py", "--lineage-root", str(lr), "--feats-root", str(feats), "--chain", chain, *args],
+                       cwd=REPO_ROOT, capture_output=True, text=True)
+    if p.returncode != 0:
+        raise RuntimeError(f"stage.py {' '.join(args)} failed rc={p.returncode}:\n{p.stderr[-1500:]}")
+    out = p.stdout
+    return json.loads(out[out.index("{"):])
+
+
+def integration() -> int:
+    """S8(a), AC8.1, AC8.2, AC8.4 and the second half of AC6.4: attribute x2 -> ensemble -> select (per-task harm / help / random, global
+    harm / random) -> score -> analyze, all through ``scripts/stage.py --lineage-root`` on a scratch copy of the store, with SYNTHETIC
+    features, rollouts and returns over a real v3 training subset. Needs a clean ``vlapoc/``+``scripts/`` tree (the CLI has no allow_dirty)."""
+    import subprocess
+
+    import numpy as np
+
+    from vlapoc import attribution as at
+    from vlapoc.lineage import LineageError, Subset
+    from vlapoc.runs import client, select_run, trace
+
+    t0 = time.time()
+    sha0 = db_sha()
+    dirty = subprocess.run(["git", "status", "--porcelain", "--", "vlapoc", "scripts"], cwd=REPO_ROOT, capture_output=True, text=True).stdout.strip()
+    if dirty:
+        print(f"commit first: the stage CLI refuses a dirty tree:\n{dirty}")
+        return 2
+    results: list[tuple[str, bool, str]] = []
+
+    def check(name: str, ok: bool, detail: str = "") -> None:
+        results.append((name, bool(ok), detail))
+        print(f"[{'PASS' if ok else 'FAIL'}] {name}{'  ' + detail if detail else ''}")
+
+    shutil.rmtree(SCRATCH / "integration", ignore_errors=True)
+    base = SCRATCH / "integration"
+    base.mkdir(parents=True)
+    CH, T = "ti-fixture0", "ti"
+    made_dirs = [REPO_ROOT / "data" / "attribution" / n for n in (f"attribute-{T}-s0", f"attribute-{T}-s1", f"attribute-{T}-ens", f"score-{T}", f"analyze-{T}")]
+    try:
+        fx = make_fixture(base, parent="v3/candidate", cover_types=True, chain=CH, train_name=f"train-{T}-s0")
+        lr, feats = fx["lr"], base / "feats"
+        sub = fx["subset"]
+        tr0 = fx["train"]
+        tr1 = make_train(fx, f"train-{T}-s1", sub, "cd" * 32, seed=1)
+        ev0 = add_eval(fx, "s0", train=tr0, eval_name=f"eval-{T}-s0", returns_name=f"returns-{T}-s0", seed=1)
+        ev1 = add_eval(fx, "s1", train=tr1, eval_name=f"eval-{T}-s1", returns_name=f"returns-{T}-s1", seed=2)
+        eps = fx["episodes"]
+        n_types = len(set(eps["episode_id"]) & set(pd.read_parquet(lr / "versions" / sub.dataset_version_id / "labels.parquet")["episode_id"]))
+        print(f"fixture (SYNTHETIC features/rollouts/returns): {len(eps)} v3 episodes in {eps[['suite', 'libero_task_id']].drop_duplicates().shape[0]} tasks, {n_types} injected, "
+              f"2 seeds; scratch store {lr.relative_to(REPO_ROOT)}")
+        C = lambda *a: stage_cli(list(a), lr, feats, CH)  # noqa: E731
+        outs = {}
+        for s_ in (0, 1):
+            outs[f"attribute-s{s_}"] = C("attribute", "--train", f"train-{T}-s{s_}", "--eval", f"eval-{T}-s{s_}", "--returns", f"returns-{T}-s{s_}", "--name", f"attribute-{T}-s{s_}", "--device", "cpu")
+        outs["ensemble"] = C("ensemble", "--runs", f"attribute-{T}-s0", f"attribute-{T}-s1", "--name", f"attribute-{T}-ens")
+        sels = {"harm": ["--op", "drop_top_k_per_task", "--k", "1", "--metric", "harm_f30__same_task", "--direction", "highest", "--headline"],
+                "help": ["--op", "drop_top_k_per_task", "--k", "1", "--metric", "harm_f30__same_task", "--direction", "lowest", "--headline"],
+                "random": ["--op", "drop_random_k_per_task", "--k", "1", "--seed", "0", "--headline"],
+                "gharm": ["--op", "drop_top_k", "--k", "2", "--metric", "harm_f30", "--direction", "highest"],
+                "grandom": ["--op", "drop_random_k", "--k", "2", "--seed", "0"]}
+        for k, a_ in sels.items():
+            outs[f"select-{k}"] = C("select", "--parent", "fixture/train", "--name", f"select-{T}-{k}", "--scores", f"attribute-{T}-ens", "--pipeline-curation", "both", *a_)
+        outs["score"] = C("score", "--scores", f"attribute-{T}-ens", "--version", "v3", "--subset", "fixture20", "--name", f"score-{T}", "--synthetic")
+        outs["analyze"] = C("analyze", "--scores", f"attribute-{T}-ens", "--name", f"analyze-{T}", "--synthetic")
+        print("stage runs through the CLI: " + ", ".join(f"{k}={v['run_id'][:8]}" for k, v in outs.items()))
+        c = client(lr)
+        n_eps = len(eps)
+        per_task = eps.groupby(["suite", "libero_task_id"]).size()
+        check("8.1 attribute x2, ensemble, five selects, score and analyze all ran through the stage CLI on a scratch store (--lineage-root; AC6.4)",
+              len(outs) == 10 and outs["attribute-s0"]["n_episodes"] == n_eps and outs["ensemble"]["n_models"] == 2,
+              f"{len(outs)} stage runs; attribute table {outs['attribute-s0']['n_episodes']} episodes x {outs['attribute-s0']['n_rollouts']} rollouts")
+        ch = c.get_run(outs["select-harm"]["run_id"])
+        kept = {k: outs[f"select-{k}"]["n_episodes"] for k in sels}
+        check("8.1b selects: per-task arms keep n - (tasks x 1), global arms n - 2, per-task counts of curated and random children are identical",
+              kept["harm"] == kept["help"] == kept["random"] == n_eps - len(per_task) and kept["gharm"] == kept["grandom"] == n_eps - 2
+              and ch.data.params["curation"] == "per_task" and ch.data.params["headline"] == "True" and "metric_declaration" in ch.data.params,
+              f"kept {kept} of {n_eps}; harm select declares {json.loads(ch.data.params['metric_declaration'])['functional']}")
+        # AC8.1: trace from the select run
+        tr_ = trace(outs["select-harm"]["run_id"], lr)
+        stages = sorted({r["stage"] for r in tr_["runs"].values()})
+        n_feat = sum(1 for e in tr_["edges"] if e["consumes"].startswith("features:"))
+        run_names = {r["name"] for r in tr_["runs"].values()}
+        need_runs = {f"attribute-{T}-s0", f"attribute-{T}-s1", f"attribute-{T}-ens", f"returns-{T}-s0", f"returns-{T}-s1", f"eval-{T}-s0", f"eval-{T}-s1", f"train-{T}-s0", f"train-{T}-s1"}
+        check("8.2 trace from a select run reaches both attribute runs and the ensemble, both seeds' returns, eval and train runs, every feature digest and the training subset",
+              need_runs <= run_names and n_feat == 12 and sub.subset_id in tr_["entities"],
+              f"stages {stages}; {len(tr_['runs'])} runs; {n_feat} features inputs (2 seeds x 6 files); training subset {sub.subset_id[:12]} in entities: {sub.subset_id in tr_['entities']}; "
+              f"dead ends (no producer): {sorted({e['consumes'].split(':')[0] for e in tr_['edges'] if not e['produced_by']})}")
+        # recovery output of the CLI score stage (SYNTHETIC random scores: only the shape is checked)
+        rm = pd.read_csv(REPO_ROOT / "data" / "attribution" / f"score-{T}" / "recovery_matrix.csv")
+        sc = c.get_run(outs["score"]["run_id"]).data.params
+        check("8.3 the score stage ran on the v3 subset (recovery matrix has 7 types + pooled per harm column, flagged synthetic)",
+              set(rm["type"]) >= {"idle_padding", "gripper_release", "pooled"} and rm["type"].nunique() == 8 and sc["synthetic"] == "True", f"{len(rm)} rows, {rm['column'].nunique()} harm columns")
+        # AC8.2 negatives: nothing written
+        n_before = n_runs(lr)
+        sha_b = "ef" * 32
+        sub_b = Subset(sub.dataset_version_id, tuple(sub.episode_ids[:-1]), {"op": "synthetic_fixture_b", "parent_subset_id": sub.derivation["parent_subset_id"]})
+        sub_b.save(lr)
+        tr_b = make_train(fx, f"train-{T}-b", sub_b, sha_b, seed=7)
+        ev_b = add_eval(fx, "b", train=tr_b, eval_name=f"eval-{T}-b", returns_name=f"returns-{T}-b", seed=8)
+        ra_b = run_attribute(fx, ev_b, f"attribute-{T}-b")  # a valid run on another subset (expected to be written)
+        n_neg0 = n_runs(lr)
+        neg = []
+
+        def refuse(label, fn, exc, contains):
+            try:
+                fn()
+                neg.append((label, False, "did not raise"))
+            except exc as e:
+                neg.append((label, contains in str(e) and n_runs(lr) == n_neg0, str(e)[:110]))
+
+        alt = feats / "alt"
+        for suffix, mutate in (("ckpt", lambda m: m.update(checkpoint_sha256="99" * 32)), ("eps", lambda m: m.update(episodes=m["episodes"][:-1]))):
+            for f in (feats / tr0["name"]).glob("train.shard*"):
+                shutil.copy(f, alt / suffix / f.name) if (alt / suffix).mkdir(parents=True, exist_ok=True) is None else None
+            for mf in (alt / suffix).glob("*.manifest.json"):
+                m = json.loads(mf.read_text())
+                mutate(m)
+                mf.write_text(json.dumps(m))
+        refuse("features from another checkpoint", lambda: run_attribute(fx, ev0, "attribute-bad-ckpt") if False else
+               at.attribute_run(tr0["train_id"], ev0["eval_id"], ev0["returns_id"], alt / "ckpt" / "train", ev0["rollout_prefix"], "attribute-bad-ckpt",
+                                out_dir=base / "out" / "bad1", device="cpu", lineage_root=lr, allow_dirty=True), ValueError, "another checkpoint")
+        refuse("train features on a different episode list", lambda: at.attribute_run(tr0["train_id"], ev0["eval_id"], ev0["returns_id"], alt / "eps" / "train", ev0["rollout_prefix"],
+                                                                                    "attribute-bad-eps", out_dir=base / "out" / "bad2", device="cpu", lineage_root=lr, allow_dirty=True),
+               ValueError, "exactly the training subset")
+        tab_b = at._artifact_table(c.get_run(ra_b["run_id"]), "attribution_scores", lr)
+        pb = base / "tab_b.parquet"
+        tab_b.to_parquet(pb, index=False)
+        refuse("a score table from another subset at select", lambda: select_run("fixture/train", "select-bad", "drop_top_k_per_task", k=1, score_path=pb, metric="harm_f30__same_task",
+                                                                                score_run_id=ra_b["run_id"], lineage_root=lr, allow_dirty=True), LineageError, "keys")
+        refuse("an ensemble of two runs on different subsets", lambda: at.ensemble_run([outs["attribute-s0"]["run_id"], ra_b["run_id"]], "ens-bad", out_dir=base / "out" / "bad4",
+                                                                                      lineage_root=lr, allow_dirty=True), ValueError, "different subsets")
+        for label, ok, msg in neg:
+            check(f"8.4 refused with nothing written: {label}", ok, msg)
+        check("8.4b the integration run left the real mlflow.db sha256 unchanged", db_sha() == sha0, f"{sha0[:16]}...")
+        ARTIFACTS.mkdir(parents=True, exist_ok=True)
+        (ARTIFACTS / "s8_trace_select_SYNTHETIC.json").write_text(json.dumps({"SYNTHETIC": "fixture runs on a scratch store", "stages": stages, "n_runs": len(tr_["runs"]),
+                                                                          "runs": sorted(r["name"] for r in tr_["runs"].values()), "n_feature_inputs": n_feat,
+                                                                          "edges": [{k: e[k] for k in ("consumes", "role")} | {"produced_by": len(e["produced_by"])} for e in tr_["edges"]]}, indent=1))
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+        for d in made_dirs:
+            shutil.rmtree(d, ignore_errors=True)
+    check("R7 real mlflow.db sha256 unchanged", db_sha() == sha0, f"{sha0[:16]}...")
+    ok_all = all(r_[1] for r_ in results)
+    (ARTIFACTS / "s8_integration.json").write_text(json.dumps({"SYNTHETIC": True, "pass": ok_all, "checks": [{"name": n_, "pass": p_, "detail": d} for n_, p_, d in results], "seconds": round(time.time() - t0)}, indent=1))
+    print(f"S8(a) pass: {ok_all} ({sum(r_[1] for r_ in results)}/{len(results)}, {time.time() - t0:.0f}s)")
+    return 0 if ok_all else 1
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--blind", action="store_true", help="S1")
@@ -1130,6 +1287,7 @@ def main() -> int:
     ap.add_argument("--recovery", action="store_true", help="S5 AC5.1-5.6: recovery matrix on SYNTHETIC planted scores")
     ap.add_argument("--names", action="store_true", help="S6 AC6.1-6.6: site config, chain-scoped names, no /tmp")
     ap.add_argument("--groups", action="store_true", help="S7 AC7.1-7.4: four groups, aggregation, figures (SYNTHETIC)")
+    ap.add_argument("--integration", action="store_true", help="S8(a): the chain through stage.py on a scratch store (SYNTHETIC data; clean tree)")
     ap.add_argument("--step4", action="store_true", help="S4 AC4.4-4.5: step4-summary on synthetic verdicts, select arm counts")
     ap.add_argument("--manifest", type=Path, default=None, help="S3 AC3.2: a manifest written by influence.featurize")
     a = ap.parse_args()
@@ -1147,6 +1305,8 @@ def main() -> int:
         return names()
     if a.groups:
         return groups()
+    if a.integration:
+        return integration()
     ap.print_help()
     return 2
 

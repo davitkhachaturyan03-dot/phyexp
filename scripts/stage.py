@@ -269,14 +269,14 @@ def cmd_score(a) -> dict:
     from vlapoc.recovery import recovery_run
 
     sid = rid(a.scores, "attribute")
-    return recovery_run(sid, a.version, a.name, subset=a.subset, chain=a.chain, lineage_root=LR)
+    return recovery_run(sid, a.version, a.name, subset=a.subset, chain=a.chain, lineage_root=LR, synthetic=a.synthetic)
 
 
 def cmd_analyze(a) -> dict:
     """The §4.2 / §4.5 outputs of an attribute or ensemble run (``vlapoc.analysis``): groups, aggregation, heatmap, scatter."""
     from vlapoc.analysis import analyze_run
 
-    return analyze_run(rid(a.scores, "attribute"), a.name, z=a.z, by=tuple(a.by), chain=a.chain, lineage_root=LR)
+    return analyze_run(rid(a.scores, "attribute"), a.name, z=a.z, by=tuple(a.by), chain=a.chain, lineage_root=LR, synthetic=a.synthetic)
 
 
 def cmd_step4_summary(a) -> dict:
@@ -383,6 +383,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--scores", required=True, help="the attribute run (name or id) whose score table to score")
     s.add_argument("--version", required=True, help="a version with an answer key (e.g. v3)")
     s.add_argument("--subset", default="candidate", help="subset of that version the table must key exactly")
+    s.add_argument("--synthetic", action="store_true", help="the scores are test data: recorded in the run's params")
     s.add_argument("--name", required=True)
 
     s = sub.add_parser("analyze")
@@ -390,6 +391,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--name", required=True)
     s.add_argument("--z", type=float, default=1.0, help="group threshold on the z-scored harm columns (declared, inferred default 1)")
     s.add_argument("--by", nargs="+", default=["task_name"], help="catalog columns to aggregate by (PoC §1 p.3)")
+    s.add_argument("--synthetic", action="store_true", help="the scores are test data: put SYNTHETIC in every figure title")
 
     s = sub.add_parser("step4-summary")
     s.add_argument("--tag", required=True, help="the chain's tag (runs are named <stage>-<tag>-...)")
