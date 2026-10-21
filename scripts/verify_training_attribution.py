@@ -521,8 +521,8 @@ def functionals(manifest: Path | None) -> int:
                          ValueError, "undeclared")
         check("3.6b select refuses (require_declaration) a score run that recorded no functionals.json", ok, msg)
         ok, msg = raises(lambda: select_run("fixture/train", "select-badcol", "drop_top_k_per_task", k=1, score_path=score_path, metric="harm_nonexistent",
-                                            score_run_id=re_["run_id"], lineage_root=lr, allow_dirty=True), ValueError, "declares 0")
-        check("3.6c select refuses a column the score run does not declare", ok, msg)
+                                            score_run_id=re_["run_id"], lineage_root=lr, allow_dirty=True), Exception, "harm_nonexistent")
+        check("3.6c select refuses a column the score run neither contains nor declares (before any run is created)", ok, msg)
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
         (ARTIFACTS / "s3_functionals_example.json").write_text(json.dumps(
             {"SYNTHETIC": "fixture data, not an attribution of any real policy", "source": "attribute run of verify_training_attribution.py --functionals",
