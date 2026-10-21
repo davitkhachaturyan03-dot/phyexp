@@ -1,0 +1,176 @@
+{
+ "SYNTHETIC": "fixture runs on a scratch store",
+ "stages": [
+  "attribute",
+  "eval",
+  "returns",
+  "select",
+  "train"
+ ],
+ "n_runs": 10,
+ "runs": [
+  "attribute-ti-ens",
+  "attribute-ti-s0",
+  "attribute-ti-s1",
+  "eval-ti-s0",
+  "eval-ti-s1",
+  "returns-ti-s0",
+  "returns-ti-s1",
+  "select-ti-harm",
+  "train-ti-s0",
+  "train-ti-s1"
+ ],
+ "n_feature_inputs": 12,
+ "edges": [
+  {
+   "consumes": "subset:308ff4d8d805f371acea7259ea9b11f16f054867276fc91c6b5a804aeb0f4fa2",
+   "role": "parent",
+   "produced_by": 0
+  },
+  {
+   "consumes": "score_table:3a5ade88f85e988e3376627294c196db17457d35187141d6c78cd921b89e68b6",
+   "role": "scores",
+   "produced_by": 0
+  },
+  {
+   "consumes": "score_table:54e788038c4eb36cc3a4319fa61e007c8015669492b20961df81be9914791618",
+   "role": "score_run_table",
+   "produced_by": 1
+  },
+  {
+   "consumes": "subset:308ff4d8d805f371acea7259ea9b11f16f054867276fc91c6b5a804aeb0f4fa2",
+   "role": "training",
+   "produced_by": 0
+  },
+  {
+   "consumes": "score_table:07c546f5b1435ff834607249094a54053f749bd3056d1cda5deccae234291989",
+   "role": "seed_table_0",
+   "produced_by": 1
+  },
+  {
+   "consumes": "score_table:ae1245cca4c6838471c01b1582e41e8436c48cbd029870de742e2318ae3e38f7",
+   "role": "seed_table_1",
+   "produced_by": 1
+  },
+  {
+   "consumes": "subset:308ff4d8d805f371acea7259ea9b11f16f054867276fc91c6b5a804aeb0f4fa2",
+   "role": "training",
+   "produced_by": 0
+  },
+  {
+   "consumes": "checkpoint:abababababababababababababababababababababababababababababababab",
+   "role": "checkpoint",
+   "produced_by": 1
+  },
+  {
+   "consumes": "rollouts:dcd1dd81c274766856e74d03201735dad52ae1869628b6e3302a18b6ac20c5be",
+   "role": "rollouts",
+   "produced_by": 1
+  },
+  {
+   "consumes": "returns:8b4cd5ed4680db8291dc4a6962e8c30e4bbfa934ed1e5c1526cba99999c19ea9",
+   "role": "returns",
+   "produced_by": 1
+  },
+  {
+   "consumes": "features:bcc730bc2f295b559d818fb1fabc51750426d820931bcf1e75a8c9e1f6b2a4a7",
+   "role": "features.train.shard0.meta.npz",
+   "produced_by": 0
+  },
+  {
+   "consumes": "features:50f778da2f60aa35cf2abcd49cd8bfd3a1d513822a97fde2168d4af37d126c60",
+   "role": "features.train.shard0.npy",
+   "produced_by": 0
+  },
+  {
+   "consumes": "features:0e71e2bfe148033e40621b557d24ac680d29be2c59c5c1c8183e5fa37b41be7e",
+   "role": "features.train.shard1.meta.npz",
+   "produced_by": 0
+  },
+  {
+   "consumes": "features:8e86371fb2799a6810a91fbeb236f405129c1eeaa6ddaa6780ae7c6b5c11f859",
+   "role": "features.train.shard1.npy",
+   "produced_by": 0
+  },
+  {
+   "consumes": "features:e2995e9e6e466ddd8d7206b03347503834e5a8cace6c6483d663eb33b343bd49",
+   "role": "features.rollouts.meta.npz",
+   "produced_by": 0
+  },
+  {
+   "consumes": "features:d3126c7fa30b123b88d692d664f9293c4eddacb3e99895e0e5fec285aa3f7040",
+   "role": "features.rollouts.npy",
+   "produced_by": 0
+  },
+  {
+   "consumes": "subset:308ff4d8d805f371acea7259ea9b11f16f054867276fc91c6b5a804aeb0f4fa2",
+   "role": "training",
+   "produced_by": 0
+  },
+  {
+   "consumes": "checkpoint:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+   "role": "checkpoint",
+   "produced_by": 1
+  },
+  {
+   "consumes": "rollouts:8aba1149a987b6fcd52307a2fbb28617decc2f0d6a04183e1ba92486d40c12c3",
+   "role": "rollouts",
+   "produced_by": 1
+  },
+  {
+   "consumes": "returns:bb04a3a5b71895a5ca544f93963335ed5ddb6979f44e61d7c443504d1160b037",
+   "role": "returns",
+   "produced_by": 1
+  },
+  {
+   "consumes": "features:bcc730bc2f295b559d818fb1fabc51750426d820931bcf1e75a8c9e1f6b2a4a7",
+   "role": "features.train.shard0.meta.npz",
+   "produced_by": 0
+  },
+  {
+   "consumes": "features:bfd11d1c4680a17bf54933fb56eab32bccbe2da7dd961f9901d01027247c8b94",
+   "role": "features.train.shard0.npy",
+   "produced_by": 0
+  },
+  {
+   "consumes": "features:0e71e2bfe148033e40621b557d24ac680d29be2c59c5c1c8183e5fa37b41be7e",
+   "role": "features.train.shard1.meta.npz",
+   "produced_by": 0
+  },
+  {
+   "consumes": "features:cabb10f599e6baf75c02327b69de8d1dd67159c6f68822bf2d3f81918b201d8d",
+   "role": "features.train.shard1.npy",
+   "produced_by": 0
+  },
+  {
+   "consumes": "features:e2995e9e6e466ddd8d7206b03347503834e5a8cace6c6483d663eb33b343bd49",
+   "role": "features.rollouts.meta.npz",
+   "produced_by": 0
+  },
+  {
+   "consumes": "features:39277c889c9bc17476f12618553afd01fe5be870339ed5d84f57b5a70d11d14d",
+   "role": "features.rollouts.npy",
+   "produced_by": 0
+  },
+  {
+   "consumes": "subset:308ff4d8d805f371acea7259ea9b11f16f054867276fc91c6b5a804aeb0f4fa2",
+   "role": "training",
+   "produced_by": 0
+  },
+  {
+   "consumes": "rollouts:dcd1dd81c274766856e74d03201735dad52ae1869628b6e3302a18b6ac20c5be",
+   "role": "rollouts",
+   "produced_by": 1
+  },
+  {
+   "consumes": "subset:308ff4d8d805f371acea7259ea9b11f16f054867276fc91c6b5a804aeb0f4fa2",
+   "role": "training",
+   "produced_by": 0
+  },
+  {
+   "consumes": "rollouts:8aba1149a987b6fcd52307a2fbb28617decc2f0d6a04183e1ba92486d40c12c3",
+   "role": "rollouts",
+   "produced_by": 1
+  }
+ ]
+}

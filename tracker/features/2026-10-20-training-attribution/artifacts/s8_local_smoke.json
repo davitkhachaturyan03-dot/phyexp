@@ -1,0 +1,185 @@
+{
+ "label": "smoke (not attribution-grade): 2-step SmolVLA checkpoint, 2 rollouts, 1 train sample per episode",
+ "device": "mps",
+ "train_run": "0a33bc75bb71433ca2def5220014dde0",
+ "stages": [
+  {
+   "stage": "eval",
+   "ok": true,
+   "seconds": 87.9,
+   "output": {
+    "run_id": "03da0e549b5847ffbc8390e14ce8e7ae",
+    "rollouts": "data/eval/eval-ts-smoke/rollouts.parquet",
+    "n_rollouts": 2,
+    "n_success": 0,
+    "trajectories": {
+     "root": "data/eval/eval-ts-smoke/trajectories",
+     "digest": "b09a1f5e7705f9c02718c4faba7b9a70c543d0981f88b4fab136a3d33a380752",
+     "episodes": 2,
+     "frames": 2400
+    },
+    "out_dir": "data/eval/eval-ts-smoke"
+   }
+  },
+  {
+   "stage": "returns",
+   "ok": true,
+   "seconds": 1.9,
+   "output": {
+    "run_id": "b09334bea4494b868ca068d7ec76af38",
+    "returns": "data/eval/returns-03da0e549b58/returns.parquet",
+    "rows": 2,
+    "operation_rows": 2,
+    "hrt_macro_at_policy": 0.06881666666666668
+   }
+  },
+  {
+   "stage": "features-train",
+   "ok": true,
+   "seconds": 343.1,
+   "output": {
+    "checkpoint_sha256": "0adc283bda8e686575daeb2355a8892373ac6e056d8cd11b842f18be1c577acf",
+    "dataset_root": "data/lerobot/libero_spatial_10",
+    "stride": 100000,
+    "shard": [
+     0,
+     1
+    ],
+    "n_samples": 40,
+    "dim": 7488,
+    "output_fn": "square"
+   }
+  },
+  {
+   "stage": "features-rollouts",
+   "ok": true,
+   "seconds": 32.3,
+   "output": {
+    "checkpoint_sha256": "0adc283bda8e686575daeb2355a8892373ac6e056d8cd11b842f18be1c577acf",
+    "dataset_root": "data/eval/eval-ts-smoke/trajectories",
+    "stride": 150,
+    "shard": [
+     0,
+     1
+    ],
+    "n_samples": 16,
+    "dim": 7488,
+    "output_fn": "square"
+   }
+  },
+  {
+   "stage": "attribute",
+   "ok": true,
+   "seconds": 6.3,
+   "output": {
+    "run_id": "545c573799704774bc747b2049b63643",
+    "scores": "data/attribution/attribute-ts-smoke/attribution_scores.parquet",
+    "n_episodes": 40,
+    "n_rollouts": 2
+   }
+  },
+  {
+   "stage": "select",
+   "ok": true,
+   "seconds": 4.6,
+   "output": {
+    "run_id": "2e5964623239477ab165236ac8f4d454",
+    "subset_id": "308d4102c0a85ec0bc67f89035f4251b711fa1c16b44917502a9d0d99dd5d284",
+    "n_episodes": 38
+   }
+  }
+ ],
+ "failed": null,
+ "n_rollouts": 2,
+ "n_episodes": 40,
+ "score_table_shape": [
+  40,
+  30
+ ],
+ "tau_agreement": {
+  "infl_f30__same_task|infl_rmst60__same_task": {
+   "tau": NaN,
+   "p": NaN,
+   "n": 2
+  },
+  "infl_f30__same_task|infl_auc_expected__same_task": {
+   "tau": NaN,
+   "p": NaN,
+   "n": 2
+  },
+  "infl_f30__same_task|infl_auc_sampled__same_task": {
+   "tau": NaN,
+   "p": NaN,
+   "n": 2
+  },
+  "infl_f30__same_task|infl_hrt60_lin__same_task": {
+   "tau": NaN,
+   "p": NaN,
+   "n": 2
+  },
+  "infl_f30__same_task|infl_censored60__same_task": {
+   "tau": NaN,
+   "p": NaN,
+   "n": 2
+  },
+  "infl_rmst60__same_task|infl_auc_expected__same_task": {
+   "tau": NaN,
+   "p": NaN,
+   "n": 2
+  },
+  "infl_rmst60__same_task|infl_auc_sampled__same_task": {
+   "tau": NaN,
+   "p": NaN,
+   "n": 2
+  },
+  "infl_rmst60__same_task|infl_hrt60_lin__same_task": {
+   "tau": NaN,
+   "p": NaN,
+   "n": 2
+  },
+  "infl_rmst60__same_task|infl_censored60__same_task": {
+   "tau": NaN,
+   "p": NaN,
+   "n": 2
+  },
+  "infl_auc_expected__same_task|infl_auc_sampled__same_task": {
+   "tau": NaN,
+   "p": NaN,
+   "n": 2
+  },
+  "infl_auc_expected__same_task|infl_hrt60_lin__same_task": {
+   "tau": NaN,
+   "p": NaN,
+   "n": 2
+  },
+  "infl_auc_expected__same_task|infl_censored60__same_task": {
+   "tau": NaN,
+   "p": NaN,
+   "n": 2
+  },
+  "infl_auc_sampled__same_task|infl_hrt60_lin__same_task": {
+   "tau": NaN,
+   "p": NaN,
+   "n": 2
+  },
+  "infl_auc_sampled__same_task|infl_censored60__same_task": {
+   "tau": NaN,
+   "p": NaN,
+   "n": 2
+  },
+  "infl_hrt60_lin__same_task|infl_censored60__same_task": {
+   "tau": NaN,
+   "p": NaN,
+   "n": 2
+  }
+ },
+ "all_finite_harm_columns": true,
+ "train_output_fn": "square",
+ "rollout_output_fn": "square",
+ "feature_files_recorded": 4,
+ "select_declared_functional": "F(30) = P(T <= 30 s)",
+ "select_child_episodes": 38,
+ "mlflow_db_sha256_before": "306af4123fda7e635892d459a2e34008ba1cb62f6c4fce152c546e0da7bdde79",
+ "mlflow_db_sha256_after": "306af4123fda7e635892d459a2e34008ba1cb62f6c4fce152c546e0da7bdde79",
+ "seconds": 477
+}

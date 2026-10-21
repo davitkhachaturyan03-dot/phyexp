@@ -1,0 +1,57 @@
+{
+ "SYNTHETIC": true,
+ "pass": true,
+ "checks": [
+  {
+   "name": "8.1 attribute x2, ensemble, five selects, score and analyze all ran through the stage CLI on a scratch store (--lineage-root; AC6.4)",
+   "pass": true,
+   "detail": "10 stage runs; attribute table 14 episodes x 12 rollouts"
+  },
+  {
+   "name": "8.1b selects: per-task arms keep n - (tasks x 1), global arms n - 2, per-task counts of curated and random children are identical",
+   "pass": true,
+   "detail": "kept {'harm': 12, 'help': 12, 'random': 12, 'gharm': 12, 'grandom': 12} of 14; harm select declares F(30) = P(T <= 30 s)"
+  },
+  {
+   "name": "8.2 trace from a select run reaches both attribute runs and the ensemble, both seeds' returns, eval and train runs, every feature digest and the training subset",
+   "pass": true,
+   "detail": "stages ['attribute', 'eval', 'returns', 'select', 'train']; 10 runs; 12 features inputs (2 seeds x 6 files); training subset 308ff4d8d805 in entities: True; dead ends (no producer): ['features', 'score_table', 'subset']"
+  },
+  {
+   "name": "8.3 the score stage ran on the v3 subset (recovery matrix has 7 types + pooled per harm column, flagged synthetic)",
+   "pass": true,
+   "detail": "104 rows, 13 harm columns"
+  },
+  {
+   "name": "8.4 refused with nothing written: features from another checkpoint",
+   "pass": true,
+   "detail": "features /Users/davit_khachaturyan/Projects/personal/vlaExp/data/scratch/training_attribution/integration/feat"
+  },
+  {
+   "name": "8.4 refused with nothing written: train features on a different episode list",
+   "pass": true,
+   "detail": "train features were not computed on exactly the training subset's episodes"
+  },
+  {
+   "name": "8.4 refused with nothing written: a score table from another subset at select",
+   "pass": true,
+   "detail": "score table keys != parent subset's episode versions: 0 unknown/stale (e.g. []), 1 unscored (e.g. [('libero_10"
+  },
+  {
+   "name": "8.4 refused with nothing written: an ensemble of two runs on different subsets",
+   "pass": true,
+   "detail": "ensemble inputs were trained on different subsets: ['subset:2cd29b6df0d840ace4ed9972e391b5394eda0452516cddda3f"
+  },
+  {
+   "name": "8.4b the integration run left the real mlflow.db sha256 unchanged",
+   "pass": true,
+   "detail": "306af4123fda7e63..."
+  },
+  {
+   "name": "R7 real mlflow.db sha256 unchanged",
+   "pass": true,
+   "detail": "306af4123fda7e63..."
+  }
+ ],
+ "seconds": 47
+}
