@@ -18,8 +18,7 @@ Grounding
 
 What ``open_for_method(subset_ref)`` does, every call
 -----------------------------------------------------
-1. ``Subset.load(subset_ref)``; ``verify_version`` on its version (a changed byte raises
-   ``VersionIntegrityError``).
+1. ``Subset.load(subset_ref)``.
 2. ``assert_blind`` on the version (fenced, or any bookkeeping column differing from the parent: ``LineageError``
    naming the fence / offending columns).
 3. Refuses a ground-truth-derived subset: any subset whose derivation chain (``parent_subset_id`` /
@@ -28,6 +27,8 @@ What ``open_for_method(subset_ref)`` does, every call
 4. Diff guard: one dataset lineage per process. Opening a version that is an ancestor or a descendant of one
    already opened in this process raises, because comparing the two versions' content hashes names the edited
    episodes (``lineage.parent_hashes`` docstring). ``_reset_session()`` clears the registry (tests only).
+5. ``verify_version`` on the version (a changed byte raises ``VersionIntegrityError``). Last, because it hashes the
+   whole version; the cheap refusals above come first (order changed in training-attribution S1; same checks).
 
 ``MethodView`` (frozen) carries ``version_id``, ``subset_id``, ``lerobot_root``, ``episode_indices`` (from
 ``Subset.resolve``), ``catalog`` and ``reference_ids``, plus ``iter_episodes()``.
@@ -151,13 +152,15 @@ def open_for_method(subset_ref: str, lineage_root: Path | None = None) -> Method
     """
     subset = Subset.load(subset_ref, lineage_root)
     vid = subset.dataset_version_id
-    verify_version(vid, lineage_root=lineage_root)
+    # Cheap refusals first (fence, leak, ground-truth chain, diff guard), so a refused input is not first hashed in
+    # full (~20 s per 6.9 GB version, measured in training-attribution S1); the integrity hash runs last.
     assert_blind(vid, lineage_root)
     hit = _groundtruth_in_chain(subset, lineage_root)
     if hit:
         raise LineageError(f"subset {subset_ref!r} is ground-truth-derived (op {hit!r}); a method under test must not "
                            "be given a subset built from the labels (owner decision 3)")
     _check_lineage_isolation(vid, lineage_root)
+    verify_version(vid, lineage_root=lineage_root)
     v = resolve_version(vid, lineage_root)
     cat = subset.episodes(lineage_root)[CATALOG_COLUMNS].sort_values("episode_index").reset_index(drop=True)
     refs: tuple[str, ...] = ()

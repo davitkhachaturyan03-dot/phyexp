@@ -1,0 +1,23 @@
+entry_point,input,result,names_reason,runs_before,runs_after,as_expected,message
+attribute,fenced v1,REFUSED LineageError,True,79,79,True,"version v1 (16076b9c5cb2) is not blind to its edits: fenced=True, offending=['episode_index'] (PoC §2.1 item 4 p.3)"
+features --which train,fenced v1,REFUSED LineageError,True,79,79,True,"version v1 (16076b9c5cb2) is not blind to its edits: fenced=True, offending=['episode_index'] (PoC §2.1 item 4 p.3)"
+train,fenced v1,REFUSED LineageError,True,79,79,True,"version v1 (16076b9c5cb2) is not blind to its edits: fenced=True, offending=['episode_index'] (PoC §2.1 item 4 p.3)"
+select (parent),fenced v1,REFUSED LineageError,True,79,79,True,"version v1 (16076b9c5cb2) is not blind to its edits: fenced=True, offending=['episode_index'] (PoC §2.1 item 4 p.3)"
+attribute,fenced v2 (superseded),REFUSED LineageError,True,79,79,True,version v2 (eaeed043455a) is fenced: superseded by v3 (002a68e4caf2); use the superseding version (ground-truth feature r3)
+features --which train,fenced v2 (superseded),REFUSED LineageError,True,79,79,True,version v2 (eaeed043455a) is fenced: superseded by v3 (002a68e4caf2); use the superseding version (ground-truth feature r3)
+train,fenced v2 (superseded),REFUSED LineageError,True,79,79,True,version v2 (eaeed043455a) is fenced: superseded by v3 (002a68e4caf2); use the superseding version (ground-truth feature r3)
+select (parent),fenced v2 (superseded),REFUSED LineageError,True,79,79,True,version v2 (eaeed043455a) is fenced: superseded by v3 (002a68e4caf2); use the superseding version (ground-truth feature r3)
+attribute,ground-truth-derived (oracle_drop),REFUSED LineageError,True,79,79,True,subset 'b14facf53a1c2dfe229ffc91afe54edcf63de2ece5429dd2fba3a2e7b3cf5094' is ground-truth-derived (op 'oracle_drop'); a method under test mu
+features --which train,ground-truth-derived (oracle_drop),REFUSED LineageError,True,79,79,True,subset 'b14facf53a1c2dfe229ffc91afe54edcf63de2ece5429dd2fba3a2e7b3cf5094' is ground-truth-derived (op 'oracle_drop'); a method under test mu
+train,ground-truth-derived (oracle_drop),REFUSED LineageError,True,79,79,True,subset 'b14facf53a1c2dfe229ffc91afe54edcf63de2ece5429dd2fba3a2e7b3cf5094' is ground-truth-derived (op 'oracle_drop'); a method under test mu
+select (parent),ground-truth-derived (oracle_drop),REFUSED LineageError,True,79,79,True,subset 'b14facf53a1c2dfe229ffc91afe54edcf63de2ece5429dd2fba3a2e7b3cf5094' is ground-truth-derived (op 'oracle_drop'); a method under test mu
+attribute,descendant of oracle_drop,REFUSED LineageError,True,79,79,True,subset '71f58e89f8b619e518ea990658444405d2b3b5606882f78f2b795e332eecfa43' is ground-truth-derived (op 'oracle_drop'); a method under test mu
+features --which train,descendant of oracle_drop,REFUSED LineageError,True,79,79,True,subset '71f58e89f8b619e518ea990658444405d2b3b5606882f78f2b795e332eecfa43' is ground-truth-derived (op 'oracle_drop'); a method under test mu
+train,descendant of oracle_drop,REFUSED LineageError,True,79,79,True,subset '71f58e89f8b619e518ea990658444405d2b3b5606882f78f2b795e332eecfa43' is ground-truth-derived (op 'oracle_drop'); a method under test mu
+select (parent),descendant of oracle_drop,REFUSED LineageError,True,79,79,True,subset '71f58e89f8b619e518ea990658444405d2b3b5606882f78f2b795e332eecfa43' is ground-truth-derived (op 'oracle_drop'); a method under test mu
+open_for_method (control),v3/candidate (blind),OPENED,True,0,0,True,"960 episodes, 2.5s incl. integrity hash"
+attribute,tampered version (1 byte flipped),REFUSED VersionIntegrityError,True,1,1,True,dataset copy at /Users/davit_khachaturyan/Projects/personal/vlaExp/data/scratch/training_attribution/blind/small/lerobot/small20_gt does not
+features --which train,tampered version (1 byte flipped),REFUSED VersionIntegrityError,True,1,1,True,dataset copy at /Users/davit_khachaturyan/Projects/personal/vlaExp/data/scratch/training_attribution/blind/small/lerobot/small20_gt does not
+train,tampered version (1 byte flipped),REFUSED VersionIntegrityError,True,1,1,True,dataset copy at /Users/davit_khachaturyan/Projects/personal/vlaExp/data/scratch/training_attribution/blind/small/lerobot/small20_gt does not
+select (parent),tampered version (1 byte flipped),REFUSED VersionIntegrityError,True,1,1,True,dataset copy at /Users/davit_khachaturyan/Projects/personal/vlaExp/data/scratch/training_attribution/blind/small/lerobot/small20_gt does not
+open_for_method (control),"same small version, byte restored",OPENED,True,0,0,True,20 episodes

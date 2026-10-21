@@ -14,8 +14,11 @@ Grounding
 - CUPID (docs/papers/CUPID_Influence_Functions_arXiv-2506.19121.pdf) §5.1 p. 5, Prop. 1 / Alg. 1, as quoted in
   ``vlapoc.returns``: Ψ̂(ξ) = (1/m) Σ_i R(τ_i)/H Σ_{(s',a')∈τ_i} Σ_{(s,a)∈ξ} Ψ_a-inf((s,a),(s',a')). The action
   influence is TRAK's: Ψ_a-inf = φ'ᵀ (ΦᵀΦ/N + λI)⁻¹ φ with projected gradients φ (``vlapoc.influence``).
-- PoC §2.1 item 4 (p. 3) and the evaluation layer's S0: a method under test only sees blind versions;
-  ``attribute_run`` calls ``vlapoc.lineage.assert_blind`` on the training version first.
+- PoC §2.1 item 4 (p. 3): "Deliberately corrupt known subsets of training data ... Then check whether your
+  attribution method flags exactly those." Owner decision 3 (ground-truth feature): a method under test reads data
+  only through ``vlapoc.method_data.open_for_method``. ``attribute_run`` opens the training subset that way before
+  it creates any run: integrity hash (``VersionIntegrityError``), fence/blindness, ground-truth-derived subsets and
+  the one-lineage-per-process diff guard are all enforced (training-attribution S1).
 
 The estimator, and how this implementation evaluates it
 -------------------------------------------------------
@@ -313,20 +316,23 @@ def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, trai
     """Stage ``attribute`` (PoC §9.1 Step 3 p. 19): CUPID influence of every training episode version on every
     family-W return (and per-failure-type return) of one eval run, recorded as one MLflow run.
 
-    Refuses (``LineageError``/``ValueError``, before any run exists) unless: the training version is blind
-    (``assert_blind``); the eval run evaluated this train run's checkpoint and recorded trajectories; the returns run
+    Refuses (``LineageError``/``VersionIntegrityError``/``ValueError``, before any run exists) unless: the training
+    subset opens through ``open_for_method`` (intact, not fenced, blind, not ground-truth-derived; PoC §2.1 item 4
+    p. 3, owner decision 3); the eval run evaluated this train run's checkpoint and recorded trajectories; the returns run
     consumed that eval's rollouts; both feature sets were computed from this checkpoint with one projection; the train
     features cover exactly the training subset and the rollout features exactly the recorded trajectories.
     Returns ``{"run_id", "scores", "n_episodes", "n_rollouts", "agreement"}``.
     """
-    from vlapoc.lineage import assert_blind, rel
+    from vlapoc.lineage import rel
+    from vlapoc.method_data import open_for_method
     from vlapoc.returns import load_eval_rollouts
     from vlapoc.runs import _training_subset, check_scores, client, stage_run
 
     c = client(lineage_root)
-    tr, ev, rr = c.get_run(train_run_id), c.get_run(eval_run_id), c.get_run(returns_run_id)
+    tr = c.get_run(train_run_id)
     subset = _training_subset(tr, lineage_root)
-    assert_blind(subset.dataset_version_id, lineage_root)
+    open_for_method(subset.subset_id, lineage_root)  # refuses fenced / leaky / ground-truth-derived / tampered input
+    ev, rr = c.get_run(eval_run_id), c.get_run(returns_run_id)
     ckpt_sha = tr.data.tags["checkpoint.weights.sha256"]
     if ev.data.params.get("train_run_id") != train_run_id or ev.data.params.get("checkpoint_sha256") != ckpt_sha:
         raise ValueError(f"eval run {eval_run_id[:12]} did not evaluate train run {train_run_id[:12]}'s checkpoint")

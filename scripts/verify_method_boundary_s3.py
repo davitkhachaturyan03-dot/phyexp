@@ -75,8 +75,10 @@ def scan_boundary(paths: list[Path]) -> list[str]:
 
 
 def method_sources() -> list[Path]:
-    """``vlapoc/method_data.py`` and every module under ``vlapoc/methods/``."""
-    return [REPO_ROOT / "vlapoc" / "method_data.py", *sorted((REPO_ROOT / "vlapoc" / "methods").rglob("*.py"))]
+    """``vlapoc/method_data.py``, every module under ``vlapoc/methods/``, and the attribution method's own modules
+    ``vlapoc/influence.py`` and ``vlapoc/attribution.py`` (training-attribution S1, AC1.5)."""
+    return [REPO_ROOT / "vlapoc" / "method_data.py", *sorted((REPO_ROOT / "vlapoc" / "methods").rglob("*.py")),
+            REPO_ROOT / "vlapoc" / "influence.py", REPO_ROOT / "vlapoc" / "attribution.py"]
 
 
 def attempt(label: str, fn, rows: list, expect: type | None):

@@ -6,6 +6,10 @@ result as JSON. Run arguments (``--train``, ``--eval``, ``--returns``, ``--runs`
 *name*; a name resolves to the latest FINISHED run of that name and stage, so a chain of SLURM jobs can refer to
 runs that do not exist yet when the chain is submitted.
 
+Blindness (PoC §2.1 item 4 p.3; owner decision 3): ``train``, ``features --which train`` and ``select`` open their
+subset through ``method_view`` (= ``vlapoc.method_data.open_for_method``); ``attribute`` does the same inside
+``attribute_run``. A fenced, leaky, ground-truth-derived or tampered version is refused (training-attribution S1).
+
 Stages (docs/dataflow.md; PoC §9.1 pp. 18-19):
 
 - ``train``    AC8.5: ``train_run`` with SmolVLA from ``data/hf_models/smolvla_base`` (``load_vlm_weights=False``),
@@ -91,9 +95,25 @@ def subset_ref(ref: str) -> str:
     return client().get_run(run_id(ref.split(":", 1)[1], "select")).data.tags["output.subset"].split(":", 1)[1]
 
 
+def method_view(ref: str, lineage_root: Path | None = None):
+    """Open a subset for the method chain through ``vlapoc.method_data.open_for_method`` and return its ``MethodView``.
+
+    Grounding: PoC §2.1 item 4 p.3 ("flags exactly those" only means something if the method cannot read the
+    answer) and owner decision 3 (ground-truth feature): the attribution chain's trainer, feature extractor and
+    selector read data only through the method-facing loader, which hashes the version (``VersionIntegrityError``),
+    refuses fenced / leaky versions and ground-truth-derived subsets (``LineageError``). ``train_run`` itself is
+    left unchanged because the ground-truth feature's oracle arms legitimately train on ``oracle_drop`` subsets; the
+    check sits here, at the chain's entry (training-attribution S1). ``ref`` may be ``select:<select run>``.
+    """
+    from vlapoc.method_data import open_for_method
+
+    return open_for_method(subset_ref(ref), lineage_root)
+
+
 def cmd_train(a) -> dict:
     from vlapoc.runs import train_run
 
+    method_view(a.subset)
     return train_run(subset_ref(a.subset), a.name, seed=a.seed, steps=a.steps, batch_size=a.batch_size, policy_type="smolvla",
                      policy_overrides={"load_vlm_weights": False}, device=a.device, pretrained_path=PRETRAINED_DIR,
                      pretrained_ref=a.pretrained_ref, smoke=a.smoke, chain=a.chain)
@@ -119,7 +139,7 @@ def cmd_returns(a) -> dict:
 
 def cmd_features(a) -> dict:
     from vlapoc.influence import featurize
-    from vlapoc.lineage import file_digests, resolve_version, sha256_json
+    from vlapoc.lineage import file_digests, sha256_json
     from vlapoc.runs import _training_subset, client
 
     c = client()
@@ -127,9 +147,8 @@ def cmd_features(a) -> dict:
     tr = c.get_run(tid)
     ckpt = REPO_ROOT / tr.data.tags["checkpoint.path"]
     if a.which == "train":
-        subset = _training_subset(tr, None)
-        root = REPO_ROOT / resolve_version(subset.dataset_version_id)["lerobot_root"]
-        episodes, eid = subset.resolve(), None
+        view = method_view(_training_subset(tr, None).subset_id)  # S1: root and episodes come from the MethodView
+        root, episodes, eid = view.lerobot_root, list(view.episode_indices), None
     else:
         eid = run_id(a.eval, "eval")
         ev = c.get_run(eid)
@@ -167,6 +186,7 @@ def cmd_select(a) -> dict:
     from vlapoc.attribution import _artifact_table
     from vlapoc.runs import client, select_run
 
+    method_view(a.parent)  # S1: the parent opens through the method loader (fence / integrity / ground-truth chain)
     score_path, sid = None, None
     if a.op.startswith("drop_top_k"):
         sid = run_id(a.scores, "attribute")

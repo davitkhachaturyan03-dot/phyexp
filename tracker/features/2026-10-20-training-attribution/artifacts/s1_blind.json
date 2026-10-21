@@ -1,0 +1,241 @@
+{
+ "pass": true,
+ "rows": [
+  {
+   "entry_point": "attribute",
+   "input": "fenced v1",
+   "result": "REFUSED LineageError",
+   "names_reason": true,
+   "runs_before": 79,
+   "runs_after": 79,
+   "as_expected": true,
+   "message": "version v1 (16076b9c5cb2) is not blind to its edits: fenced=True, offending=['episode_index'] (PoC \u00a72.1 item 4 p.3)"
+  },
+  {
+   "entry_point": "features --which train",
+   "input": "fenced v1",
+   "result": "REFUSED LineageError",
+   "names_reason": true,
+   "runs_before": 79,
+   "runs_after": 79,
+   "as_expected": true,
+   "message": "version v1 (16076b9c5cb2) is not blind to its edits: fenced=True, offending=['episode_index'] (PoC \u00a72.1 item 4 p.3)"
+  },
+  {
+   "entry_point": "train",
+   "input": "fenced v1",
+   "result": "REFUSED LineageError",
+   "names_reason": true,
+   "runs_before": 79,
+   "runs_after": 79,
+   "as_expected": true,
+   "message": "version v1 (16076b9c5cb2) is not blind to its edits: fenced=True, offending=['episode_index'] (PoC \u00a72.1 item 4 p.3)"
+  },
+  {
+   "entry_point": "select (parent)",
+   "input": "fenced v1",
+   "result": "REFUSED LineageError",
+   "names_reason": true,
+   "runs_before": 79,
+   "runs_after": 79,
+   "as_expected": true,
+   "message": "version v1 (16076b9c5cb2) is not blind to its edits: fenced=True, offending=['episode_index'] (PoC \u00a72.1 item 4 p.3)"
+  },
+  {
+   "entry_point": "attribute",
+   "input": "fenced v2 (superseded)",
+   "result": "REFUSED LineageError",
+   "names_reason": true,
+   "runs_before": 79,
+   "runs_after": 79,
+   "as_expected": true,
+   "message": "version v2 (eaeed043455a) is fenced: superseded by v3 (002a68e4caf2); use the superseding version (ground-truth feature r3)"
+  },
+  {
+   "entry_point": "features --which train",
+   "input": "fenced v2 (superseded)",
+   "result": "REFUSED LineageError",
+   "names_reason": true,
+   "runs_before": 79,
+   "runs_after": 79,
+   "as_expected": true,
+   "message": "version v2 (eaeed043455a) is fenced: superseded by v3 (002a68e4caf2); use the superseding version (ground-truth feature r3)"
+  },
+  {
+   "entry_point": "train",
+   "input": "fenced v2 (superseded)",
+   "result": "REFUSED LineageError",
+   "names_reason": true,
+   "runs_before": 79,
+   "runs_after": 79,
+   "as_expected": true,
+   "message": "version v2 (eaeed043455a) is fenced: superseded by v3 (002a68e4caf2); use the superseding version (ground-truth feature r3)"
+  },
+  {
+   "entry_point": "select (parent)",
+   "input": "fenced v2 (superseded)",
+   "result": "REFUSED LineageError",
+   "names_reason": true,
+   "runs_before": 79,
+   "runs_after": 79,
+   "as_expected": true,
+   "message": "version v2 (eaeed043455a) is fenced: superseded by v3 (002a68e4caf2); use the superseding version (ground-truth feature r3)"
+  },
+  {
+   "entry_point": "attribute",
+   "input": "ground-truth-derived (oracle_drop)",
+   "result": "REFUSED LineageError",
+   "names_reason": true,
+   "runs_before": 79,
+   "runs_after": 79,
+   "as_expected": true,
+   "message": "subset 'b14facf53a1c2dfe229ffc91afe54edcf63de2ece5429dd2fba3a2e7b3cf5094' is ground-truth-derived (op 'oracle_drop'); a method under test mu"
+  },
+  {
+   "entry_point": "features --which train",
+   "input": "ground-truth-derived (oracle_drop)",
+   "result": "REFUSED LineageError",
+   "names_reason": true,
+   "runs_before": 79,
+   "runs_after": 79,
+   "as_expected": true,
+   "message": "subset 'b14facf53a1c2dfe229ffc91afe54edcf63de2ece5429dd2fba3a2e7b3cf5094' is ground-truth-derived (op 'oracle_drop'); a method under test mu"
+  },
+  {
+   "entry_point": "train",
+   "input": "ground-truth-derived (oracle_drop)",
+   "result": "REFUSED LineageError",
+   "names_reason": true,
+   "runs_before": 79,
+   "runs_after": 79,
+   "as_expected": true,
+   "message": "subset 'b14facf53a1c2dfe229ffc91afe54edcf63de2ece5429dd2fba3a2e7b3cf5094' is ground-truth-derived (op 'oracle_drop'); a method under test mu"
+  },
+  {
+   "entry_point": "select (parent)",
+   "input": "ground-truth-derived (oracle_drop)",
+   "result": "REFUSED LineageError",
+   "names_reason": true,
+   "runs_before": 79,
+   "runs_after": 79,
+   "as_expected": true,
+   "message": "subset 'b14facf53a1c2dfe229ffc91afe54edcf63de2ece5429dd2fba3a2e7b3cf5094' is ground-truth-derived (op 'oracle_drop'); a method under test mu"
+  },
+  {
+   "entry_point": "attribute",
+   "input": "descendant of oracle_drop",
+   "result": "REFUSED LineageError",
+   "names_reason": true,
+   "runs_before": 79,
+   "runs_after": 79,
+   "as_expected": true,
+   "message": "subset '71f58e89f8b619e518ea990658444405d2b3b5606882f78f2b795e332eecfa43' is ground-truth-derived (op 'oracle_drop'); a method under test mu"
+  },
+  {
+   "entry_point": "features --which train",
+   "input": "descendant of oracle_drop",
+   "result": "REFUSED LineageError",
+   "names_reason": true,
+   "runs_before": 79,
+   "runs_after": 79,
+   "as_expected": true,
+   "message": "subset '71f58e89f8b619e518ea990658444405d2b3b5606882f78f2b795e332eecfa43' is ground-truth-derived (op 'oracle_drop'); a method under test mu"
+  },
+  {
+   "entry_point": "train",
+   "input": "descendant of oracle_drop",
+   "result": "REFUSED LineageError",
+   "names_reason": true,
+   "runs_before": 79,
+   "runs_after": 79,
+   "as_expected": true,
+   "message": "subset '71f58e89f8b619e518ea990658444405d2b3b5606882f78f2b795e332eecfa43' is ground-truth-derived (op 'oracle_drop'); a method under test mu"
+  },
+  {
+   "entry_point": "select (parent)",
+   "input": "descendant of oracle_drop",
+   "result": "REFUSED LineageError",
+   "names_reason": true,
+   "runs_before": 79,
+   "runs_after": 79,
+   "as_expected": true,
+   "message": "subset '71f58e89f8b619e518ea990658444405d2b3b5606882f78f2b795e332eecfa43' is ground-truth-derived (op 'oracle_drop'); a method under test mu"
+  },
+  {
+   "entry_point": "open_for_method (control)",
+   "input": "v3/candidate (blind)",
+   "result": "OPENED",
+   "names_reason": true,
+   "runs_before": 0,
+   "runs_after": 0,
+   "as_expected": true,
+   "message": "960 episodes, 2.5s incl. integrity hash"
+  },
+  {
+   "entry_point": "attribute",
+   "input": "tampered version (1 byte flipped)",
+   "result": "REFUSED VersionIntegrityError",
+   "names_reason": true,
+   "runs_before": 1,
+   "runs_after": 1,
+   "as_expected": true,
+   "message": "dataset copy at /Users/davit_khachaturyan/Projects/personal/vlaExp/data/scratch/training_attribution/blind/small/lerobot/small20_gt does not"
+  },
+  {
+   "entry_point": "features --which train",
+   "input": "tampered version (1 byte flipped)",
+   "result": "REFUSED VersionIntegrityError",
+   "names_reason": true,
+   "runs_before": 1,
+   "runs_after": 1,
+   "as_expected": true,
+   "message": "dataset copy at /Users/davit_khachaturyan/Projects/personal/vlaExp/data/scratch/training_attribution/blind/small/lerobot/small20_gt does not"
+  },
+  {
+   "entry_point": "train",
+   "input": "tampered version (1 byte flipped)",
+   "result": "REFUSED VersionIntegrityError",
+   "names_reason": true,
+   "runs_before": 1,
+   "runs_after": 1,
+   "as_expected": true,
+   "message": "dataset copy at /Users/davit_khachaturyan/Projects/personal/vlaExp/data/scratch/training_attribution/blind/small/lerobot/small20_gt does not"
+  },
+  {
+   "entry_point": "select (parent)",
+   "input": "tampered version (1 byte flipped)",
+   "result": "REFUSED VersionIntegrityError",
+   "names_reason": true,
+   "runs_before": 1,
+   "runs_after": 1,
+   "as_expected": true,
+   "message": "dataset copy at /Users/davit_khachaturyan/Projects/personal/vlaExp/data/scratch/training_attribution/blind/small/lerobot/small20_gt does not"
+  },
+  {
+   "entry_point": "open_for_method (control)",
+   "input": "same small version, byte restored",
+   "result": "OPENED",
+   "names_reason": true,
+   "runs_before": 0,
+   "runs_after": 0,
+   "as_expected": true,
+   "message": "20 episodes"
+  }
+ ],
+ "static": {
+  "cmd_train": true,
+  "cmd_features": true,
+  "cmd_select": true,
+  "attribute_run uses open_for_method, not assert_blind": true
+ },
+ "boundary_scanned": [
+  "method_data.py",
+  "__init__.py",
+  "heuristics.py",
+  "influence.py",
+  "attribution.py"
+ ],
+ "mlflow_db_sha256_before": "306af4123fda7e635892d459a2e34008ba1cb62f6c4fce152c546e0da7bdde79",
+ "mlflow_db_sha256_after": "306af4123fda7e635892d459a2e34008ba1cb62f6c4fce152c546e0da7bdde79",
+ "seconds": 38
+}
