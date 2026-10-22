@@ -84,7 +84,7 @@ img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid va
     <tr><td><code>attribution.py::DIVERGENCES</code></td><td>Nine entries, each with its source; logged as a parameter of every attribute and ensemble run.</td></tr>
     <tr><td><code>attribution.py::check_compatible, output_fn_of</code></td><td>Refuse shards that mix output functions within one side; accept ATHENA's mixed loss/square pairing.</td></tr>
     <tr><td><code>vlapoc/third_party/cupid_quality.py</code></td><td>CUPID's own <code>sum_of_sum_influence</code> and <code>compute_demo_quality_scores</code>, copied verbatim from <code>agiachris/cupid</code> @ <code>2941eba9</code> (MIT), used only as the reference in check 7a.</td></tr>
-    <tr><td><code>scripts/stage.py features --preset {cupid,athena,branch}</code>, <code>attribute --cupid-returns</code></td><td>Switches between CUPID's choice, ATHENA's mixed choice and the old behaviour.</td></tr>
+    <tr><td><code>scripts/stage.py features --preset {cupid,athena,branch}</code>, <code>attribute --raw-returns</code> (CUPID's ±1 for yes/no columns is the default since 2026-10-22)</td><td>Switches between CUPID's choice, ATHENA's mixed choice and the old behaviour.</td></tr>
   </tbody>
 </table>
 </div>

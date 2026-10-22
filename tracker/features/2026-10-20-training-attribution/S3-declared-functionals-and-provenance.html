@@ -102,7 +102,7 @@ img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid va
 </table>
 </div>
 <h2>Example</h2>
-<p>One row of <code>functionals.json</code> (SYNTHETIC fixture, <code>artifacts/s3_functionals_example.json</code>). It says that the column <code>infl_f30__same_task</code> explains the chance of finishing within 30 s, uses only rollouts of the same task as each training episode, was centred (the default; <code>--cupid-returns</code> would use CUPID's ±1 coding instead), and was computed with the square output function on both sides:</p>
+<p>One row of <code>functionals.json</code> (SYNTHETIC fixture, <code>artifacts/s3_functionals_example.json</code>). It says that the column <code>infl_f30__same_task</code> explains the chance of finishing within 30 s, uses only rollouts of the same task as each training episode, used CUPID's ±1 coding for yes/no columns and centring for continuous ones (the default since 2026-10-22; <code>--raw-returns</code> centres the yes/no ones too), and was computed with the square output function on both sides:</p>
 <pre><code>column         infl_f30__same_task
 functional     F(30) = P(T &lt;= 30 s)
 tau            30 s            family  W            rollout_subset  same_task
