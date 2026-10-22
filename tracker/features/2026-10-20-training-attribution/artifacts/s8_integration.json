@@ -20,7 +20,7 @@
   {
    "name": "8.3 the score stage ran on the v3 subset (recovery matrix has 7 types + pooled per harm column, flagged synthetic)",
    "pass": true,
-   "detail": "104 rows, 13 harm columns"
+   "detail": "112 rows, 14 harm columns"
   },
   {
    "name": "8.4 refused with nothing written: features from another checkpoint",
@@ -63,5 +63,5 @@
    "detail": "306af4123fda7e63..."
   }
  ],
- "seconds": 56
+ "seconds": 54
 }

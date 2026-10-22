@@ -19,7 +19,12 @@
   {
    "name": "2.5 attribute run params carry output functions, encoding, centring and DIVERGENCES",
    "pass": true,
-   "detail": "{'train_output_fn': 'square', 'rollout_output_fn': 'square', 'return_encoding': 'raw', 'center_returns': 'True', 'min_failure_type_rollouts_inferred': '5'}, divergences keys ['centred_returns', 'continuous_returns', 'damping', 'draws', 'failure_type_returns', 'model_family', 'numerics', 'projection', 'strides']"
+   "detail": "{'train_output_fn': 'square', 'rollout_output_fn': 'square', 'return_encoding': 'pm1', 'center_returns': 'True', 'min_failure_type_rollouts_inferred': '5'}, divergences keys ['centred_returns', 'continuous_returns', 'damping', 'draws', 'failure_type_returns', 'model_family', 'numerics', 'projection', 'strides']"
+  },
+  {
+   "name": "2.5b owner ruling 2026-10-22: a default attribute run weights yes/no columns by CUPID's \u00b11 (params and every functionals row say so)",
+   "pass": true,
+   "detail": "{'binary_columns': 'CUPID \u00b11, uncentred', 'continuous_columns': 'centred (R \u2212 mean R)'}; f30: CUPID \u00b11, uncentred (success +1, otherwise \u22121); rmst60: centred (R \u2212 mean R)"
   },
   {
    "name": "3.3 the attribute run lists one `features` input per .npy / .meta.npz file with its sha256",
@@ -34,7 +39,7 @@
   {
    "name": "3.4 attribute raises when one rollout lacks a trajectory",
    "pass": true,
-   "detail": "1 of 30 rollouts of eval run 59130a6106ee have no recorded trajectory, so they would be dropped from the attribution silently; pass allow_partial=True to accept"
+   "detail": "1 of 30 rollouts of eval run 69f628f21d41 have no recorded trajectory, so they would be dropped from the attribution silently; pass allow_partial=True to accept"
   },
   {
    "name": "3.4b --allow-partial passes and records n_rollouts_without_trajectory",
@@ -49,7 +54,7 @@
   {
    "name": "3.5 ensemble_run raises on [id, id] duplicates",
    "pass": true,
-   "detail": "ensemble inputs contain duplicate runs: ['1aa2a001cee1405dbb3c25705d798e39', '1aa2a001cee1405dbb3c25705d798e39']"
+   "detail": "ensemble inputs contain duplicate runs: ['e4ec9d509cc045c88aab7bc3a832fd1f', 'e4ec9d509cc045c88aab7bc3a832fd1f']"
   },
   {
    "name": "3.5b ensemble_run raises on mixed center_returns",
@@ -69,7 +74,7 @@
   {
    "name": "3.6b select refuses (require_declaration) a score run that recorded no functionals.json",
    "pass": true,
-   "detail": "score run 7cb5e6bf43f1 recorded no functionals.json, so the functional that 'harm_f30__same_task' explains is undeclared (PoC \u00a73.4 p. 7); re-run the attribute s"
+   "detail": "score run ed8a70d111e0 recorded no functionals.json, so the functional that 'harm_f30__same_task' explains is undeclared (PoC \u00a73.4 p. 7); re-run the attribute s"
   },
   {
    "name": "3.6c select refuses a column the score run neither contains nor declares (before any run is created)",

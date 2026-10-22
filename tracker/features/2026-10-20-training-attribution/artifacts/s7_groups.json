@@ -25,7 +25,7 @@
   {
    "name": "7.3 the heatmap and scatter PNGs are written",
    "pass": true,
-   "detail": "{'tradeoff.png': 53844, 'heatmap.png': 100695}"
+   "detail": "{'tradeoff.png': 52334, 'heatmap.png': 100744}"
   },
   {
    "name": "7.3b each axis label names the column's functional and \u03c4 from functionals.json, and the titles say SYNTHETIC",
@@ -35,7 +35,7 @@
   {
    "name": "7.4 the analyze run's params carry the group threshold and the descriptive-unverified status, and link the score run",
    "pass": true,
-   "detail": "z=1.0, counts {\"consistent_harmer\": 2, \"consistent_helper\": 1, \"metric_specific\": 6, \"neutral\": 1, \"trade_off\": 5}"
+   "detail": "z=1.0, counts {\"consistent_harmer\": 1, \"consistent_helper\": 1, \"metric_specific\": 5, \"neutral\": 2, \"trade_off\": 6}"
   },
   {
    "name": "7.5 the group module passes the ground-truth boundary scan (no groundtruth import, no label files)",

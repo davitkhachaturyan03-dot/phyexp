@@ -28,12 +28,12 @@
    "produced_by": 0
   },
   {
-   "consumes": "score_table:3a5ade88f85e988e3376627294c196db17457d35187141d6c78cd921b89e68b6",
+   "consumes": "score_table:118fe47545e4cf93bfa7dffeac98fceb034f9f048ff47f1e45e67ad61b95e999",
    "role": "scores",
    "produced_by": 0
   },
   {
-   "consumes": "score_table:54e788038c4eb36cc3a4319fa61e007c8015669492b20961df81be9914791618",
+   "consumes": "score_table:4be26cb7cf0f1a3cc04c5263252f081453e733909140d9f60bf65d0d7aa97225",
    "role": "score_run_table",
    "produced_by": 1
   },
@@ -43,12 +43,12 @@
    "produced_by": 0
   },
   {
-   "consumes": "score_table:07c546f5b1435ff834607249094a54053f749bd3056d1cda5deccae234291989",
+   "consumes": "score_table:60ba79656accfde83dc00e21c72d4c0e1a2357d4614accee54f4a44203491441",
    "role": "seed_table_0",
    "produced_by": 1
   },
   {
-   "consumes": "score_table:ae1245cca4c6838471c01b1582e41e8436c48cbd029870de742e2318ae3e38f7",
+   "consumes": "score_table:708bf9e093931b2162dcfd6d34546b34b38c434c06b82601fe56e66ae351eb7c",
    "role": "seed_table_1",
    "produced_by": 1
   },

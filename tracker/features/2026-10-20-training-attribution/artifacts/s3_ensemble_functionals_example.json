@@ -47,12 +47,13 @@
    "family": "W",
    "rollout_subset": "all",
    "good_sign": 1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
    ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -68,12 +69,13 @@
    "family": "W",
    "rollout_subset": "same_task",
    "good_sign": 1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
    ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -95,6 +97,7 @@
     "square",
     "square"
    ],
+   "weighting": "centred (R − mean R)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -116,6 +119,7 @@
     "square",
     "square"
    ],
+   "weighting": "centred (R − mean R)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -137,6 +141,7 @@
     "square",
     "square"
    ],
+   "weighting": "centred (R − mean R)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -158,6 +163,7 @@
     "square",
     "square"
    ],
+   "weighting": "centred (R − mean R)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -179,6 +185,7 @@
     "square",
     "square"
    ],
+   "weighting": "centred (R − mean R)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -200,6 +207,7 @@
     "square",
     "square"
    ],
+   "weighting": "centred (R − mean R)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -221,6 +229,7 @@
     "square",
     "square"
    ],
+   "weighting": "centred (R − mean R)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -242,6 +251,7 @@
     "square",
     "square"
    ],
+   "weighting": "centred (R − mean R)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -257,12 +267,13 @@
    "family": "W",
    "rollout_subset": "all",
    "good_sign": -1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
    ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -278,12 +289,13 @@
    "family": "W",
    "rollout_subset": "same_task",
    "good_sign": -1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
    ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -299,12 +311,13 @@
    "family": "W",
    "rollout_subset": "all",
    "good_sign": -1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
    ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -320,12 +333,13 @@
    "family": "W",
    "rollout_subset": "same_task",
    "good_sign": -1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
    ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -341,12 +355,13 @@
    "family": "W",
    "rollout_subset": "all",
    "good_sign": 1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
    ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -362,12 +377,13 @@
    "family": "W",
    "rollout_subset": "same_task",
    "good_sign": 1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
    ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -389,6 +405,7 @@
     "square",
     "square"
    ],
+   "weighting": "centred (R − mean R)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -410,6 +427,7 @@
     "square",
     "square"
    ],
+   "weighting": "centred (R − mean R)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -431,6 +449,7 @@
     "square",
     "square"
    ],
+   "weighting": "centred (R − mean R)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -452,6 +471,7 @@
     "square",
     "square"
    ],
+   "weighting": "centred (R − mean R)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -473,6 +493,7 @@
     "square",
     "square"
    ],
+   "weighting": "centred (R − mean R)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -494,6 +515,7 @@
     "square",
     "square"
    ],
+   "weighting": "centred (R − mean R)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -515,6 +537,7 @@
     "square",
     "square"
    ],
+   "weighting": "centred (R − mean R)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -536,6 +559,7 @@
     "square",
     "square"
    ],
+   "weighting": "centred (R − mean R)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -551,12 +575,13 @@
    "family": "W",
    "rollout_subset": "all",
    "good_sign": -1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
    ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -572,12 +597,13 @@
    "family": "W",
    "rollout_subset": "same_task",
    "good_sign": -1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
    ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -593,12 +619,13 @@
    "family": "W",
    "rollout_subset": "all",
    "good_sign": -1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
    ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -614,12 +641,13 @@
    "family": "W",
    "rollout_subset": "same_task",
    "good_sign": -1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
    ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)",
    "n_models": 2,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -635,12 +663,13 @@
    "family": "W",
    "rollout_subset": "all",
    "good_sign": -1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
    ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)",
    "n_models": 1,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -656,12 +685,13 @@
    "family": "W",
    "rollout_subset": "same_task",
    "good_sign": -1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
    ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)",
    "n_models": 1,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -677,12 +707,13 @@
    "family": "W",
    "rollout_subset": "all",
    "good_sign": -1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
    ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)",
    "n_models": 1,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   },
@@ -698,12 +729,13 @@
    "family": "W",
    "rollout_subset": "same_task",
    "good_sign": -1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
    ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)",
    "n_models": 1,
    "aggregation": "mean over seeds of per-seed z-scores (unit: seed s.d.)"
   }

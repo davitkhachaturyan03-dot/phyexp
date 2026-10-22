@@ -19,7 +19,7 @@
   {
    "name": "6.3 run_id with a chain prefix returns the run of that chain only",
    "pass": true,
-   "detail": "u- scope -> 81c48f0f (u-bbbb2222 is 81c48f0f)"
+   "detail": "u- scope -> 30310732 (u-bbbb2222 is 30310732)"
   },
   {
    "name": "6.3b two runs of one name in scope (t-aaaa1111, t-cccc3333) raise without --latest",
@@ -54,7 +54,7 @@
   {
    "name": "6.6 verify_attribution.py with TMPDIR set to an empty dir under data/scratch leaves it empty, and uses explicit dir=",
    "pass": true,
-   "detail": "rc 0, entries left in TMPDIR: []; ['pass: True (29/29)']"
+   "detail": "rc 0, entries left in TMPDIR: []; ['pass: True (32/32)']"
   },
   {
    "name": "R7 real mlflow.db sha256 unchanged",

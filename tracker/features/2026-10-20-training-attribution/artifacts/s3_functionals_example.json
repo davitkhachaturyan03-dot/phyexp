@@ -14,12 +14,13 @@
    "family": "W",
    "rollout_subset": "all",
    "good_sign": 1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)"
   },
   {
    "column": "infl_f30__same_task",
@@ -33,12 +34,13 @@
    "family": "W",
    "rollout_subset": "same_task",
    "good_sign": 1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)"
   },
   {
    "column": "infl_rmst60",
@@ -57,7 +59,8 @@
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "centred (R − mean R)"
   },
   {
    "column": "infl_rmst60__same_task",
@@ -76,7 +79,8 @@
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "centred (R − mean R)"
   },
   {
    "column": "infl_auc_expected",
@@ -95,7 +99,8 @@
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "centred (R − mean R)"
   },
   {
    "column": "infl_auc_expected__same_task",
@@ -114,7 +119,8 @@
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "centred (R − mean R)"
   },
   {
    "column": "infl_auc_sampled",
@@ -133,7 +139,8 @@
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "centred (R − mean R)"
   },
   {
    "column": "infl_auc_sampled__same_task",
@@ -152,7 +159,8 @@
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "centred (R − mean R)"
   },
   {
    "column": "infl_hrt60_lin",
@@ -171,7 +179,8 @@
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "centred (R − mean R)"
   },
   {
    "column": "infl_hrt60_lin__same_task",
@@ -190,7 +199,8 @@
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "centred (R − mean R)"
   },
   {
    "column": "infl_censored60",
@@ -204,12 +214,13 @@
    "family": "W",
    "rollout_subset": "all",
    "good_sign": -1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)"
   },
   {
    "column": "infl_censored60__same_task",
@@ -223,12 +234,13 @@
    "family": "W",
    "rollout_subset": "same_task",
    "good_sign": -1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)"
   },
   {
    "column": "infl_ft_timeout",
@@ -242,12 +254,13 @@
    "family": "W",
    "rollout_subset": "all",
    "good_sign": -1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)"
   },
   {
    "column": "infl_ft_timeout__same_task",
@@ -261,12 +274,13 @@
    "family": "W",
    "rollout_subset": "same_task",
    "good_sign": -1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)"
   },
   {
    "column": "harm_f30",
@@ -280,12 +294,13 @@
    "family": "W",
    "rollout_subset": "all",
    "good_sign": 1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)"
   },
   {
    "column": "harm_f30__same_task",
@@ -299,12 +314,13 @@
    "family": "W",
    "rollout_subset": "same_task",
    "good_sign": 1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)"
   },
   {
    "column": "harm_rmst60",
@@ -323,7 +339,8 @@
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "centred (R − mean R)"
   },
   {
    "column": "harm_rmst60__same_task",
@@ -342,7 +359,8 @@
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "centred (R − mean R)"
   },
   {
    "column": "harm_auc_expected",
@@ -361,7 +379,8 @@
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "centred (R − mean R)"
   },
   {
    "column": "harm_auc_expected__same_task",
@@ -380,7 +399,8 @@
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "centred (R − mean R)"
   },
   {
    "column": "harm_auc_sampled",
@@ -399,7 +419,8 @@
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "centred (R − mean R)"
   },
   {
    "column": "harm_auc_sampled__same_task",
@@ -418,7 +439,8 @@
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "centred (R − mean R)"
   },
   {
    "column": "harm_hrt60_lin",
@@ -437,7 +459,8 @@
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "centred (R − mean R)"
   },
   {
    "column": "harm_hrt60_lin__same_task",
@@ -456,7 +479,8 @@
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "centred (R − mean R)"
   },
   {
    "column": "harm_censored60",
@@ -470,12 +494,13 @@
    "family": "W",
    "rollout_subset": "all",
    "good_sign": -1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)"
   },
   {
    "column": "harm_censored60__same_task",
@@ -489,12 +514,13 @@
    "family": "W",
    "rollout_subset": "same_task",
    "good_sign": -1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)"
   },
   {
    "column": "harm_ft_timeout",
@@ -508,12 +534,13 @@
    "family": "W",
    "rollout_subset": "all",
    "good_sign": -1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)"
   },
   {
    "column": "harm_ft_timeout__same_task",
@@ -527,12 +554,13 @@
    "family": "W",
    "rollout_subset": "same_task",
    "good_sign": -1.0,
-   "centred": true,
-   "return_encoding": "raw",
+   "centred": false,
+   "return_encoding": "pm1",
    "output_fns": [
     "square",
     "square"
-   ]
+   ],
+   "weighting": "CUPID ±1, uncentred (success +1, otherwise −1)"
   }
  ]
 }

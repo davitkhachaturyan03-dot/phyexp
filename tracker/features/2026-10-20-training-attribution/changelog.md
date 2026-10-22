@@ -15,3 +15,9 @@
 - **Evidence:** see the final run below.
 - **Divergence:** none from the owner rulings. Scores computed before this date used centred yes/no columns and are not comparable (the run params' `return_encoding` tells which).
 - **Group rule:** now owner-approved as a recorded divergence from §4.2 p.10 ("every metric"); no code change beyond the note.
+- **Evidence (HEAD after this entry's code commit):** `verify_attribution.py` 32/32 (new 7e: default `score_table` yes/no column equals the vendored CUPID `net` score, max abs err 4.2e-17;
+  7f timed-out column and centred continuous column; 7g `--raw-returns` restores the centred version). `verify_training_attribution.py --functionals` 18/18 (new 2.5b: a default attribute run's params and every `functionals.json` row state
+  "CUPID ±1, uncentred" for yes/no columns and "centred (R − mean R)" for continuous ones), `--pipeline` 9/9 (new 4.7: `--curation per_task --metrics f30 hrt60_lin` = 112 jobs, 24 trainings; script default still 313),
+  `--blind`, `--step4`, `--recovery`, `--names`, `--groups`, `--integration` all rc=0. Older verifiers (`verify_lineage_s3`, `verify_runs_s5 --r2`, `verify_blind_s0`, `verify_method_boundary_s3`,
+  `verify_derive_gt_s2`, `verify_verdict_s7`, `verify_returns_s6 --synthetic`, `verify_metrics_s1`, `verify_consumers_s6`) all rc=0. `data/lineage/mlflow.db` sha256 `306af4123fda7e63…` unchanged.
+  Other features' rewritten artifacts (ids/timings; plus the known structural drift of `data-lineage-layer/s3_summary.json`) restored with `git checkout`; this feature's artifacts refreshed by the final run are committed.
