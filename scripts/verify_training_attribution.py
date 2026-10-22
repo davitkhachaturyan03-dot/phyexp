@@ -201,13 +201,13 @@ def add_eval(fx: dict, tag: str, per_task: int = 6, drop_traj: int | None = None
     ename = eval_name or f"fake-eval-{tag}"
     from vlapoc.lineage import file_digests, rel, sha256_json
 
-    traj = out / "trajectories"  # a stand-in trajectories copy: the eval run records its digest, the rollout features' manifest names its root
-    traj.mkdir(exist_ok=True)
-    (traj / "synthetic.txt").write_text(f"synthetic trajectories of {ename}")
+    traj_dir = out / "trajectories"  # a stand-in trajectories copy: the eval run records its digest, the rollout features' manifest names its root
+    traj_dir.mkdir(exist_ok=True)
+    (traj_dir / "synthetic.txt").write_text(f"synthetic trajectories of {ename}")
     with stage_run("eval", ename, lr, allow_dirty=True, chain=fx.get("chain")) as r:
         r.params({"train_run_id": tr["train_id"], "checkpoint_sha256": tr["sha"]})
         r.output_file("rollouts", out / "rollouts.parquet", kind="rollouts")
-        mlflow.set_tag("output.trajectories", f"trajectories:{sha256_json(file_digests(traj))}")
+        mlflow.set_tag("output.trajectories", f"trajectories:{sha256_json(file_digests(traj_dir))}")
         eval_id = r.run_id
     sha = sha256_file(out / "rollouts.parquet")
     with stage_run("returns", returns_name or f"fake-returns-{tag}", lr, allow_dirty=True, chain=fx.get("chain")) as r:
@@ -216,7 +216,7 @@ def add_eval(fx: dict, tag: str, per_task: int = 6, drop_traj: int | None = None
         returns_id = r.run_id
     has = ro["traj_episode_index"].notna().to_numpy()
     traj = np.repeat(ro.loc[has, "traj_episode_index"].to_numpy().astype(int), 2)
-    man = {**tr["manifest"], "episodes": None, "stride": 4, "dataset_root": rel(traj)}
+    man = {**tr["manifest"], "episodes": None, "stride": 4, "dataset_root": rel(traj_dir)}
     prefix = fx["base"] / "feats" / tr["name"] / f"rollouts-{ename}"
     write_features(prefix, rng.normal(size=(len(traj), FEATURE_DIM)), traj, man, 1)
     return {"eval_id": eval_id, "returns_id": returns_id, "rollout_prefix": prefix, "n_rollouts": n, "train": tr, "name": ename}
