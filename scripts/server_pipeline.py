@@ -42,6 +42,10 @@ Cost (inferred, see the batch-2 log): the default is large because ``--curation 
 ``--curation per_task``, fewer ``--metrics`` / ``--seeds`` / ``--random-draws``, or ``--no-ac75``; every arm costs
 (seeds) x (one train + one eval + its verifies).
 
+Migration note: feature files written before training-attribution round 2 (an absolute or other-version ``dataset_root`` in
+their manifest) are refused by ``attribute_run``; regenerate them with ``stage.py features`` (this chain does it in its ``feat``
+jobs). Editing a manifest's ``dataset_root`` by hand defeats the check.
+
 Run names are ``<stage>-<tag>[-<arm>]-s<S>``; ``stage.py`` resolves them to run ids when each job starts, so the
 chain can be submitted before any run exists. The chain refuses to submit from a dirty tree and every job refuses
 to start on a commit other than the one it was submitted from (``slurm/guard.sh``).
@@ -88,6 +92,8 @@ def load_site(path: Path) -> dict[str, str]:
 
 
 class Chain:
+    """Submits jobs with ``sbatch``, each depending on the job ids it is given; ``dry`` prints the full argv instead."""
+
     def __init__(self, dry: bool, after: list[str], sha: str, chain: str, partition: str, log_dir: str = "", site_file: str = ""):
         self.dry, self.after, self.sha, self.chain, self.partition = dry, after, sha, chain, partition
         self.log_dir, self.site_file = log_dir, site_file
@@ -172,6 +178,7 @@ def head_to_head(plan: list[dict], metrics: list[str]) -> list[tuple[dict, dict]
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Parse the flags, build the arm lists, and submit (or dry-run print) every job in dependency order."""
     p = argparse.ArgumentParser(prog="scripts/server_pipeline.py", description=__doc__.split("\n\n")[0])
     p.add_argument("--tag", required=True, help="names every run of this experiment (e.g. v0cand)")
     p.add_argument("--subset", default="v0/candidate", help="the base training subset (blind; AC8.5)")

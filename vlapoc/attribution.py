@@ -547,6 +547,11 @@ def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, trai
     rollout of the eval run has a recorded trajectory, unless ``allow_partial`` (then the count is recorded as param
     ``n_rollouts_without_trajectory``; PoC §2.1 item 1 p. 3 "Every eval rollout should be tied back to that checkpoint").
 
+    Migration note: feature files written before training-attribution round 2 (an absolute or other-version ``dataset_root``
+    in the manifest) are refused by the two data-binding checks above; regenerate them with ``scripts/stage.py features``.
+    Rewriting a manifest's ``dataset_root`` by hand defeats the check, because the manifest is then no longer evidence of
+    what the features were computed on.
+
     Records (training-attribution S3, PoC §2.1 item 1 p. 3 and §3.4 p. 7): the sha256 of every feature ``.npy`` and
     ``.meta.npz`` file it read as inputs of kind ``features`` (so a regenerated feature file is distinguishable), the
     estimator's settings and ``DIVERGENCES`` as params, and ``functionals.json`` (``column_declarations``) as an output.
@@ -576,19 +581,20 @@ def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, trai
     # Bind each feature set to the data it claims (PoC §2.1 item 1 p. 3, "tied to exact dataset versions"; §9.2 p. 19): the train
     # features to the training version's own copy (the root ``open_for_method`` returned), the rollout features to the
     # trajectories this eval run recorded (the digest check ``stage.py features`` makes when it writes them).
+    regen = ("; feature files written before training-attribution round 2 must be regenerated with `stage.py features` "
+             "(editing a manifest's dataset_root by hand defeats this check)")
     vroot = rel(view.lerobot_root)
     _, _, tm0 = load_features(train_features)
     wrong = sorted({m["dataset_root"] for m in tm0} - {vroot})
     if wrong:
-        raise ValueError(f"train features were computed on {wrong}, not on the training subset's version copy {vroot}")
+        raise ValueError(f"train features were computed on {wrong}, not on the training subset's version copy {vroot}{regen}")
     _, _, rm0 = load_features(rollout_features)
     roots = {m["dataset_root"] for m in rm0}
     recorded = ev.data.tags["output.trajectories"].split(":", 1)[-1]
     if len(roots) != 1 or sha256_json(file_digests(REPO_ROOT / next(iter(roots)))) != recorded:
         raise ValueError(f"rollout features were computed on {sorted(roots)}, which is not the trajectories copy eval run "
-                         f"{eval_run_id[:12]} recorded")
-    _, _, tman = load_features(train_features)
-    if sorted(tman[0]["episodes"] or []) != subset.resolve(lineage_root):
+                         f"{eval_run_id[:12]} recorded{regen}")
+    if sorted(tm0[0]["episodes"] or []) != subset.resolve(lineage_root):
         raise ValueError("train features were not computed on exactly the training subset's episodes")
     episodes = subset.episodes(lineage_root)
     rollouts, _ = load_eval_rollouts(eval_run_id, lineage_root, make_out_dir=False)

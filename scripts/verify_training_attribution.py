@@ -3,10 +3,18 @@
 Grounding: PoC §2.1 item 4 p.3, §3.4 p.7, §4.2-§4.5 pp.9-11, §9.1 Steps 3-4 p.19, §9.2 p.19; owner decision 3
 (ground-truth feature); CUPID (docs/papers/CUPID_Influence_Functions_arXiv-2506.19121.pdf) App. A.1-A.2.
 
-    .venv/bin/python scripts/verify_training_attribution.py --blind        # S1: refusal table (~2-3 min)
-    .venv/bin/python scripts/verify_training_attribution.py (S2 lives in scripts/verify_attribution.py: checks 6-8 and --cpu-smoke; CUPID parity is its check 7a)
+Run from the repo root; each mode exits 0 when every check passes (S2 lives in ``scripts/verify_attribution.py``: checks 6-8
+and ``--cpu-smoke``, CUPID parity is its check 7a)::
+
+    .venv/bin/python scripts/verify_training_attribution.py --blind        # S1: refusal table (~40 s)
     .venv/bin/python scripts/verify_training_attribution.py --functionals  # S3: functionals.json, ensemble, provenance
-    .venv/bin/python scripts/verify_training_attribution.py --pipeline data/scratch/dry.txt   # S4: parse a dry run
+    .venv/bin/python scripts/verify_training_attribution.py --pipeline     # S4: parse a dry run (optional path to write it to)
+    .venv/bin/python scripts/verify_training_attribution.py --step4        # S4: step4-summary on synthetic verdicts
+    .venv/bin/python scripts/verify_training_attribution.py --recovery     # S5: recovery matrix on synthetic planted scores
+    .venv/bin/python scripts/verify_training_attribution.py --names        # S6: site config, chain-scoped names
+    .venv/bin/python scripts/verify_training_attribution.py --groups       # S7: four groups, aggregation, figures
+    .venv/bin/python scripts/verify_training_attribution.py --integration  # S8(a): whole chain via stage.py, synthetic data
+    .venv/bin/python scripts/verify_training_attribution.py --local-smoke --device mps   # S8(b): real checkpoint, ~8 min
 
 Every MLflow-writing check runs on a scratch lineage store under ``data/scratch/`` (``runs.scratch_lineage_copy``);
 the real ``data/lineage/mlflow.db`` sha256 is recorded before and after and must not change (plan rule R7). Scratch

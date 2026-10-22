@@ -4,6 +4,10 @@ Ground-truth side (imports ``vlapoc.groundtruth``): this module reads the answer
 ``vlapoc.influence`` / ``vlapoc.attribution`` or any method code (owner decision 3; boundary scan in
 ``scripts/verify_training_attribution.py --recovery``).
 
+Where this sits (docs/dataflow.md, the injection test, PoC §2.1 item 4): after attribution, only on a version that carries an answer
+key (v3). ``scripts/stage.py score`` calls ``recovery_run``; ``recovery_matrix`` does the scoring. ``EXPECTED_METRICS`` below was
+committed before any scoring code existed (see ``b4790ee``), so the hypotheses cannot have been fitted to results.
+
 Grounding
 ---------
 - PoC §2.1 item 4 (p. 3): "Deliberately corrupt known subsets of training data ... Then check whether your attribution
@@ -41,9 +45,6 @@ EXPECTED_METRICS: dict[str, tuple[str, ...] | None] = {
 # scoring (added after the hypotheses above were committed)
 # ---------------------------------------------------------------------------------------------
 
-import argparse  # noqa: E402
-import json  # noqa: E402
-import sys  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 import pandas as pd  # noqa: E402
@@ -105,7 +106,7 @@ def recovery_run(score_run_id: str, version: str, name: str, subset: str = "cand
     and the score table. Ground-truth side; run it only after the attribution exists. ``synthetic`` labels the outputs.
     PoC §2.1 item 4 p. 3, §4.5 p. 11."""
     from vlapoc.attribution import _artifact_table
-    from vlapoc.lineage import rel, score_table_digest
+    from vlapoc.lineage import rel
     from vlapoc.runs import client, resolve_version, stage_run
 
     run = client(lineage_root).get_run(score_run_id)

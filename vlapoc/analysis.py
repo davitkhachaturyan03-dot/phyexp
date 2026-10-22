@@ -1,6 +1,11 @@
 """Metric-resolved views of an attribution table: the four groups, aggregation by catalog column, the heatmap and the
 throughput-vs-reliability scatter, and the ``analyze`` stage that records them.
 
+Where this sits (docs/dataflow.md, Step 3 "Attribution"): after ``vlapoc.attribution`` has written a score table (one attribute or
+ensemble run), ``scripts/stage.py analyze`` calls ``analyze_run`` here to turn it into the PoC's episode x metric views. Nothing
+downstream consumes these labels; they are for reading. Reading order: ``metric_groups``, ``aggregate_by``, the two figure
+functions, then ``analyze_run``.
+
 Grounding
 ---------
 - PoC §4.2 (pp. 9-10), quoted: "Results are reported as an episode × metric matrix." The four groups of episodes:
@@ -34,7 +39,8 @@ import numpy as np
 import pandas as pd
 
 DIVERGENCE_NOTE = ("consistent helper/harmer = at least 2 non-zero calls, all of one sign (not 'every metric' as PoC §4.2 p. 10 reads); "
-                   "five family-W returns are partly redundant (rmst60, hrt60_lin, censored60)")
+                   "a judgement call (inferred, not measured). Risk: two near-redundant reliability readouts (harm_f30 + harm_censored60) "
+                   "can alone make an episode 'consistent'")
 GROUPS = ("consistent_helper", "consistent_harmer", "trade_off", "metric_specific", "neutral")
 DEFAULT_METRICS = ("f30", "rmst60", "auc_expected", "hrt60_lin", "censored60")  # family-W returns, one harm column each
 STATUS = "descriptive, unverified (no per-episode multiplicity-corrected test from 2-3 seeds; PoC §4.4)"
@@ -50,11 +56,11 @@ def metric_groups(table: pd.DataFrame, columns: list[str], z: float = 1.0) -> pd
     ``consistent_helper``; both signs -> ``trade_off``.
 
     Named divergence from PoC §4.2 (p. 10): the PoC's "consistent helpers/harmers" read as helping/harming *every* metric;
-    here a consistent group needs at least two non-zero calls all of one sign (>= 2 of the 5 metrics), not all five. I kept
-    this rather than the all-metrics rule because the five family-W returns are partly redundant (``rmst60``, ``hrt60_lin`` and
-    ``censored60`` move together), so requiring all five would leave "consistent" nearly empty; the cost is that an episode
-    that is harmful on two metrics and flat on three counts as a consistent harmer. It is recorded in ``DIVERGENCE_NOTE``
-    and in the analyze run's params. Descriptive and unverified (module docstring). ``z`` is a declared
+    here a consistent group needs at least two non-zero calls all of one sign (>= 2 of the 5 metrics), not all five. The
+    >= 2 rule is a judgement call (inferred; nothing was measured to choose it) and the owner may prefer the strict all-metrics
+    rule. Its specific risk: the five family-W returns are not independent, and two near-redundant reliability readouts
+    (``harm_f30`` and ``harm_censored60``) can alone make an episode a "consistent harmer" while the throughput metrics are flat.
+    It is recorded in ``DIVERGENCE_NOTE`` and in the analyze run's params. Descriptive and unverified (module docstring). ``z`` is a declared
     parameter (inferred default 1).
     """
     zs = pd.DataFrame({c: (table[c] - table[c].mean()) / table[c].std(ddof=0) for c in columns})

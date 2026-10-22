@@ -51,7 +51,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 
@@ -65,7 +64,6 @@ from vlapoc.lineage import (
     load_names,
     resolve_version,
     verify_version,
-    version_episodes,
 )
 
 _OPENED: dict[tuple[str, str], str] = {}  # (lineage root, version id) -> subset ref first opened

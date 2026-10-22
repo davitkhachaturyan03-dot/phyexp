@@ -116,6 +116,7 @@ def rid(ref: str, stage: str) -> str:
 
 
 def run_name(run: str) -> str:
+    """The MLflow run name of a run id."""
     from vlapoc.runs import client
 
     return client(LR).get_run(run).info.run_name
@@ -152,6 +153,7 @@ def method_view(ref: str, lineage_root: Path | None = None):
 
 
 def cmd_train(a) -> dict:
+    """Stage ``train``: SmolVLA on a subset opened through ``method_view`` (blind). Returns ``train_run``'s summary."""
     from vlapoc.runs import train_run
 
     method_view(a.subset)
@@ -161,6 +163,7 @@ def cmd_train(a) -> dict:
 
 
 def cmd_eval(a) -> dict:
+    """Stage ``eval``: roll out a train run's checkpoint on the canonical tasks; trajectories recorded unless ``--no-trajectories``."""
     from vlapoc.runs import CANONICAL_TASKS, eval_run
 
     tasks = CANONICAL_TASKS if not a.tasks else [(s, int(t)) for s, t in (x.split(":") for x in a.tasks.split(","))]
@@ -173,12 +176,19 @@ def cmd_eval(a) -> dict:
 
 
 def cmd_returns(a) -> dict:
+    """Stage ``returns``: per-rollout returns (``ret_*`` columns) from an eval run's rollouts."""
     from vlapoc.returns import returns_run
 
     return returns_run(rid(a.eval, "eval"), a.name, chain=a.chain, lineage_root=LR)
 
 
 def cmd_features(a) -> dict:
+    """Stage ``features``: write one shard of projected gradient features (``.npy`` + ``.meta.npz`` + manifest) under ``data/attribution/feats``.
+
+    ``--which train`` featurizes the training subset's own version copy; ``--which rollouts`` the trajectories copy the
+    eval run recorded (refused if its digest differs). The manifest's ``dataset_root`` is what ``attribute_run`` later checks,
+    so feature files written before training-attribution round 2 must be regenerated with this command; do not edit a manifest by hand.
+    """
     from vlapoc.influence import featurize
     from vlapoc.lineage import file_digests, sha256_json
     from vlapoc.runs import _training_subset, client
@@ -207,6 +217,7 @@ def cmd_features(a) -> dict:
 
 
 def cmd_attribute(a) -> dict:
+    """Stage ``attribute``: CUPID influence of every training episode on every return column; refuses unbound feature files (see ``cmd_features``)."""
     from vlapoc.attribution import attribute_run
 
     tid, eid = rid(a.train, "train"), rid(a.eval, "eval")
@@ -218,6 +229,7 @@ def cmd_attribute(a) -> dict:
 
 
 def cmd_ensemble(a) -> dict:
+    """Stage ``ensemble``: z-scored mean of several attribute runs (one per seed)."""
     from vlapoc.attribution import ensemble_run
 
     return ensemble_run([rid(r, "attribute") for r in a.runs], a.name, chain=a.chain, lineage_root=LR)
@@ -232,6 +244,7 @@ def select_params(op: str, headline: bool = False, pipeline_curation: str | None
 
 
 def cmd_select(a) -> dict:
+    """Stage ``select``: derive a child subset from a parent by a rank or random op (the retraining arms' data). Parent opens blind."""
     import tempfile
 
     from vlapoc.attribution import _artifact_table
@@ -253,6 +266,7 @@ def cmd_select(a) -> dict:
 
 
 def cmd_verify(a) -> dict:
+    """Stage ``verify``: the two-step verdict (``vlapoc.verdict``) between eval runs ``--a`` and ``--b`` (e.g. base policy vs a curated arm); ``--comparison`` tags it for ``step4-summary``."""
     from vlapoc.verdict import verify_run
 
     tags = {}

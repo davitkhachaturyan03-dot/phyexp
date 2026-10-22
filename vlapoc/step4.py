@@ -1,5 +1,10 @@
 """Step 4 summary: one table over the verify runs of a chain, with a seed-consistency count per comparison.
 
+Where this sits (docs/dataflow.md, Step 4 "Verification"): last stage of the chain. It reads the ``verify`` runs that
+``scripts/stage.py verify`` wrote for each retrained arm and summarises them in one ``summarize`` run; it trains and evaluates nothing.
+Reading order: ``collect`` (find the verdicts), ``call`` (T/C/0/g per metric and seed), ``summarize`` (one row per arm and comparison),
+``summary_run`` (record it).
+
 Grounding
 ---------
 - PoC §9.1 Step 4 (p. 19), quoted: "1 Remove the top-k most harmful episodes and retrain. As a control, remove k random
