@@ -22,6 +22,7 @@ pre code{overflow-wrap:normal}
 table.gloss th.grp{background:var(--surface-2);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
 table.gloss td:first-child{min-width:11em}
 td.mono{font-family:var(--mono)}
+.nw td code{white-space:nowrap;overflow-wrap:normal}
 img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
 .tag-syn{display:inline-block;font:600 11px/1.6 var(--mono);padding:1px 8px;border-radius:999px;border:1px solid var(--warn);color:var(--warn);margin-left:6px}
 /* figure vocabulary */
@@ -30,10 +31,10 @@ img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid va
 .f-box.acc{stroke:var(--accent);stroke-width:1.8}
 .f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
 .f-box.warn{stroke:var(--warn)}
-.f-t{fill:var(--text);font:600 12.5px var(--sans)}
-.f-m{fill:var(--muted);font:10.5px var(--mono)}
-.f-mt{fill:var(--text);font:10.5px var(--mono)}
-.f-n{fill:var(--muted);font:600 10px var(--mono);letter-spacing:.05em}
+.f-t{fill:var(--text);font:600 13.5px var(--sans)}
+.f-m{fill:var(--muted);font:12px var(--mono)}
+.f-mt{fill:var(--text);font:12px var(--mono)}
+.f-n{fill:var(--muted);font:600 11px var(--mono);letter-spacing:.04em}
 .f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}
 .f-ah{fill:var(--muted)}
 .f-axis{stroke:var(--border);stroke-width:1.2}
@@ -102,47 +103,61 @@ img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid va
 <p>With the real v3 answer key and a <b>synthetic</b> score table whose <code>harm_rmst60</code> column ranks the 13 idle-padding episodes first, the idle-padding row for that column reads AUROC 1.0 and <code>matches_hypothesis = True</code>, because the §4.5 hypothesis says idle padding should show up in a speed metric. A random column pooled over all 91 damaged recordings scored 0.527. The recovery table is deleted with the scratch store on purpose: synthetic numbers must not be kept as if they were results.</p>
 <h2>Visual</h2>
 <figure>
-<svg viewBox="0 0 560 330" role="img" aria-label="Best simple heuristic score per corruption type, the bar a method must beat">
+<svg viewBox="0 0 560 336" role="img" aria-label="Best simple heuristic score per corruption type, the bar a method must beat">
 <text x="20" y="18" class="f-n">BEST ONE-LINE STATISTIC, AUROC (0.5 = GUESSING), MEASURED EARLIER</text>
-<line x1="190.0" y1="30" x2="190.0" y2="266" class="f-grid"/>
-<text x="190.0" y="282" class="f-m" text-anchor="middle">0.5</text>
-<line x1="258.0" y1="30" x2="258.0" y2="266" class="f-grid"/>
-<text x="258.0" y="282" class="f-m" text-anchor="middle">0.6</text>
-<line x1="326.0" y1="30" x2="326.0" y2="266" class="f-grid"/>
-<text x="326.0" y="282" class="f-m" text-anchor="middle">0.7</text>
-<line x1="394.0" y1="30" x2="394.0" y2="266" class="f-grid"/>
-<text x="394.0" y="282" class="f-m" text-anchor="middle">0.8</text>
-<line x1="462.0" y1="30" x2="462.0" y2="266" class="f-grid"/>
-<text x="462.0" y="282" class="f-m" text-anchor="middle">0.9</text>
-<line x1="530.0" y1="30" x2="530.0" y2="266" class="f-grid"/>
-<text x="530.0" y="282" class="f-m" text-anchor="middle">1.0</text>
-<text x="182" y="49" class="f-mt" text-anchor="end">time_shift</text>
-<rect x="190" y="36" width="236.6" height="18" rx="3" class="f-barw"/>
-<text x="432.6" y="49" class="f-m">0.848 length_vs_task_lowest</text>
-<text x="182" y="80" class="f-mt" text-anchor="end">detour</text>
-<rect x="190" y="67" width="312.8" height="18" rx="3" class="f-bar"/>
-<text x="508.8" y="80" class="f-m">0.960 length_vs_task</text>
-<text x="182" y="111" class="f-mt" text-anchor="end">gripper_release</text>
-<rect x="190" y="98" width="315.5" height="18" rx="3" class="f-bar"/>
-<text x="511.5" y="111" class="f-m">0.964 post_release_share_vs_task</text>
-<text x="182" y="142" class="f-mt" text-anchor="end">action_noise</text>
-<rect x="190" y="129" width="340.0" height="18" rx="3" class="f-bar"/>
-<text x="536.0" y="142" class="f-m">1.000 smoothness</text>
-<text x="182" y="173" class="f-mt" text-anchor="end">dropped_frames</text>
-<rect x="190" y="160" width="340.0" height="18" rx="3" class="f-bar"/>
-<text x="536.0" y="173" class="f-m">1.000 duplicate_frame_pairs</text>
-<text x="182" y="204" class="f-mt" text-anchor="end">idle_padding</text>
-<rect x="190" y="191" width="340.0" height="18" rx="3" class="f-bar"/>
-<text x="536.0" y="204" class="f-m">1.000 idle_steps</text>
-<text x="182" y="235" class="f-mt" text-anchor="end">instruction_swap</text>
-<rect x="190" y="222" width="340.0" height="18" rx="3" class="f-bar"/>
-<text x="536.0" y="235" class="f-m">1.000 instruction_mismatch</text>
-<line x1="190.0" y1="30" x2="190.0" y2="266" class="f-ref"/>
-<text x="20" y="306" class="f-m">A method counts as better than a simple statistic only if it scores above that type's bar.</text>
-<text x="20" y="322" class="f-m">These are the earlier feature's measured bars, not attribution results.</text>
+<line x1="180.0" y1="30" x2="180.0" y2="266" class="f-grid"/>
+<text x="180.0" y="282" class="f-m" text-anchor="middle">0.5</text>
+<line x1="244.0" y1="30" x2="244.0" y2="266" class="f-grid"/>
+<text x="244.0" y="282" class="f-m" text-anchor="middle">0.6</text>
+<line x1="308.0" y1="30" x2="308.0" y2="266" class="f-grid"/>
+<text x="308.0" y="282" class="f-m" text-anchor="middle">0.7</text>
+<line x1="372.0" y1="30" x2="372.0" y2="266" class="f-grid"/>
+<text x="372.0" y="282" class="f-m" text-anchor="middle">0.8</text>
+<line x1="436.0" y1="30" x2="436.0" y2="266" class="f-grid"/>
+<text x="436.0" y="282" class="f-m" text-anchor="middle">0.9</text>
+<line x1="500.0" y1="30" x2="500.0" y2="266" class="f-grid"/>
+<text x="500.0" y="282" class="f-m" text-anchor="middle">1.0</text>
+<text x="172" y="49" class="f-mt" text-anchor="end">time_shift</text>
+<rect x="180" y="36" width="222.7" height="18" rx="3" class="f-barw"/>
+<text x="408.7" y="50" class="f-m">0.848</text>
+<text x="172" y="80" class="f-mt" text-anchor="end">detour</text>
+<rect x="180" y="67" width="294.4" height="18" rx="3" class="f-bar"/>
+<text x="480.4" y="81" class="f-m">0.960</text>
+<text x="172" y="111" class="f-mt" text-anchor="end">gripper_release</text>
+<rect x="180" y="98" width="297.0" height="18" rx="3" class="f-bar"/>
+<text x="483.0" y="112" class="f-m">0.964</text>
+<text x="172" y="142" class="f-mt" text-anchor="end">action_noise</text>
+<rect x="180" y="129" width="320.0" height="18" rx="3" class="f-bar"/>
+<text x="506.0" y="143" class="f-m">1.000</text>
+<text x="172" y="173" class="f-mt" text-anchor="end">dropped_frames</text>
+<rect x="180" y="160" width="320.0" height="18" rx="3" class="f-bar"/>
+<text x="506.0" y="174" class="f-m">1.000</text>
+<text x="172" y="204" class="f-mt" text-anchor="end">idle_padding</text>
+<rect x="180" y="191" width="320.0" height="18" rx="3" class="f-bar"/>
+<text x="506.0" y="205" class="f-m">1.000</text>
+<text x="172" y="235" class="f-mt" text-anchor="end">instruction_swap</text>
+<rect x="180" y="222" width="320.0" height="18" rx="3" class="f-bar"/>
+<text x="506.0" y="236" class="f-m">1.000</text>
+<line x1="180.0" y1="30" x2="180.0" y2="266" class="f-ref"/>
+<text x="20" y="304" class="f-m">A method beats a simple statistic only if it scores above</text>
+<text x="20" y="320" class="f-m">that type's bar. These are not attribution results.</text>
 </svg>
   <figcaption><b>The bar a real method must clear, per kind of damage.</b> These are not attribution results. They are the earlier feature's measured scores of the best one-line statistic for each kind of damage (from the ground-truth bands file). The scorer built here will place real attribution columns next to these bars. Notice <code>time_shift</code> (amber, 0.848): the only kind a simple statistic does not nearly solve, so it is where attribution has the most room to add value.</figcaption>
 </figure>
+<div class="scroll">
+<table class="nw">
+  <thead><tr><th>Kind of damage</th><th>Best simple statistic (earlier feature, measured)</th><th>AUROC</th></tr></thead>
+  <tbody>
+    <tr><td><code>action_noise</code></td><td><code>smoothness</code></td><td class="num">1.0</td></tr>
+    <tr><td><code>detour</code></td><td><code>length_vs_task</code></td><td class="num">0.96</td></tr>
+    <tr><td><code>dropped_frames</code></td><td><code>duplicate_frame_pairs</code></td><td class="num">1.0</td></tr>
+    <tr><td><code>gripper_release</code></td><td><code>post_release_share_vs_task</code></td><td class="num">0.964</td></tr>
+    <tr><td><code>idle_padding</code></td><td><code>idle_steps</code></td><td class="num">1.0</td></tr>
+    <tr><td><code>instruction_swap</code></td><td><code>instruction_mismatch</code></td><td class="num">1.0</td></tr>
+    <tr><td><code>time_shift</code></td><td><code>length_vs_task_lowest</code></td><td class="num">0.848</td></tr>
+  </tbody>
+</table>
+</div>
 <h2>Divergences and limitations</h2>
 <ul>
   <li>Only two types have a PoC-stated expected metric. The other five have none and are not given an invented one (<code>None</code>).</li>

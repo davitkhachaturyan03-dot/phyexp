@@ -22,6 +22,7 @@ pre code{overflow-wrap:normal}
 table.gloss th.grp{background:var(--surface-2);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
 table.gloss td:first-child{min-width:11em}
 td.mono{font-family:var(--mono)}
+.nw td code{white-space:nowrap;overflow-wrap:normal}
 img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
 .tag-syn{display:inline-block;font:600 11px/1.6 var(--mono);padding:1px 8px;border-radius:999px;border:1px solid var(--warn);color:var(--warn);margin-left:6px}
 /* figure vocabulary */
@@ -30,10 +31,10 @@ img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid va
 .f-box.acc{stroke:var(--accent);stroke-width:1.8}
 .f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
 .f-box.warn{stroke:var(--warn)}
-.f-t{fill:var(--text);font:600 12.5px var(--sans)}
-.f-m{fill:var(--muted);font:10.5px var(--mono)}
-.f-mt{fill:var(--text);font:10.5px var(--mono)}
-.f-n{fill:var(--muted);font:600 10px var(--mono);letter-spacing:.05em}
+.f-t{fill:var(--text);font:600 13.5px var(--sans)}
+.f-m{fill:var(--muted);font:12px var(--mono)}
+.f-mt{fill:var(--text);font:12px var(--mono)}
+.f-n{fill:var(--muted);font:600 11px var(--mono);letter-spacing:.04em}
 .f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}
 .f-ah{fill:var(--muted)}
 .f-axis{stroke:var(--border);stroke-width:1.2}
@@ -109,58 +110,59 @@ attribute,tampered version (1 byte flipped),REFUSED VersionIntegrityError,1,1
 open_for_method (control),v3/candidate (blind),OPENED,0,0      # 960 episodes, 2.3s incl. integrity hash</code></pre>
 <h2>Visual</h2>
 <figure>
-<svg viewBox="0 0 560 250" role="img" aria-label="Four method entry points by five unsafe inputs: all twenty combinations refused">
-<text x="190.0" y="42" class="f-mt" text-anchor="middle">fenced v1</text>
-<text x="270.0" y="42" class="f-mt" text-anchor="middle">fenced v2</text>
-<text x="350.0" y="42" class="f-mt" text-anchor="middle">oracle subset</text>
-<text x="430.0" y="42" class="f-mt" text-anchor="middle">oracle descendant</text>
-<text x="510.0" y="42" class="f-mt" text-anchor="middle">tampered byte</text>
-<text x="142" y="73.0" class="f-mt" text-anchor="end">attribute</text>
-<rect x="153" y="55" width="74" height="28" rx="5" class="f-good"/>
-<text x="190.0" y="73.0" class="f-mt" text-anchor="middle">refused</text>
-<rect x="233" y="55" width="74" height="28" rx="5" class="f-good"/>
-<text x="270.0" y="73.0" class="f-mt" text-anchor="middle">refused</text>
-<rect x="313" y="55" width="74" height="28" rx="5" class="f-good"/>
-<text x="350.0" y="73.0" class="f-mt" text-anchor="middle">refused</text>
-<rect x="393" y="55" width="74" height="28" rx="5" class="f-good"/>
-<text x="430.0" y="73.0" class="f-mt" text-anchor="middle">refused</text>
-<rect x="473" y="55" width="74" height="28" rx="5" class="f-good"/>
-<text x="510.0" y="73.0" class="f-mt" text-anchor="middle">refused</text>
-<text x="142" y="107.0" class="f-mt" text-anchor="end">features</text>
-<rect x="153" y="89" width="74" height="28" rx="5" class="f-good"/>
-<text x="190.0" y="107.0" class="f-mt" text-anchor="middle">refused</text>
-<rect x="233" y="89" width="74" height="28" rx="5" class="f-good"/>
-<text x="270.0" y="107.0" class="f-mt" text-anchor="middle">refused</text>
-<rect x="313" y="89" width="74" height="28" rx="5" class="f-good"/>
-<text x="350.0" y="107.0" class="f-mt" text-anchor="middle">refused</text>
-<rect x="393" y="89" width="74" height="28" rx="5" class="f-good"/>
-<text x="430.0" y="107.0" class="f-mt" text-anchor="middle">refused</text>
-<rect x="473" y="89" width="74" height="28" rx="5" class="f-good"/>
-<text x="510.0" y="107.0" class="f-mt" text-anchor="middle">refused</text>
-<text x="142" y="141.0" class="f-mt" text-anchor="end">train</text>
-<rect x="153" y="123" width="74" height="28" rx="5" class="f-good"/>
-<text x="190.0" y="141.0" class="f-mt" text-anchor="middle">refused</text>
-<rect x="233" y="123" width="74" height="28" rx="5" class="f-good"/>
-<text x="270.0" y="141.0" class="f-mt" text-anchor="middle">refused</text>
-<rect x="313" y="123" width="74" height="28" rx="5" class="f-good"/>
-<text x="350.0" y="141.0" class="f-mt" text-anchor="middle">refused</text>
-<rect x="393" y="123" width="74" height="28" rx="5" class="f-good"/>
-<text x="430.0" y="141.0" class="f-mt" text-anchor="middle">refused</text>
-<rect x="473" y="123" width="74" height="28" rx="5" class="f-good"/>
-<text x="510.0" y="141.0" class="f-mt" text-anchor="middle">refused</text>
-<text x="142" y="175.0" class="f-mt" text-anchor="end">select (parent)</text>
-<rect x="153" y="157" width="74" height="28" rx="5" class="f-good"/>
-<text x="190.0" y="175.0" class="f-mt" text-anchor="middle">refused</text>
-<rect x="233" y="157" width="74" height="28" rx="5" class="f-good"/>
-<text x="270.0" y="175.0" class="f-mt" text-anchor="middle">refused</text>
-<rect x="313" y="157" width="74" height="28" rx="5" class="f-good"/>
-<text x="350.0" y="175.0" class="f-mt" text-anchor="middle">refused</text>
-<rect x="393" y="157" width="74" height="28" rx="5" class="f-good"/>
-<text x="430.0" y="175.0" class="f-mt" text-anchor="middle">refused</text>
-<rect x="473" y="157" width="74" height="28" rx="5" class="f-good"/>
-<text x="510.0" y="175.0" class="f-mt" text-anchor="middle">refused</text>
-<text x="150" y="214" class="f-m">controls (must open): v3/candidate blind, 960 episodes, and the tampered copy with the byte restored, 20 episodes: both OPENED</text>
-<text x="150" y="230" class="f-m">each refusal left the run count unchanged (79 -> 79 on the real-store copy)</text>
+<svg viewBox="0 0 560 270" role="img" aria-label="Four method entry points by five unsafe inputs: all twenty combinations refused">
+<text x="148.0" y="42" class="f-mt" text-anchor="middle">fenced v1</text>
+<text x="236.0" y="42" class="f-mt" text-anchor="middle">fenced v2</text>
+<text x="324.0" y="42" class="f-mt" text-anchor="middle">answer-key</text>
+<text x="412.0" y="42" class="f-mt" text-anchor="middle">key child</text>
+<text x="500.0" y="42" class="f-mt" text-anchor="middle">bad byte</text>
+<text x="96" y="73.0" class="f-mt" text-anchor="end">attribute</text>
+<rect x="107" y="55" width="82" height="28" rx="5" class="f-good"/>
+<text x="148.0" y="73.0" class="f-mt" text-anchor="middle">refused</text>
+<rect x="195" y="55" width="82" height="28" rx="5" class="f-good"/>
+<text x="236.0" y="73.0" class="f-mt" text-anchor="middle">refused</text>
+<rect x="283" y="55" width="82" height="28" rx="5" class="f-good"/>
+<text x="324.0" y="73.0" class="f-mt" text-anchor="middle">refused</text>
+<rect x="371" y="55" width="82" height="28" rx="5" class="f-good"/>
+<text x="412.0" y="73.0" class="f-mt" text-anchor="middle">refused</text>
+<rect x="459" y="55" width="82" height="28" rx="5" class="f-good"/>
+<text x="500.0" y="73.0" class="f-mt" text-anchor="middle">refused</text>
+<text x="96" y="107.0" class="f-mt" text-anchor="end">features</text>
+<rect x="107" y="89" width="82" height="28" rx="5" class="f-good"/>
+<text x="148.0" y="107.0" class="f-mt" text-anchor="middle">refused</text>
+<rect x="195" y="89" width="82" height="28" rx="5" class="f-good"/>
+<text x="236.0" y="107.0" class="f-mt" text-anchor="middle">refused</text>
+<rect x="283" y="89" width="82" height="28" rx="5" class="f-good"/>
+<text x="324.0" y="107.0" class="f-mt" text-anchor="middle">refused</text>
+<rect x="371" y="89" width="82" height="28" rx="5" class="f-good"/>
+<text x="412.0" y="107.0" class="f-mt" text-anchor="middle">refused</text>
+<rect x="459" y="89" width="82" height="28" rx="5" class="f-good"/>
+<text x="500.0" y="107.0" class="f-mt" text-anchor="middle">refused</text>
+<text x="96" y="141.0" class="f-mt" text-anchor="end">train</text>
+<rect x="107" y="123" width="82" height="28" rx="5" class="f-good"/>
+<text x="148.0" y="141.0" class="f-mt" text-anchor="middle">refused</text>
+<rect x="195" y="123" width="82" height="28" rx="5" class="f-good"/>
+<text x="236.0" y="141.0" class="f-mt" text-anchor="middle">refused</text>
+<rect x="283" y="123" width="82" height="28" rx="5" class="f-good"/>
+<text x="324.0" y="141.0" class="f-mt" text-anchor="middle">refused</text>
+<rect x="371" y="123" width="82" height="28" rx="5" class="f-good"/>
+<text x="412.0" y="141.0" class="f-mt" text-anchor="middle">refused</text>
+<rect x="459" y="123" width="82" height="28" rx="5" class="f-good"/>
+<text x="500.0" y="141.0" class="f-mt" text-anchor="middle">refused</text>
+<text x="96" y="175.0" class="f-mt" text-anchor="end">select</text>
+<rect x="107" y="157" width="82" height="28" rx="5" class="f-good"/>
+<text x="148.0" y="175.0" class="f-mt" text-anchor="middle">refused</text>
+<rect x="195" y="157" width="82" height="28" rx="5" class="f-good"/>
+<text x="236.0" y="175.0" class="f-mt" text-anchor="middle">refused</text>
+<rect x="283" y="157" width="82" height="28" rx="5" class="f-good"/>
+<text x="324.0" y="175.0" class="f-mt" text-anchor="middle">refused</text>
+<rect x="371" y="157" width="82" height="28" rx="5" class="f-good"/>
+<text x="412.0" y="175.0" class="f-mt" text-anchor="middle">refused</text>
+<rect x="459" y="157" width="82" height="28" rx="5" class="f-good"/>
+<text x="500.0" y="175.0" class="f-mt" text-anchor="middle">refused</text>
+<text x="20" y="212" class="f-m">Controls that must open, both OPENED: v3/candidate</text>
+<text x="20" y="228" class="f-m">(960 episodes) and the byte-restored copy (20 episodes).</text>
+<text x="20" y="244" class="f-m">No refusal created a run (79 -> 79 on a store copy).</text>
 </svg>
   <figcaption><b>Refusal matrix.</b> Every cell is a real row of the table above, not a drawing of intent: four ways a method can open data, five kinds of unsafe input, all twenty refused. Notice that none of the refusals created a run (run count unchanged), and that the two control cases at the bottom still open, so the gate is not simply refusing everything.</figcaption>
 </figure>

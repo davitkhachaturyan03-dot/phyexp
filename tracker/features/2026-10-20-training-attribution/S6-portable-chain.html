@@ -22,6 +22,7 @@ pre code{overflow-wrap:normal}
 table.gloss th.grp{background:var(--surface-2);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
 table.gloss td:first-child{min-width:11em}
 td.mono{font-family:var(--mono)}
+.nw td code{white-space:nowrap;overflow-wrap:normal}
 img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
 .tag-syn{display:inline-block;font:600 11px/1.6 var(--mono);padding:1px 8px;border-radius:999px;border:1px solid var(--warn);color:var(--warn);margin-left:6px}
 /* figure vocabulary */
@@ -30,10 +31,10 @@ img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid va
 .f-box.acc{stroke:var(--accent);stroke-width:1.8}
 .f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
 .f-box.warn{stroke:var(--warn)}
-.f-t{fill:var(--text);font:600 12.5px var(--sans)}
-.f-m{fill:var(--muted);font:10.5px var(--mono)}
-.f-mt{fill:var(--text);font:10.5px var(--mono)}
-.f-n{fill:var(--muted);font:600 10px var(--mono);letter-spacing:.05em}
+.f-t{fill:var(--text);font:600 13.5px var(--sans)}
+.f-m{fill:var(--muted);font:12px var(--mono)}
+.f-mt{fill:var(--text);font:12px var(--mono)}
+.f-n{fill:var(--muted);font:600 11px var(--mono);letter-spacing:.04em}
 .f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}
 .f-ah{fill:var(--muted)}
 .f-axis{stroke:var(--border);stroke-width:1.2}
@@ -111,21 +112,21 @@ would submit 313 jobs; chain demo-6b49d1cf; arms: [...]</code></pre>
 <p class="small">The first lines are from the committed <code>artifacts/s4_dry_run_default.txt</code>; the last line is the output of the command re-run now.</p>
 <h2>Visual</h2>
 <figure>
-<svg viewBox="0 0 560 250" role="img" aria-label="The six jobs of one seed and their dependencies, from the dry run">
+<svg viewBox="0 0 560 262" role="img" aria-label="The six jobs of one seed and their dependencies, from the dry run">
 <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="f-ah"/></marker></defs>
-<text x="20" y="16" class="f-n">ONE SEED, JOBS J1 TO J6 OF THE DRY RUN (ARROW = STARTS AFTER)</text>
+<text x="20" y="16" class="f-n">ONE SEED, JOBS J1-J6 OF THE DRY RUN (ARROW = STARTS AFTER)</text>
 <rect x="20" y="40" width="160" height="36" rx="8" class="f-box "/>
-<text x="32" y="59" class="f-t">J1 train-t-s0</text>
+<text x="32" y="60" class="f-t">J1 train-t-s0</text>
 <rect x="200" y="40" width="160" height="36" rx="8" class="f-box "/>
-<text x="212" y="59" class="f-t">J2 eval-t-s0</text>
+<text x="212" y="60" class="f-t">J2 eval-t-s0</text>
 <rect x="380" y="40" width="160" height="36" rx="8" class="f-box "/>
-<text x="392" y="59" class="f-t">J3 returns-t-s0</text>
+<text x="392" y="60" class="f-t">J3 returns-t-s0</text>
 <rect x="20" y="130" width="160" height="36" rx="8" class="f-box "/>
-<text x="32" y="149" class="f-t">J4 feat-t-s0-train</text>
+<text x="32" y="150" class="f-t">J4 feat-t-s0-train</text>
 <rect x="200" y="130" width="160" height="36" rx="8" class="f-box "/>
-<text x="212" y="149" class="f-t">J5 feat-t-s0-roll</text>
+<text x="212" y="150" class="f-t">J5 feat-t-s0-roll</text>
 <rect x="380" y="190" width="160" height="36" rx="8" class="f-box acc"/>
-<text x="392" y="209" class="f-t">J6 attribute-t-s0</text>
+<text x="392" y="210" class="f-t">J6 attribute-t-s0</text>
 <line x1="180" y1="58" x2="200" y2="58" class="f-arrow" marker-end="url(#ah)"/>
 <line x1="360" y1="58" x2="380" y2="58" class="f-arrow" marker-end="url(#ah)"/>
 <line x1="100" y1="76" x2="100" y2="130" class="f-arrow" marker-end="url(#ah)"/>
@@ -134,7 +135,8 @@ would submit 313 jobs; chain demo-6b49d1cf; arms: [...]</code></pre>
 <path d="M 100 166 L 100 208 L 380 208" class="f-arrow" marker-end="url(#ah)"/>
 <path d="M 280 166 L 280 190 L 380 196" class="f-arrow" marker-end="url(#ah)"/>
 <path d="M 460 76 L 460 190" class="f-arrow" marker-end="url(#ah)"/>
-<text x="20" y="240" class="f-m">attribute waits for returns, the train features and the rollout features (deps=returns-t-s0,feat-t-s0-train,feat-t-s0-roll).</text>
+<text x="20" y="236" class="f-m">attribute waits for three parents: returns, the train</text>
+<text x="20" y="252" class="f-m">features and the rollout features.</text>
 </svg>
   <figcaption><b>One seed's six jobs and what each waits for.</b> Notice that <code>attribute</code> starts only after three parents finish, and that the two feature jobs depend on different parents (the training run and the evaluation), so they can run in parallel with <code>returns</code>. Job names and dependencies are parsed from the committed dry-run artifact, not drawn by hand.</figcaption>
 </figure>

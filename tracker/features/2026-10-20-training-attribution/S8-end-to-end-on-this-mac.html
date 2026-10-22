@@ -22,6 +22,7 @@ pre code{overflow-wrap:normal}
 table.gloss th.grp{background:var(--surface-2);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
 table.gloss td:first-child{min-width:11em}
 td.mono{font-family:var(--mono)}
+.nw td code{white-space:nowrap;overflow-wrap:normal}
 img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
 .tag-syn{display:inline-block;font:600 11px/1.6 var(--mono);padding:1px 8px;border-radius:999px;border:1px solid var(--warn);color:var(--warn);margin-left:6px}
 /* figure vocabulary */
@@ -30,10 +31,10 @@ img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid va
 .f-box.acc{stroke:var(--accent);stroke-width:1.8}
 .f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
 .f-box.warn{stroke:var(--warn)}
-.f-t{fill:var(--text);font:600 12.5px var(--sans)}
-.f-m{fill:var(--muted);font:10.5px var(--mono)}
-.f-mt{fill:var(--text);font:10.5px var(--mono)}
-.f-n{fill:var(--muted);font:600 10px var(--mono);letter-spacing:.05em}
+.f-t{fill:var(--text);font:600 13.5px var(--sans)}
+.f-m{fill:var(--muted);font:12px var(--mono)}
+.f-mt{fill:var(--text);font:12px var(--mono)}
+.f-n{fill:var(--muted);font:600 11px var(--mono);letter-spacing:.04em}
 .f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}
 .f-ah{fill:var(--muted)}
 .f-axis{stroke:var(--border);stroke-width:1.2}
@@ -107,45 +108,47 @@ img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid va
 <p><b>The smoke run's timings</b> (<code>artifacts/s8_local_smoke.json</code>, final code): evaluation 85.1 s, returns 1.8 s, train features 333.8 s (40 samples; dominated by opening the dataset), rollout features 31.3 s, attribute 6.3 s, select 2.6 s; total 461 s. The select child had 38 episodes (40 minus 2) and declared the functional <code>F(30) = P(T &lt;= 30 s)</code>.</p>
 <h2>Visual</h2>
 <figure>
-<svg viewBox="0 0 560 330" role="img" aria-label="Lineage trace from a curated subset back to the training data, synthetic fixture">
+<svg viewBox="0 0 560 376" role="img" aria-label="Lineage trace from a curated subset back to the training data, synthetic fixture">
 <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="f-ah"/></marker></defs>
-<text x="20" y="16" class="f-n">SYNTHETIC FIXTURE: trace FROM THE SELECT RUN BACK</text>
-<rect x="150" y="26" width="260" height="34" rx="8" class="f-box acc"/>
-<text x="162" y="45" class="f-t">select-ti-harm</text>
-<text x="162" y="62" class="f-m">curated subset (harmful removed)</text>
-<line x1="280" y1="60" x2="280" y2="80" class="f-arrow" marker-end="url(#ah)"/>
-<rect x="150" y="80" width="260" height="34" rx="8" class="f-box acc"/>
-<text x="162" y="99" class="f-t">attribute-ti-ens</text>
-<text x="162" y="116" class="f-m">ensemble of two seeds</text>
-<line x1="240" y1="114" x2="135" y2="138" class="f-arrow" marker-end="url(#ah)"/>
-<line x1="320" y1="114" x2="425" y2="138" class="f-arrow" marker-end="url(#ah)"/>
-<rect x="20" y="138" width="240" height="34" rx="8" class="f-box "/>
-<text x="32" y="157" class="f-t">attribute-ti-s0</text>
-<text x="32" y="174" class="f-m">+ 6 feature-file digests</text>
-<rect x="50" y="190" width="180" height="30" rx="8" class="f-box "/>
-<text x="62" y="209" class="f-t">returns-ti-s0</text>
-<rect x="50" y="228" width="180" height="30" rx="8" class="f-box "/>
-<text x="62" y="247" class="f-t">eval-ti-s0</text>
-<rect x="50" y="266" width="180" height="30" rx="8" class="f-box "/>
-<text x="62" y="285" class="f-t">train-ti-s0</text>
-<line x1="40" y1="172" x2="40" y2="281" class="f-arrow"/>
-<line x1="40" y1="205" x2="50" y2="205" class="f-arrow" marker-end="url(#ah)"/>
-<line x1="40" y1="243" x2="50" y2="243" class="f-arrow" marker-end="url(#ah)"/>
-<line x1="40" y1="281" x2="50" y2="281" class="f-arrow" marker-end="url(#ah)"/>
-<rect x="300" y="138" width="240" height="34" rx="8" class="f-box "/>
-<text x="312" y="157" class="f-t">attribute-ti-s1</text>
-<text x="312" y="174" class="f-m">+ 6 feature-file digests</text>
-<rect x="330" y="190" width="180" height="30" rx="8" class="f-box "/>
-<text x="342" y="209" class="f-t">returns-ti-s1</text>
-<rect x="330" y="228" width="180" height="30" rx="8" class="f-box "/>
-<text x="342" y="247" class="f-t">eval-ti-s1</text>
-<rect x="330" y="266" width="180" height="30" rx="8" class="f-box "/>
-<text x="342" y="285" class="f-t">train-ti-s1</text>
-<line x1="320" y1="172" x2="320" y2="281" class="f-arrow"/>
-<line x1="320" y1="205" x2="330" y2="205" class="f-arrow" marker-end="url(#ah)"/>
-<line x1="320" y1="243" x2="330" y2="243" class="f-arrow" marker-end="url(#ah)"/>
-<line x1="320" y1="281" x2="330" y2="281" class="f-arrow" marker-end="url(#ah)"/>
-<text x="20" y="318" class="f-m">10 runs and 12 feature-file digests reached; the training subset (308ff4d8d805) is in the record. 5 stages: attribute, eval, returns, select, train.</text>
+<text x="20" y="16" class="f-n">SYNTHETIC FIXTURE: TRACE FROM THE SELECT RUN BACK</text>
+<rect x="130" y="26" width="300" height="46" rx="8" class="f-box acc"/>
+<text x="142" y="46" class="f-t">select-ti-harm</text>
+<text x="142" y="64" class="f-m">curated subset (harmful removed)</text>
+<line x1="280" y1="72" x2="280" y2="90" class="f-arrow" marker-end="url(#ah)"/>
+<rect x="130" y="90" width="300" height="46" rx="8" class="f-box acc"/>
+<text x="142" y="110" class="f-t">attribute-ti-ens</text>
+<text x="142" y="128" class="f-m">ensemble of two seeds</text>
+<line x1="220" y1="136" x2="135" y2="156" class="f-arrow" marker-end="url(#ah)"/>
+<line x1="340" y1="136" x2="425" y2="156" class="f-arrow" marker-end="url(#ah)"/>
+<rect x="20" y="156" width="240" height="46" rx="8" class="f-box "/>
+<text x="32" y="176" class="f-t">attribute-ti-s0</text>
+<text x="32" y="194" class="f-m">+ 6 feature-file digests</text>
+<rect x="50" y="216" width="190" height="30" rx="8" class="f-box "/>
+<text x="62" y="236" class="f-t">returns-ti-s0</text>
+<rect x="50" y="256" width="190" height="30" rx="8" class="f-box "/>
+<text x="62" y="276" class="f-t">eval-ti-s0</text>
+<rect x="50" y="296" width="190" height="30" rx="8" class="f-box "/>
+<text x="62" y="316" class="f-t">train-ti-s0</text>
+<line x1="40" y1="202" x2="40" y2="311" class="f-arrow"/>
+<line x1="40" y1="231" x2="50" y2="231" class="f-arrow" marker-end="url(#ah)"/>
+<line x1="40" y1="271" x2="50" y2="271" class="f-arrow" marker-end="url(#ah)"/>
+<line x1="40" y1="311" x2="50" y2="311" class="f-arrow" marker-end="url(#ah)"/>
+<rect x="300" y="156" width="240" height="46" rx="8" class="f-box "/>
+<text x="312" y="176" class="f-t">attribute-ti-s1</text>
+<text x="312" y="194" class="f-m">+ 6 feature-file digests</text>
+<rect x="330" y="216" width="190" height="30" rx="8" class="f-box "/>
+<text x="342" y="236" class="f-t">returns-ti-s1</text>
+<rect x="330" y="256" width="190" height="30" rx="8" class="f-box "/>
+<text x="342" y="276" class="f-t">eval-ti-s1</text>
+<rect x="330" y="296" width="190" height="30" rx="8" class="f-box "/>
+<text x="342" y="316" class="f-t">train-ti-s1</text>
+<line x1="320" y1="202" x2="320" y2="311" class="f-arrow"/>
+<line x1="320" y1="231" x2="330" y2="231" class="f-arrow" marker-end="url(#ah)"/>
+<line x1="320" y1="271" x2="330" y2="271" class="f-arrow" marker-end="url(#ah)"/>
+<line x1="320" y1="311" x2="330" y2="311" class="f-arrow" marker-end="url(#ah)"/>
+<text x="20" y="334" class="f-m">10 runs and 12 feature-file digests reached, plus the</text>
+<text x="20" y="350" class="f-m">training subset (308ff4d8d805). Stages: attribute, eval,</text>
+<text x="20" y="366" class="f-m">returns, select, train.</text>
 </svg>
   <figcaption><b>The lineage trace from a curated subset back to its evidence (SYNTHETIC fixture).</b> Start at the top box (the select run that removed the 'harmful' episodes) and follow the arrows: it was ranked on an ensemble of two seeds, each seed's attribution rests on a returns run, an eval run and a train run, and every feature file's fingerprint is recorded along the way. Notice that no box is orphaned. This is what lets a reader ask, for any curated subset, which rollouts justified it. Run names and counts are from <code>artifacts/s8_trace_select_SYNTHETIC.json</code>.</figcaption>
 </figure>

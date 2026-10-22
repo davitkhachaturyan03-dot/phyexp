@@ -22,6 +22,7 @@ pre code{overflow-wrap:normal}
 table.gloss th.grp{background:var(--surface-2);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
 table.gloss td:first-child{min-width:11em}
 td.mono{font-family:var(--mono)}
+.nw td code{white-space:nowrap;overflow-wrap:normal}
 img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
 .tag-syn{display:inline-block;font:600 11px/1.6 var(--mono);padding:1px 8px;border-radius:999px;border:1px solid var(--warn);color:var(--warn);margin-left:6px}
 /* figure vocabulary */
@@ -30,10 +31,10 @@ img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid va
 .f-box.acc{stroke:var(--accent);stroke-width:1.8}
 .f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
 .f-box.warn{stroke:var(--warn)}
-.f-t{fill:var(--text);font:600 12.5px var(--sans)}
-.f-m{fill:var(--muted);font:10.5px var(--mono)}
-.f-mt{fill:var(--text);font:10.5px var(--mono)}
-.f-n{fill:var(--muted);font:600 10px var(--mono);letter-spacing:.05em}
+.f-t{fill:var(--text);font:600 13.5px var(--sans)}
+.f-m{fill:var(--muted);font:12px var(--mono)}
+.f-mt{fill:var(--text);font:12px var(--mono)}
+.f-n{fill:var(--muted);font:600 11px var(--mono);letter-spacing:.04em}
 .f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}
 .f-ah{fill:var(--muted)}
 .f-axis{stroke:var(--border);stroke-width:1.2}
@@ -105,7 +106,7 @@ img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid va
 <p><b>Cost.</b> The default chain is large. The first-run decision for the owner, with the whole table, is in the <a href="report.html#decisions">report's open decisions</a>.</p>
 <h2>Visual</h2>
 <figure>
-<svg viewBox="0 0 560 300" role="img" aria-label="Seed-by-seed calls of the Step 4 summary on planted synthetic verdicts">
+<svg viewBox="0 0 560 320" role="img" aria-label="Seed-by-seed calls of the Step 4 summary on planted synthetic verdicts">
 <text x="20" y="18" class="f-n">SYNTHETIC (PLANTED) VERDICTS, ONE CELL PER SEED (0, 1, 2)</text>
 <text x="20" y="42" class="f-mt">curated beats random: remove most harmful, compare on F(30)</text>
 <rect x="20" y="48" width="46" height="26" rx="5" class="f-good"/>
@@ -147,7 +148,8 @@ img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid va
 <rect x="124" y="256" width="46" height="26" rx="5" class="f-bad"/>
 <text x="147" y="274" class="f-t" text-anchor="middle">C</text>
 <text x="190" y="274" class="f-m">only the 2 fired seeds count</text>
-<text x="20" y="300" class="f-m">T = treated arm better · C = control better · 0 = no clear difference · g = macro-KS gate did not fire</text>
+<text x="20" y="300" class="f-m">T = treated better · C = control better · 0 = no clear difference</text>
+<text x="20" y="316" class="f-m">g = the macro-KS gate did not fire</text>
 </svg>
   <figcaption><b>What the Step 4 summary says, seed by seed (planted, SYNTHETIC).</b> Green cells are seeds where the treated arm did better, red where the control did, grey where nothing was clear, amber where the first-step gate did not fire. Notice the last two rows: an amber cell adds nothing, however significant its individual metrics looked. All five rows are planted test inputs from <code>artifacts/s4_summary_and_selects.json</code> and <code>s4_step4_summary_SYNTHETIC.csv</code>; they show the summary logic works, not that any curation helps.</figcaption>
 </figure>
