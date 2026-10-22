@@ -9,7 +9,7 @@
   {
    "name": "4.4b planted case: curated beats random on f30 in 2/3 seeds, with the by-seed calls and the expectation counted",
    "pass": true,
-   "detail": "T,T,0 | treated better in 2/3 seeds, control better in 0/3; expectation (treated_better) met in 2/3"
+   "detail": "T,T,0 | treated better in 2/3 seeds, control better in 0/3, gate not fired in 0/3; expectation (treated_better) met in 2/3"
   },
   {
    "name": "4.4c helpful removal: control better in 2/3 seeds meets the 'treated worse' expectation twice",
@@ -25,6 +25,16 @@
    "name": "4.4e each row carries the declared functional of its treated arm",
    "pass": true,
    "detail": ""
+  },
+  {
+   "name": "4.4h seeds whose macro-KS gate did not fire add no directional support even when every metric is Holm-significant (planted)",
+   "pass": true,
+   "detail": "by seed g,g,g, supports 0, gate_fires 0/3"
+  },
+  {
+   "name": "4.4i a mixed case: gate fired in 2 of 3 seeds, so at most 2 count (control better in the 2 fired seeds, none from the third)",
+   "pass": true,
+   "detail": "by seed C,g,C"
   },
   {
    "name": "4.4f the other chain's verdict is not in the table (a chain is summarized alone)",

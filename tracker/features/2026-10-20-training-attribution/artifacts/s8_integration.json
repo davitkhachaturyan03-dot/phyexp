@@ -33,6 +33,16 @@
    "detail": "train features were not computed on exactly the training subset's episodes"
   },
   {
+   "name": "8.4 refused with nothing written: train features from another version's root (v0 root for a v3 subset)",
+   "pass": true,
+   "detail": "train features were computed on ['data/lerobot/libero_spatial_10'], not on the training subset's version copy "
+  },
+  {
+   "name": "8.4 refused with nothing written: rollout features computed on another eval's trajectories",
+   "pass": true,
+   "detail": "rollout features were computed on ['data/scratch/training_attribution/integration/evals/s1/trajectories'], whi"
+  },
+  {
    "name": "8.4 refused with nothing written: a score table from another subset at select",
    "pass": true,
    "detail": "score table keys != parent subset's episode versions: 0 unknown/stale (e.g. []), 1 unscored (e.g. [('libero_10"
@@ -53,5 +63,5 @@
    "detail": "306af4123fda7e63..."
   }
  ],
- "seconds": 48
+ "seconds": 56
 }

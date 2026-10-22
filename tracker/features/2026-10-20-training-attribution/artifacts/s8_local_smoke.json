@@ -6,15 +6,15 @@
   {
    "stage": "eval",
    "ok": true,
-   "seconds": 87.9,
+   "seconds": 85.1,
    "output": {
-    "run_id": "03da0e549b5847ffbc8390e14ce8e7ae",
+    "run_id": "288f95ca46254effbb4c3da031263e07",
     "rollouts": "data/eval/eval-ts-smoke/rollouts.parquet",
     "n_rollouts": 2,
     "n_success": 0,
     "trajectories": {
      "root": "data/eval/eval-ts-smoke/trajectories",
-     "digest": "b09a1f5e7705f9c02718c4faba7b9a70c543d0981f88b4fab136a3d33a380752",
+     "digest": "6f5e320a651b23cca97fd013602085ea1780a11c7aff70ed014f0b27db704ab4",
      "episodes": 2,
      "frames": 2400
     },
@@ -24,10 +24,10 @@
   {
    "stage": "returns",
    "ok": true,
-   "seconds": 1.9,
+   "seconds": 1.8,
    "output": {
-    "run_id": "b09334bea4494b868ca068d7ec76af38",
-    "returns": "data/eval/returns-03da0e549b58/returns.parquet",
+    "run_id": "28d7f2edab1b4072bb1e5d847aebda30",
+    "returns": "data/eval/returns-288f95ca4625/returns.parquet",
     "rows": 2,
     "operation_rows": 2,
     "hrt_macro_at_policy": 0.06881666666666668
@@ -36,7 +36,7 @@
   {
    "stage": "features-train",
    "ok": true,
-   "seconds": 343.1,
+   "seconds": 333.8,
    "output": {
     "checkpoint_sha256": "0adc283bda8e686575daeb2355a8892373ac6e056d8cd11b842f18be1c577acf",
     "dataset_root": "data/lerobot/libero_spatial_10",
@@ -53,7 +53,7 @@
   {
    "stage": "features-rollouts",
    "ok": true,
-   "seconds": 32.3,
+   "seconds": 31.3,
    "output": {
     "checkpoint_sha256": "0adc283bda8e686575daeb2355a8892373ac6e056d8cd11b842f18be1c577acf",
     "dataset_root": "data/eval/eval-ts-smoke/trajectories",
@@ -72,7 +72,7 @@
    "ok": true,
    "seconds": 6.3,
    "output": {
-    "run_id": "545c573799704774bc747b2049b63643",
+    "run_id": "fe6bf5c8f5f346c2afef0efc43e7017a",
     "scores": "data/attribution/attribute-ts-smoke/attribution_scores.parquet",
     "n_episodes": 40,
     "n_rollouts": 2
@@ -81,10 +81,10 @@
   {
    "stage": "select",
    "ok": true,
-   "seconds": 4.6,
+   "seconds": 2.6,
    "output": {
-    "run_id": "2e5964623239477ab165236ac8f4d454",
-    "subset_id": "308d4102c0a85ec0bc67f89035f4251b711fa1c16b44917502a9d0d99dd5d284",
+    "run_id": "7f80fc8bf2c2494f9dab12a8988fa6fd",
+    "subset_id": "f818b38cbd58c92e44c534952f8ff44231d2d0dae3cb536a365c787b9f0a4cb3",
     "n_episodes": 38
    }
   }
@@ -181,5 +181,5 @@
  "select_child_episodes": 38,
  "mlflow_db_sha256_before": "306af4123fda7e635892d459a2e34008ba1cb62f6c4fce152c546e0da7bdde79",
  "mlflow_db_sha256_after": "306af4123fda7e635892d459a2e34008ba1cb62f6c4fce152c546e0da7bdde79",
- "seconds": 477
+ "seconds": 461
 }

@@ -19,7 +19,7 @@
   {
    "name": "6.3 run_id with a chain prefix returns the run of that chain only",
    "pass": true,
-   "detail": "u- scope -> eff4cde7 (u-bbbb2222 is eff4cde7)"
+   "detail": "u- scope -> 81c48f0f (u-bbbb2222 is 81c48f0f)"
   },
   {
    "name": "6.3b two runs of one name in scope (t-aaaa1111, t-cccc3333) raise without --latest",
@@ -60,6 +60,11 @@
    "name": "R7 real mlflow.db sha256 unchanged",
    "pass": true,
    "detail": "306af4123fda7e63... == 306af4123fda7e63..."
+  },
+  {
+   "name": "6.7 a real (non-dry) submission creates LOG_DIR first (mkdir -p) so sbatch can open --output",
+   "pass": true,
+   "detail": "dir existed at the sbatch call: True"
   }
  ]
 }

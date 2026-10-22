@@ -501,3 +501,52 @@ is added.)
   20-ish-episode subset); the smoke's per-task `__same_task` columns are NaN for tasks without rollouts, so it selects on the global column.
 - **Debris to know about:** `data/scratch/` still holds `dry.txt`, `dry_parsed.txt`, `local_smoke.log`, `reg_b2/` (gitignored, safe to delete);
   `data/scratch/cupid_src/` is the planner's CUPID clone.
+
+## Round 2: 2026-10-22 (analyzer round 1, REWORK routed to the executor)
+
+Code commits: `12c81c9`, `b22fe7b`. Real `data/lineage/mlflow.db` sha256 `306af4123fda7e63…` before and after every verifier run below.
+
+### Blocking items
+1. **Macro-KS gate in the Step 4 summary (`vlapoc/step4.py`).** `call()` takes `gate_fires`; a seed whose gate did not fire is `g` and adds
+   no directional support, whatever its Holm p-values (PoC §4.4 p.10, §9.1 Step 4.3-4.4 p.19; docstring cites both). Evidence, `--step4`
+   (13/13): `[PASS] 4.4h seeds whose macro-KS gate did not fire add no directional support even when every metric is Holm-significant (planted)
+   by seed g,g,g, supports 0, gate_fires 0/3`; `[PASS] 4.4i a mixed case ... by seed C,g,C` (2 of 3 count, none from the unfired seed).
+2. **LOG_DIR.** `Chain.submit` does `mkdir(parents=True, exist_ok=True)` on LOG_DIR before every real sbatch; `slurm/site.env.example` says LOG_DIR must
+   be on a filesystem the compute nodes share. `--names` (13/13): `[PASS] 6.7 a real (non-dry) submission creates LOG_DIR first ...  dir existed at
+   the sbatch call: True` (stubbed `subprocess.run`, nothing submitted).
+3. **Features bound to the data they claim (`attribute_run`).** Train manifests' `dataset_root` must equal `rel(open_for_method(subset).lerobot_root)`;
+   the rollout manifest's root must hash (`file_digests`) to the eval run's `output.trajectories` digest, as `stage.cmd_features` checks. The fixture now
+   writes a real version root and a stand-in trajectories dir with its digest. `--integration` (12/12) adds two negatives, each refused with the run
+   count unchanged: `train features were computed on ['data/lerobot/libero_spatial_10'], not on the training subset's version copy ...` and
+   `rollout features were computed on [.../evals/s1/trajectories], which is not the trajectories copy eval run ... recorded`. On real objects the
+   binding also holds: `--local-smoke --device mps` re-run on the final code completed all six stages (eval 85 s, returns 2 s, train features 334 s,
+   rollout features 31 s, attribute 6 s, select 3 s; n_rollouts 2, n_episodes 40, score table [40, 30], still not attribution-grade, τ undefined with 2 rollouts).
+   Consequence: feature files written before this change with absolute or mismatching `dataset_root` (e.g. the October cluster features) are refused.
+4. **Stale `--estimator` references** replaced: `scripts/verify_training_attribution.py` docstring now points to `verify_attribution.py` checks 6-8 and
+   `--cpu-smoke` (parity = check 7a); `vlapoc/third_party/cupid_quality.py` header likewise. `grep -rn -e '--estimator' scripts vlapoc` finds none.
+5. **`--functionals` without `--manifest`:** 3.2 records `[SKIP] 3.2 featurize manifests are repo-relative (no --manifest given; see
+   artifacts/s3_manifest_example.json)` and counts as passing; the bare invocation gives `S3 pass: True (17/17)`, rc=0.
+
+### Non-blocking items done
+- **NB3:** the ensemble run's params carry `divergences_from_cupid` and an `aggregation` note (mean of per-seed z-scores, unit seed s.d., partial-seed columns averaged over `n_models_per_column`).
+- **NB4:** I kept the >= 2 non-zero calls rule and recorded it as a **named divergence** (`analysis.DIVERGENCE_NOTE`, in the `metric_groups` docstring and
+  the analyze run's param `group_rule_divergence`). The PoC §4.2 wording reads closer to "every metric", but the five family-W returns are partly
+  redundant (rmst60, hrt60_lin, censored60), so an all-five rule would leave the consistent groups nearly empty; the cost (two harmful, three flat
+  counts as a consistent harmer) is stated. The owner can choose the stricter rule; that is a one-line change.
+- **NB5:** `server_pipeline.py` passes `--chain-id <tag>-<sha8>` to the `step4-summary` job.
+- **NB7:** one docstring paragraph in `analyze_run` on why reading catalog rows via `Subset.load(...).episodes()` is inside the method boundary
+  (bookkeeping columns of the already-gated training subset; boundary scan clean).
+- Left alone as instructed: NB1 (cost), NB2 (centred returns default, for the owner), NB6 (scipy bootstrap).
+
+### Full regression on the final code (HEAD `b22fe7b`)
+`verify_lineage_s3`, `verify_runs_s5 --r2`, `verify_blind_s0`, `verify_method_boundary_s3`, `verify_derive_gt_s2` (full), `verify_verdict_s7`,
+`verify_returns_s6 --synthetic`, `verify_metrics_s1`, `verify_consumers_s6`: all rc=0. `verify_attribution.py` rc=0 (29/29). This feature's `--blind`,
+`--functionals --manifest`, `--pipeline`, `--step4`, `--recovery`, `--names`, `--groups`, `--integration`: all rc=0.
+
+### Artifacts after the final run
+- Restored with `git checkout` (other features, rewritten by their own verifiers): `data-lineage-layer/s5_r2_summary.json`, `evaluation-layer/s0_verify_blind.json`,
+  `ground-truth/s6_v3_verify.json` (ids and timings only) and `data-lineage-layer/s3_summary.json` (the structural drift noted in batch 1).
+- Committed as legitimate refreshes from this final run: `s1_blind.json`, `s1_refusal_table.csv`, `s3_functionals.json`, `s5_recovery.json`, `s6_names.json`,
+  `s8_integration.json` (run ids, timings, chain sha, the extra 6.7 check and the two extra negatives), `s4_summary_and_selects.json` and
+  `s4_step4_summary_SYNTHETIC.csv` (now include the gate-not-fired planted rows), `s4_dry_run_default.txt` (chain sha in the commands, `--chain-id` on the summary job),
+  `s8_local_smoke.json` (the re-run on the final code).
