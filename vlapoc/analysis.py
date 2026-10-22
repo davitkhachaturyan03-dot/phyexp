@@ -33,6 +33,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+DIVERGENCE_NOTE = ("consistent helper/harmer = at least 2 non-zero calls, all of one sign (not 'every metric' as PoC §4.2 p. 10 reads); "
+                   "five family-W returns are partly redundant (rmst60, hrt60_lin, censored60)")
 GROUPS = ("consistent_helper", "consistent_harmer", "trade_off", "metric_specific", "neutral")
 DEFAULT_METRICS = ("f30", "rmst60", "auc_expected", "hrt60_lin", "censored60")  # family-W returns, one harm column each
 STATUS = "descriptive, unverified (no per-episode multiplicity-corrected test from 2-3 seeds; PoC §4.4)"
@@ -45,7 +47,14 @@ def metric_groups(table: pd.DataFrame, columns: list[str], z: float = 1.0) -> pd
 
     Per metric the call is +1 (harmful, z >= ``z``), -1 (helpful, z <= -``z``) or 0. Then: no non-zero call ->
     ``neutral``; exactly one -> ``metric_specific``; all non-zero calls +1 -> ``consistent_harmer``; all -1 ->
-    ``consistent_helper``; both signs -> ``trade_off``. Descriptive and unverified (module docstring). ``z`` is a declared
+    ``consistent_helper``; both signs -> ``trade_off``.
+
+    Named divergence from PoC §4.2 (p. 10): the PoC's "consistent helpers/harmers" read as helping/harming *every* metric;
+    here a consistent group needs at least two non-zero calls all of one sign (>= 2 of the 5 metrics), not all five. I kept
+    this rather than the all-metrics rule because the five family-W returns are partly redundant (``rmst60``, ``hrt60_lin`` and
+    ``censored60`` move together), so requiring all five would leave "consistent" nearly empty; the cost is that an episode
+    that is harmful on two metrics and flat on three counts as a consistent harmer. It is recorded in ``DIVERGENCE_NOTE``
+    and in the analyze run's params. Descriptive and unverified (module docstring). ``z`` is a declared
     parameter (inferred default 1).
     """
     zs = pd.DataFrame({c: (table[c] - table[c].mean()) / table[c].std(ddof=0) for c in columns})
@@ -183,7 +192,11 @@ def analyze_run(score_run_id: str, name: str, z: float = 1.0, columns: list[str]
     """Stage ``analyze`` (recorded as stage ``summarize``): groups, aggregation by catalog column(s), heatmap and scatter of an
     attribute (or ensemble) run's score table, linked to that run (input entity = the score table's sha256, param
     ``score_run_id``) with the group threshold and the "descriptive, unverified" status in its params (PoC §4.2, §4.4, §4.5).
-    ``synthetic`` puts SYNTHETIC in every figure title and in the params."""
+    ``synthetic`` puts SYNTHETIC in every figure title and in the params.
+
+    Reading catalog rows through ``Subset.load(...).episodes()`` (for ``aggregate_by``) is not a method-boundary breach: it is
+    the catalog's bookkeeping columns of the training subset this attribute run already consumed through ``open_for_method``
+    (``attribute_run``), the same columns ``MethodView.catalog`` exposes, and no label or parent hash is read (boundary scan)."""
     from vlapoc.attribution import _artifact_json, _artifact_table
     from vlapoc.lineage import Subset, rel
     from vlapoc.runs import client, stage_run
@@ -218,7 +231,7 @@ def analyze_run(score_run_id: str, name: str, z: float = 1.0, columns: list[str]
     with stage_run("summarize", name, lineage_root, chain=chain, allow_dirty=allow_dirty) as r:
         r.input_entity("score_table", run.data.tags["output.attribution_scores.sha256"], "scores")
         r.params({"score_run_id": score_run_id, "group_z_threshold": z, "group_z_threshold_status": "inferred default 1; declared parameter",
-                  "group_status": STATUS, "columns": cols, "aggregate_by": list(by), "synthetic": synthetic,
+                  "group_status": STATUS, "group_rule_divergence": DIVERGENCE_NOTE, "columns": cols, "aggregate_by": list(by), "synthetic": synthetic,
                   "group_counts": {g: int(counts.get(g, 0)) for g in GROUPS}, "x_throughput": x, "y_reliability": y})
         for k, p in outputs.items():
             r.output_file(k, p, kind="figure" if str(p).endswith(".png") else "table")

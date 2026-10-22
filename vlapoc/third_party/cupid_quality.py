@@ -5,7 +5,7 @@ Source: https://github.com/agiachris/cupid at commit ``2941eba9427a3398d3cbe26b1
 (lines 299-335), function bodies **verbatim** (only this header and the two imports are added).
 Copyright (c) 2025 Christopher Agia, MIT License (``LICENSE-cupid`` next to this file).
 
-Used only as the reference in ``scripts/verify_training_attribution.py --estimator`` (training-attribution S2, AC2.2):
+Used only as the reference in ``scripts/verify_attribution.py`` check 7a (training-attribution S2, AC2.2):
 ``vlapoc.attribution.performance_influence(M, 2*r01 - 1, center=False) * m`` must equal
 ``compute_demo_quality_scores(<sum_of_sum trajectory scores>, success_mask, "net")``. Not imported by any pipeline code.
 """

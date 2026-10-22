@@ -24,8 +24,9 @@ policy) and ``step4.seed``, plus the chain tag ``vlapoc.chain``. The run's ``ver
 gives, per family-W metric, ``p_holm`` and ``diff_better`` (> 0: arm A, the control, is better). The treated arm's select
 run (``select-<tag>-<arm>``) gives its operation, direction, curation mode and declared functional.
 
-Per metric and seed the call is ``T`` (Holm p < α and the treated arm is better), ``C`` (Holm p < α and the control is
-better) or ``0`` (not significant). The two-step verdict (macro-KS gate, then per-metric CIs) is PhAIL §3.3 as
+Per metric and seed the call is ``T`` (gate fired, Holm p < α and the treated arm is better), ``C`` (gate fired, Holm p < α
+and the control is better), ``0`` (gate fired, not significant) or ``g`` (the macro-KS gate did not fire: no directional
+support, PoC §4.4 p. 10, §9.1 Step 4.4 p. 19; training-attribution round 2). The two-step verdict (macro-KS gate, then per-metric CIs) is PhAIL §3.3 as
 ``vlapoc.verdict`` implements it; this module aggregates, it does not re-test. It refuses verdicts from several chains
 under one tag unless a chain id is given, and a verify run whose chain differs from the requested one.
 
@@ -63,8 +64,15 @@ def expected_direction(kind: str, arm_direction: str | None, metric: str, treate
     return None
 
 
-def call(metric_row: dict, alpha: float = ALPHA) -> str:
-    """``T`` / ``C`` / ``0`` for one verdict metric row (``diff_better`` > 0 means arm A, the control, is better)."""
+def call(metric_row: dict, alpha: float = ALPHA, gate_fires: bool = True) -> str:
+    """``T`` / ``C`` / ``0`` / ``g`` for one verdict metric row (``diff_better`` > 0 means arm A, the control, is better).
+
+    The two-step verdict is gated: PoC §4.4 (p. 10) and §9.1 Step 4.3-4.4 (p. 19), "Apply the macro-KS test ... If it did
+    [fire], check each metric's confidence interval for the direction of the change". A seed whose macro-KS gate did not fire
+    (``gate_fires`` False) gets ``g`` whatever its per-metric Holm p-values say: it contributes no directional support in
+    either direction (consistent with ``vlapoc.verdict.outcome``, which reports outcome "iii" and no direction then)."""
+    if not gate_fires:
+        return "g"
     if metric_row["p_holm"] >= alpha or metric_row["diff_better"] == 0:
         return "0"
     return "C" if metric_row["diff_better"] > 0 else "T"
@@ -95,7 +103,7 @@ def summarize(records: list[dict], arms: dict[str, dict]) -> pd.DataFrame:
                "rollout_subset": decl.get("rollout_subset", ""), "good_sign": decl.get("good_sign", "")}
         keys = list(g["verdict"].iloc[0]["metrics"])
         for m in keys:
-            calls = [call(v["metrics"][m], v.get("alpha", ALPHA)) for v in g["verdict"]]
+            calls = [call(v["metrics"][m], v.get("alpha", ALPHA), bool(v["gate"]["fires"])) for v in g["verdict"]]
             exp = expected_direction(kind, arm.get("direction"), m, treated, control)
             want = {"treated_better": "T", "treated_worse": "C"}.get(exp)
             n_t, n_c = calls.count("T"), calls.count("C")
@@ -104,7 +112,7 @@ def summarize(records: list[dict], arms: dict[str, dict]) -> pd.DataFrame:
             row[f"{m}__T"], row[f"{m}__C"] = n_t, n_c
             row[f"{m}__expected"] = exp or "-"
             row[f"{m}__supports"] = supports if supports is not None else "-"
-            row[f"{m}__consistency"] = (f"treated better in {n_t}/{len(g)} seeds, control better in {n_c}/{len(g)}"
+            row[f"{m}__consistency"] = (f"treated better in {n_t}/{len(g)} seeds, control better in {n_c}/{len(g)}, gate not fired in {calls.count('g')}/{len(g)}"
                                         + (f"; expectation ({exp}) met in {supports}/{len(g)}" if want else ""))
         rows.append(row)
     return pd.DataFrame(rows)

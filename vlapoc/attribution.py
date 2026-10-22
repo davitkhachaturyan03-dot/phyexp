@@ -542,7 +542,8 @@ def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, trai
     subset opens through ``open_for_method`` (intact, not fenced, blind, not ground-truth-derived; PoC §2.1 item 4
     p. 3, owner decision 3); the eval run evaluated this train run's checkpoint and recorded trajectories; the returns run
     consumed that eval's rollouts; both feature sets were computed from this checkpoint with one projection; the train
-    features cover exactly the training subset and the rollout features exactly the recorded trajectories; and every
+    features cover exactly the training subset and were computed on that version's own copy (manifest ``dataset_root``), and the
+    rollout features were computed on the trajectories copy this eval run recorded (digest equals ``output.trajectories``); and every
     rollout of the eval run has a recorded trajectory, unless ``allow_partial`` (then the count is recorded as param
     ``n_rollouts_without_trajectory``; PoC §2.1 item 1 p. 3 "Every eval rollout should be tied back to that checkpoint").
 
@@ -551,7 +552,7 @@ def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, trai
     estimator's settings and ``DIVERGENCES`` as params, and ``functionals.json`` (``column_declarations``) as an output.
     Returns ``{"run_id", "scores", "n_episodes", "n_rollouts", "agreement"}``.
     """
-    from vlapoc.lineage import rel
+    from vlapoc.lineage import file_digests, rel, sha256_json
     from vlapoc.method_data import open_for_method
     from vlapoc.returns import load_eval_rollouts
     from vlapoc.runs import _training_subset, check_scores, client, stage_run
@@ -559,7 +560,7 @@ def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, trai
     c = client(lineage_root)
     tr = c.get_run(train_run_id)
     subset = _training_subset(tr, lineage_root)
-    open_for_method(subset.subset_id, lineage_root)  # refuses fenced / leaky / ground-truth-derived / tampered input
+    view = open_for_method(subset.subset_id, lineage_root)  # refuses fenced / leaky / ground-truth-derived / tampered input
     ev, rr = c.get_run(eval_run_id), c.get_run(returns_run_id)
     ckpt_sha = tr.data.tags["checkpoint.weights.sha256"]
     if ev.data.params.get("train_run_id") != train_run_id or ev.data.params.get("checkpoint_sha256") != ckpt_sha:
@@ -570,8 +571,22 @@ def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, trai
         raise ValueError(f"returns run {returns_run_id[:12]} did not consume eval run {eval_run_id[:12]}'s rollouts")
     for prefix in (train_features, rollout_features):
         _, _, mans = load_features(prefix)
-        if mans[0]["checkpoint_sha256"] != ckpt_sha:
+        if any(m["checkpoint_sha256"] != ckpt_sha for m in mans):
             raise ValueError(f"features {prefix} were computed from another checkpoint")
+    # Bind each feature set to the data it claims (PoC §2.1 item 1 p. 3, "tied to exact dataset versions"; §9.2 p. 19): the train
+    # features to the training version's own copy (the root ``open_for_method`` returned), the rollout features to the
+    # trajectories this eval run recorded (the digest check ``stage.py features`` makes when it writes them).
+    vroot = rel(view.lerobot_root)
+    _, _, tm0 = load_features(train_features)
+    wrong = sorted({m["dataset_root"] for m in tm0} - {vroot})
+    if wrong:
+        raise ValueError(f"train features were computed on {wrong}, not on the training subset's version copy {vroot}")
+    _, _, rm0 = load_features(rollout_features)
+    roots = {m["dataset_root"] for m in rm0}
+    recorded = ev.data.tags["output.trajectories"].split(":", 1)[-1]
+    if len(roots) != 1 or sha256_json(file_digests(REPO_ROOT / next(iter(roots)))) != recorded:
+        raise ValueError(f"rollout features were computed on {sorted(roots)}, which is not the trajectories copy eval run "
+                         f"{eval_run_id[:12]} recorded")
     _, _, tman = load_features(train_features)
     if sorted(tman[0]["episodes"] or []) != subset.resolve(lineage_root):
         raise ValueError("train features were not computed on exactly the training subset's episodes")
@@ -687,6 +702,8 @@ def ensemble_run(attribute_run_ids: list[str], name: str, out_dir: Path | None =
         r.params({"method": "ensemble: mean over seeds of per-seed z-scored influence columns",
                   "attribute_run_ids": attribute_run_ids, "n_models": len(runs), "n_rows": len(ens),
                   "n_models_per_column": n_models,
+                  "aggregation": "mean over seeds of per-seed z-scored columns (unit: seed s.d.); a column present in only some seeds is "
+                                 "averaged over those (n_models_per_column)", "divergences_from_cupid": DIVERGENCES,
                   **{k: runs[0].data.params.get(k) for k in ENSEMBLE_SAME_PARAMS}})
         r.output_file("attribution_scores", path, kind="score_table")
         r.output_file("functionals", fpath, kind="functionals")

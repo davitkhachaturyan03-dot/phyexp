@@ -112,6 +112,7 @@ class Chain:
         if self.dry:
             print(f"[dry {self.n}] {name}  deps={','.join(deps) or '-'}\n    {cmd}\n    {shlex.join(args)}")
             return f"J{self.n}"
+        Path(self.log_dir).mkdir(parents=True, exist_ok=True)  # sbatch does not create the --output directory (round 2)
         job = subprocess.run(args, env={**os.environ, **env}, check=True, capture_output=True, text=True).stdout.strip()
         job = job.split(";")[0]
         print(f"[{job}] {name}  deps={','.join(deps) or '-'}  :: {cmd}")
@@ -272,7 +273,7 @@ def main(argv: list[str] | None = None) -> int:
                 cmd = (f"{PY} verify --a eval-{t}-{f30['arm']}-s{s} --b eval-{t}-{hrt['arm']}-s{s} --family W --name verify-{name}-s{s}-W "
                        f"--comparison head_to_head --treated {hrt['arm']} --control {f30['arm']} --seed-id {s}")
                 verifies.append(ch.submit("cpu.sbatch", cmd, f"verify-{name}-s{s}", [ev_of[(hrt["arm"], s)], ev_of[(f30["arm"], s)]]))
-        ch.submit("cpu.sbatch", f"{PY} step4-summary --tag {t} --name step4-summary-{t}", f"step4-summary-{t}", verifies)
+        ch.submit("cpu.sbatch", f"{PY} step4-summary --tag {t} --name step4-summary-{t} --chain-id {ch.chain}", f"step4-summary-{t}", verifies)
     print(f"{'would submit' if a.dry_run else 'submitted'} {ch.n} jobs; chain {ch.chain}; arms: {[x['arm'] for x in plan]}")
     return 0
 
