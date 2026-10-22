@@ -117,4 +117,10 @@ attribution", "Metric-resolved attribution" and "Verification & demo". Defining 
 
 ## Owner rulings
 
-(none yet)
+- **2026-10-22, after round 2 PASS:**
+  - **First server run size: "112 jobs, ~96 GPU-h".** The first run is per-task curation with metrics F30 and
+    HRT (`--curation per_task --metrics f30 hrt60_lin`); global curation runs later.
+  - **Return weighting: "CUPID's +1/−1".** Yes/no columns use CUPID's ±1 returns; centring stays only for
+    continuous metrics. Resolves analyzer NB2 / planner N2.
+  - **Group rule: "Keep 2-of-5, documented".** The ≥2-of-5 rule stays as a recorded divergence from §4.2.
+  - **Merge into `main`: "Not yet".** The branch stays unmerged; nothing pushed.
