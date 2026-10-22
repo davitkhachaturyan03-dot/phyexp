@@ -169,7 +169,7 @@
    "runs_before": 0,
    "runs_after": 0,
    "as_expected": true,
-   "message": "960 episodes, 2.5s incl. integrity hash"
+   "message": "960 episodes, 2.4s incl. integrity hash"
   },
   {
    "entry_point": "attribute",

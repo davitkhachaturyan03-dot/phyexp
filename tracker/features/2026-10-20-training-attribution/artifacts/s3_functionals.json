@@ -34,7 +34,7 @@
   {
    "name": "3.4 attribute raises when one rollout lacks a trajectory",
    "pass": true,
-   "detail": "1 of 30 rollouts of eval run fcd5be7b5d1a have no recorded trajectory, so they would be dropped from the attribution silently; pass allow_partial=True to accept"
+   "detail": "1 of 30 rollouts of eval run b3cf680d1af9 have no recorded trajectory, so they would be dropped from the attribution silently; pass allow_partial=True to accept"
   },
   {
    "name": "3.4b --allow-partial passes and records n_rollouts_without_trajectory",
@@ -49,7 +49,7 @@
   {
    "name": "3.5 ensemble_run raises on [id, id] duplicates",
    "pass": true,
-   "detail": "ensemble inputs contain duplicate runs: ['42061ab5f93b4ae9b6d46c281a93bfd6', '42061ab5f93b4ae9b6d46c281a93bfd6']"
+   "detail": "ensemble inputs contain duplicate runs: ['a05c3f932a004c11ac909cac88b67c12', 'a05c3f932a004c11ac909cac88b67c12']"
   },
   {
    "name": "3.5b ensemble_run raises on mixed center_returns",
@@ -69,12 +69,12 @@
   {
    "name": "3.6b select refuses (require_declaration) a score run that recorded no functionals.json",
    "pass": true,
-   "detail": "score run fea2277578ba recorded no functionals.json, so the functional that 'harm_f30__same_task' explains is undeclared (PoC \u00a73.4 p. 7); re-run the attribute s"
+   "detail": "score run 2cdd3498554e recorded no functionals.json, so the functional that 'harm_f30__same_task' explains is undeclared (PoC \u00a73.4 p. 7); re-run the attribute s"
   },
   {
-   "name": "3.6c select refuses a column the score run does not declare",
+   "name": "3.6c select refuses a column the score run neither contains nor declares (before any run is created)",
    "pass": true,
-   "detail": "run 71c8140569e5 declares 0 functionals for column 'harm_nonexistent', expected exactly 1"
+   "detail": "score table lacks column 'harm_nonexistent'"
   },
   {
    "name": "3.2 featurize manifests hold repo-relative checkpoint and dataset_root (rel() round-trips to an existing path)",

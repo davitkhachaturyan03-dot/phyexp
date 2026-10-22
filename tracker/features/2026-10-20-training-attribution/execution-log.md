@@ -412,3 +412,92 @@ ensemble), `scripts/verify_training_attribution.py` (`--groups`).
 240-episode table; viewed after rendering: legend and group labels do not overlap the data), `artifacts/s7_heatmap_SYNTHETIC.png`,
 `artifacts/s7_tradeoff_SYNTHETIC.png` (15-episode fixture run through the stage), `artifacts/s7_figure_labels_SYNTHETIC.json`,
 `artifacts/s7_groups.json`.
+
+### S8: Run the chain end to end on this Mac (synthetic integration and a real toy-scale smoke)
+**Files:** `scripts/verify_training_attribution.py` (`--integration`, `--local-smoke`; the fixture `make_fixture`/`make_train`/`add_eval`/
+`run_attribute`/`pick_covering`), `scripts/stage.py` (`--feats-root`, `--synthetic` on `score`/`analyze`), `vlapoc/runs.py`
+(`select_run`: validates the key contract and k's bounds before any run exists, and links the score run's own output entity).
+
+**Defects found by running the chain (fixed here):**
+1. `trace` from a select run dead-ended at the score table: `select_run` consumed the table's *column digest*, while the ensemble run
+   *produced* the file's sha256, so no edge connected them. `select_run` now also records `input.score_run_table` = the score run's
+   `output.attribution_scores.sha256`; `trace` then reaches the ensemble, both attribute runs, returns, eval and train runs.
+2. A select refused for a stale score table or an emptying k still left a FAILED MLflow run (the check ran inside the run). The key contract
+   and k bounds are now checked before `stage_run`, so a refusal writes nothing (AC8.4).
+3. S3's check 3.6c expected `ValueError` from `declaration_of` for an unknown column; after (2) the key check refuses first with
+   `LineageError` ("score table lacks column"). The check now asserts a refusal with no run created, whichever check fires.
+
+**Acceptance criteria:**
+- ✅ AC8.1 (a) `.venv/bin/python scripts/verify_training_attribution.py --integration` (SYNTHETIC features, rollouts and returns over a real
+  v3 training subset of 14 episodes in 2 tasks, 10 of them injected, 2 seeds; scratch copy of the store; every stage through
+  `stage.py --lineage-root`): 2 x attribute, ensemble, 5 selects (per-task harm / help / random with `--headline`, global harm / random),
+  score (v3), analyze, all 10 stage runs succeeded (`attribute table 14 episodes x 12 rollouts`; per-task arms keep 12 of 14, global arms 12).
+  `trace` from the harm select run: stages `['attribute', 'eval', 'returns', 'select', 'train']`, 10 runs including both seeds' returns, eval
+  and train runs, **12 `features` inputs (2 seeds x 6 files)**, the training subset in the entities. Dead ends (inputs with no producing run,
+  by design): `features` (intermediate files), `subset` (the training subset's own producer is not in the fixture) and `score_table` (the
+  select's column digest).
+- ✅ AC8.2 four negatives, each refused with the run count unchanged: features from another checkpoint (`features ... were computed from another
+  checkpoint`), train features on a different episode list (`train features were not computed on exactly the training subset's episodes`),
+  a score table from another subset at select (`score table keys != parent subset's episode versions ...`), an ensemble of two runs on different
+  subsets (`ensemble inputs were trained on different subsets`).
+- ✅ AC6.4 second half: the whole chain above ran on the scratch store; real db untouched.
+- ✅ AC8.3 (b) `.venv/bin/python scripts/verify_training_attribution.py --local-smoke --device mps` completed. Tracked train run `0a33bc75bb…`
+  (2-step SmolVLA on v0/reference), through the stage CLI on a scratch copy: eval `--smoke` 1 task x 2 init states 88 s (n_rollouts 2, 0
+  successes), returns 2 s, train features (1 sample per episode, 40 samples, dim 7,488, output_fn `square`) 343 s, rollout features (16 samples)
+  32 s, attribute 6 s, select 5 s. **smoke (not attribution-grade):** n_rollouts 2, n_episodes 40, score table shape [40, 30], all harm columns
+  finite, 4 feature files recorded as inputs, select declared functional `F(30) = P(T <= 30 s)`, child 38 episodes. τ agreement: 15 column pairs
+  with n = 2 episodes each (only one task has rollouts), so Kendall τ is undefined (NaN): nothing about agreement can be read from this smoke.
+  No stage failed (no MPS problem, premise P6 did not bite). The eval and attribute output directories were deleted afterwards.
+- ✅ AC8.4 both runs leave the real `data/lineage/mlflow.db` sha256 unchanged (`306af4123fda7e63…`, checked inside each run and at the end of the batch).
+- ✅ AC8.5 final batch run on the committed code: `verify_lineage_s3`, `verify_runs_s5 --r2`, `verify_blind_s0`, `verify_method_boundary_s3`,
+  `verify_derive_gt_s2` (full, with the hash-seed part), `verify_verdict_s7`, `verify_returns_s6 --synthetic`, `verify_metrics_s1`,
+  `verify_consumers_s6` all rc=0; `verify_attribution` 29/29; this feature's `--blind`, `--functionals`, `--pipeline`, `--step4`, `--recovery`,
+  `--names`, `--groups`, `--integration` all rc=0.
+
+**Artifact decisions after the final run (diffed one by one):**
+- Committed as legitimate refreshes of this feature's own artifacts from the final run: `s1_blind.json`, `s1_refusal_table.csv` (timing 2.5 s ->
+  2.4 s), `s3_functionals.json` (3.6c wording), `s4_dry_run_default.txt` and `s4_pipeline.json` (now 313 jobs: the `analyze` job from S7 and the
+  sbatch argv lines), `s5_recovery.json`, `s6_names.json` (chain id, run ids, 60 sbatch lines), `s7_groups.json`, `s8_integration.json`
+  (timings/ids), `s7_heatmap_SYNTHETIC.png` and `s7_tradeoff_SYNTHETIC.png` (re-rendered with the final layout; both viewed).
+- Restored with `git checkout` (other features' artifacts rewritten by their own verifiers): `data-lineage-layer/s5_r2_summary.json`,
+  `evaluation-layer/s0_verify_blind.json`, `ground-truth/s6_v3_verify.json` (ids and timings only) and `data-lineage-layer/s3_summary.json`
+  (the same structural drift as batch 1, from the verifier having changed in earlier features; restored, not committed).
+
+**Demo artifacts:** `artifacts/s8_integration.json`, `artifacts/s8_trace_select_SYNTHETIC.json` (every edge of the trace), `artifacts/s8_local_smoke.json`
+(per-stage seconds and outputs of the real-checkpoint smoke, labelled).
+
+#### Owner-visible cost of the Step 4 chain (final counts, replaces the S6 table: the `analyze` job adds one job everywhere)
+Counts are measured from `server_pipeline.py --tag t --dry-run <flags>`. Training GPU-hours use the only figure in the repo (runbook:
+"≈ 4 h per seed on one A100, unmeasured on our server"), labelled **inferred**; eval, feature and attribute GPU time are not derivable, so the
+GPU column is a lower bound. The smoke gives one real number for scale: 40 train samples took 343 s on MPS, dominated by opening the dataset.
+
+| Configuration | Arms | Jobs | Train jobs | Training GPU-h (inferred) |
+|---|---|---|---|---|
+| Before this feature (6 arms, 3 seeds) | 6 | 74 | 21 | about 84 |
+| **Default now** (`--curation both`, 4 metrics, 3 seeds, 2 random draws, AC7.5 gate) | 21 | **313** | 66 | about 264 |
+| `--curation per_task` | 11 | 172 | 36 | about 144 |
+| `--curation per_task --metrics f30 hrt60_lin` (keeps the §4.5 head-to-head) | 7 | 112 | 24 | about 96 |
+| the same, `--seeds 0 1` | 7 | 76 | 16 | about 64 |
+| the same, `--seeds 0 1 --random-draws 1 --no-ac75` | 5 | 56 | 12 | about 48 |
+| `--curation per_task --metrics f30 rmst60 auc_expected --no-ac75` | 8 | 130 | 27 | about 108 |
+
+Shrinking flags: `--curation per_task|global`, `--metrics`, `--seeds` (PoC §2.3 allows 2–3), `--random-draws`, `--no-ac75`, `--k-per-task`,
+`--from select|arms` (reuse a finished base). (74 became 312 after S4; the S7 `analyze` job makes it 313; with `--subset v3/candidate` a `score` job
+is added.)
+
+### Findings for the analyzer (batch 2)
+- **Real defects found and fixed by integration (S8):** the select-to-attribute lineage gap, and refused selects leaving FAILED runs (above).
+  Both were invisible to the unit tests that monkeypatch `resolve_version`.
+- **Plan deviations:** `metric_groups`, `aggregate_by` and the plots live in `vlapoc/analysis.py`, not `attribution.py` (S7); `recovery_run` records one
+  `score` run per table instead of one per column (S5); `rollout_subset` has no `failure_type=<t>` value (S3, batch 1); the S5 random-column AUROC band
+  is applied to the pooled value only (per type the s.d. is about 0.08 with 13 positives).
+- **Site config:** the owner's cluster values moved to `docs/site-profile-cluster.env` (outside the "no cluster path in code" grep scope on purpose);
+  `slurm/site.env` is gitignored; a real submission now needs it.
+- **Inferred, not measured:** the 4 h/train GPU estimate; `#SBATCH` lines not expanding variables (from the sbatch manual, not re-read); the group
+  threshold |z| >= 1; the global arms' size N = k x 20 = 100.
+- **Not verifiable here (server):** real attribution scores, retrained-arm verdicts, the same-dataset-opposite-curations result, real v3 recovery,
+  SQLite behaviour under concurrent jobs. The smoke's τ agreement is undefined (2 rollouts) and says nothing.
+- **Known limits:** the `score` stage needs a table keyed exactly to the named subset (full `v3/candidate` on the server; the integration uses a named
+  20-ish-episode subset); the smoke's per-task `__same_task` columns are NaN for tasks without rollouts, so it selects on the global column.
+- **Debris to know about:** `data/scratch/` still holds `dry.txt`, `dry_parsed.txt`, `local_smoke.log`, `reg_b2/` (gitignored, safe to delete);
+  `data/scratch/cupid_src/` is the planner's CUPID clone.

@@ -19,7 +19,7 @@
   {
    "name": "6.3 run_id with a chain prefix returns the run of that chain only",
    "pass": true,
-   "detail": "u- scope -> 3e44c553 (u-bbbb2222 is 3e44c553)"
+   "detail": "u- scope -> eff4cde7 (u-bbbb2222 is eff4cde7)"
   },
   {
    "name": "6.3b two runs of one name in scope (t-aaaa1111, t-cccc3333) raise without --latest",
@@ -49,7 +49,7 @@
   {
    "name": "6.5 the dry run prints the full sbatch argv with --partition=<PARTITION> and --output=<LOG_DIR>/... from site.env.example",
    "pass": true,
-   "detail": "59 sbatch lines; e.g. sbatch --parsable --job-name=train-t-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch"
+   "detail": "60 sbatch lines; e.g. sbatch --parsable --job-name=train-t-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch"
   },
   {
    "name": "6.6 verify_attribution.py with TMPDIR set to an empty dir under data/scratch leaves it empty, and uses explicit dir=",
