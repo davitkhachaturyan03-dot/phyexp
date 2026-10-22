@@ -223,7 +223,7 @@ def cmd_attribute(a) -> dict:
     tid, eid = rid(a.train, "train"), rid(a.eval, "eval")
     out = attribute_run(tid, eid, rid(a.returns, "returns"), feats_prefix(tid, "train"),
                         feats_prefix(tid, "rollouts", eid), a.name, damping=a.damping, center=not a.no_center,
-                        device=a.device, chain=a.chain, return_encoding="pm1" if a.cupid_returns else "raw",
+                        device=a.device, chain=a.chain, return_encoding="raw" if a.raw_returns else "pm1",
                         allow_partial=a.allow_partial, lineage_root=LR)
     return {k: v for k, v in out.items() if k != "agreement"}
 
@@ -360,7 +360,7 @@ def main(argv: list[str] | None = None) -> int:
         s.add_argument(k, required=True)
     s.add_argument("--damping", type=float, default=1e-3)
     s.add_argument("--no-center", action="store_true")
-    s.add_argument("--cupid-returns", action="store_true", help="CUPID's R = ±1 (uncentred) for the binary return columns")
+    s.add_argument("--raw-returns", action="store_true", help="centre the yes/no columns like the continuous ones (old behaviour); default is CUPID's ±1")
     s.add_argument("--allow-partial", action="store_true",
                    help="accept eval rollouts that have no recorded trajectory (the count is recorded)")
     s.add_argument("--device", default=None)

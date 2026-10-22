@@ -38,7 +38,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-DIVERGENCE_NOTE = ("consistent helper/harmer = at least 2 non-zero calls, all of one sign (not 'every metric' as PoC §4.2 p. 10 reads); "
+DIVERGENCE_NOTE = ("owner-approved 2026-10-22 (\"Keep 2-of-5, documented\"): consistent helper/harmer = at least 2 non-zero calls, all of one sign (not 'every metric' as PoC §4.2 p. 10 reads); "
                    "a judgement call (inferred, not measured). Risk: two near-redundant reliability readouts (harm_f30 + harm_censored60) "
                    "can alone make an episode 'consistent'")
 GROUPS = ("consistent_helper", "consistent_harmer", "trade_off", "metric_specific", "neutral")

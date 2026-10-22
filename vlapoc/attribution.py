@@ -34,17 +34,20 @@ What is CUPID's (training-attribution S2; each line checked against the paper or
 - **The output function** is ℓ_square = E‖v_θ‖² on both sides by default (``vlapoc.influence`` docstring), with H the
   Gauss-Newton matrix of the training-side features (Eq. 9; ΦᵀΦ/N is its 1/(|D|H) normalisation).
 - ``performance_influence(M, 2·r01 − 1, center=False) · m`` equals CUPID's released
-  ``compute_demo_quality_scores(sum_of_sum, success_mask, "net")`` (AC2.2, against the vendored copy).
+  ``compute_demo_quality_scores(sum_of_sum, success_mask, "net")`` (AC2.2, against the vendored copy). **Since the owner's ruling
+  of 2026-10-22 ("CUPID's +1/−1") this is the default for every yes/no column** (``return_encoding="pm1"``: the success, timed-out and
+  failure-type columns); only the continuous metrics are centred.
 
 What differs (``DIVERGENCES`` below, logged in every run's params), notably:
-- **Centred returns (inferred baseline subtraction; not CUPID's).** CUPID uses R = ±1 with no centring (App. A.2 p. 19;
+- **Centred returns for the continuous metrics (inferred baseline subtraction; not CUPID's).** For a yes/no column the
+  centred form below is what ``--raw-returns`` gives; the default is CUPID's. CUPID uses R = ±1 with no centring (App. A.2 p. 19;
   code ``net`` = Σ_succ M − Σ_fail M). With p the success fraction over m rollouts and ms, mf the mean of M over
   successful and failed rollouts: centred Σ(R−R̄)M = p(1−p)·m·(ms − mf), whereas CUPID's net = m·[p·ms − (1−p)·mf]
   = m·[p(ms − mf) + (2p − 1)·mf]. The two rank episodes alike only when p = ½ or mf is constant across episodes;
   otherwise net also ranks by how much an episode moves the average *failed* rollout (AC2.3 demonstrates a
   counterexample). The earlier statement that centring "is CUPID's contrast scaled by p(1−p)" holds for a difference
-  of *means*; CUPID's code takes a difference of *sums*. ``return_encoding="pm1"`` (``--cupid-returns``) gives CUPID's
-  encoding for the binary returns.
+  of *means*; CUPID's code takes a difference of *sums*. ``return_encoding="pm1"`` (the default) is CUPID's
+  encoding for the binary returns; ``--raw-returns`` restores centring for them.
 - Fewer draws, a Kronecker projection, damping and sample strides (see ``DIVERGENCES``).
 
 Sign convention: Ψ_R(ξ) > 0 means episode ξ pushes return R up. Every family-W return is "higher is better" except
@@ -98,12 +101,13 @@ RETURN_ENCODINGS = ("raw", "pm1")  # pm1: binary returns {0,1} -> {-1,+1}, uncen
 # and the released code agiachris/cupid @ 2941eba9). Logged as a run param by ``attribute_run`` so each score table
 # carries its own list of caveats (PoC §3.4 p. 7: say which functional a result explains).
 DIVERGENCES = {
-    "centred_returns": "ours: Ψ uses R − mean(R) by default (inferred baseline subtraction); CUPID: R = ±1, no centring "
-                       "(App. A.2 p. 19; error_util.compute_demo_quality_scores 'net' = Σ_succ M − Σ_fail M). centred = "
-                       "p(1−p)·m·(ms − mf) vs net = m·[p·ms − (1−p)·mf]; same ranking only at p = ½ (module docstring). "
-                       "--cupid-returns / return_encoding='pm1' gives CUPID's.",
+    "centred_returns": "centring (R − mean R, an inferred baseline subtraction) now applies only to the continuous columns (RMST, AUC, "
+                       "HRT); the yes/no columns use CUPID's R = ±1, uncentred (App. A.2 p. 19; error_util.compute_demo_quality_scores "
+                       "'net' = Σ_succ M − Σ_fail M), the owner's ruling of 2026-10-22. For reference, centred = p(1−p)·m·(ms − mf) vs "
+                       "net = m·[p·ms − (1−p)·mf]: same ranking only at p = ½ (module docstring). --raw-returns restores centring "
+                       "for the yes/no columns.",
     "continuous_returns": "ours: one return per PoC metric, mostly continuous (RMST, AUC, HRT), per §4.3 p. 10; CUPID: binary "
-                          "success/failure only. pm1 applies to binary columns only; the rest stay raw.",
+                          "success/failure only. pm1 applies to binary columns only; the continuous ones are centred.",
     "draws": "ours: K = 4 shared (noise, time) draws averaged into each feature; CUPID: B = 64 (ε, i) samples (App. A.2 p. 19).",
     "projection": "ours: Kronecker per-layer projection, rank 8 per side, 7,488 dims over the trainable action-expert Linear "
                   "layers (LoGra/ATHENA §4.1 route); CUPID: dense TRAK projection d = 4000 over all parameters "
@@ -241,11 +245,13 @@ def is_binary(r: np.ndarray) -> bool:
     return bool(np.isin(np.unique(r), (0.0, 1.0)).all())
 
 
-def column_plan(returns: dict[str, np.ndarray], center: bool = True, return_encoding: str = "raw") -> dict[str, dict]:
+def column_plan(returns: dict[str, np.ndarray], center: bool = True, return_encoding: str = "pm1") -> dict[str, dict]:
     """Per return column: the ``encoding`` actually applied (``raw`` or ``pm1``) and whether it is ``centred``.
 
-    ``pm1`` (CUPID's R ∈ {+1, −1}, uncentred) applies to binary columns; every other column stays raw and is centred
-    iff ``center``. Used by ``score_table`` and by ``column_declarations`` so the declared and the applied agree.
+    ``pm1`` (CUPID's R ∈ {+1, −1}, uncentred; App. A.2 p. 19) is the default and applies to binary columns (success / timed-out /
+    failure-type indicators); every other column stays raw and is centred iff ``center``. ``"raw"`` restores the earlier behaviour
+    (binary columns centred like the rest). Owner ruling 2026-10-22 "CUPID's +1/−1" made ``pm1`` the default; centring stays
+    only for continuous metrics. Used by ``score_table`` and by ``column_declarations`` so the declared and the applied agree.
     """
     if return_encoding not in RETURN_ENCODINGS:
         raise ValueError(f"return_encoding must be one of {RETURN_ENCODINGS}, got {return_encoding!r}")
@@ -295,7 +301,7 @@ def failure_type_returns(ret: pd.DataFrame, min_rollouts: int = MIN_FAILURE_TYPE
 
 
 def score_table(m: np.ndarray, episodes: pd.DataFrame, ret: pd.DataFrame, center: bool = True,
-                return_encoding: str = "raw") -> pd.DataFrame:
+                return_encoding: str = "pm1") -> pd.DataFrame:
     """The episode × metric table. ``episodes`` (rows of M's columns, in order) carries ``episode_id``,
     ``content_hash`` and the task key; ``ret`` (rows of M's rows, in order) is the returns table.
 
@@ -377,7 +383,13 @@ def _tau_s(tau: str, default: float | None) -> float | None:
     return float(m.group(1)) if m else default
 
 
-def column_declarations(table: pd.DataFrame, ret: pd.DataFrame, center: bool = True, return_encoding: str = "raw",
+def weighting_label(p: dict) -> str:
+    """Plain statement of how a column's return is weighted: CUPID's ±1, centred, or raw (PoC §3.4 p. 7: say what is explained)."""
+    return "CUPID ±1, uncentred (success +1, otherwise −1)" if p["encoding"] == "pm1" else (
+        "centred (R − mean R)" if p["centred"] else "raw R, uncentred")
+
+
+def column_declarations(table: pd.DataFrame, ret: pd.DataFrame, center: bool = True, return_encoding: str = "pm1",
                         output_fns: tuple[str, str] = ("square", "square")) -> list[dict]:
     """One row per ``infl_``/``harm_`` column of ``table``: which functional the column explains (PoC §3.4 p. 7, §4.4 p. 10).
 
@@ -412,7 +424,8 @@ def column_declarations(table: pd.DataFrame, ret: pd.DataFrame, center: bool = T
         rows.append({"column": col, "kind": kind, "return_column": name, **row, "family": e["family"],
                      "rollout_subset": "same_task" if suffix == "same_task" else "all",
                      "good_sign": GOOD_SIGN.get(name, -1.0), "centred": plan[name]["centred"],
-                     "return_encoding": plan[name]["encoding"], "output_fns": list(output_fns)})
+                     "return_encoding": plan[name]["encoding"], "output_fns": list(output_fns),
+                     "weighting": weighting_label(plan[name])})
     return rows
 
 
@@ -494,7 +507,7 @@ def declaration_of(score_run_id: str, column: str, lineage_root: Path | None = N
 
 def attribute(train_feats_prefix: Path, rollout_feats_prefix: Path, episodes: pd.DataFrame, rollouts: pd.DataFrame,
               ret: pd.DataFrame, damping: float = 1e-3, center: bool = True, rollout_mean: bool = False,
-              device: str | None = None, return_encoding: str = "raw") -> tuple[pd.DataFrame, np.ndarray, dict]:
+              device: str | None = None, return_encoding: str = "pm1") -> tuple[pd.DataFrame, np.ndarray, dict]:
     """The untracked core of ``attribute_run``: features + keys → (score table, M, shared feature manifest).
 
     ``episodes`` are the training subset's catalog rows; ``rollouts`` the eval run's record (``traj_episode_index``
@@ -533,7 +546,7 @@ def attribute(train_feats_prefix: Path, rollout_feats_prefix: Path, episodes: pd
 def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, train_features: Path, rollout_features: Path,
                   name: str, out_dir: Path | None = None, damping: float = 1e-3, center: bool = True,
                   rollout_mean: bool = False, device: str | None = None, lineage_root: Path | None = None,
-                  chain: str | None = None, allow_dirty: bool = False, return_encoding: str = "raw",
+                  chain: str | None = None, allow_dirty: bool = False, return_encoding: str = "pm1",
                   allow_partial: bool = False) -> dict:
     """Stage ``attribute`` (PoC §9.1 Step 3 p. 19): CUPID influence of every training episode version on every
     family-W return (and per-failure-type return) of one eval run, recorded as one MLflow run.
@@ -628,6 +641,9 @@ def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, trai
         r.params({"method": "CUPID influence on returns (TRAK action influence, Kronecker-projected gradients)",
                   "train_run_id": train_run_id, "eval_run_id": eval_run_id, "returns_run_id": returns_run_id,
                   "damping": damping, "center_returns": center, "return_encoding": return_encoding,
+                  "return_weighting": {"binary_columns": "CUPID ±1, uncentred" if return_encoding == "pm1" else
+                                       ("centred" if center else "raw"),
+                                       "continuous_columns": "centred (R − mean R)" if center else "raw"},
                   "rollout_mean": rollout_mean,
                   "train_output_fn": shared["output_fns"][0], "rollout_output_fn": shared["output_fns"][1],
                   "divergences_from_cupid": DIVERGENCES, "min_failure_type_rollouts_inferred": MIN_FAILURE_TYPE_ROLLOUTS,
@@ -735,15 +751,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--name", required=True)
     p.add_argument("--damping", type=float, default=1e-3)
     p.add_argument("--no-center", action="store_true", help="CUPID Prop. 1 with raw returns")
-    p.add_argument("--cupid-returns", action="store_true",
-                   help="CUPID's R = ±1, uncentred, for the binary return columns (return_encoding='pm1')")
+    p.add_argument("--raw-returns", action="store_true",
+                   help="centre the yes/no columns like the continuous ones (the pre-2026-10-22 behaviour); default is CUPID's ±1")
     p.add_argument("--allow-partial", action="store_true",
                    help="accept rollouts that have no recorded trajectory (recorded as a count)")
     p.add_argument("--device", default=None)
     a = p.parse_args(argv)
     out = attribute_run(a.train_run, a.eval_run, a.returns_run, a.train_features, a.rollout_features, a.name,
                         damping=a.damping, center=not a.no_center, device=a.device,
-                        return_encoding="pm1" if a.cupid_returns else "raw", allow_partial=a.allow_partial)
+                        return_encoding="raw" if a.raw_returns else "pm1", allow_partial=a.allow_partial)
     print(json.dumps({k: v for k, v in out.items() if k != "agreement"}, indent=1))
     return 0
 

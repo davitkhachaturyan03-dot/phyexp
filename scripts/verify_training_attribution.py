@@ -470,6 +470,12 @@ def functionals(manifest: Path | None) -> int:
         check("2.5 attribute run params carry output functions, encoding, centring and DIVERGENCES",
               all(k in prm for k in need) and prm["train_output_fn"] == "square" and set(json.loads(prm["divergences_from_cupid"])) == set(at.DIVERGENCES),
               f"{ {k: prm[k] for k in need if k != 'divergences_from_cupid'} }, divergences keys {sorted(json.loads(prm['divergences_from_cupid']))}")
+        rw = json.loads(prm["return_weighting"])
+        dec_a = at._artifact_json(run_a, "functionals", lr)
+        wf = {r["return_column"]: r["weighting"] for r in dec_a if r["column"].startswith("infl_") and "__" not in r["column"]}
+        check("2.5b owner ruling 2026-10-22: a default attribute run weights yes/no columns by CUPID's ±1 (params and every functionals row say so)",
+              prm["return_encoding"] == "pm1" and rw["binary_columns"].startswith("CUPID ±1") and rw["continuous_columns"].startswith("centred")
+              and wf["ret_f30"].startswith("CUPID ±1") and wf["ret_rmst60"].startswith("centred") and wf["ft_timeout"].startswith("CUPID ±1"), f"{rw}; f30: {wf['ret_f30']}; rmst60: {wf['ret_rmst60']}")
         # ---- AC3.3 feature digests ---------------------------------------------------------------------------------
         from vlapoc.catalog import sha256_file
 
@@ -683,7 +689,14 @@ def pipeline(dry_path: Path | None) -> int:
         key = re.sub(r"-(s\d|t-.*)$", "", j["name"].split("-")[0])
         n_by[key] = n_by.get(key, 0) + 1
     check("4.6 job count and arm list of the default dry run recorded", True, f"{len(jobs)} jobs ({n_by}); arms ({len(arm_list)}): {arm_list}")
+    # owner ruling 2026-10-22: the first server run is per-task, metrics f30 and hrt60_lin (112 jobs, 24 trainings)
+    fj, fsum = dry_run("--curation", "per_task", "--metrics", "f30", "hrt60_lin")
+    ftrain = [j for j in fj if j["name"].startswith("train-")]
+    check("4.7 first server run (--curation per_task --metrics f30 hrt60_lin): 112 jobs, 24 training runs, and it is documented in the module docstring",
+          len(fj) == 112 and len(ftrain) == 24 and "--curation per_task --metrics f30 hrt60_lin" in (REPO_ROOT / "scripts" / "server_pipeline.py").read_text()
+          and len(jobs) == 313, f"{len(fj)} jobs, {len(ftrain)} trains; script default unchanged at {len(jobs)} jobs")
     ARTIFACTS.mkdir(parents=True, exist_ok=True)
+    (ARTIFACTS / "s4_dry_run_first_run.txt").write_text("# first server run: server_pipeline.py --tag t --dry-run --curation per_task --metrics f30 hrt60_lin\n" + "\n".join(f"{j['id']} {j['name']} deps={','.join(j['dep_names'])} :: {j['cmd']}" for j in fj) + "\n" + fsum + "\n")
     (ARTIFACTS / "s4_dry_run_default.txt").write_text("\n".join(f"{j['id']} {j['name']} deps={','.join(j['dep_names'])} :: {j['cmd']}" for j in jobs) + "\n" + summary + "\n")
     ok_all = all(r[1] for r in results)
     (ARTIFACTS / "s4_pipeline.json").write_text(json.dumps({"pass": ok_all, "n_jobs": len(jobs), "arms": arm_list, "checks": [{"name": n, "pass": p_, "detail": d} for n, p_, d in results]}, indent=1))

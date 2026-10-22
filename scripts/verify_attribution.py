@@ -311,6 +311,34 @@ def cupid_parity() -> None:
             check(f"7d refuses {label}", True)
 
 
+def default_weighting() -> None:
+    """Owner ruling 2026-10-22 ("CUPID's +1/-1"): the pipeline default weights yes/no columns by CUPID's ±1, uncentred, and centres only
+    continuous columns. Through ``score_table`` (the default arguments), and against the vendored released ``net`` score."""
+    from vlapoc.third_party.cupid_quality import compute_demo_quality_scores
+
+    rng = np.random.default_rng(31)
+    n_ro, n_ep = 30, 8
+    eps = pd.DataFrame({"episode_id": [f"e{i}" for i in range(n_ep)], "content_hash": [f"h{i}" for i in range(n_ep)], "episode_index": range(n_ep),
+                        "suite": "s", "libero_task_id": 0, "task_name": "t"})
+    ret = pd.DataFrame({"rollout_id": range(n_ro), "suite": "s", "libero_task_id": 0})
+    for c in at.RETURN_COLUMNS:
+        ret[c] = rng.normal(size=n_ro)
+    succ = rng.random(n_ro) < 0.4
+    ret["ret_f30"], ret["ret_censored60"] = succ.astype(float), (~succ).astype(float)
+    ret["failure_type"] = ["success"] * 15 + ["timeout"] * 15
+    m = rng.normal(size=(n_ro, n_ep))
+    t = at.score_table(m, eps, ret)  # defaults
+    net = compute_demo_quality_scores(m, succ, "net") / n_ro  # CUPID's released score, per rollout like Ψ
+    check("7e default score_table: the yes/no column ret_f30 equals CUPID's released 'net' score (±1, uncentred), parity with the vendored copy",
+          np.allclose(t["infl_f30"], net, atol=1e-12), f"max abs err {np.abs(t['infl_f30'] - net).max():.1e}")
+    check("7f ... the timed-out column too (R = +1 timed out), and the continuous column ret_rmst60 is still centred",
+          np.allclose(t["infl_censored60"], at.performance_influence(m, ret["ret_censored60"].to_numpy(), center=False, return_encoding="pm1"))
+          and np.allclose(t["infl_rmst60"], at.performance_influence(m, ret["ret_rmst60"].to_numpy(), center=True)))
+    old = at.score_table(m, eps, ret, return_encoding="raw")
+    check("7g return_encoding='raw' (--raw-returns) restores the centred yes/no columns, and the two weightings differ",
+          np.allclose(old["infl_f30"], at.performance_influence(m, succ.astype(float), center=True)) and not np.allclose(old["infl_f30"], t["infl_f30"]))
+
+
 def output_fn_guards() -> None:
     """AC2.5 (part): manifests with mixed train-side output functions are refused; one side may differ from the other."""
     base = {"checkpoint_sha256": "a", "seed": 0, "rank": 8, "k_draws": 4, "dim": 4, "layers": ["l"], "dataset_root": "d"}
@@ -519,6 +547,7 @@ def main() -> int:
         synthetic_select()
         toy_output_functions()
         cupid_parity()
+        default_weighting()
         output_fn_guards()
     ok = all(r[1] for r in RESULTS)
     if a.out:

@@ -50,6 +50,16 @@ Run names are ``<stage>-<tag>[-<arm>]-s<S>``; ``stage.py`` resolves them to run 
 chain can be submitted before any run exists. The chain refuses to submit from a dirty tree and every job refuses
 to start on a commit other than the one it was submitted from (``slurm/guard.sh``).
 
+FIRST SERVER RUN (owner ruling 2026-10-22, "112 jobs, ~96 GPU-h"): per-task curation with metrics F30 and HRT only::
+
+    .venv/bin/python scripts/server_pipeline.py --tag v0cand --curation per_task --metrics f30 hrt60_lin
+
+That is 112 jobs, 24 of them training runs (3 base seeds + 7 arms x 3 seeds), about 96 training GPU-hours (inferred: 4 h per
+train, runbook; eval time not included). The script's own defaults are unchanged (``--curation both``, four metrics: 313 jobs); the owner
+ruled the size of the first run, not the default. Global curation (``--curation global``, the PoC §9.1 Step 4.1 literal version) runs later,
+reusing the finished base with ``--from select``. ``scripts/verify_training_attribution.py --pipeline`` checks the 112 / 24 counts and
+writes the dry run to ``artifacts/s4_dry_run_first_run.txt``.
+
 Usage::
 
     cp slurm/site.env.example slurm/site.env                                   # once per machine; edit it
