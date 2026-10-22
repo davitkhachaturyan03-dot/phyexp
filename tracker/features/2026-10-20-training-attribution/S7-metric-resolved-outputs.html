@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S7 Metric-resolved outputs — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+/* page-specific styling: every colour comes from tracker.css variables */
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}
+.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.good{border-left-color:var(--good)}
+.note.bad{border-left-color:var(--bad)}
+.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}
+code{overflow-wrap:anywhere}
+pre code{overflow-wrap:normal}
+table.gloss th.grp{background:var(--surface-2);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+table.gloss td:first-child{min-width:11em}
+td.mono{font-family:var(--mono)}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.tag-syn{display:inline-block;font:600 11px/1.6 var(--mono);padding:1px 8px;border-radius:999px;border:1px solid var(--warn);color:var(--warn);margin-left:6px}
+/* figure vocabulary */
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+.f-box.dash{stroke-dasharray:6 4}
+.f-box.acc{stroke:var(--accent);stroke-width:1.8}
+.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
+.f-box.warn{stroke:var(--warn)}
+.f-t{fill:var(--text);font:600 12.5px var(--sans)}
+.f-m{fill:var(--muted);font:10.5px var(--mono)}
+.f-mt{fill:var(--text);font:10.5px var(--mono)}
+.f-n{fill:var(--muted);font:600 10px var(--mono);letter-spacing:.05em}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}
+.f-ah{fill:var(--muted)}
+.f-axis{stroke:var(--border);stroke-width:1.2}
+.f-grid{stroke:var(--border);stroke-width:1;opacity:.6}
+.f-ref{stroke:var(--muted);stroke-width:1.2;stroke-dasharray:4 3}
+.f-bar{fill:var(--accent)}
+.f-bar2{fill:var(--muted)}
+.f-barw{fill:var(--warn)}
+.f-dot{fill:var(--accent);fill-opacity:.8}
+.f-med{stroke:var(--text);stroke-width:1.6}
+.f-good{fill:var(--good);fill-opacity:.28;stroke:var(--good)}
+.f-bad{fill:var(--bad);fill-opacity:.28;stroke:var(--bad)}
+.f-zero{fill:var(--surface-2);stroke:var(--border)}
+.f-gate{fill:var(--warn);fill-opacity:.25;stroke:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Training and attribution: checking the ported influence code</a></p>
+  <h1>S7 · Metric-resolved outputs: four groups, heatmap, scatter, grouping by task</h1>
+  <p class="dek">From a table of scores the code now labels each episode (helper, harmer, trade-off, metric-specific or neutral), draws the two figures the spec asks for, and averages scores by any catalog column such as task.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">4/4</span><span class="tag-syn">SYNTHETIC inputs and figures</span></span>
+    <span><b>Depends on</b> S3</span>
+    <span><b>Glossary</b> <a href="report.html#glossary">report.html#glossary</a></span>
+  </div>
+</header>
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>The point of the project is to say not just "this recording is bad" but <i>which kind of badness</i>: slows the robot, makes it fail more, or both. The spec asks for an episode-by-metric table, a heatmap of it, and a scatter plot of speed influence against reliability influence with four groups as quadrants: <b>consistent helpers</b> (help on every metric), <b>consistent harmers</b>, <b>trade-off</b> episodes (help one metric and hurt another) and <b>metric-specific</b> ones (move only one).</p>
+  <p>This story builds that: a labelling rule, an average-by-column function (for example mean harm per task, with an uncertainty range), the heatmap and the scatter. Each figure's axis names the exact quantity and time cap from the declared functionals, and each title says SYNTHETIC when the input is synthetic.</p>
+  <p><b>Every figure here is from made-up scores.</b> On a planted test table of 240 episodes with 5 in each group, all 20 planted episodes got the right label and all 220 noise episodes came out neutral. That shows the code labels correctly when the answer is planted; it says nothing about real data, and the labels are <b>descriptive and unverified</b> by design, since a verified claim needs the retraining test in S4.</p>
+  <p class="small">Terms (z-score, trade-off, family W, Holm, catalog column) are in the <a href="report.html#glossary">report glossary</a>.</p>
+</div>
+<h2>Why</h2>
+<p>PoC §4.2 defines the four groups and the episode-by-metric matrix, §4.5 asks for the heatmap and the throughput-versus-reliability scatter, and §1 and §2.2 ask for aggregation by metadata such as task.</p>
+<blockquote>"Results are reported as an episode × metric matrix." — §4.2, p. 9; the four groups are "Consistent helpers / Consistent harmers / Trade-off episodes / Metric-specific"</blockquote>
+<h2>What was built</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File / function</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>vlapoc/analysis.py::metric_groups</code></td><td>z-scores each <code>harm_</code> column across episodes, makes a call per metric (+1 harmful, −1 helpful, 0, threshold |z| ≥ 1, an inferred declared parameter), then labels each episode.</td></tr>
+    <tr><td><code>analysis.py::aggregate_by</code></td><td>Mean, bootstrap CI over episodes, and n per group, on any catalog column; refuses a non-catalog column and per-episode identifiers.</td></tr>
+    <tr><td><code>analysis.py::plot_heatmap, plot_tradeoff, axis_label</code></td><td>The two figures; axis labels are built from <code>functionals.json</code>.</td></tr>
+    <tr><td><code>analysis.py::analyze_run</code>, <code>scripts/stage.py::cmd_analyze</code></td><td>A tracked run linking the figures and tables to the score run, with threshold and status as parameters; a CPU job after the ensemble in the chain.</td></tr>
+  </tbody>
+</table>
+</div>
+<h2>Acceptance criteria</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead>
+  <tbody>
+    <tr><td>7.1 Every planted helper, harmer, trade-off and metric-specific episode gets its label</td><td>PoC §4.2 p.10</td><td>met</td><td><code>.venv/bin/python scripts/verify_training_attribution.py --groups</code> → <code>20/20 planted correct; counts {'neutral': 220, 'consistent_helper': 5, 'consistent_harmer': 5, 'trade_off': 5, 'metric_specific': 5}</code>; 220/220 noise episodes neutral; <code>S7 pass: True (9/9)</code> (re-run now)</td></tr>
+    <tr><td>7.2 <code>aggregate_by('task_name')</code>: one row per task, n sums to the rows; refuses a non-catalog column</td><td>PoC §1 p.3; §2.2 p.4</td><td>met</td><td>6 rows, n sum 240, each mean inside its CI; refuses <code>not_a_column</code> and <code>episode_id</code></td></tr>
+    <tr><td>7.3 PNGs written; axis labels name the functional and τ; titles say SYNTHETIC</td><td>PoC §4.4; §4.5 p.11</td><td>met</td><td>heatmap 100,695 B, scatter 53,844 B; x: <code>harm_rmst60: RMST(60) = ∫_0^60 (1 - F(t)) dt [τ 60 s = τ_episode, all, good_sign +1]</code>; titles start <code>SYNTHETIC DATA — not a result about any policy</code></td></tr>
+    <tr><td>7.4 The analyze run's params carry the threshold and the "descriptive, unverified" status</td><td>PoC §4.4 p.10 multiple comparisons</td><td>met</td><td><code>z=1.0</code>, <code>group_status descriptive, unverified ...</code>, <code>group_rule_divergence</code> (see below), <code>synthetic True</code></td></tr>
+  </tbody>
+</table>
+</div>
+<h2>Example</h2>
+<p>On the planted table (<b>synthetic</b>, 240 episodes), five episodes were built to score strongly harmful on every metric, five strongly helpful on every metric, five harmful on speed but helpful on reliability, and five unusual on one metric only. <code>metric_groups</code> recovered all 20 and left the 220 noise episodes neutral. A separate 15-episode fixture run through the real <code>analyze</code> stage produced these counts (random-ish synthetic data, so the mix means nothing): <code>consistent_harmer 2, consistent_helper 1, metric_specific 6, neutral 1, trade_off 5</code>.</p>
+<h2>Visual</h2>
+<figure>
+  <img class="shot" src="artifacts/s7_tradeoff_planted_SYNTHETIC.png" alt="Synthetic scatter of speed influence against reliability influence with four quadrants, planted groups at the corners and 220 neutral episodes at the centre">
+  <figcaption><b>Throughput versus reliability scatter (planted, SYNTHETIC).</b> Each dot is an episode; right means harmful for speed (RMST), up means harmful for reliability (F(30)). The planted groups sit in the four corners, the 220 noise episodes cluster at the centre. Notice the title and axis labels: the metric, its definition and its time cap are on the plot, as the spec's "label every claim" rule asks. From <code>artifacts/s7_tradeoff_planted_SYNTHETIC.png</code>.</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="artifacts/s7_heatmap_planted_SYNTHETIC.png" alt="Synthetic episode by metric heatmap sorted by group, planted helper and harmer rows saturated blue and red, noise episodes pale">
+  <figcaption><b>Episode × metric heatmap (planted, SYNTHETIC).</b> Rows are training episodes sorted by group, columns are the five family-W metrics; red means harmful, blue helpful (z-scored). The top four bands are the planted groups (helpers all blue, harmers all red, the trade-off band mixed, the metric-specific band lit in one column); the long pale block is the neutral episodes. From <code>artifacts/s7_heatmap_planted_SYNTHETIC.png</code>. (The axis text on this planted render reads "(harm_f30 functional)" where the stage output on the fixture run carries the full definitions; check 7.3b and <code>s7_figure_labels_SYNTHETIC.json</code> show those.)</figcaption>
+</figure>
+<h2>Divergences and limitations</h2>
+<ul>
+  <li><b>The "consistent" rule departs from the spec's wording (recorded; the owner may choose the stricter rule).</b> §4.2 reads "Improve every metric" and "Degrade every metric". The code calls an episode a consistent helper or harmer when at least 2 of the 5 metrics make a non-zero call, all of one sign. This is a judgement call (inferred, nothing measured). <b>Its specific risk:</b> two near-redundant reliability readouts (<code>harm_f30</code> and <code>harm_censored60</code>) can alone make an episode "consistent" while the speed metrics are flat. Stated in <code>analysis.DIVERGENCE_NOTE</code>, the <code>metric_groups</code> docstring and the analyze run's <code>group_rule_divergence</code> param. Making it all five is a one-line change.</li>
+  <li>The labels are descriptive and unverified: §4.4 asks for Holm correction before calling an episode a trade-off, and per-episode tests are not available from 2–3 seeds. The verified claim lives at the intervention level (S4).</li>
+  <li>The threshold |z| ≥ 1 is inferred and declared as a parameter.</li>
+  <li>The functions live in <code>vlapoc/analysis.py</code>, not <code>attribution.py</code> as the plan said, to keep the estimator module about estimation.</li>
+  <li><code>analyze_run</code> reads catalog rows through <code>Subset.load(...).episodes()</code>, not <code>open_for_method</code>: bookkeeping columns of an already-gated training subset, no label access; the boundary scan is clean (7.5).</li>
+</ul>
+
+</div>
+</body>
+</html>

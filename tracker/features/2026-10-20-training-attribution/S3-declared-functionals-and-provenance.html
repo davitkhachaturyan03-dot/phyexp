@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S3 Declare the functional of every column — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+/* page-specific styling: every colour comes from tracker.css variables */
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}
+.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.good{border-left-color:var(--good)}
+.note.bad{border-left-color:var(--bad)}
+.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}
+code{overflow-wrap:anywhere}
+pre code{overflow-wrap:normal}
+table.gloss th.grp{background:var(--surface-2);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+table.gloss td:first-child{min-width:11em}
+td.mono{font-family:var(--mono)}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.tag-syn{display:inline-block;font:600 11px/1.6 var(--mono);padding:1px 8px;border-radius:999px;border:1px solid var(--warn);color:var(--warn);margin-left:6px}
+/* figure vocabulary */
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+.f-box.dash{stroke-dasharray:6 4}
+.f-box.acc{stroke:var(--accent);stroke-width:1.8}
+.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
+.f-box.warn{stroke:var(--warn)}
+.f-t{fill:var(--text);font:600 12.5px var(--sans)}
+.f-m{fill:var(--muted);font:10.5px var(--mono)}
+.f-mt{fill:var(--text);font:10.5px var(--mono)}
+.f-n{fill:var(--muted);font:600 10px var(--mono);letter-spacing:.05em}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}
+.f-ah{fill:var(--muted)}
+.f-axis{stroke:var(--border);stroke-width:1.2}
+.f-grid{stroke:var(--border);stroke-width:1;opacity:.6}
+.f-ref{stroke:var(--muted);stroke-width:1.2;stroke-dasharray:4 3}
+.f-bar{fill:var(--accent)}
+.f-bar2{fill:var(--muted)}
+.f-barw{fill:var(--warn)}
+.f-dot{fill:var(--accent);fill-opacity:.8}
+.f-med{stroke:var(--text);stroke-width:1.6}
+.f-good{fill:var(--good);fill-opacity:.28;stroke:var(--good)}
+.f-bad{fill:var(--bad);fill-opacity:.28;stroke:var(--bad)}
+.f-zero{fill:var(--surface-2);stroke:var(--border)}
+.f-gate{fill:var(--warn);fill-opacity:.25;stroke:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Training and attribution: checking the ported influence code</a></p>
+  <h1>S3 · Declare what every score column explains, and tie features to their data</h1>
+  <p class="dek">Every score column now states which quantity it explains (for example, the chance of finishing within 30 s), and the attribute run refuses features that were not computed on the data it claims.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">6/6</span></span>
+    <span><b>Depends on</b> S2</span>
+    <span><b>Glossary</b> <a href="report.html#glossary">report.html#glossary</a></span>
+  </div>
+</header>
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>A score of "harmful" means nothing unless it says <i>harmful for what</i>. The spec's rule is that every attribution result states which <b>functional</b> it explains, meaning the exact measured quantity such as "the chance a rollout finishes within 30 seconds" (written F(30)). The ported code recorded only a list of column names. Now every score column has a recorded row naming its metric, time cap, which rollouts it used (all, or only the same task), the sign convention, and whether it was centred.</p>
+  <p>The same story closes four gaps in what the attribution run records and checks: it logs a fingerprint of every feature file it read, refuses an evaluation in which some rollouts have no recorded trajectory (they used to be dropped silently), refuses to average two seeds that explain different things, and, after the analyzer's first review, refuses feature files that were not computed on the very dataset copy and rollouts it is attributing.</p>
+  <p>Result: 32 columns, 32 declaration rows in the checked fixture, and every refusal case tested. This matters because a score table is only evidence if you can say what it is about and where it came from.</p>
+  <p class="small">Synthetic note: the fixture used here is made-up data. It tests the bookkeeping, not any real policy. Terms: <a href="report.html#glossary">report glossary</a>.</p>
+</div>
+<h2>Why</h2>
+<p>PoC §3.4 requires every attribution result to declare its functional; §4.4 asks for every claim to carry its metric and time cap τ; §2.1 item 1 asks that every run tie back to exact data.</p>
+<blockquote>"Every attribution result states which functional it explains, following PhAIL's disclosure principle." — §3.4, p. 7</blockquote>
+<h2>What was built</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File / function</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>vlapoc/attribution.py::column_declarations, declaration_of</code></td><td>One row per score column: column, return column, family, τ, rollout subset, sign, centring, encoding, output functions. Written to <code>functionals.json</code> by both <code>attribute_run</code> and <code>ensemble_run</code>.</td></tr>
+    <tr><td><code>attribution.py::feature_file_digests</code></td><td>sha256 of each feature <code>.npy</code> and <code>.meta.npz</code>, logged as input entities (kind <code>features</code>).</td></tr>
+    <tr><td><code>attribution.py::attribute_run</code></td><td>Refuses an eval with any rollout lacking a trajectory (unless <code>--allow-partial</code>, which records the count); <b>round 2:</b> refuses train features whose <code>dataset_root</code> is not the training subset's version copy, and rollout features whose root does not hash to the eval run's recorded trajectories; any shard from another checkpoint is refused.</td></tr>
+    <tr><td><code>attribution.py::ensemble_run, zscore_ensemble</code></td><td>Refuses duplicate runs and runs that differ in damping, centring, encoding or output functions; records <code>n_models</code> per column; takes the <i>union</i> of columns (a failure-type column present in one seed used to be dropped silently).</td></tr>
+    <tr><td><code>vlapoc/runs.py::select_run(require_declaration=...)</code></td><td>The select run records the declaration of the metric it ranked on, and refuses a score run with no <code>functionals.json</code>.</td></tr>
+    <tr><td><code>vlapoc/influence.py</code></td><td>Feature manifests store repo-relative <code>checkpoint</code> and <code>dataset_root</code> paths (<code>lineage.rel()</code>).</td></tr>
+  </tbody>
+</table>
+</div>
+<h2>Acceptance criteria</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead>
+  <tbody>
+    <tr><td>3.1 Every <code>infl_</code>/<code>harm_</code> column has exactly one declaration row; its τ equals the metric registry's</td><td>PoC §3.4 p.7; §4.4</td><td>met</td><td><code>.venv/bin/python scripts/verify_training_attribution.py --functionals</code> → 32 columns, 32 rows; 3.1b, 3.1c, 3.1d PASS (28 rows from a real attribute run)</td></tr>
+    <tr><td>3.2 Manifests written on the real checkpoint hold repo-relative paths</td><td>PoC §2.1 item 1</td><td>met (SKIP without a manifest)</td><td>run with <code>--manifest artifacts/s3_manifest_example.json</code>: PASS, no leading <code>/</code>. Bare <code>--functionals</code> now SKIPs 3.2 and exits 0 (round-1 defect fixed); re-run now: <code>S3 pass: True (17/17)</code></td></tr>
+    <tr><td>3.3 One <code>features</code> input per file; one flipped byte changes exactly that digest</td><td>PoC §2.1 item 1</td><td>met</td><td>6 inputs for 6 files; flipping <code>train.shard1.npy</code> changes only <code>input.features.train.shard1.npy</code></td></tr>
+    <tr><td>3.4 A rollout without a trajectory makes attribute raise; <code>--allow-partial</code> passes and records it</td><td>§2.1 item 1 "every eval rollout tied back"</td><td>met</td><td><code>1 of 30 rollouts ... have no recorded trajectory</code>; with the flag: n_rollouts 29 of 30, recorded 1</td></tr>
+    <tr><td>3.5 Ensemble refuses duplicates and mixed centring; records n_models</td><td>PoC §2.3 p.4</td><td>met</td><td><code>ensemble inputs contain duplicate runs</code>; <code>differ in 'center_returns'</code>; 4 failure-type columns have n_models=1, others 2</td></tr>
+    <tr><td>3.6 The select run's params carry the ranked column's declaration</td><td>PoC §3.4 p.7</td><td>met</td><td><code>harm_f30__same_task: F(30) = P(T &lt;= 30 s) | tau 30 s | subset same_task | good_sign 1.0</code>; 3.6b and 3.6c refuse an undeclared or missing column before any run exists</td></tr>
+  </tbody>
+</table>
+</div>
+<h2>Example</h2>
+<p>One row of <code>functionals.json</code> (SYNTHETIC fixture, <code>artifacts/s3_functionals_example.json</code>). It says that the column <code>infl_f30__same_task</code> explains the chance of finishing within 30 s, uses only rollouts of the same task as each training episode, was centred (the default; <code>--cupid-returns</code> would use CUPID's ±1 coding instead), and was computed with the square output function on both sides:</p>
+<pre><code>column         infl_f30__same_task
+functional     F(30) = P(T &lt;= 30 s)
+tau            30 s            family  W            rollout_subset  same_task
+good_sign      1.0             output_fns  square, square</code></pre>
+<h2>Visual</h2>
+<p>This story produces a record, not a picture. The real-file evidence is the table above; for the round-2 binding checks see the two negative cases in <a href="S8-end-to-end-on-this-mac.html">S8</a>.</p>
+<h2>Divergences and limitations</h2>
+<ul>
+  <li><code>rollout_subset</code> takes only <code>all</code> and <code>same_task</code>. The plan listed <code>failure_type=&lt;t&gt;</code> too, but a failure-type column is an indicator return over all (or same-task) rollouts, so that value would misdescribe it; the indicator is stated in <code>return_definition</code> instead. (Related recorded difference: PoC §9.1 Step 3 says "only rollouts with a specific failure type".)</li>
+  <li><code>select_run</code> writes <code>"undeclared"</code> for score runs without a declaration (the stand-in runs older verifiers use); only the attribution chain's <code>stage.py select</code> insists.</li>
+  <li><b>Migration:</b> feature files written before round 2 (absolute or other-version <code>dataset_root</code>, for example the October cluster's) are refused, and so is any attribute run made before this story (no <code>functionals.json</code>). Regenerate with <code>stage.py features</code>; editing a manifest by hand defeats the check. None of those files is in this repo's store.</li>
+  <li>The trajectory binding hashes the whole trajectories folder once per attribute run. Not measured at full scale (1,000 rollouts).</li>
+</ul>
+
+</div>
+</body>
+</html>

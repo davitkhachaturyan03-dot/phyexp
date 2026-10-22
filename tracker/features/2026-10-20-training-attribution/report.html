@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Training and attribution: checking the ported influence code — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+/* page-specific styling: every colour comes from tracker.css variables */
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}
+.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.good{border-left-color:var(--good)}
+.note.bad{border-left-color:var(--bad)}
+.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}
+code{overflow-wrap:anywhere}
+pre code{overflow-wrap:normal}
+table.gloss th.grp{background:var(--surface-2);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+table.gloss td:first-child{min-width:11em}
+td.mono{font-family:var(--mono)}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.tag-syn{display:inline-block;font:600 11px/1.6 var(--mono);padding:1px 8px;border-radius:999px;border:1px solid var(--warn);color:var(--warn);margin-left:6px}
+/* figure vocabulary */
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+.f-box.dash{stroke-dasharray:6 4}
+.f-box.acc{stroke:var(--accent);stroke-width:1.8}
+.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
+.f-box.warn{stroke:var(--warn)}
+.f-t{fill:var(--text);font:600 12.5px var(--sans)}
+.f-m{fill:var(--muted);font:10.5px var(--mono)}
+.f-mt{fill:var(--text);font:10.5px var(--mono)}
+.f-n{fill:var(--muted);font:600 10px var(--mono);letter-spacing:.05em}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}
+.f-ah{fill:var(--muted)}
+.f-axis{stroke:var(--border);stroke-width:1.2}
+.f-grid{stroke:var(--border);stroke-width:1;opacity:.6}
+.f-ref{stroke:var(--muted);stroke-width:1.2;stroke-dasharray:4 3}
+.f-bar{fill:var(--accent)}
+.f-bar2{fill:var(--muted)}
+.f-barw{fill:var(--warn)}
+.f-dot{fill:var(--accent);fill-opacity:.8}
+.f-med{stroke:var(--text);stroke-width:1.6}
+.f-good{fill:var(--good);fill-opacity:.28;stroke:var(--good)}
+.f-bad{fill:var(--bad);fill-opacity:.28;stroke:var(--bad)}
+.f-zero{fill:var(--surface-2);stroke:var(--border)}
+.f-gate{fill:var(--warn);fill-opacity:.25;stroke:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="../../index.html">← All features</a></p>
+  <h1>Training and attribution: checking the ported influence code</h1>
+  <p class="dek">The code that computes "which training recordings help or hurt the robot" arrived from the owner's cluster unreviewed. This feature checked it against the spec, fixed eight kinds of gap, and tested the result on made-up data and on a tiny real-model trial. No real attribution result exists yet; that needs the GPU server.</p>
+  <div class="meta">
+    <span><b>Date</b> 2026-10-20 → 2026-10-22</span>
+    <span><b>Milestone</b> Fine-grained and metric-resolved attribution, verification (spec §10, p. 20): code and checks, no real results</span>
+    <span><b>Stories</b> 8 · <b>ACs</b> 46/46</span>
+    <span><b>Analyzer rounds</b> 2</span>
+    <span><b>Status</b> <span class="pill good">verified locally</span> <span class="pill warn">real results: pending server</span></span>
+  </div>
+</header>
+
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>This project wants to find which of its training recordings make a trained robot worse or better. The method for that (called <b>influence</b>, from a research method named <b>CUPID</b>) was written on the owner's compute cluster and copied into this repository without anyone checking it. This feature checked that copy against the project's spec, found gaps, and fixed them: it now follows CUPID's own formula, refuses to read data it should not see, writes down exactly what each score means, and lays out the whole experiment as a chain of cluster jobs that can be inspected before anything is submitted.</p>
+  <p>Every check passes on made-up test data and on a tiny trial with a real robot model, and the analyzer re-ran them independently. <b>But there are no real attribution results yet</b>, because real results need the GPU server, which this feature deliberately did not touch. Three decisions are the owner's: how big the first server run should be (about 264 hours of one graphics card at the largest setting, about 48 at the smallest, lower-bound estimates), whether to keep a scoring convention that differs from CUPID's, and a rule for calling a recording "consistently harmful".</p>
+  <p class="small">Every technical term is defined where it first appears and again in the <a href="#glossary">glossary</a>. Precise names, commands and citations are in the tables and in the "Technical detail" part after the explanations.</p>
+</div>
+
+<div class="note bad">
+  <p><b>What this report does not show.</b> No real influence scores, no retrained-arm verdicts, no real recovery numbers. Every figure and every Step 4, recovery and grouping check here uses <b>SYNTHETIC</b> inputs (made-up data planted to test the code) and is labelled so. The one real-model run is a <b>smoke run</b> (a 2-step toy checkpoint, 2 rollouts, 0 successes) and is not attribution-grade.</p>
+</div>
+<div class="note">
+  <p><b>Flag for the owner: the default output function changed.</b> The ported code took the gradient of the training <i>loss</i>. CUPID's paper says that choice "works poorly in practice" and uses the <i>square</i> of the model's output; <code>square</code> is now the default (S2). <b>This changes what the next server run computes</b>: feature files and scores made with the old default are not comparable with new ones. <code>stage.py features --preset branch</code> reproduces the old behaviour. On 13 real samples the two choices point in different directions (cosine 0.402 at worst, 0.870 median; <a href="S2-cupid-estimator.html">S2</a>).</p>
+</div>
+
+<h2 id="decisions">Owner decisions still open</h2>
+<p>The first three below are the owner's call. None blocks this feature (the analyzer passed it with all three open); each changes what the server does or how results will be read.</p>
+
+<h3>1 · How big should the first server run be?</h3>
+<p>The default chain is large because it builds both curation modes (owner-approved), the helpful-removal arms the spec asks for, and an extra metric (HRT) for the opposite-curations test. The job counts below were re-counted now with <code>server_pipeline.py --tag demo --dry-run &lt;flags&gt;</code> for the first four rows (313, 172, 112, 56 jobs; 66 trainings in the default) and come from the execution log for the others. <b>GPU-hours are a lower bound</b>: they count training only, at about 4 h each, a figure quoted from LeRobot's SmolVLA docs and unmeasured on our server (inferred). Evaluation, feature and attribution time are not derivable from anything recorded.</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>Setting (flags of <code>server_pipeline.py</code>)</th><th>Arms</th><th>Jobs</th><th>Trainings</th><th>Training GPU-hours (lower bound, inferred)</th></tr></thead>
+  <tbody>
+    <tr><td>Before this feature (6 arms, 3 seeds)</td><td class="num">6</td><td class="num">74</td><td class="num">21</td><td>about 84</td></tr>
+    <tr><td><b>Default now</b>: <code>--curation both</code>, 4 metrics, 3 seeds, 2 random draws, 20-drop gate</td><td class="num">21</td><td class="num"><b>313</b></td><td class="num">66</td><td>about 264</td></tr>
+    <tr><td><code>--curation per_task</code></td><td class="num">11</td><td class="num">172</td><td class="num">36</td><td>about 144</td></tr>
+    <tr><td><code>--curation per_task --metrics f30 hrt60_lin</code> (keeps the opposite-curations test)</td><td class="num">7</td><td class="num">112</td><td class="num">24</td><td>about 96</td></tr>
+    <tr><td>the same, <code>--seeds 0 1</code></td><td class="num">7</td><td class="num">76</td><td class="num">16</td><td>about 64</td></tr>
+    <tr><td>the same, <code>--seeds 0 1 --random-draws 1 --no-ac75</code> (smallest)</td><td class="num">5</td><td class="num">56</td><td class="num">12</td><td>about 48</td></tr>
+    <tr><td><code>--curation per_task --metrics f30 rmst60 auc_expected --no-ac75</code> (old metric set plus helpful arms)</td><td class="num">8</td><td class="num">130</td><td class="num">27</td><td>about 108</td></tr>
+  </tbody>
+</table>
+</div>
+<figure>
+<svg viewBox="0 0 560 330" role="img" aria-label="Size of the first server run for six settings: training GPU-hours, lower bound">
+<text x="20" y="20" class="f-n">LOWER-BOUND TRAINING GPU-HOURS (4 H PER TRAINING, INFERRED)</text>
+<text x="20" y="50" class="f-mt">Before this feature</text>
+<rect x="20" y="56" width="75.6" height="16" rx="3" class="f-barw"/>
+<text x="103.6" y="69" class="f-m">84 h · 74 jobs · 21 trainings</text>
+<text x="20" y="96" class="f-mt">Default now (both modes, 4 metrics)</text>
+<rect x="20" y="102" width="237.6" height="16" rx="3" class="f-bar"/>
+<text x="265.6" y="115" class="f-m">264 h · 313 jobs · 66 trainings</text>
+<text x="20" y="142" class="f-mt">per-task only</text>
+<rect x="20" y="148" width="129.6" height="16" rx="3" class="f-bar"/>
+<text x="157.6" y="161" class="f-m">144 h · 172 jobs · 36 trainings</text>
+<text x="20" y="188" class="f-mt">per-task, 2 metrics</text>
+<rect x="20" y="194" width="86.4" height="16" rx="3" class="f-bar"/>
+<text x="114.4" y="207" class="f-m">96 h · 112 jobs · 24 trainings</text>
+<text x="20" y="234" class="f-mt">... and 2 seeds</text>
+<rect x="20" y="240" width="57.6" height="16" rx="3" class="f-bar"/>
+<text x="85.6" y="253" class="f-m">64 h · 76 jobs · 16 trainings</text>
+<text x="20" y="280" class="f-mt">... 1 random draw, no 20-drop gate</text>
+<rect x="20" y="286" width="43.2" height="16" rx="3" class="f-bar"/>
+<text x="71.2" y="299" class="f-m">48 h · 56 jobs · 12 trainings</text>
+<line x1="20" y1="30" x2="20" y2="308" class="f-axis"/>
+</svg>
+  <figcaption><b>Size of the first server run (lower bound).</b> Bars are training GPU-hours only (4 h per training, an estimate that has not been measured on our server); the real cost is higher. The amber bar is the size before this feature. Notice that the default is about three times the old chain, and that choosing per-task curation with two metrics keeps the spec's headline experiments at about a third of the default.</figcaption>
+</figure>
+<p><b>The analyzer's suggestion</b> (round 1, labelled inferred): make <code>--curation per_task --metrics f30 hrt60_lin</code> the first server run (112 jobs, 24 trainings), which still covers the spec's opposite-curations test and the harmful-versus-random comparison, and run the global mode second. PoC §10 (p. 20) lists "Compute budget" as an open decision. The shrinking flags are documented in the <code>server_pipeline.py</code> docstring.</p>
+
+<h3>2 · Centred returns, or CUPID's ±1, for yes/no columns?</h3>
+<p>Our default subtracts the average return before computing influence. CUPID instead scores success as +1 and failure as −1 with no centring. We derived (and tested numerically, identity error about 4e-15) that the two give the same ranking only when exactly half of the rollouts succeed; at a success rate of 0.3 they differ (Kendall's τ between the rankings 0.667, a counterexample). Centred is the planner's default, <b>not owner-approved</b>; its justification (baseline subtraction does not bias the estimate) is argued for a different gradient than ours, so it does not obviously carry over (inferred). <code>stage.py attribute --cupid-returns</code> gives CUPID's. Options: keep centred (recorded divergence), or make ±1 the default for yes/no columns so the F(30) column is CUPID's own.</p>
+
+<h3>3 · The "consistent helper / harmer" rule: at least 2 of 5 metrics, not "every metric"</h3>
+<p>The spec's §4.2 says "Improve every metric" and "Degrade every metric" (p. 10). The code calls an episode a consistent harmer when at least 2 of the 5 metrics flag it and none flag it as helpful. That is a recorded divergence and a judgement call (inferred, nothing measured). <b>The specific risk:</b> two near-redundant reliability readouts, F(30) and the censored rate, can by themselves make an episode "consistent" while all the speed metrics are flat. The labels are descriptive and unverified either way, since the verified claim comes from the retraining test. Options: keep, require all five, or require agreement across the speed block and the reliability block. A one-line change.</p>
+
+<div class="note">
+  <p><b>Migration note.</b> Feature files written before analyzer round 2 (an absolute or other-version <code>dataset_root</code> in the manifest, such as the October cluster's) are now refused by <code>attribute_run</code>; regenerate them with <code>stage.py features</code> (the chain's feature jobs do). Editing a manifest's <code>dataset_root</code> by hand defeats the check. None of those files is in this repo's store, and the old <code>loss</code>-form features would not match the new default anyway.</p>
+</div>
+<div class="note good">
+  <p><b>Owner-approved in this feature.</b> (a) <b>Scope</b>, 2026-10-20: "Just dismiss the parts that need the server and fix everything else." (b) <b>Curation unit</b>, Q1: "Both, per-task headline (Rec.)": both curation modes are built, per-task is the reported headline, global top-k (the spec's literal text) is reported alongside; this roughly doubles the server's retraining arms and the owner accepted that. Earlier owner decisions carried: SmolVLA, per-subset normalisation, all PoC metrics (family W as the attribution family), ghost events out of scope, <code>n_boot</code> 1000, and the ground-truth rulings.</p>
+</div>
+
+<h2 id="glossary">Glossary</h2>
+<p>Terms in the order you meet them, including our own labels. Story pages link back here.</p>
+<div class="scroll">
+<table class="gloss">
+  <thead><tr><th>Term</th><th>Plain meaning</th></tr></thead>
+  <tbody>
+    <tr><th colspan="2" class="grp">The robot-learning setting</th></tr>
+    <tr><td><b>Demonstration, episode</b></td><td>One recording of a person guiding a robot arm through a task once, stored as a sequence of time steps (camera images, robot state, commands). The two words mean the same thing here.</td></tr>
+    <tr><td><b>LIBERO</b></td><td>A simulated robot-arm benchmark: household-style tasks, each with recorded human demonstrations. Our corpus is 1,000 demonstrations over 20 LIBERO tasks.</td></tr>
+    <tr><td><b>LeRobot</b></td><td>An open-source Hugging Face library and file format for robot-learning data and training. Our datasets and the training code use it.</td></tr>
+    <tr><td><b>Policy</b></td><td>A trained model that decides what the robot does next from what its cameras see and the instruction it was given.</td></tr>
+    <tr><td><b>SmolVLA</b></td><td>The compact open-source robot model (a "vision-language-action" model: it reads images and a text instruction and outputs motions) that this project trains as its policy.</td></tr>
+    <tr><td><b>Checkpoint</b></td><td>A saved copy of a model's learned numbers at some point in training.</td></tr>
+    <tr><td><b>Rollout</b></td><td>One attempt by a trained policy to do a task in the simulator, recorded and judged success or failure.</td></tr>
+    <tr><td><b>Seed</b></td><td>One random starting point for training. Training the same recipe from several seeds shows how much of a result is luck.</td></tr>
+    <tr><th colspan="2" class="grp">Influence and attribution</th></tr>
+    <tr><td><b>Training-data attribution</b></td><td>Working out which training recordings are responsible for how a trained policy behaves, which help and which hurt. The purpose of the whole project.</td></tr>
+    <tr><td><b>Influence</b></td><td>A number per training episode saying how much it pushed some later outcome up or down. Positive influence on a good outcome means the episode helped.</td></tr>
+    <tr><td><b>CUPID</b></td><td>A published method (paper, plus MIT-licensed code) that computes influence of each training demonstration on how robot rollouts turned out. The spec calls it the best starting point to fork. We cite it as "CUPID" throughout; its released code is at <code>agiachris/cupid</code>.</td></tr>
+    <tr><td><b>ATHENA</b></td><td>A second paper in <code>docs/papers/</code> on scaling influence to large robot models; we take its Kronecker projection and its per-task grouping from it.</td></tr>
+    <tr><td><b>TRAK, kronfluence</b></td><td>Existing open-source influence libraries that we checked and chose not to adopt (see the reinvention audit).</td></tr>
+    <tr><td><b>Gradient</b></td><td>The direction in which a model's numbers would have to change to raise or lower some quantity. Influence is built from gradients.</td></tr>
+    <tr><td><b>Output function</b></td><td>The quantity whose gradient is taken. <b>square</b> (CUPID's, now our default): the squared size of the model's predicted motion. <b>loss</b> (the ported code's choice): the training error. CUPID's paper says the loss form "works poorly in practice".</td></tr>
+    <tr><td><b>Projection, Kronecker, 7,488 dims</b></td><td>A gradient has hundreds of millions of numbers; we shrink it to 7,488 using a random projection applied separately per layer (a Kronecker projection, 117 layers × 64). It keeps the geometry approximately and makes the arithmetic affordable.</td></tr>
+    <tr><td><b>Gauss-Newton Hessian, damping</b></td><td>A matrix built from the training gradients that corrects influence for gradients that overlap. Damping adds a small constant so the matrix can be inverted safely.</td></tr>
+    <tr><td><b>Return</b></td><td>One number per rollout per metric that influence is measured against. For example, the F(30) return is 1 if the rollout finished within 30 s and 0 otherwise.</td></tr>
+    <tr><td><b>Functional</b></td><td>The exact measured quantity a result is about, with its time cap. <b>F(30)</b> = the chance of finishing within 30 s. <b>RMST(60)</b> = average time to finish, counting up to a 60 s cap. <b>HRT(60)</b> = how the robot's time compares with the human demonstrators'. <b>AUC</b> = the chance the robot beats a sampled human time. <b>censored rate</b> = share that never finished by the cap.</td></tr>
+    <tr><td><b>Time cap, τ</b></td><td>The cutoff in seconds beyond which a rollout counts as not having finished (60 s here). Not to be confused with Kendall's τ.</td></tr>
+    <tr><td><b>Family W</b></td><td>The set of five whole-task metrics (F(30), RMST, AUC, HRT, censored rate) declared as the attribution family. Every attribution column and every verdict says which family it is on.</td></tr>
+    <tr><td><b>Centred returns</b></td><td>Subtracting the average return before computing influence, so only differences from typical count. Our default for every column. CUPID instead uses a plain +1 for success and −1 for failure with no centring ("±1").</td></tr>
+    <tr><td><b>Ensemble, z-score</b></td><td>Averaging the score tables of several seeds after rescaling each to mean 0 and standard deviation 1 (a z-score), so seeds on different scales can be combined.</td></tr>
+    <tr><td><b>Kendall's τ</b></td><td>A score from −1 to 1 for how closely two rankings agree (1 = identical order, 0 = unrelated). Used to ask whether two metrics rank episodes alike.</td></tr>
+    <tr><td><b>Key contract</b></td><td>Our rule that scores belong to exact (episode id, content hash) pairs, so scores for a version of the data a model was not trained on are refused.</td></tr>
+    <tr><th colspan="2" class="grp">Planting damage and keeping methods blind</th></tr>
+    <tr><td><b>Corruption, answer key</b></td><td>An earlier feature planted known damage in a copy of the dataset: 91 of 960 candidate episodes, seven kinds. The answer key is the separate table recording which and how.</td></tr>
+    <tr><td><b>v0, v1, v2, v3</b></td><td>Dataset versions. <b>v0</b>: the original clean data. <b>v1</b>, <b>v2</b>: earlier damaged copies, now off-limits (fenced). <b>v3</b>: the current damaged dataset; in prose, "the corrupted dataset".</td></tr>
+    <tr><td><b>Blind, fenced</b></td><td>A version is <b>blind</b> if a method reading it cannot tell which episodes were edited. <b>Fenced</b> means our loader refuses to open it for a method.</td></tr>
+    <tr><td><b><code>open_for_method</code></b></td><td>The single safe entry point a method must use to read a dataset version; it refuses fenced versions, answer-key-derived subsets and tampered copies.</td></tr>
+    <tr><td><b>Content hash, lineage, MLflow</b></td><td>A <b>content hash</b> is a fingerprint of an episode's data (change one byte, it changes). <b>Lineage</b> is the record of which dataset version and run came from which. <b>MLflow</b> is the open-source experiment logger we keep that record in.</td></tr>
+    <tr><td><b>Scratch store</b></td><td>A throwaway copy of the record store used for tests, so the real one is never touched. We prove that by comparing its fingerprint (sha256) before and after.</td></tr>
+    <tr><th colspan="2" class="grp">Scoring and verifying</th></tr>
+    <tr><td><b>AUROC, recall@13</b></td><td><b>AUROC</b>: from 0.5 (guessing) to 1.0 (perfect), how well a ranking puts damaged items above clean ones. <b>recall@13</b>: of the 13 damaged episodes of one kind, the share within the top 13.</td></tr>
+    <tr><td><b>Heuristic, recovery</b></td><td>A <b>heuristic</b> is a simple one-line statistic that needs no learning. <b>Recovery</b> is how many planted damaged episodes a method finds.</td></tr>
+    <tr><td><b>Arm</b></td><td>One variant of the retraining experiment: a model retrained after removing a particular set of episodes.</td></tr>
+    <tr><td><b>Harmful / helpful removal, random control</b></td><td>Remove the episodes the method calls most harmful (the model should improve), or most helpful (it should get worse), and compare with removing the same number at random.</td></tr>
+    <tr><td><b>Per-task vs global curation</b></td><td><b>Per-task</b>: remove the top k from every task (here k = 5, so 43 of 48 episodes remain in each of 20 tasks). <b>Global</b>: remove the top N episodes overall (N = 100). Per-task is the headline; both are built (owner-approved).</td></tr>
+    <tr><td><b>Macro-KS gate</b></td><td>A test of whether the whole distribution of finishing times changed at all between two policies, averaged over tasks. Step one of the spec's two-step verdict: only if it fires do we look at which direction each metric moved.</td></tr>
+    <tr><td><b>Bootstrap CI, n_boot, Holm</b></td><td>A <b>bootstrap confidence interval</b> is an uncertainty range from resampling the data; <b>n_boot</b> = 1000 is the number of resamples (owner ruling). <b>Holm</b> is a correction for checking several metrics at once so luck does not look like a finding.</td></tr>
+    <tr><td><b>Consistent helper / harmer, trade-off, metric-specific, neutral</b></td><td>Descriptive labels for episodes: helps (or hurts) on at least two metrics with none opposed; helps one metric and hurts another; moves only one metric; moves none. Unverified by design.</td></tr>
+    <tr><th colspan="2" class="grp">The cluster and our run types</th></tr>
+    <tr><td><b>SLURM, <code>sbatch</code>, <code>afterok</code></b></td><td><b>SLURM</b>: the job scheduler used on shared GPU clusters (jobs queue and run on a free machine). <code>sbatch</code> submits one job; <code>--dependency=afterok</code> starts it only after named jobs finished successfully.</td></tr>
+    <tr><td><b>GPU-hour</b></td><td>One graphics card working for one hour. Our estimates count only training, at about 4 h per training, a figure quoted from LeRobot's SmolVLA docs and unmeasured on our server, so they are lower bounds.</td></tr>
+    <tr><td><b>Server</b></td><td>The owner's GPU cluster. Anything needing it (real training, rollouts, feature extraction on real checkpoints, running the chain, verdicts on retrained arms) is out of scope here by the owner's ruling.</td></tr>
+    <tr><td><b>Dry run</b></td><td>Printing every job and its command without submitting anything.</td></tr>
+    <tr><td><b>MPS, smoke run</b></td><td><b>MPS</b> is Apple's GPU backend on this Mac. A <b>smoke run</b> is a tiny end-to-end trial that shows the machinery runs; it is not attribution-grade.</td></tr>
+    <tr><td><b>SYNTHETIC</b></td><td>Made-up inputs built to test code. A synthetic number shows the code behaves correctly when the answer is planted; it is never a result about any policy.</td></tr>
+    <tr><td><b>Attribution-grade</b></td><td>Run at the full settings (20,000-step training, full rollouts) needed for a result to count.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Technical detail</h2>
+<p>Everything above is meant to stand alone. The rest of this report is the reference: spec grounding, the dataflow, the stories, what changed, the demo, the process trail and the reading guide.</p>
+
+<div class="grounding">
+  <h2>Grounding</h2>
+  <dl>
+    <dt>Spec section</dt>
+    <dd>PoC §9.1 Steps 3–4 (p. 19), §4.2–§4.5 (pp. 9–11), §3.4 (p. 7), §2.1 items 1 and 4 (p. 3), §2.3 (p. 4), §2.6 (p. 5), §6 (p. 12), §9.2 (p. 19), §10 rows "Fine-grained attribution", "Metric-resolved attribution", "Verification &amp; demo" (p. 20). Quote: "The estimator is CUPID's; the way it is applied is not." (§4.3, p. 10); "Every attribution result states which functional it explains" (§3.4, p. 7); "Remove the top-k most harmful episodes and retrain. As a control, remove k random episodes and retrain." (§9.1 Step 4, p. 19).</dd>
+    <dt>Papers</dt>
+    <dd><code>docs/papers/CUPID_Influence_Functions_arXiv-2506.19121.pdf</code>: App. A.1 Eq. 9 p. 18 (the square output function and Gauss-Newton Hessian), App. A.2 p. 19 (±1 returns, B = 64 draws), Prop. 2 §D.2 p. 27 (sum over steps), and its released code (<code>agiachris/cupid</code> @ <code>2941eba9</code>, vendored for the parity check). <code>ATHENA_Influence_Functions_arXiv-2606.16208.pdf</code>: §3.2 p. 3 and §4.2 Eq. 7 p. 5 (per-task grouping), §4.1 (Kronecker projection), App. A.1 Eq. 14–15 p. 14 (flow-matching form).</dd>
+    <dt>Prior art</dt>
+    <dd>No library implements CUPID's return-weighted influence on a flow-matching robot model. <b>trak</b> (dense, CUDA-only projector, quoted from its source), <b>kronfluence</b> (a different Hessian: identity/diagonal/KFAC/EKFAC, quoted from its docs), <b>dattri</b> and <b>LogIX/LoGra</b> (the Kronecker route we mirror, but under development with no releases) were each checked and would change the estimator. Verdict: keep the custom estimator and make it a faithful CUPID port (S2). For job orchestration, <b>submitit</b> (its examples document no dependency chaining) and <b>Snakemake</b> (a second workflow record next to MLflow) were not adopted. Details in the reinvention audit below.</dd>
+    <dt>Implements</dt>
+    <dd>§4.3 CUPID estimator with its own output function and parity; §3.4 declared functional per column; §4.2 episode × metric table, four groups and aggregation; §4.4 Kendall's τ and the two-step verdict in the summary; §4.5 hypotheses committed before scoring, heatmap and scatter; §9.1 Step 4 harmful, helpful and random arms in both modes; §9.2 the key contract extended to feature files; blindness for all four method entry points.</dd>
+    <dt>Diverges</dt>
+    <dd>Per-task headline with global alongside (<b>owner-approved</b>, Q1). Every remaining difference from CUPID (table below; centred returns is an open owner decision). The "at least 2 of 5" group rule against §4.2's "every metric" (recorded; open owner decision). Four-group labels are descriptive and unverified (§4.4 asks for Holm before calling a trade-off).</dd>
+    <dt>Not yet covered</dt>
+    <dd>Everything under "Out of scope (needs the server)" below. Not built by this feature, owned by others: §9.1 Step 1 screening (DemInf and RoboDrop-style scores) and the §9.2 screening-versus-attribution comparison, §8.10 RoboDrop comparison; §10 group-level leave-one-out ablations and datamodels regression; attribution against ghost-event rate (out of scope by owner decision); the §2.7 dashboard linking failed rollouts to influential episodes; §3.5 per-sub-task T; the real-robot stage and scale-up.</dd>
+  </dl>
+</div>
+
+<h2 id="fidelity">CUPID fidelity, in plain terms</h2>
+<p>The analyzer compared our estimator with CUPID's paper and released code point by point. Where we match, the arithmetic was tested against CUPID's own functions; every difference is stored with its source in <code>attribution.DIVERGENCES</code> and logged as a parameter of every run.</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>What</th><th>CUPID (paper / released code)</th><th>Ours now</th><th>Status</th></tr></thead>
+  <tbody>
+    <tr><td>The quantity whose gradient is taken (output function)</td><td>Square of the model's output on both the training and rollout side (App. A.1 Eq. 9). The training-loss form "works poorly in practice" (quoted)</td><td><code>square</code> on both sides (S2 changed the default)</td><td><span class="pill good">matches CUPID</span></td></tr>
+    <tr><td>How overlapping gradients are corrected (Hessian)</td><td>Gauss-Newton matrix, 1/(|D|H) Σ g gᵀ (quoted p. 18)</td><td>ΦᵀΦ/N of the training features</td><td><span class="pill good">matches</span></td></tr>
+    <tr><td>How per-step influence becomes per-episode</td><td>Sum over steps (Prop. 2, §D.2 p. 27); <code>sum_of_sum</code> then <code>net</code></td><td>Group sums; equals CUPID's vendored functions to 2.84e-14 (check 7a)</td><td><span class="pill good">matches</span></td></tr>
+    <tr><td>An extra model-output term in TRAK</td><td><code>get_out_to_loss_grad</code> = ones (read in its code)</td><td>none</td><td><span class="pill good">equivalent</span></td></tr>
+    <tr><td>Damping added to the Hessian</td><td>0.0 (<code>lambda_reg</code>, train_trak.sh)</td><td>1e-3 × mean of the diagonal</td><td><span class="pill warn">recorded difference</span> (<code>damping</code>)</td></tr>
+    <tr><td>Gradient shrinking (projection)</td><td>Dense random projection to 4,000 numbers over all parameters</td><td>Kronecker per-layer projection, 7,488 numbers over the action-expert layers (ATHENA's route)</td><td><span class="pill warn">recorded</span> (<code>projection</code>)</td></tr>
+    <tr><td>Random draws averaged per feature</td><td>B = 64</td><td>K = 4 shared draws</td><td><span class="pill warn">recorded</span> (<code>draws</code>)</td></tr>
+    <tr><td>How returns are weighted</td><td>+1 / −1, no centring (App. A.2 p. 19)</td><td>Centred by default; <code>--cupid-returns</code> gives ±1</td><td><span class="pill warn">recorded; open owner decision 2</span></td></tr>
+    <tr><td>Kinds of return</td><td>Binary success/failure only</td><td>One return per PoC metric, mostly continuous (spec §4.3)</td><td><span class="pill warn">recorded</span> (by the spec)</td></tr>
+    <tr><td>How many frames are used</td><td>Every sample</td><td>Every 2nd training frame, every 4th rollout frame</td><td><span class="pill warn">recorded</span> (<code>strides</code>)</td></tr>
+    <tr><td>Numerics</td><td>—</td><td>fp32 weights as the eval stage loads them (13.5% median feature difference from LeRobot's bf16 loader, earlier measurement)</td><td><span class="pill warn">recorded</span> (<code>numerics</code>)</td></tr>
+    <tr><td>Model family</td><td>Diffusion-policy noise prediction</td><td>SmolVLA flow matching (ATHENA Eq. 14–15 gives the form)</td><td><span class="pill warn">recorded</span> (<code>model_family</code>)</td></tr>
+    <tr><td>Failure-type returns</td><td>—</td><td>An indicator over all rollouts (spec says "only rollouts with a specific failure type"); types with at least 5 rollouts (inferred threshold)</td><td><span class="pill warn">recorded</span> (<code>failure_type_returns</code>)</td></tr>
+    <tr><td>Averaging seeds</td><td>TRAK averages raw scores across models</td><td>Mean of per-seed z-scores</td><td><span class="pill warn">recorded</span> (ensemble params, round-2 fix)</td></tr>
+  </tbody>
+</table>
+</div>
+<h2>How it works</h2>
+<figure>
+<svg viewBox="0 0 560 828" role="img" aria-label="Dataflow of the training and attribution feature: stage.py commands, vlapoc functions and the SLURM chain">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="f-ah"/></marker></defs>
+<rect x="20" y="8" width="520" height="50" rx="8" class="f-box soft"/>
+<text x="32" y="27" class="f-t">server_pipeline.py: the whole experiment as one SLURM chain</text>
+<text x="32" y="44" class="f-m">one sbatch job per box below, each started only after its parents finished (afterok)</text>
+<text x="32" y="58" class="f-m">slurm/env.sh + site.env (machine settings), slurm/guard.sh (same commit)</text>
+<text x="530" y="27" class="f-n" text-anchor="end">S6</text>
+<line x1="280" y1="58" x2="280" y2="76" class="f-arrow" marker-end="url(#ah)"/>
+<rect x="20" y="76" width="520" height="62" rx="8" class="f-box dash"/>
+<text x="32" y="95" class="f-t">train, evaluate, score the rollouts</text>
+<text x="32" y="112" class="f-m">stage.py cmd_train (via method_view -&gt; open_for_method), cmd_eval, cmd_returns</text>
+<text x="32" y="126" class="f-m">eval layer = earlier feature; real runs need the GPU server</text>
+<text x="530" y="95" class="f-n" text-anchor="end">S1</text>
+<line x1="280" y1="138" x2="280" y2="156" class="f-arrow" marker-end="url(#ah)"/>
+<rect x="20" y="156" width="520" height="62" rx="8" class="f-box dash"/>
+<text x="32" y="175" class="f-t">extract gradient features</text>
+<text x="32" y="192" class="f-m">stage.py cmd_features -&gt; influence.featurize(output_fn='square')</text>
+<text x="32" y="206" class="f-m">7,488 numbers per sample; real checkpoints need the server (MPS smoke ran)</text>
+<text x="530" y="175" class="f-n" text-anchor="end">S2</text>
+<line x1="280" y1="218" x2="280" y2="236" class="f-arrow" marker-end="url(#ah)"/>
+<rect x="20" y="236" width="520" height="90" rx="8" class="f-box acc"/>
+<text x="32" y="255" class="f-t">attribute: the episode x metric table</text>
+<text x="32" y="272" class="f-m">stage.py cmd_attribute -&gt; attribution.attribute_run</text>
+<text x="32" y="286" class="f-m">opens the subset through open_for_method; refuses features not computed on it</text>
+<text x="32" y="300" class="f-m">performance_influence (CUPID 'net') -&gt; scores + functionals.json</text>
+<text x="530" y="255" class="f-n" text-anchor="end">S1 S2 S3</text>
+<line x1="280" y1="326" x2="280" y2="344" class="f-arrow" marker-end="url(#ah)"/>
+<rect x="20" y="344" width="520" height="48" rx="8" class="f-box acc"/>
+<text x="32" y="363" class="f-t">ensemble over seeds</text>
+<text x="32" y="380" class="f-m">stage.py cmd_ensemble -&gt; attribution.ensemble_run (z-scored mean, n_models per column)</text>
+<text x="530" y="363" class="f-n" text-anchor="end">S3</text>
+<line x1="12" y1="392" x2="12" y2="512" class="f-arrow"/>
+<line x1="12" y1="431" x2="28" y2="431" class="f-arrow" marker-end="url(#ah)"/>
+<rect x="30" y="410" width="510" height="40" rx="8" class="f-box acc"/>
+<text x="42" y="429" class="f-t">analyze: groups, heatmap, scatter</text>
+<text x="42" y="446" class="f-m">stage.py cmd_analyze -&gt; analysis.analyze_run</text>
+<text x="530" y="429" class="f-n" text-anchor="end">S7</text>
+<line x1="12" y1="477" x2="28" y2="477" class="f-arrow" marker-end="url(#ah)"/>
+<rect x="30" y="456" width="510" height="40" rx="8" class="f-box acc"/>
+<text x="42" y="475" class="f-t">score: recovery of planted damage</text>
+<text x="42" y="492" class="f-m">stage.py cmd_score -&gt; recovery.recovery_run</text>
+<text x="530" y="475" class="f-n" text-anchor="end">S5</text>
+<line x1="12" y1="523" x2="28" y2="523" class="f-arrow" marker-end="url(#ah)"/>
+<rect x="30" y="502" width="510" height="40" rx="8" class="f-box acc"/>
+<text x="42" y="521" class="f-t">select: curated subsets</text>
+<text x="42" y="538" class="f-m">cmd_select -&gt; runs.select_run -&gt; lineage.drop_top_k[_per_task] / drop_random_k</text>
+<text x="530" y="521" class="f-n" text-anchor="end">S4</text>
+<line x1="12" y1="392" x2="280" y2="392" class="f-arrow"/>
+<line x1="285" y1="542" x2="285" y2="566" class="f-arrow" marker-end="url(#ah)"/>
+<rect x="20" y="566" width="520" height="62" rx="8" class="f-box dash"/>
+<text x="32" y="585" class="f-t">retrain every arm, evaluate it</text>
+<text x="32" y="602" class="f-m">stage.py cmd_train -&gt; cmd_eval for each curated and random subset and seed</text>
+<text x="32" y="616" class="f-m">needs the GPU server</text>
+<text x="530" y="585" class="f-n" text-anchor="end">S4</text>
+<line x1="280" y1="628" x2="280" y2="646" class="f-arrow" marker-end="url(#ah)"/>
+<rect x="20" y="646" width="520" height="62" rx="8" class="f-box dash"/>
+<text x="32" y="665" class="f-t">verify: did the policy change, and which way?</text>
+<text x="32" y="682" class="f-m">stage.py cmd_verify -&gt; verdict.verify_run (earlier feature)</text>
+<text x="32" y="696" class="f-m">macro-KS gate first, then per-metric CIs with Holm</text>
+<text x="530" y="665" class="f-n" text-anchor="end">S4</text>
+<line x1="280" y1="708" x2="280" y2="726" class="f-arrow" marker-end="url(#ah)"/>
+<rect x="20" y="726" width="520" height="62" rx="8" class="f-box acc"/>
+<text x="32" y="745" class="f-t">step4 summary across seeds</text>
+<text x="32" y="762" class="f-m">stage.py cmd_step4_summary -&gt; step4.summarize / summary_run</text>
+<text x="32" y="776" class="f-m">counts a direction only where the macro-KS gate fired (g = gate did not)</text>
+<text x="530" y="745" class="f-n" text-anchor="end">S4</text>
+<rect x="20" y="800" width="26" height="14" rx="3" class="f-box acc"/><text x="52" y="811" class="f-m">built and checked here (synthetic inputs or smoke)</text>
+<rect x="318" y="800" width="26" height="14" rx="3" class="f-box dash"/><text x="350" y="811" class="f-m">needs the server</text>
+</svg>
+  <figcaption><b>Where this feature sits in the pipeline (spec §9.1 Steps 3–4, docs/dataflow.md).</b> Read top to bottom: the SLURM chain submits one job per box; features feed the attribute run, which feeds the ensemble; the ensemble fans out to the analysis figures, the recovery scorer and the curated subsets; the curated subsets are retrained, verified and summarised. Solid boxes were built and checked here (on synthetic inputs or a smoke run). Dashed boxes need the GPU server to run for real. Labels S1 to S8 are the stories. Names are real modules and functions.</figcaption>
+</figure>
+<h2>Stories</h2>
+<a class="entry" href="S1-method-inputs-through-blind-loader.html">
+  <div class="top"><span class="title">S1 · Every method input goes through the blind loader</span><span class="date">6/6 ACs</span></div>
+  <p class="sum">20 of 20 unsafe combinations (4 entry points × 5 unsafe inputs: fenced v1, fenced v2, answer-key-derived, its descendant, a flipped byte) are refused, none leaves a run behind, and the clean v3/candidate (960 episodes) still opens.</p>
+</a>
+<a class="entry" href="S2-cupid-estimator.html">
+  <div class="top"><span class="title">S2 · Make the estimator CUPID's, and record every difference</span><span class="date">6/6 ACs</span></div>
+  <p class="sum">Default output function is now CUPID's square; our score equals CUPID's own vendored code to 2.84e-14; nine remaining differences named with sources. The change alters what the next server run computes.</p>
+</a>
+<a class="entry" href="S3-declared-functionals-and-provenance.html">
+  <div class="top"><span class="title">S3 · Declare what every column explains, and tie features to their data</span><span class="date">6/6 ACs</span></div>
+  <p class="sum">32 score columns, 32 declaration rows; feature files are fingerprinted and, after round 2, refused if not computed on the exact dataset copy and rollouts being attributed.</p>
+</a>
+<a class="entry" href="S4-step4-arms-verdicts-summary.html">
+  <div class="top"><span class="title">S4 · Complete the verification step</span><span class="date">6/6 ACs</span></div>
+  <p class="sum">21 arms and 313 jobs (66 trainings) in the default chain; a seed summary that counts a direction only where the macro-KS gate fired (round-1 defect fixed, 13/13).</p>
+</a>
+<a class="entry" href="S5-recovery-scoring.html">
+  <div class="top"><span class="title">S5 · Score attribution against the planted damage</span><span class="date">6/6 ACs</span></div>
+  <p class="sum">Scorer returns AUROC 1.0 for planted columns and 0.527 for a random one (SYNTHETIC); the §4.5 hypotheses were committed before the scoring code existed.</p>
+</a>
+<a class="entry" href="S6-portable-chain.html">
+  <div class="top"><span class="title">S6 · Make the chain testable and portable</span><span class="date">7/7 ACs</span></div>
+  <p class="sum">One example file holds all machine settings; run names resolve only within their chain; the log folder is created before any real submission (round-1 defect fixed).</p>
+</a>
+<a class="entry" href="S7-metric-resolved-outputs.html">
+  <div class="top"><span class="title">S7 · Metric-resolved outputs: groups, heatmap, scatter</span><span class="date">4/4 ACs</span></div>
+  <p class="sum">On a planted synthetic table, 20 of 20 planted episodes get the right group and 220 of 220 noise episodes come out neutral; both §4.5 figures drawn, labelled SYNTHETIC.</p>
+</a>
+<a class="entry" href="S8-end-to-end-on-this-mac.html">
+  <div class="top"><span class="title">S8 · Run the chain end to end on this Mac</span><span class="date">5/5 ACs</span></div>
+  <p class="sum">10 stage runs through the real command-line tool on a scratch store, 6 refusals, 3 integration defects found and fixed; a real-model smoke run completed, not attribution-grade.</p>
+</a>
+
+<h2>What the review found, and what became of it</h2>
+<p>The plan began with a compliance matrix of 20 spec requirements the ported code touches. Counts at the time of the plan (each row tagged measured, quoted or inferred there): 8 met, 7 partly met, 1 divergence awaiting the owner, 4 missing. After the 8 stories every row is met or recorded:</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>Gap found in the ported code</th><th>Spec</th><th>Fixed in</th></tr></thead>
+  <tbody>
+    <tr><td>Attribution used a weaker blindness check; training and feature extraction used none</td><td>§2.1 item 4</td><td>S1</td></tr>
+    <tr><td>Gradient of the training loss, which CUPID rejects; differences from CUPID unrecorded or mis-stated (a wrong formula for the centring note)</td><td>§4.3, §6</td><td>S2</td></tr>
+    <tr><td>No record of which quantity a column explains; feature files unfingerprinted; rollouts silently dropped; a seed's failure-type column silently dropped in the ensemble</td><td>§3.4, §4.4, §2.1 item 1</td><td>S3</td></tr>
+    <tr><td>No helpful-removal arms, no comparison with a random control, no HRT-versus-reliability test, no seed summary; per-task curation never put to the owner</td><td>§9.1 Step 4, §2.6, §4.5</td><td>S4</td></tr>
+    <tr><td>Nothing scored attribution against the planted damage</td><td>§2.1 item 4, §4.5</td><td>S5</td></tr>
+    <tr><td>Cluster paths hard-coded; "latest run" could be another experiment's; temp files outside the project</td><td>§2.1 item 1</td><td>S6</td></tr>
+    <tr><td>No four groups, heatmap, scatter or aggregation by task</td><td>§4.2, §4.5</td><td>S7</td></tr>
+    <tr><td>Contracts only unit-tested with stubs; three integration defects</td><td>§9.2, §2.1 item 1</td><td>S8</td></tr>
+  </tbody>
+</table>
+</div>
+<h2>Demo</h2>
+<p>There is no real attribution result to demo, so this section shows the pieces working on the data that exists: real counts of the planned experiment, a real-model gradient comparison, and clearly labelled synthetic figures.</p>
+<div class="tiles">
+  <div class="tile good"><div class="label">Acceptance criteria</div><div class="value">46/46</div><div class="note">8 stories; analyzer reproduced all but S2.4 (partly) and S8.3 (not re-run)</div></div>
+  <div class="tile good"><div class="label">CUPID parity</div><div class="value">2.84e-14</div><div class="note">our score vs CUPID's vendored functions; 29/29 estimator checks (re-run now)</div></div>
+  <div class="tile good"><div class="label">Unsafe inputs refused</div><div class="value">20/20</div><div class="note">4 entry points × 5 unsafe inputs, nothing written</div></div>
+  <div class="tile"><div class="label">Default chain</div><div class="value">313 jobs</div><div class="note">66 trainings, about 264 GPU-h (lower bound, inferred); re-counted now</div></div>
+  <div class="tile"><div class="label">Square vs loss gradients</div><div class="value">cos 0.870</div><div class="note">median of 13 real samples; min 0.402, max 0.953</div></div>
+  <div class="tile"><div class="label">Verifier commands</div><div class="value">18/18</div><div class="note">exit 0 in analyzer round 2; real mlflow.db unchanged</div></div>
+</div>
+<figure>
+<svg viewBox="0 0 560 150" role="img" aria-label="Cosine similarity between the square and loss gradient features of 13 real samples">
+<line x1="40.0" y1="40" x2="40.0" y2="96" class="f-grid"/>
+<text x="40.0" y="112" class="f-m" text-anchor="middle">0.3</text>
+<line x1="110.0" y1="40" x2="110.0" y2="96" class="f-grid"/>
+<text x="110.0" y="112" class="f-m" text-anchor="middle">0.4</text>
+<line x1="180.0" y1="40" x2="180.0" y2="96" class="f-grid"/>
+<text x="180.0" y="112" class="f-m" text-anchor="middle">0.5</text>
+<line x1="250.0" y1="40" x2="250.0" y2="96" class="f-grid"/>
+<text x="250.0" y="112" class="f-m" text-anchor="middle">0.6</text>
+<line x1="320.0" y1="40" x2="320.0" y2="96" class="f-grid"/>
+<text x="320.0" y="112" class="f-m" text-anchor="middle">0.7</text>
+<line x1="390.0" y1="40" x2="390.0" y2="96" class="f-grid"/>
+<text x="390.0" y="112" class="f-m" text-anchor="middle">0.8</text>
+<line x1="460.0" y1="40" x2="460.0" y2="96" class="f-grid"/>
+<text x="460.0" y="112" class="f-m" text-anchor="middle">0.9</text>
+<line x1="530.0" y1="40" x2="530.0" y2="96" class="f-grid"/>
+<text x="530.0" y="112" class="f-m" text-anchor="middle">1.0</text>
+<line x1="40" y1="96" x2="530" y2="96" class="f-axis"/>
+<circle cx="111.4" cy="86" r="5" class="f-dot"/>
+<circle cx="246.4" cy="86" r="5" class="f-dot"/>
+<circle cx="393.2" cy="86" r="5" class="f-dot"/>
+<circle cx="399.1" cy="73" r="5" class="f-dot"/>
+<circle cx="429.7" cy="86" r="5" class="f-dot"/>
+<circle cx="436.0" cy="73" r="5" class="f-dot"/>
+<circle cx="438.7" cy="60" r="5" class="f-dot"/>
+<circle cx="440.0" cy="47" r="5" class="f-dot"/>
+<circle cx="440.9" cy="86" r="5" class="f-dot"/>
+<circle cx="447.9" cy="73" r="5" class="f-dot"/>
+<circle cx="448.2" cy="34" r="5" class="f-dot"/>
+<circle cx="462.6" cy="86" r="5" class="f-dot"/>
+<circle cx="497.0" cy="86" r="5" class="f-dot"/>
+<line x1="438.7" y1="34" x2="438.7" y2="96" class="f-med"/>
+<text x="444.7" y="32" class="f-mt">median 0.870</text>
+<text x="111.4" y="130" class="f-mt" text-anchor="middle">min 0.402</text>
+<text x="497.0" y="130" class="f-mt" text-anchor="middle">max 0.953</text>
+<text x="40" y="16" class="f-n">COSINE: 1.0 = SAME DIRECTION</text>
+<text x="545" y="142" class="f-m" text-anchor="end">13 real samples, SmolVLA checkpoint, MPS</text>
+</svg>
+  <figcaption><b>How different the two output-function choices are, on real samples.</b> Real data: 13 samples from a toy SmolVLA checkpoint on this Mac. The choice of CUPID's square over the old loss changes the direction of the gradient noticeably for some samples. This is the only real-model measurement in this feature that bears on the estimator; it says the change is not cosmetic, not that either choice finds better data.</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="artifacts/s7_tradeoff_planted_SYNTHETIC.png" alt="Synthetic throughput versus reliability scatter">
+  <figcaption><b>The scatter the spec asks for, on planted SYNTHETIC scores.</b> Four groups sit in four corners and 220 noise episodes at the centre. Notice the SYNTHETIC banner in the title: this shows the labelling and plotting code, not a finding. Real scores replace it after the server run (<a href="S7-metric-resolved-outputs.html">S7</a>).</figcaption>
+</figure>
+<figure>
+<svg viewBox="0 0 560 330" role="img" aria-label="Lineage trace from a curated subset back to the training data, synthetic fixture">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="f-ah"/></marker></defs>
+<text x="20" y="16" class="f-n">SYNTHETIC FIXTURE: trace FROM THE SELECT RUN BACK</text>
+<rect x="150" y="26" width="260" height="34" rx="8" class="f-box acc"/>
+<text x="162" y="45" class="f-t">select-ti-harm</text>
+<text x="162" y="62" class="f-m">curated subset (harmful removed)</text>
+<line x1="280" y1="60" x2="280" y2="80" class="f-arrow" marker-end="url(#ah)"/>
+<rect x="150" y="80" width="260" height="34" rx="8" class="f-box acc"/>
+<text x="162" y="99" class="f-t">attribute-ti-ens</text>
+<text x="162" y="116" class="f-m">ensemble of two seeds</text>
+<line x1="240" y1="114" x2="135" y2="138" class="f-arrow" marker-end="url(#ah)"/>
+<line x1="320" y1="114" x2="425" y2="138" class="f-arrow" marker-end="url(#ah)"/>
+<rect x="20" y="138" width="240" height="34" rx="8" class="f-box "/>
+<text x="32" y="157" class="f-t">attribute-ti-s0</text>
+<text x="32" y="174" class="f-m">+ 6 feature-file digests</text>
+<rect x="50" y="190" width="180" height="30" rx="8" class="f-box "/>
+<text x="62" y="209" class="f-t">returns-ti-s0</text>
+<rect x="50" y="228" width="180" height="30" rx="8" class="f-box "/>
+<text x="62" y="247" class="f-t">eval-ti-s0</text>
+<rect x="50" y="266" width="180" height="30" rx="8" class="f-box "/>
+<text x="62" y="285" class="f-t">train-ti-s0</text>
+<line x1="40" y1="172" x2="40" y2="281" class="f-arrow"/>
+<line x1="40" y1="205" x2="50" y2="205" class="f-arrow" marker-end="url(#ah)"/>
+<line x1="40" y1="243" x2="50" y2="243" class="f-arrow" marker-end="url(#ah)"/>
+<line x1="40" y1="281" x2="50" y2="281" class="f-arrow" marker-end="url(#ah)"/>
+<rect x="300" y="138" width="240" height="34" rx="8" class="f-box "/>
+<text x="312" y="157" class="f-t">attribute-ti-s1</text>
+<text x="312" y="174" class="f-m">+ 6 feature-file digests</text>
+<rect x="330" y="190" width="180" height="30" rx="8" class="f-box "/>
+<text x="342" y="209" class="f-t">returns-ti-s1</text>
+<rect x="330" y="228" width="180" height="30" rx="8" class="f-box "/>
+<text x="342" y="247" class="f-t">eval-ti-s1</text>
+<rect x="330" y="266" width="180" height="30" rx="8" class="f-box "/>
+<text x="342" y="285" class="f-t">train-ti-s1</text>
+<line x1="320" y1="172" x2="320" y2="281" class="f-arrow"/>
+<line x1="320" y1="205" x2="330" y2="205" class="f-arrow" marker-end="url(#ah)"/>
+<line x1="320" y1="243" x2="330" y2="243" class="f-arrow" marker-end="url(#ah)"/>
+<line x1="320" y1="281" x2="330" y2="281" class="f-arrow" marker-end="url(#ah)"/>
+<text x="20" y="318" class="f-m">10 runs and 12 feature-file digests reached; the training subset (308ff4d8d805) is in the record. 5 stages: attribute, eval, returns, select, train.</text>
+</svg>
+  <figcaption><b>Trace from a curated subset to its evidence (SYNTHETIC fixture).</b> Every curated subset can be walked back through the ensemble, each seed's attribution, the returns, evaluation and training runs, and 12 feature-file fingerprints. Notice no orphaned box. Fixture on a scratch store; counts from <code>artifacts/s8_trace_select_SYNTHETIC.json</code> (<a href="S8-end-to-end-on-this-mac.html">S8</a>).</figcaption>
+</figure>
+<h3>A real example: what each arm keeps (SYNTHETIC scores, real catalog)</h3>
+<p>The curation operations were run through <code>select_run</code> on the real v0/candidate manifests (20 tasks × 48 episodes) with a synthetic score table. Per-task arms keep exactly 43 per task, so the task mix is untouched; global arms keep the same total but shift the mix (<code>artifacts/s4_select_counts_SYNTHETIC_SCORES.csv</code>):</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>Arm</th><th>Mode</th><th>Episodes kept</th><th>Per-task counts</th></tr></thead>
+  <tbody>
+    <tr><td><code>harm-f30-k5</code></td><td>per task (headline)</td><td class="num">860</td><td>43 in every task</td></tr>
+    <tr><td><code>random0-k5</code></td><td>per task (matched control)</td><td class="num">860</td><td>43 in every task</td></tr>
+    <tr><td><code>gharm-f30-n100</code></td><td>global</td><td class="num">860</td><td>between 38 and 46 per task</td></tr>
+    <tr><td><code>grandom0-n100</code></td><td>global (control)</td><td class="num">860</td><td>between 39 and 46 per task</td></tr>
+    <tr><td><code>drop-random-20</code></td><td>20-drop gate</td><td class="num">940</td><td>between 44 and 48 per task</td></tr>
+  </tbody>
+</table>
+</div>
+<h3>Reproduce it</h3>
+<p>From the repo root. The first block re-counts the experiment's size; the second re-runs the checks (all read-only on the real store; they write scratch copies under <code>data/scratch/</code>).</p>
+<pre><code>for f in "" "--curation per_task" "--curation per_task --metrics f30 hrt60_lin" \
+         "--curation per_task --metrics f30 hrt60_lin --seeds 0 1 --random-draws 1 --no-ac75"; do
+  .venv/bin/python scripts/server_pipeline.py --tag demo --dry-run $f | tail -1 | cut -c1-24
+done</code></pre>
+<pre><code>would submit 313 jobs
+would submit 172 jobs
+would submit 112 jobs
+would submit 56 jobs</code></pre>
+<pre><code>.venv/bin/python scripts/verify_attribution.py                           # estimator maths, CUPID parity
+.venv/bin/python scripts/verify_training_attribution.py --functionals    # S3
+.venv/bin/python scripts/verify_training_attribution.py --pipeline       # S4 chain shape
+.venv/bin/python scripts/verify_training_attribution.py --step4          # S4 summary (synthetic)
+.venv/bin/python scripts/verify_training_attribution.py --groups         # S7 (synthetic)
+# also --blind (S1), --recovery (S5), --names (S6), --integration (S8), --local-smoke --device mps (S8, ~8 min)</code></pre>
+<pre><code>pass: True (29/29)
+S3 pass: True (17/17, 20s)
+S4 pipeline pass: True (8/8, 2s)
+S4 summary/selects pass: True (13/13, 4s)
+S7 pass: True (9/9, 6s)</code></pre>
+<p class="small">Output above was captured now (HEAD 6b49d1c). Each check also prints <code>[PASS] R7 real mlflow.db sha256 unchanged  306af4123fda7e63...</code>.</p>
+
+<h2>Out of scope (needs the server)</h2>
+<p>Dismissed by the owner's ruling, listed once so this report stays honest. No stories, acceptance criteria or runbook work were written for these:</p>
+<ul>
+  <li>Training at 20,000 steps and attribution-grade evaluations and returns at full scale.</li>
+  <li>Feature extraction on real, fully trained checkpoints (the MPS smoke used a 2-step toy checkpoint).</li>
+  <li>Running the SLURM chain for real, and SQLite behaviour under concurrent jobs.</li>
+  <li>Real attribution scores; verdicts on retrained arms; the "same dataset, opposite curations" result; real recovery numbers on v3.</li>
+  <li>The October cluster regressions (the 3.2e-13 estimator match and the GPU smoke), kept as the ported branch's server-side evidence only; re-computing the October scores after the time-seeding fix.</li>
+  <li>The <code>smolvla_base</code> revision discrepancy in the cluster's cache (<code>5e8d12a6</code> versus <code>d9f33c94</code>).</li>
+</ul>
+
+<h2>Verification</h2>
+<p><b>Round 1</b> (analyzer, HEAD <code>139c32d</code>) re-ran <code>verify_attribution.py</code> (29/29), all eight modes of <code>verify_training_attribution.py</code> and nine older verifiers; it also measured separation of per-sample gradients on the real SmolVLA on MPS (a batch of 3 against three batches of 1 differ by 0.27–0.64%, so no cross-sample leakage). <b>Round 2</b> (HEAD <code>520be42</code>) re-ran all 18 verifier commands (all exit 0) and checked each round-1 fix in the code; the real <code>mlflow.db</code> sha256 <code>306af4123fda7e635892d459a2e34008ba1cb62f6c4fce152c546e0da7bdde79</code> was unchanged before and after. The refactorer then ran the same 18 commands before and after its edits on <code>aa47526</code> and <code>6dce7d2</code>: per-check results identical apart from run ids and the chain hash. I re-ran the five fast checks and the dry-run counts now (HEAD <code>6b49d1c</code>).</p>
+<p><b>Unverified, said plainly:</b> S8.3 (the real-model smoke) was re-run by the executor on the final code but not by the analyzer (about 8 minutes); S2.4 (the 300 s per call checkpoint smoke) was only partly re-run by the analyzer (it loaded the same checkpoint and got finite 7,488-dim features for both functions). The smoke's rank agreement is undefined (2 rollouts). The 4 h per training figure is an unmeasured estimate. That <code>#SBATCH</code> lines do not expand variables is from the sbatch manual, not re-read. The cost of hashing the trajectories folder per attribute run is unmeasured at 1,000 rollouts. Nothing that needs the server is verified.</p>
+
+<h2>Process trail</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>Round</th><th>Verdict</th><th>Sent back to</th><th>What was caught</th></tr></thead>
+  <tbody>
+    <tr><td>0 (before this feature)</td><td>—</td><td>—</td><td>The ported branch (3 commits, about 2,000 lines) had gone through the build skill only: no plan review, no analyzer, no refactor, and a 56-line report.</td></tr>
+    <tr><td>Plan</td><td>—</td><td>—</td><td>20-row compliance matrix; 8 stories; one blocking owner question (curation unit), answered "Both, per-task headline". Premises found false while executing: <code>assert_blind('v0')</code> passed a subset cut with the answer-key operation; the ensemble silently dropped a failure-type column absent from seed 0; the quoted 20 s to open a version is 2.3 s here.</td></tr>
+    <tr><td>1</td><td><b>REWORK</b></td><td>executor</td><td>(1) The Step 4 summary counted directions when the macro-KS gate had not fired (measured: a planted case read "expectation met in 3/3"); (2) the SLURM log folder was never created, so on a new account every job would die before starting; (3) feature files were not tied to the data they claimed (a v0-root feature set could attribute a v3 subset; rollout features from another eval of the same checkpoint would pass); (4) stale <code>--estimator</code> references in two docstrings; (5) <code>--functionals</code> exited 1 without <code>--manifest</code>. Non-blocking: ensemble params lacked the divergences, group rule vs "every metric", step4-summary without chain id, a catalog read needing a docstring.</td></tr>
+    <tr><td>2</td><td><b>PASS</b></td><td>—</td><td>All five fixed and re-run (18 commands, rc 0). The executor kept the ≥ 2-of-5 group rule and recorded it as a named divergence; the analyzer did not accept the stated rationale (redundancy argues the other way), so the refactorer reworded it to say it is a judgement call with a specific risk. Left for the owner: cost, centring, the rule.</td></tr>
+    <tr><td>Refactor</td><td>—</td><td>—</td><td>Docs only: migration note in <code>attribute_run</code>, the pipeline docstring and two refusal messages; one-line docstrings on every <code>stage.py</code> command; unused imports removed. All 18 commands identical before and after.</td></tr>
+  </tbody>
+</table>
+</div>
+<p><b>Earlier integration defects, caught by S8 before the analyzer saw them:</b> the lineage trace from a select run dead-ended at the score table; a refused select left a FAILED run behind; and one S3 check expected the wrong error once the first was fixed. All three were invisible to tests that stub the lookup.</p>
+<h3>Reinvention audit</h3>
+<div class="scroll">
+<table>
+  <thead><tr><th>Mechanism</th><th>Open-source alternative</th><th>Decision</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td><code>KroneckerProjector</code> + <code>influence_matrix</code> (influence.py, attribution.py)</td><td><code>trak</code> projectors</td><td><b>kept</b></td><td>TRAK's projectors are dense and its fast one needs CUDA, so it cannot be tested on this Mac; chunking is by parameter count, not per layer (quoted from its source). The math core is about 40 lines, checked against a brute-force sum (7.4e-16). The swap is inferred-only.</td></tr>
+    <tr><td>same</td><td><code>kronfluence</code></td><td><b>kept</b></td><td>Its Hessians are identity/diagonal/KFAC/EKFAC, not CUPID's projected Gauss-Newton (quoted from its docs); adopting it would change the estimator.</td></tr>
+    <tr><td>same</td><td>pytorch-influence-functions, <code>dattri</code></td><td><b>kept</b></td><td>Not CUPID's estimator; no return weighting (inferred).</td></tr>
+    <tr><td><code>server_pipeline.py</code> (<code>sbatch --dependency=afterok</code>)</td><td><code>submitit</code>, Snakemake</td><td><b>kept</b></td><td>submitit's examples document no dependency chaining (quoted); Snakemake would be a second record system beside MLflow stage runs. Trade given up: no automatic retries or resubmission.</td></tr>
+    <tr><td><code>vlapoc/step4.py</code> (summary)</td><td>—</td><td><b>kept</b></td><td>Aggregates <code>verdict.json</code>, reuses <code>vlapoc.verdict</code>; small.</td></tr>
+    <tr><td><code>vlapoc/recovery.py</code></td><td>—</td><td><b>kept</b></td><td>Wraps the existing <code>groundtruth.score_recovery</code>.</td></tr>
+    <tr><td><code>analysis.aggregate_by</code> (hand percentile bootstrap)</td><td><code>scipy.stats.bootstrap</code></td><td><b>kept, optional cleanup</b></td><td>A drop-in replacement; left alone as non-blocking.</td></tr>
+    <tr><td><code>load_site</code> (<code>.env</code> parser, ~15 lines)</td><td><code>python-dotenv</code></td><td><b>kept</b></td><td>A new dependency for 15 lines (inferred).</td></tr>
+  </tbody>
+</table>
+</div>
+<h3>Disputes and owner rulings</h3>
+<p>No formal dispute reached the owner. In round 2 the executor kept the ≥ 2-of-5 group rule (its rationale: the five returns are partly redundant); the analyzer did not accept that reasoning but, because the labels are declared descriptive, did not block; the point went to the owner as decision 3. The owner's rulings in this feature: scope (2026-10-20) "Just dismiss the parts that need the server and fix everything else", and curation unit (Q1) "Both, per-task headline (Rec.)". Both are recorded in the brief.</p>
+
+<h2>What changed</h2>
+<p>Insertions and deletions outside <code>tracker/</code> and <code>calls/</code>, from <code>git diff --stat efee1db..HEAD</code>: 22 files, 3,308 insertions, 158 deletions.</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>File</th><th>Change</th><th>Lines added</th></tr></thead>
+  <tbody>
+    <tr><td><code>vlapoc/attribution.py</code></td><td>Divergences, ±1 encoding, declarations, feature digests and binding, ensemble guards</td><td class="num">+394</td></tr>
+    <tr><td><code>vlapoc/influence.py</code></td><td><code>square</code> output function, output capture, relative manifests</td><td class="num">+149</td></tr>
+    <tr><td><code>vlapoc/analysis.py</code> (new)</td><td>Groups, aggregation, heatmap, scatter, analyze run</td><td class="num">+262</td></tr>
+    <tr><td><code>vlapoc/step4.py</code> (new)</td><td>Gate-aware seed summary</td><td class="num">+205</td></tr>
+    <tr><td><code>vlapoc/recovery.py</code> (new)</td><td>Hypotheses and recovery matrix</td><td class="num">+129</td></tr>
+    <tr><td><code>vlapoc/third_party/cupid_quality.py</code> + LICENSE (new)</td><td>CUPID's two functions, verbatim, MIT</td><td class="num">+59 / +21</td></tr>
+    <tr><td><code>vlapoc/runs.py</code>, <code>method_data.py</code>, <code>verdict.py</code></td><td>select checks before run creation; check order; extra tags</td><td class="num">+40 / +11 / +8</td></tr>
+    <tr><td><code>scripts/stage.py</code></td><td><code>method_view</code>, new stage commands, <code>--lineage-root</code>, chain-scoped names</td><td class="num">+230</td></tr>
+    <tr><td><code>scripts/server_pipeline.py</code></td><td>Arms, verifies, score, analyze, summary jobs; site config; LOG_DIR</td><td class="num">+184</td></tr>
+    <tr><td><code>scripts/verify_training_attribution.py</code> (new)</td><td>Nine verifier modes, one per story</td><td class="num">+1475</td></tr>
+    <tr><td><code>scripts/verify_attribution.py</code>, <code>verify_method_boundary_s3.py</code></td><td>Checks 6–8, smoke; boundary scan widened</td><td class="num">+224 / +6</td></tr>
+    <tr><td><code>slurm/</code>, <code>docs/site-profile-cluster.env</code>, <code>.gitignore</code></td><td>Portable site config; no absolute paths</td><td class="num">+20 +21 +12 +9 +1</td></tr>
+  </tbody>
+</table>
+</div>
+<h2>How to read the code</h2>
+<p>Follow one attribution run through the chain, then the checks (spec §9.1 Steps 3–4, p. 19; §4.3–§4.5, pp. 10–11).</p>
+<ol>
+  <li><code>docs/dataflow.md</code>, Steps 3 and 4: the picture the code implements.</li>
+  <li><code>scripts/server_pipeline.py</code> docstring: the whole experiment as one SLURM chain with the PoC sentence each arm tests. Run <code>server_pipeline.py --tag demo --dry-run</code> to see every job and command.</li>
+  <li><code>scripts/stage.py</code> docstring and <code>cmd_*</code>: one subcommand per tracked stage. <code>method_view</code> is the one door through which training, feature extraction and select read a dataset.</li>
+  <li><code>vlapoc/method_data.py</code> (<code>open_for_method</code>): the four refusals (fenced, answer-key-derived, tampered, not blind).</li>
+  <li><code>vlapoc/influence.py</code>: <code>featurize</code> turns a checkpoint plus data into projected per-sample gradient features. Read the module docstring for the output function, then <code>OutputCapture</code>, <code>square_objective</code>, <code>batch_features</code>.</li>
+  <li><code>vlapoc/attribution.py</code>: the module docstring and <code>DIVERGENCES</code> first. Then <code>performance_influence</code> (CUPID's <code>net</code>), <code>column_plan</code> / <code>column_declarations</code>, <code>attribute_run</code>, then <code>ensemble_run</code>.</li>
+  <li><code>vlapoc/third_party/cupid_quality.py</code>: CUPID's own two functions, the parity reference for check 7a.</li>
+  <li><code>vlapoc/analysis.py</code>: <code>metric_groups</code> (with the named divergence), <code>aggregate_by</code>, the two figures, <code>analyze_run</code>.</li>
+  <li><code>vlapoc/step4.py</code>: <code>call</code> (T/C/0/g per metric and seed, gated on macro-KS), <code>summarize</code>, <code>summary_run</code>; verdicts come from <code>vlapoc/verdict.py</code> <code>verify_run</code>.</li>
+  <li><code>vlapoc/recovery.py</code>: <code>EXPECTED_METRICS</code> (committed before any scoring), <code>recovery_matrix</code>, <code>recovery_run</code>.</li>
+  <li>Verification: <code>scripts/verify_attribution.py</code> and <code>scripts/verify_training_attribution.py</code> (nine modes, listed in its docstring).</li>
+</ol>
+<p class="small">Left as-is by the refactorer: <code>attribution.py</code> is 752 lines, and splitting it (estimator / provenance / ensemble) would touch imports across verifiers, so that is for the owner to decide.</p>
+
+<h2>Next</h2>
+<ul>
+  <li><b>Owner decisions</b> above: first server run size (the spec's open "Compute budget" decision, §10 p. 20), centred returns versus ±1, the group rule.</li>
+  <li><b>Unblocks, per the milestone table (p. 20):</b> "Fine-grained attribution" (a faithful CUPID port is ready to run on real checkpoints), "Metric-resolved attribution" (the per-metric influence vector, metric-targeted injections via <code>--subset v3/candidate</code>, and the opposite-curations design are built and wait on real runs) and the counterfactual part of "Verification &amp; demo". The p. 20 open decision "which metric is the declared headline objective for curation" stays open: the chain curates on four metrics and compares an HRT-curated arm head-to-head with an F(30)-curated arm.</li>
+  <li><b>Still unbuilt in the spec:</b> the dashboard linking failed rollouts to influential episodes, screening-versus-attribution comparison, group-level leave-one-out, and the real-robot stage.</li>
+</ul>
+
+<h2>Changes since first release</h2>
+<p class="empty">None yet. Later changes are logged in a <code>changelog.md</code> in this folder.</p>
+
+<footer class="doc">
+  Grounded in <a href="../../../docs/VLA_Data_Attribution_PoC.pdf">VLA_Data_Attribution_PoC.pdf</a>
+  · feature record: <a href="brief.md">brief</a> · <a href="plan.md">plan</a> · <a href="execution-log.md">execution log</a>
+  · <a href="refactor.md">refactor</a> · analyzer rounds <a href="analysis-r1.md">r1</a>, <a href="analysis-r2.md">r2</a>
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S4 Complete Step 4: arms, verdicts, summary — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+/* page-specific styling: every colour comes from tracker.css variables */
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}
+.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.good{border-left-color:var(--good)}
+.note.bad{border-left-color:var(--bad)}
+.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}
+code{overflow-wrap:anywhere}
+pre code{overflow-wrap:normal}
+table.gloss th.grp{background:var(--surface-2);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+table.gloss td:first-child{min-width:11em}
+td.mono{font-family:var(--mono)}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.tag-syn{display:inline-block;font:600 11px/1.6 var(--mono);padding:1px 8px;border-radius:999px;border:1px solid var(--warn);color:var(--warn);margin-left:6px}
+/* figure vocabulary */
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+.f-box.dash{stroke-dasharray:6 4}
+.f-box.acc{stroke:var(--accent);stroke-width:1.8}
+.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
+.f-box.warn{stroke:var(--warn)}
+.f-t{fill:var(--text);font:600 12.5px var(--sans)}
+.f-m{fill:var(--muted);font:10.5px var(--mono)}
+.f-mt{fill:var(--text);font:10.5px var(--mono)}
+.f-n{fill:var(--muted);font:600 10px var(--mono);letter-spacing:.05em}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}
+.f-ah{fill:var(--muted)}
+.f-axis{stroke:var(--border);stroke-width:1.2}
+.f-grid{stroke:var(--border);stroke-width:1;opacity:.6}
+.f-ref{stroke:var(--muted);stroke-width:1.2;stroke-dasharray:4 3}
+.f-bar{fill:var(--accent)}
+.f-bar2{fill:var(--muted)}
+.f-barw{fill:var(--warn)}
+.f-dot{fill:var(--accent);fill-opacity:.8}
+.f-med{stroke:var(--text);stroke-width:1.6}
+.f-good{fill:var(--good);fill-opacity:.28;stroke:var(--good)}
+.f-bad{fill:var(--bad);fill-opacity:.28;stroke:var(--bad)}
+.f-zero{fill:var(--surface-2);stroke:var(--border)}
+.f-gate{fill:var(--warn);fill-opacity:.25;stroke:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Training and attribution: checking the ported influence code</a></p>
+  <h1>S4 · Complete the verification step: helpful arms, controls, opposite curations, a gate-aware summary</h1>
+  <p class="dek">The experiment design now has every arm the spec asks for (harmful removal, helpful removal, random controls, both curation modes), a head-to-head between two curation targets, and a summary that respects the two-step verdict.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">6/6</span></span>
+    <span><b>Depends on</b> S3</span>
+    <span><b>Glossary</b> <a href="report.html#glossary">report.html#glossary</a></span>
+  </div>
+</header>
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>Finding harmful recordings is only a claim until you test it. The spec's test: remove the recordings the method calls most harmful, retrain the robot model, and see whether it gets better than after removing the same number of <i>random</i> recordings. Then do the reverse with the most helpful ones, which should make things worse. The ported code had only the first half and compared each arm only with the original model, never with a random control.</p>
+  <p>This story adds the missing arms and comparisons to the job chain, adds a command that summarises a whole experiment across training seeds (a <b>seed</b> is one random starting point for training; repeating with several shows what is luck), and adds the spec's "opposite curations" test: curate the same dataset once for speed and once for reliability and check that each curated model wins on its own metric. It also builds <i>both</i> ways of choosing what to remove, per task and across all tasks, as the owner decided.</p>
+  <p>The analyzer found one real defect here: the summary counted a metric's direction even when the first step of the spec's two-step verdict (the <b>macro-KS gate</b>, a test of whether the whole distribution of finishing times changed at all) had not fired. That is fixed and tested. All the figures on this page come from <b>planted synthetic verdicts</b>; no model has been retrained, so there is no real Step 4 result yet.</p>
+  <p class="small">Terms (macro-KS gate, Holm, seed, arm, per-task vs global curation, family W, bootstrap, n_boot) are in the <a href="report.html#glossary">report glossary</a>.</p>
+</div>
+<h2>Why</h2>
+<p>PoC §9.1 Step 4 and §2.6 define the counterfactual test, §4.4 defines the two-step verdict, and §4.5 defines "same dataset, opposite curations". The owner's Q1 ruling (recorded in the brief) was to build both curation modes with the per-task one as the headline.</p>
+<blockquote>"Remove the top-k most harmful episodes and retrain. As a control, remove k random episodes and retrain." — §9.1 Step 4, p. 19</blockquote>
+<blockquote>"First the macro-KS gate ... Then each metric's bootstrap CI gives the direction." — §4.4, p. 10 (quoted from the plan's reading of the page)</blockquote>
+<h2>What was built</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File / function</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>scripts/server_pipeline.py::arms</code></td><td>21 arms: per-task <code>harm-</code>/<code>help-&lt;metric&gt;-k5</code> for four metrics (8) plus <code>random0/1-k5</code> (2); global <code>gharm-</code>/<code>ghelp-&lt;metric&gt;-n100</code> (8) plus <code>grandom0/1-n100</code> (2); and the earlier drop-random-20 gate (1). <code>--curation {per_task,global,both}</code>, default <code>both</code>.</td></tr>
+    <tr><td><code>server_pipeline.py</code> verify jobs</td><td>Per seed: each arm vs the base model, each harm/help arm vs each random control of its family, and <code>harm-hrt60_lin</code> vs <code>harm-f30</code> (the opposite-curations head-to-head). 165 verify jobs in the default chain.</td></tr>
+    <tr><td><code>vlapoc/step4.py::call, summarize, summary_run</code></td><td>Turns each verdict into T (treated better), C (control better), 0, or <b>g</b> (macro-KS gate did not fire), and counts seeds. Directions are written down before any real verdict exists.</td></tr>
+    <tr><td><code>scripts/stage.py::cmd_step4_summary, cmd_verify, cmd_select</code></td><td>New stage command; <code>verify --comparison/--treated/--control</code>; <code>select --headline</code>.</td></tr>
+    <tr><td><code>vlapoc/verdict.py::verify_run(extra_tags=)</code>, <code>vlapoc/runs.py::select_run(extra_params=)</code></td><td>Small hooks so each verdict and select run records which arm and curation mode it belongs to.</td></tr>
+  </tbody>
+</table>
+</div>
+<h2>Acceptance criteria</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead>
+  <tbody>
+    <tr><td>4.1 Dry run lists help arms and, per seed, harm-vs-random and help-vs-random verifies depending on both arms' evals</td><td>PoC §9.1 Step 4.1/4.5; §2.6</td><td>met</td><td><code>.venv/bin/python scripts/verify_training_attribution.py --pipeline</code> → <code>96 jobs checked, 8 help arms, mismatches []</code>; <code>S4 pipeline pass: True (8/8)</code> (re-run now)</td></tr>
+    <tr><td>4.2 A <code>harm-hrt60_lin</code> arm and a head-to-head verify per seed</td><td>PoC §4.5 p.11</td><td>met</td><td>4.2 PASS, depends on both evals</td></tr>
+    <tr><td>4.3 <code>--curation global</code> uses all-rollout columns and a size-matched random control; <code>both</code> is the default and recorded in each select</td><td>PoC §9.1 Step 4.1; ATHENA §3.2</td><td>met</td><td>global: 8 <code>drop_top_k</code> arms (k 100), 2 random; both: 21 selects (8, 8, 3, 2 by op); select params record <code>curation=per_task headline=True pipeline_curation=both</code></td></tr>
+    <tr><td>4.4 The summary on planted verdicts gives the expected table; refuses another chain's verdicts; <b>(round 2)</b> respects the macro-KS gate</td><td>PoC §2.6; §4.4 p.10</td><td>met</td><td><code>.venv/bin/python scripts/verify_training_attribution.py --step4</code> → 13/13: 4.4b <code>T,T,0 ... expectation met in 2/3</code>; 4.4h <code>g,g,g, supports 0, gate_fires 0/3</code>; 4.4i <code>C,g,C</code></td></tr>
+    <tr><td>4.5 Per-task arms keep exactly 43 of 48 episodes in each of the 20 tasks</td><td>PoC p.1 "data is the only variable"</td><td>met</td><td><code>21 arms: [('ac75', 940), ('global', 860), ('per_task', 860)]</code>, on real v0/candidate manifests with a <b>synthetic</b> score table</td></tr>
+    <tr><td>4.6 Job count and arm list of the default dry run recorded</td><td>honest record</td><td>met</td><td>313 jobs (train 66, eval 66, returns 3, feat 6, attribute 3, ensemble 1, analyze 1, select 1, verify 165, step4 1); re-counted now with <code>server_pipeline.py --tag demo --dry-run</code>: <code>would submit 313 jobs</code></td></tr>
+  </tbody>
+</table>
+</div>
+<h2>Example</h2>
+<p>A planted case (synthetic): the "most harmful removed" arm beats its random control on F(30), the chance of finishing within 30 s, in seeds 0 and 1 but shows no clear difference in seed 2. The summary row reads: <code>T,T,0 | treated better in 2/3 seeds, control better in 0/3, gate not fired in 0/3; expectation (treated_better) met in 2/3</code>. Then the round-2 case: three seeds where the macro-KS gate never fired but every metric looked significant on its own. Before the fix this counted as "expectation met in 3/3" (analyzer measured it); now it is <code>g,g,g, supports 0</code>.</p>
+<p><b>Cost.</b> The default chain is large. The first-run decision for the owner, with the whole table, is in the <a href="report.html#decisions">report's open decisions</a>.</p>
+<h2>Visual</h2>
+<figure>
+<svg viewBox="0 0 560 300" role="img" aria-label="Seed-by-seed calls of the Step 4 summary on planted synthetic verdicts">
+<text x="20" y="18" class="f-n">SYNTHETIC (PLANTED) VERDICTS, ONE CELL PER SEED (0, 1, 2)</text>
+<text x="20" y="42" class="f-mt">curated beats random: remove most harmful, compare on F(30)</text>
+<rect x="20" y="48" width="46" height="26" rx="5" class="f-good"/>
+<text x="43" y="66" class="f-t" text-anchor="middle">T</text>
+<rect x="72" y="48" width="46" height="26" rx="5" class="f-good"/>
+<text x="95" y="66" class="f-t" text-anchor="middle">T</text>
+<rect x="124" y="48" width="46" height="26" rx="5" class="f-zero"/>
+<text x="147" y="66" class="f-t" text-anchor="middle">0</text>
+<text x="190" y="66" class="f-m">expected: treated better</text>
+<text x="20" y="94" class="f-mt">remove most helpful, compare with random on F(30)</text>
+<rect x="20" y="100" width="46" height="26" rx="5" class="f-bad"/>
+<text x="43" y="118" class="f-t" text-anchor="middle">C</text>
+<rect x="72" y="100" width="46" height="26" rx="5" class="f-bad"/>
+<text x="95" y="118" class="f-t" text-anchor="middle">C</text>
+<rect x="124" y="100" width="46" height="26" rx="5" class="f-zero"/>
+<text x="147" y="118" class="f-t" text-anchor="middle">0</text>
+<text x="190" y="118" class="f-m">expected: treated worse</text>
+<text x="20" y="146" class="f-mt">opposite curations: HRT arm vs F(30) arm, judged on F(30)</text>
+<rect x="20" y="152" width="46" height="26" rx="5" class="f-bad"/>
+<text x="43" y="170" class="f-t" text-anchor="middle">C</text>
+<rect x="72" y="152" width="46" height="26" rx="5" class="f-bad"/>
+<text x="95" y="170" class="f-t" text-anchor="middle">C</text>
+<rect x="124" y="152" width="46" height="26" rx="5" class="f-bad"/>
+<text x="147" y="170" class="f-t" text-anchor="middle">C</text>
+<text x="190" y="170" class="f-m">expected: HRT arm worse here</text>
+<text x="20" y="198" class="f-mt">planted: gate never fired, every metric looked significant</text>
+<rect x="20" y="204" width="46" height="26" rx="5" class="f-gate"/>
+<text x="43" y="222" class="f-t" text-anchor="middle">g</text>
+<rect x="72" y="204" width="46" height="26" rx="5" class="f-gate"/>
+<text x="95" y="222" class="f-t" text-anchor="middle">g</text>
+<rect x="124" y="204" width="46" height="26" rx="5" class="f-gate"/>
+<text x="147" y="222" class="f-t" text-anchor="middle">g</text>
+<text x="190" y="222" class="f-m">counts for nothing</text>
+<text x="20" y="250" class="f-mt">planted: gate fired in 2 of 3 seeds</text>
+<rect x="20" y="256" width="46" height="26" rx="5" class="f-bad"/>
+<text x="43" y="274" class="f-t" text-anchor="middle">C</text>
+<rect x="72" y="256" width="46" height="26" rx="5" class="f-gate"/>
+<text x="95" y="274" class="f-t" text-anchor="middle">g</text>
+<rect x="124" y="256" width="46" height="26" rx="5" class="f-bad"/>
+<text x="147" y="274" class="f-t" text-anchor="middle">C</text>
+<text x="190" y="274" class="f-m">only the 2 fired seeds count</text>
+<text x="20" y="300" class="f-m">T = treated arm better · C = control better · 0 = no clear difference · g = macro-KS gate did not fire</text>
+</svg>
+  <figcaption><b>What the Step 4 summary says, seed by seed (planted, SYNTHETIC).</b> Green cells are seeds where the treated arm did better, red where the control did, grey where nothing was clear, amber where the first-step gate did not fire. Notice the last two rows: an amber cell adds nothing, however significant its individual metrics looked. All five rows are planted test inputs from <code>artifacts/s4_summary_and_selects.json</code> and <code>s4_step4_summary_SYNTHETIC.csv</code>; they show the summary logic works, not that any curation helps.</figcaption>
+</figure>
+<h2>Divergences and limitations</h2>
+<ul>
+  <li><b>Per-task versus global curation (owner-approved, Q1: "Both, per-task headline").</b> The PoC's literal text is global top-k; the ported code was per-task (grounded in ATHENA §3.2, not in the PoC). Both are built; per-task is the reported headline, global is reported alongside. This roughly doubles the server's retraining arms.</li>
+  <li>Each treated arm is compared with <i>every</i> random draw (2 draws) of its family, each a separate row, so the control's own variability is visible. The new comparisons use family W only (the declared family); the comparisons against the base model keep families W and O.</li>
+  <li>The summary does not re-test: the two-step verdict is <code>vlapoc.verdict</code>'s. Expected directions (harm removed: treated better; help removed: treated worse; HRT arm wins HRT, F(30) arm wins F(30)) are written in <code>step4.py</code> before any real verdict.</li>
+  <li>Global arms rank the all-rollout column and remove N = k × 20 = 100 episodes to match the per-task total; the claim that per-task columns cannot be ranked globally is a design reason (inferred), not measured.</li>
+  <li><b>Not available here:</b> any real retrained-arm verdict (server).</li>
+</ul>
+
+</div>
+</body>
+</html>

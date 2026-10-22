@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S5 Score attribution against the planted damage — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+/* page-specific styling: every colour comes from tracker.css variables */
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}
+.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.good{border-left-color:var(--good)}
+.note.bad{border-left-color:var(--bad)}
+.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}
+code{overflow-wrap:anywhere}
+pre code{overflow-wrap:normal}
+table.gloss th.grp{background:var(--surface-2);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+table.gloss td:first-child{min-width:11em}
+td.mono{font-family:var(--mono)}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.tag-syn{display:inline-block;font:600 11px/1.6 var(--mono);padding:1px 8px;border-radius:999px;border:1px solid var(--warn);color:var(--warn);margin-left:6px}
+/* figure vocabulary */
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+.f-box.dash{stroke-dasharray:6 4}
+.f-box.acc{stroke:var(--accent);stroke-width:1.8}
+.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
+.f-box.warn{stroke:var(--warn)}
+.f-t{fill:var(--text);font:600 12.5px var(--sans)}
+.f-m{fill:var(--muted);font:10.5px var(--mono)}
+.f-mt{fill:var(--text);font:10.5px var(--mono)}
+.f-n{fill:var(--muted);font:600 10px var(--mono);letter-spacing:.05em}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}
+.f-ah{fill:var(--muted)}
+.f-axis{stroke:var(--border);stroke-width:1.2}
+.f-grid{stroke:var(--border);stroke-width:1;opacity:.6}
+.f-ref{stroke:var(--muted);stroke-width:1.2;stroke-dasharray:4 3}
+.f-bar{fill:var(--accent)}
+.f-bar2{fill:var(--muted)}
+.f-barw{fill:var(--warn)}
+.f-dot{fill:var(--accent);fill-opacity:.8}
+.f-med{stroke:var(--text);stroke-width:1.6}
+.f-good{fill:var(--good);fill-opacity:.28;stroke:var(--good)}
+.f-bad{fill:var(--bad);fill-opacity:.28;stroke:var(--bad)}
+.f-zero{fill:var(--surface-2);stroke:var(--border)}
+.f-gate{fill:var(--warn);fill-opacity:.25;stroke:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Training and attribution: checking the ported influence code</a></p>
+  <h1>S5 · Score attribution against the planted ground truth</h1>
+  <p class="dek">A scoring stage measures, per kind of planted damage and per metric, how well the attribution scores rank the damaged recordings, next to the best simple statistic that each kind must beat.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">6/6</span><span class="tag-syn">SYNTHETIC scores</span></span>
+    <span><b>Depends on</b> S3</span>
+    <span><b>Glossary</b> <a href="report.html#glossary">report.html#glossary</a></span>
+  </div>
+</header>
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>An earlier feature planted known damage in a copy of the dataset: 91 of 960 recordings, in seven kinds, with an answer key. This story builds the scorer that takes a table of attribution scores and asks, for each kind of damage and each metric, whether the damaged recordings are ranked near the top. The score used is <b>AUROC</b>, from 0.5 (no better than guessing) to 1.0 (perfect) for how well a ranking puts the damaged items above the clean ones; <b>recall@13</b> is the share of the 13 damaged recordings of one kind found within the top 13.</p>
+  <p>The spec's §4.5 names two expected pairings (idle padding should show up in the speed metrics, gripper release in reliability). We wrote those pairings into the code and committed them <i>before</i> any scoring code existed, so they are real hypotheses and cannot be tuned after seeing results.</p>
+  <p><b>All numbers on this page come from planted synthetic scores</b>: columns built to rank one kind first, and a random column. They prove the scorer works (1.0 where planted, 0.527 for random). They say nothing about whether the real method finds any damage; that needs the server run.</p>
+  <p class="small">Terms (AUROC, recall@13, answer key, v3, corruption types) are in the <a href="report.html#glossary">report glossary</a>.</p>
+</div>
+<h2>Why</h2>
+<p>PoC §2.1 item 4 and §4.5 want to know whether attribution assigns each corrupted group to the expected metric. The ground-truth feature's limitation D adds that a method only counts if it beats each kind's best simple statistic. Nothing in the ported code scored attribution against the key.</p>
+<blockquote>"Check whether attribution assigns each corrupted group to the expected metric" — §4.5, p. 11 (and "These mappings are hypotheses the experiment should confirm")</blockquote>
+<h2>What was built</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File / function</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>vlapoc/recovery.py::EXPECTED_METRICS</code></td><td>The §4.5 type-to-metric hypotheses. Committed alone in <code>b4790ee</code>, before the scoring code (check 5.3b reads that commit back from git).</td></tr>
+    <tr><td><code>recovery.py::recovery_matrix, recovery_run</code></td><td>For every harm column and every corruption type (plus a pooled row): AUROC and recall@13, the best heuristic's AUROC from the ground-truth bands file, the difference, and <code>matches_hypothesis</code>. Records one <code>score</code> run per table.</td></tr>
+    <tr><td><code>scripts/stage.py::cmd_score</code></td><td><code>stage.py score --scores &lt;attribute run&gt; --version v3</code>. Imports the answer-key module only inside this command.</td></tr>
+    <tr><td><code>scripts/server_pipeline.py</code></td><td>Adds a <code>score</code> job after the ensemble when the base subset's version has an answer key (<code>--subset v3/candidate</code>).</td></tr>
+  </tbody>
+</table>
+</div>
+<h2>Acceptance criteria</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead>
+  <tbody>
+    <tr><td>5.1 With planted columns, that type's AUROC = 1.0; a random column is in [0.4, 0.6]; real store unchanged</td><td>PoC §2.1 item 4 p.3</td><td>met</td><td><code>.venv/bin/python scripts/verify_training_attribution.py --recovery</code> → idle_padding 1.0 in <code>harm_rmst60</code>, gripper_release 1.0 in <code>harm_f30</code>, random column pooled AUROC 0.527 (band is inferred)</td></tr>
+    <tr><td>5.2 One row per (type, column); best heuristic equals the bands CSV for every type</td><td>ground-truth limitation D</td><td>met</td><td>48 rows = 8 × 6 columns; <code>best_heuristic_auroc</code> equals the bands file 7/7</td></tr>
+    <tr><td>5.3 Hypothesis map is in code before any scores; <code>matches_hypothesis</code> reported</td><td>PoC §4.5 p.11</td><td>met</td><td>True for both planted types, None for the other five (the PoC names no mapping for them); first commit of <code>recovery.py</code> is <code>b4790ee</code></td></tr>
+    <tr><td>5.4 Dry run with <code>--subset v3/candidate</code> has one score job depending on the ensemble; <code>v0/candidate</code> has none</td><td>PoC §2.1 item 4</td><td>met</td><td><code>python scripts/stage.py --chain t-... score --scores attribute-t-ens --version v3 --subset candidate --name score-t</code></td></tr>
+    <tr><td>5.5 A score table keyed to another version is refused</td><td>key contract, PoC §9.2 p.19</td><td>met</td><td><code>score table keys != parent subset's episode versions: 91 unknown/stale ...</code></td></tr>
+    <tr><td>5.6 The answer-key module is imported only inside the score command, never by <code>influence.py</code>/<code>attribution.py</code></td><td>owner decision 3</td><td>met</td><td>boundary scan clean; top-level imports 0</td></tr>
+  </tbody>
+</table>
+</div>
+<h2>Example</h2>
+<p>With the real v3 answer key and a <b>synthetic</b> score table whose <code>harm_rmst60</code> column ranks the 13 idle-padding episodes first, the idle-padding row for that column reads AUROC 1.0 and <code>matches_hypothesis = True</code>, because the §4.5 hypothesis says idle padding should show up in a speed metric. A random column pooled over all 91 damaged recordings scored 0.527. The recovery table is deleted with the scratch store on purpose: synthetic numbers must not be kept as if they were results.</p>
+<h2>Visual</h2>
+<figure>
+<svg viewBox="0 0 560 330" role="img" aria-label="Best simple heuristic score per corruption type, the bar a method must beat">
+<text x="20" y="18" class="f-n">BEST ONE-LINE STATISTIC, AUROC (0.5 = GUESSING), MEASURED EARLIER</text>
+<line x1="190.0" y1="30" x2="190.0" y2="266" class="f-grid"/>
+<text x="190.0" y="282" class="f-m" text-anchor="middle">0.5</text>
+<line x1="258.0" y1="30" x2="258.0" y2="266" class="f-grid"/>
+<text x="258.0" y="282" class="f-m" text-anchor="middle">0.6</text>
+<line x1="326.0" y1="30" x2="326.0" y2="266" class="f-grid"/>
+<text x="326.0" y="282" class="f-m" text-anchor="middle">0.7</text>
+<line x1="394.0" y1="30" x2="394.0" y2="266" class="f-grid"/>
+<text x="394.0" y="282" class="f-m" text-anchor="middle">0.8</text>
+<line x1="462.0" y1="30" x2="462.0" y2="266" class="f-grid"/>
+<text x="462.0" y="282" class="f-m" text-anchor="middle">0.9</text>
+<line x1="530.0" y1="30" x2="530.0" y2="266" class="f-grid"/>
+<text x="530.0" y="282" class="f-m" text-anchor="middle">1.0</text>
+<text x="182" y="49" class="f-mt" text-anchor="end">time_shift</text>
+<rect x="190" y="36" width="236.6" height="18" rx="3" class="f-barw"/>
+<text x="432.6" y="49" class="f-m">0.848 length_vs_task_lowest</text>
+<text x="182" y="80" class="f-mt" text-anchor="end">detour</text>
+<rect x="190" y="67" width="312.8" height="18" rx="3" class="f-bar"/>
+<text x="508.8" y="80" class="f-m">0.960 length_vs_task</text>
+<text x="182" y="111" class="f-mt" text-anchor="end">gripper_release</text>
+<rect x="190" y="98" width="315.5" height="18" rx="3" class="f-bar"/>
+<text x="511.5" y="111" class="f-m">0.964 post_release_share_vs_task</text>
+<text x="182" y="142" class="f-mt" text-anchor="end">action_noise</text>
+<rect x="190" y="129" width="340.0" height="18" rx="3" class="f-bar"/>
+<text x="536.0" y="142" class="f-m">1.000 smoothness</text>
+<text x="182" y="173" class="f-mt" text-anchor="end">dropped_frames</text>
+<rect x="190" y="160" width="340.0" height="18" rx="3" class="f-bar"/>
+<text x="536.0" y="173" class="f-m">1.000 duplicate_frame_pairs</text>
+<text x="182" y="204" class="f-mt" text-anchor="end">idle_padding</text>
+<rect x="190" y="191" width="340.0" height="18" rx="3" class="f-bar"/>
+<text x="536.0" y="204" class="f-m">1.000 idle_steps</text>
+<text x="182" y="235" class="f-mt" text-anchor="end">instruction_swap</text>
+<rect x="190" y="222" width="340.0" height="18" rx="3" class="f-bar"/>
+<text x="536.0" y="235" class="f-m">1.000 instruction_mismatch</text>
+<line x1="190.0" y1="30" x2="190.0" y2="266" class="f-ref"/>
+<text x="20" y="306" class="f-m">A method counts as better than a simple statistic only if it scores above that type's bar.</text>
+<text x="20" y="322" class="f-m">These are the earlier feature's measured bars, not attribution results.</text>
+</svg>
+  <figcaption><b>The bar a real method must clear, per kind of damage.</b> These are not attribution results. They are the earlier feature's measured scores of the best one-line statistic for each kind of damage (from the ground-truth bands file). The scorer built here will place real attribution columns next to these bars. Notice <code>time_shift</code> (amber, 0.848): the only kind a simple statistic does not nearly solve, so it is where attribution has the most room to add value.</figcaption>
+</figure>
+<h2>Divergences and limitations</h2>
+<ul>
+  <li>Only two types have a PoC-stated expected metric. The other five have none and are not given an invented one (<code>None</code>).</li>
+  <li>The random-column band [0.4, 0.6] is an inferred band for 91 positives of 960 and is applied to the pooled value only; per type, with 13 positives, a random column's AUROC has a standard deviation of about 0.08.</li>
+  <li><code>recovery_run</code> wraps <code>groundtruth.score_recovery</code> once per table (one tracked run) rather than <code>score_run</code> once per column (28+ runs). A design choice.</li>
+  <li>Columns containing NaN are skipped and named, since the key contract refuses NaN scores.</li>
+  <li><b>Not available here:</b> real recovery numbers on v3 (server run).</li>
+</ul>
+
+</div>
+</body>
+</html>

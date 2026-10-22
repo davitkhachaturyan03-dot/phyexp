@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S2 The estimator is CUPID&#x27;s — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+/* page-specific styling: every colour comes from tracker.css variables */
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}
+.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.good{border-left-color:var(--good)}
+.note.bad{border-left-color:var(--bad)}
+.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}
+code{overflow-wrap:anywhere}
+pre code{overflow-wrap:normal}
+table.gloss th.grp{background:var(--surface-2);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+table.gloss td:first-child{min-width:11em}
+td.mono{font-family:var(--mono)}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.tag-syn{display:inline-block;font:600 11px/1.6 var(--mono);padding:1px 8px;border-radius:999px;border:1px solid var(--warn);color:var(--warn);margin-left:6px}
+/* figure vocabulary */
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+.f-box.dash{stroke-dasharray:6 4}
+.f-box.acc{stroke:var(--accent);stroke-width:1.8}
+.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
+.f-box.warn{stroke:var(--warn)}
+.f-t{fill:var(--text);font:600 12.5px var(--sans)}
+.f-m{fill:var(--muted);font:10.5px var(--mono)}
+.f-mt{fill:var(--text);font:10.5px var(--mono)}
+.f-n{fill:var(--muted);font:600 10px var(--mono);letter-spacing:.05em}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}
+.f-ah{fill:var(--muted)}
+.f-axis{stroke:var(--border);stroke-width:1.2}
+.f-grid{stroke:var(--border);stroke-width:1;opacity:.6}
+.f-ref{stroke:var(--muted);stroke-width:1.2;stroke-dasharray:4 3}
+.f-bar{fill:var(--accent)}
+.f-bar2{fill:var(--muted)}
+.f-barw{fill:var(--warn)}
+.f-dot{fill:var(--accent);fill-opacity:.8}
+.f-med{stroke:var(--text);stroke-width:1.6}
+.f-good{fill:var(--good);fill-opacity:.28;stroke:var(--good)}
+.f-bad{fill:var(--bad);fill-opacity:.28;stroke:var(--bad)}
+.f-zero{fill:var(--surface-2);stroke:var(--border)}
+.f-gate{fill:var(--warn);fill-opacity:.25;stroke:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Training and attribution: checking the ported influence code</a></p>
+  <h1>S2 · Make the estimator CUPID's, and record every difference</h1>
+  <p class="dek">The default quantity whose gradient we take is now CUPID's own (the square of the model's output), parity with CUPID's released code is checked to 2.8e-14, and nine remaining differences are named with their source.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">6/6</span></span>
+    <span><b>Depends on</b> —</span>
+    <span><b>Glossary</b> <a href="report.html#glossary">report.html#glossary</a></span>
+  </div>
+</header>
+<div class="plain">
+  <h2>In plain words</h2>
+  <p><b>Influence</b> is a number for each training recording that says how much it pushed some later outcome up or down. <b>CUPID</b> is the research method (a paper, plus MIT-licensed code) that computes this for robot policies, and the project's spec calls it the "best starting point to fork". To compute influence you take a <b>gradient</b> (the direction in which the model's numbers would have to change) of some chosen quantity, called the <b>output function</b>, for each training sample and for each rollout.</p>
+  <p>The ported code took the gradient of the <i>training loss</i>. CUPID's paper says that choice "works poorly in practice" and uses the <i>square</i> of the model's output instead. We switched the default to CUPID's choice, tested our arithmetic against CUPID's own two functions (they agree to 2.8e-14), and wrote down every place we still differ.</p>
+  <p><b>This changes what the next server run computes.</b> Feature files made with the old default are not comparable with new ones. On 13 real samples the two choices point in noticeably different directions (cosine 0.402 at worst, 0.870 median), so the choice is not cosmetic. What we cannot say yet is whether it changes which recordings come out as harmful; that needs real runs.</p>
+  <p class="small">Terms (CUPID, influence, gradient, output function, return, centred, Kendall's τ, Gauss-Newton, projection) are in the <a href="report.html#glossary">report glossary</a>.</p>
+</div>
+<h2>Why</h2>
+<p>PoC §4.3 says the estimator is CUPID's; §6 says to fork it. The plan found that the port computed CUPID's <i>loss</i> form, which CUPID's paper rejects, and that several other differences (centred returns, fewer random draws, a different projection) were either unrecorded or recorded with a wrong formula.</p>
+<blockquote>"The estimator is CUPID's; the way it is applied is not." — §4.3, p. 10</blockquote>
+<h2>What was built</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File / function</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>vlapoc/influence.py::featurize(output_fn=...)</code></td><td><code>'square'</code> (default) = mean of the squared predicted velocity over the real (unpadded) action entries; <code>'loss'</code> = the old behaviour. The manifest records which.</td></tr>
+    <tr><td><code>influence.py::OutputCapture, square_objective, batch_features</code></td><td>A hook on SmolVLA's <code>action_out_proj</code> layer captures the prediction; it refuses unless the layer ran exactly once per forward pass.</td></tr>
+    <tr><td><code>vlapoc/attribution.py::performance_influence</code></td><td>CUPID's <code>net</code> score; <code>return_encoding='pm1'</code> maps binary returns to ±1 as CUPID does (not allowed together with centring).</td></tr>
+    <tr><td><code>attribution.py::DIVERGENCES</code></td><td>Nine entries, each with its source; logged as a parameter of every attribute and ensemble run.</td></tr>
+    <tr><td><code>attribution.py::check_compatible, output_fn_of</code></td><td>Refuse shards that mix output functions within one side; accept ATHENA's mixed loss/square pairing.</td></tr>
+    <tr><td><code>vlapoc/third_party/cupid_quality.py</code></td><td>CUPID's own <code>sum_of_sum_influence</code> and <code>compute_demo_quality_scores</code>, copied verbatim from <code>agiachris/cupid</code> @ <code>2941eba9</code> (MIT), used only as the reference in check 7a.</td></tr>
+    <tr><td><code>scripts/stage.py features --preset {cupid,athena,branch}</code>, <code>attribute --cupid-returns</code></td><td>Switches between CUPID's choice, ATHENA's mixed choice and the old behaviour.</td></tr>
+  </tbody>
+</table>
+</div>
+<h2>Acceptance criteria</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead>
+  <tbody>
+    <tr><td>2.1 On a toy module, 'square' features equal the brute-force projected per-sample gradient (rel err &lt; 1e-5)</td><td>CUPID App. A.1 Eq. 9</td><td>met</td><td><code>verify_attribution.py</code> → 6a max per-sample rel err 8.58e-08 (square), 1.18e-07 (loss); 6b abs diff 0.0</td></tr>
+    <tr><td>2.2 CUPID parity: our <code>net</code> equals CUPID's vendored functions (abs err &lt; 1e-9)</td><td>CUPID released code, <code>error_util.py</code></td><td>met</td><td>7a max abs err 2.84e-14 (re-run now: <code>pass: True (29/29)</code>)</td></tr>
+    <tr><td>2.3 Centring algebra holds, and rankings agree with CUPID's only at p = ½</td><td>CUPID App. A.2; derived</td><td>met</td><td>7b p=0.5, identity err 2.7e-15, Kendall τ 1.000; 7c p=0.3, identity err 3.6e-15, τ 0.667 (a counterexample)</td></tr>
+    <tr><td>2.4 Real SmolVLA checkpoint smoke: 7,488-dim features, manifest records the function, no NaN, two calls bit-for-bit equal</td><td>CUPID App. A.1</td><td>met (analyzer re-ran part)</td><td><code>verify_attribution.py --cpu-smoke ... --device mps</code> → shape (13, 7488), 117 layers, max abs diff 0.0, ~301–307 s per call incl. model load. The analyzer loaded the same checkpoint and got finite 7,488-dim features for both functions; it did not re-run the full 300 s calls</td></tr>
+    <tr><td>2.5 Run params carry both output functions, encoding, centring and DIVERGENCES; mixed output functions refused</td><td>PoC §3.4 p.7 disclosure</td><td>met</td><td>8a, 8b, 8c PASS; <code>--functionals</code> 2.5 PASS</td></tr>
+    <tr><td>2.6 Earlier checks 1–5 still pass</td><td>regression</td><td>met</td><td>29/29 total; original checks account for 16</td></tr>
+  </tbody>
+</table>
+</div>
+<h2>Example</h2>
+<p>Take one real sample from episodes 31 and 41 of the clean reference set. Its objective under the square function was 1.697 and under the loss function 2.371 (index 0 of <code>s2_cpu_smoke_mps.json</code>), and the cosine between the two projected gradient vectors was 0.813. Sample 7 of the 13 was the extreme case: cosine 0.402. In words: for most samples the two choices agree broadly, but for some they point in clearly different directions, so the output function changes what the influence scores mean.</p>
+<pre><code>.venv/bin/python scripts/verify_attribution.py --cpu-smoke data/runs/train-smolvla-2step-persubset-v0ref-20261005T012854Z/lerobot/checkpoints/000002/pretrained_model data/lerobot/libero_spatial_10 --device mps
+[PASS] S5 square vs loss features of the same samples  cosine min 0.402 median 0.870 max 0.953 over 13 samples; norm ratio |square|/|loss| median 0.976</code></pre>
+<p class="small">That checkpoint is a 2-step toy training run, used only to prove the code runs on a real model. It is not attribution-grade.</p>
+<h2>Visual</h2>
+<figure>
+<svg viewBox="0 0 560 150" role="img" aria-label="Cosine similarity between the square and loss gradient features of 13 real samples">
+<line x1="40.0" y1="40" x2="40.0" y2="96" class="f-grid"/>
+<text x="40.0" y="112" class="f-m" text-anchor="middle">0.3</text>
+<line x1="110.0" y1="40" x2="110.0" y2="96" class="f-grid"/>
+<text x="110.0" y="112" class="f-m" text-anchor="middle">0.4</text>
+<line x1="180.0" y1="40" x2="180.0" y2="96" class="f-grid"/>
+<text x="180.0" y="112" class="f-m" text-anchor="middle">0.5</text>
+<line x1="250.0" y1="40" x2="250.0" y2="96" class="f-grid"/>
+<text x="250.0" y="112" class="f-m" text-anchor="middle">0.6</text>
+<line x1="320.0" y1="40" x2="320.0" y2="96" class="f-grid"/>
+<text x="320.0" y="112" class="f-m" text-anchor="middle">0.7</text>
+<line x1="390.0" y1="40" x2="390.0" y2="96" class="f-grid"/>
+<text x="390.0" y="112" class="f-m" text-anchor="middle">0.8</text>
+<line x1="460.0" y1="40" x2="460.0" y2="96" class="f-grid"/>
+<text x="460.0" y="112" class="f-m" text-anchor="middle">0.9</text>
+<line x1="530.0" y1="40" x2="530.0" y2="96" class="f-grid"/>
+<text x="530.0" y="112" class="f-m" text-anchor="middle">1.0</text>
+<line x1="40" y1="96" x2="530" y2="96" class="f-axis"/>
+<circle cx="111.4" cy="86" r="5" class="f-dot"/>
+<circle cx="246.4" cy="86" r="5" class="f-dot"/>
+<circle cx="393.2" cy="86" r="5" class="f-dot"/>
+<circle cx="399.1" cy="73" r="5" class="f-dot"/>
+<circle cx="429.7" cy="86" r="5" class="f-dot"/>
+<circle cx="436.0" cy="73" r="5" class="f-dot"/>
+<circle cx="438.7" cy="60" r="5" class="f-dot"/>
+<circle cx="440.0" cy="47" r="5" class="f-dot"/>
+<circle cx="440.9" cy="86" r="5" class="f-dot"/>
+<circle cx="447.9" cy="73" r="5" class="f-dot"/>
+<circle cx="448.2" cy="34" r="5" class="f-dot"/>
+<circle cx="462.6" cy="86" r="5" class="f-dot"/>
+<circle cx="497.0" cy="86" r="5" class="f-dot"/>
+<line x1="438.7" y1="34" x2="438.7" y2="96" class="f-med"/>
+<text x="444.7" y="32" class="f-mt">median 0.870</text>
+<text x="111.4" y="130" class="f-mt" text-anchor="middle">min 0.402</text>
+<text x="497.0" y="130" class="f-mt" text-anchor="middle">max 0.953</text>
+<text x="40" y="16" class="f-n">COSINE: 1.0 = SAME DIRECTION</text>
+<text x="545" y="142" class="f-m" text-anchor="end">13 real samples, SmolVLA checkpoint, MPS</text>
+</svg>
+  <figcaption><b>How much the output-function choice changes the gradient.</b> Each dot is one real sample (13 from the toy SmolVLA checkpoint). 1.0 would mean the two gradient vectors point the same way. Notice the spread: most samples sit near 0.87, but two fall near 0.4 and 0.6, so the choice can reorder influence for a minority of samples. Numbers from <code>artifacts/s2_cpu_smoke_mps.json</code>.</figcaption>
+</figure>
+<h2>Divergences and limitations</h2>
+<p>The nine differences from CUPID that remain (in <code>DIVERGENCES</code>) are listed in plain terms in the <a href="report.html#fidelity">report's CUPID-fidelity table</a>. Three notes specific to this story:</p>
+<ul>
+  <li><b>The default changed.</b> Square on both sides is CUPID's; the owner asked this to be flagged because it changes the next server run's output. <code>--preset branch</code> reproduces the old loss/loss features; <code>--preset athena</code> is ATHENA's mixed form.</li>
+  <li><b>Centred returns are still the default for binary columns.</b> That is the planner's assumption (inferred), not an owner-approved choice, and it differs from CUPID's ±1. This is an open owner decision in the report.</li>
+  <li>The square objective averages over valid steps times action dimensions, following SmolVLA's own loss reduction. CUPID's code averages over all entries including padded ones. They are equal when nothing is padded (documented in <code>square_objective</code>).</li>
+  <li>The 2-step checkpoint smoke proves the machinery, not the quality of any scores.</li>
+</ul>
+
+</div>
+</body>
+</html>

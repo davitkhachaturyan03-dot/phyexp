@@ -32,6 +32,17 @@
   <span class="pill good">verified</span></div>
 </a>
 -->
+<a class="entry" href="features/2026-10-20-training-attribution/report.html">
+  <div class="top"><span class="title">Training and attribution: checking the ported influence code</span><span class="date">2026-10-20 → 2026-10-22</span></div>
+  <p class="sum">The cluster-ported CUPID attribution code, reviewed against the PoC and fixed in 8 stories. The default output function is now CUPID's <code>square</code>
+  (our score equals CUPID's own code to 2.84e-14; this changes what the next server run computes), all four method entry points are blind (20 of 20 unsafe inputs refused),
+  and the Step 4 chain is 21 arms / 313 jobs with a summary that respects the macro-KS gate. No real attribution results yet: every figure is synthetic.
+  Three owner decisions open (first-run size, centred vs ±1 returns, the "consistent" group rule).</p>
+  <div class="tags"><span class="pill accent">§4.3 p.10</span><span class="pill accent">§3.4 p.7</span><span class="pill accent">§4.2–4.5 pp.9–11</span>
+  <span class="pill accent">§9.1 Steps 3–4 p.19</span><span class="pill accent">§10 Fine-grained / Metric-resolved attribution p.20</span>
+  <span class="pill">CUPID (vendored parity)</span><span class="pill">SLURM</span><span class="pill warn">real results pending server</span>
+  <span class="pill good">verified · 46/46 ACs · 2 analyzer rounds</span></div>
+</a>
 <a class="entry" href="features/2026-10-18-attribution-curation/report.html">
   <div class="top"><span class="title">Attribution, curation and server training</span><span class="date">2026-10-18</span></div>
   <p class="sum">CUPID influence of every training episode on every family-W return (episode × metric table),
@@ -89,6 +100,26 @@ One row per PoC section a feature touches.</p>
     <tr><td>§2.1</td><td>3</td><td>Episode lineage via …</td>
         <td><a href="features/2026-09-28-<slug>/report.html">slug</a></td><td>none</td></tr>
 -->
+    <tr><td>§4.3</td><td>10</td><td>The CUPID estimator made faithful: <code>square</code> output function on both sides (default), Gauss-Newton Hessian, sum over steps; our <code>net</code> score equals CUPID's vendored <code>compute_demo_quality_scores</code> to 2.84e-14; nine remaining differences recorded with sources in <code>DIVERGENCES</code></td>
+        <td><a href="features/2026-10-20-training-attribution/report.html">training-attribution</a></td><td>Centred returns by default vs CUPID's ±1 (planner default, <b>not owner-approved</b>; open decision). Damping 1e-3, Kronecker 7,488 dims vs dense 4,000, K = 4 draws vs 64, strides, fp32 numerics, flow matching vs diffusion. Default changed from <code>loss</code> to <code>square</code>: alters the next server run. No real scores yet</td></tr>
+    <tr><td>§3.4</td><td>7</td><td>Every score column declares the functional it explains (metric, τ, rollout subset, sign, centring, output functions) in <code>functionals.json</code>; select runs record the ranked column's declaration</td>
+        <td><a href="features/2026-10-20-training-attribution/report.html">training-attribution</a></td><td>none (<code>rollout_subset</code> is all / same_task only; failure-type columns are indicator returns, recorded)</td></tr>
+    <tr><td>§2.1 item 4</td><td>3</td><td>All four method entry points (attribute, features, train, select) go through <code>open_for_method</code>: 20 of 20 unsafe inputs refused with nothing written; feature files bound to the exact dataset copy and eval trajectories</td>
+        <td><a href="features/2026-10-20-training-attribution/report.html">training-attribution</a></td><td>none. Feature files made before round 2 must be regenerated (migration note)</td></tr>
+    <tr><td>§2.1 item 1</td><td>3</td><td>Feature files fingerprinted as lineage inputs; rollouts without trajectories refused; run names resolve only within their chain; a lineage trace from a select run reaches its rollouts and training subset</td>
+        <td><a href="features/2026-10-20-training-attribution/report.html">training-attribution</a></td><td>none</td></tr>
+    <tr><td>§4.2</td><td>9–10</td><td>Four-group labels, aggregation by catalog column (task), episode × metric table kept as the attribute output</td>
+        <td><a href="features/2026-10-20-training-attribution/report.html">training-attribution</a></td><td>"Consistent" = at least 2 of 5 metrics, not "every metric" (recorded; <b>open owner decision</b>; risk: two near-redundant reliability readouts can alone qualify). Labels descriptive and unverified. Verified on synthetic input only</td></tr>
+    <tr><td>§4.4</td><td>10–11</td><td>Step 4 summary respects the two-step verdict (a seed counts a direction only where the macro-KS gate fired); Kendall's τ; metric and τ on every label</td>
+        <td><a href="features/2026-10-20-training-attribution/report.html">training-attribution</a></td><td>No real verdicts yet (server). Planted synthetic cases only</td></tr>
+    <tr><td>§4.5</td><td>11</td><td>Metric-targeted hypotheses committed before scoring code; recovery scorer per corruption type and metric next to the best heuristic; the "same dataset, opposite curations" head-to-head in the chain; heatmap and throughput-vs-reliability scatter</td>
+        <td><a href="features/2026-10-20-training-attribution/report.html">training-attribution</a></td><td>Only two types have a PoC-named expected metric; the other five get none. All numbers and figures SYNTHETIC; the check itself needs the server run</td></tr>
+    <tr><td>§2.3 / §2.6 / §9.1 Step 4</td><td>4, 5, 19</td><td>Harmful, helpful and random arms in per-task and global modes; 2–3 seeds; 21 arms, 313 jobs, 66 trainings in the default chain; <code>step4-summary</code> job</td>
+        <td><a href="features/2026-10-20-training-attribution/report.html">training-attribution</a></td><td>Per-task headline with global alongside (<b>owner-approved</b>, Q1). First-run size is an open owner decision: about 264 training GPU-h at default vs about 48 smallest (lower bounds, inferred). Retrained-arm verdicts pending server</td></tr>
+    <tr><td>§9.1 Step 3</td><td>19</td><td>Stage chain for Step 3 as a SLURM dependency chain (<code>server_pipeline.py</code>), portable via <code>slurm/site.env</code>, log folder created before submission; synthetic end-to-end run and a real-model smoke on MPS</td>
+        <td><a href="features/2026-10-20-training-attribution/report.html">training-attribution</a></td><td>The smoke is not attribution-grade (2-step toy checkpoint, 2 rollouts). Running the chain for real is out of scope (needs the server)</td></tr>
+    <tr><td>§9.2</td><td>19</td><td>Key contract (scores keyed to exact episode versions) extended to feature files and enforced at attribute, ensemble, select and score</td>
+        <td><a href="features/2026-10-20-training-attribution/report.html">training-attribution</a></td><td>none</td></tr>
     <tr><td>§4.2</td><td>9</td><td>Episode × metric influence matrix: one CUPID score per family-W return (and per-failure-type return), all-rollout and <code>__same_task</code> columns, keyed by (<code>episode_id</code>, <code>content_hash</code>)</td>
         <td><a href="features/2026-10-18-attribution-curation/report.html">attribution-curation</a></td><td>Centred returns (inferred): Ψ_R uses (R − R̄); <code>--no-center</code> is Prop. 1. Features are intermediate, not a lineage entity; the attribute run logs their manifests</td></tr>
     <tr><td>§4.3</td><td>10</td><td>CUPID / TRAK action influence from Kronecker-projected SmolVLA gradients (117 layers × 64 = 7,488 dims, measured); M[τ, ξ] = (Σ_j∈τ φ_j)ᵀ (ΦᵀΦ/N + λI)⁻¹ (Σ_i∈ξ φ_i), max rel err vs brute force 6.2e-16 and vs the cluster's October matrix 3.2e-13</td>

@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S8 End to end on this Mac — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+/* page-specific styling: every colour comes from tracker.css variables */
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}
+.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.good{border-left-color:var(--good)}
+.note.bad{border-left-color:var(--bad)}
+.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}
+code{overflow-wrap:anywhere}
+pre code{overflow-wrap:normal}
+table.gloss th.grp{background:var(--surface-2);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+table.gloss td:first-child{min-width:11em}
+td.mono{font-family:var(--mono)}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.tag-syn{display:inline-block;font:600 11px/1.6 var(--mono);padding:1px 8px;border-radius:999px;border:1px solid var(--warn);color:var(--warn);margin-left:6px}
+/* figure vocabulary */
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+.f-box.dash{stroke-dasharray:6 4}
+.f-box.acc{stroke:var(--accent);stroke-width:1.8}
+.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
+.f-box.warn{stroke:var(--warn)}
+.f-t{fill:var(--text);font:600 12.5px var(--sans)}
+.f-m{fill:var(--muted);font:10.5px var(--mono)}
+.f-mt{fill:var(--text);font:10.5px var(--mono)}
+.f-n{fill:var(--muted);font:600 10px var(--mono);letter-spacing:.05em}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}
+.f-ah{fill:var(--muted)}
+.f-axis{stroke:var(--border);stroke-width:1.2}
+.f-grid{stroke:var(--border);stroke-width:1;opacity:.6}
+.f-ref{stroke:var(--muted);stroke-width:1.2;stroke-dasharray:4 3}
+.f-bar{fill:var(--accent)}
+.f-bar2{fill:var(--muted)}
+.f-barw{fill:var(--warn)}
+.f-dot{fill:var(--accent);fill-opacity:.8}
+.f-med{stroke:var(--text);stroke-width:1.6}
+.f-good{fill:var(--good);fill-opacity:.28;stroke:var(--good)}
+.f-bad{fill:var(--bad);fill-opacity:.28;stroke:var(--bad)}
+.f-zero{fill:var(--surface-2);stroke:var(--border)}
+.f-gate{fill:var(--warn);fill-opacity:.25;stroke:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Training and attribution: checking the ported influence code</a></p>
+  <h1>S8 · Run the chain end to end on this Mac</h1>
+  <p class="dek">The stages ran together through the real command-line tool on a scratch store, plus a toy-scale run on a real SmolVLA checkpoint; doing so exposed three defects that the unit tests could not.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">5/5</span><span class="tag-syn">integration data SYNTHETIC; smoke not attribution-grade</span></span>
+    <span><b>Depends on</b> S1–S7</span>
+    <span><b>Glossary</b> <a href="report.html#glossary">report.html#glossary</a></span>
+  </div>
+</header>
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>The earlier stories were each tested alone, often with stand-ins. This story runs the stages together the way the server will: attribute for two seeds, ensemble, five selects, score and analyze, all through the real <code>stage.py</code> tool on a throwaway copy of the record store. The inputs are synthetic (features, rollouts and returns made up over a real corrupted-dataset subset of 14 episodes), because real ones need the GPU server.</p>
+  <p>Running it end to end found three real defects (below). It also tests six refusals: features from the wrong checkpoint, the wrong episode list, the wrong dataset copy, or the wrong evaluation; a score table from another subset; and an ensemble of runs trained on different subsets. Each is refused with nothing written.</p>
+  <p>A second, real-model run (the <b>smoke run</b>) used a 2-step toy training of SmolVLA, the open-source robot model this project trains, and ran six stages on Apple's GPU (MPS). It finished with no failed stage. It is <b>not attribution-grade</b>: it had only 2 rollouts and no successes, so the agreement between metrics is undefined. It proves the machinery runs on a real model, not that the scores mean anything.</p>
+  <p class="small">Terms (MPS, smoke run, trace, scratch store, key contract) are in the <a href="report.html#glossary">report glossary</a>.</p>
+</div>
+<h2>Why</h2>
+<p>The plan's compliance matrix noted that the key contract (scores belong to exact episode versions) was only unit-tested with monkeypatching, and the brief required separating what can be re-verified on this Mac from what needs the server. PoC §2.1 item 1 asks that everything be traceable.</p>
+<blockquote>"Every eval rollout should be tied back to that checkpoint." — §2.1 item 1, p. 3</blockquote>
+<h2>What was built</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File / function</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>scripts/verify_training_attribution.py --integration</code></td><td>Builds the fixture on a scratch copy of the real store (<code>make_fixture</code>, <code>add_eval</code>, <code>run_attribute</code>) and drives every stage through <code>stage.py --lineage-root</code>; 12 checks.</td></tr>
+    <tr><td><code>scripts/verify_training_attribution.py --local-smoke</code></td><td>The real-checkpoint run on MPS (six stages); writes <code>artifacts/s8_local_smoke.json</code>.</td></tr>
+    <tr><td><code>vlapoc/runs.py::select_run</code></td><td>Checks the key contract and the k bounds <i>before</i> creating a run, and links the score run's own output so a lineage trace connects select to attribute.</td></tr>
+    <tr><td><code>scripts/stage.py</code> <code>--feats-root</code>, <code>--synthetic</code> flags</td><td>Let the fixture point at synthetic features and label the outputs.</td></tr>
+  </tbody>
+</table>
+</div>
+<h2>Acceptance criteria</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead>
+  <tbody>
+    <tr><td>8.1 The synthetic integration passes; a trace from the select run reaches the attribute runs, both feature digests, returns, eval and the training subset</td><td>PoC §2.1 item 1 p.3</td><td>met</td><td><code>.venv/bin/python scripts/verify_training_attribution.py --integration</code> → 12/12: 10 stage runs; trace stages <code>['attribute','eval','returns','select','train']</code>, 10 runs, 12 feature digests, training subset <code>308ff4d8d805</code> in the record</td></tr>
+    <tr><td>8.2 Negative cases each refused with nothing written</td><td>key contract, PoC §9.2 p.19</td><td>met</td><td>six refusals (four original plus two added in round 2): another checkpoint; different episode list; <b>train features from another version's root</b>; <b>rollout features from another eval's trajectories</b>; a score table from another subset at select; an ensemble across different subsets</td></tr>
+    <tr><td>8.3 The real-checkpoint smoke completes (or records the first failure), labelled not attribution-grade</td><td>brief constraint</td><td>met (executor re-ran on the final code; the analyzer did not re-run its 8 minutes)</td><td><code>--local-smoke --device mps</code>: all six stages ok, n_rollouts 2, n_episodes 40, score table [40, 30], all harm columns finite, 4 feature files recorded, τ undefined (n = 2)</td></tr>
+    <tr><td>8.4 Real <code>mlflow.db</code> sha256 unchanged</td><td>R7</td><td>met</td><td><code>306af4123fda7e63…</code> before and after, also verified by the analyzer in both rounds</td></tr>
+    <tr><td>8.5 Nine older verifiers still exit 0</td><td>regression</td><td>met</td><td><code>verify_lineage_s3</code>, <code>verify_runs_s5 --r2</code>, <code>verify_blind_s0</code>, <code>verify_method_boundary_s3</code>, <code>verify_derive_gt_s2</code>, <code>verify_verdict_s7</code>, <code>verify_returns_s6 --synthetic</code>, <code>verify_metrics_s1</code>, <code>verify_consumers_s6</code>: all rc=0 (analyzer round 2)</td></tr>
+  </tbody>
+</table>
+</div>
+<h2>Example</h2>
+<p><b>Three defects that only the end-to-end run revealed</b> (found and fixed in S8; all invisible to the unit tests that stub the lookup):</p>
+<ol>
+  <li>A lineage trace from a select run dead-ended at the score table: the select recorded a fingerprint of the table's <i>columns</i>, while the ensemble run recorded the <i>file's</i> fingerprint, so no link connected them. <code>select_run</code> now also records the score run's output fingerprint.</li>
+  <li>A select that was refused (stale score table, or a k that would empty a task) still left a FAILED run in the record, because the check ran inside the run. The checks now run before the run is created.</li>
+  <li>Check 3.6c of S3 expected one kind of error for an unknown column; after fix 2 a different check fires first. The check now asserts a refusal with no run created, whichever check fires.</li>
+</ol>
+<p><b>The smoke run's timings</b> (<code>artifacts/s8_local_smoke.json</code>, final code): evaluation 85.1 s, returns 1.8 s, train features 333.8 s (40 samples; dominated by opening the dataset), rollout features 31.3 s, attribute 6.3 s, select 2.6 s; total 461 s. The select child had 38 episodes (40 minus 2) and declared the functional <code>F(30) = P(T &lt;= 30 s)</code>.</p>
+<h2>Visual</h2>
+<figure>
+<svg viewBox="0 0 560 330" role="img" aria-label="Lineage trace from a curated subset back to the training data, synthetic fixture">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="f-ah"/></marker></defs>
+<text x="20" y="16" class="f-n">SYNTHETIC FIXTURE: trace FROM THE SELECT RUN BACK</text>
+<rect x="150" y="26" width="260" height="34" rx="8" class="f-box acc"/>
+<text x="162" y="45" class="f-t">select-ti-harm</text>
+<text x="162" y="62" class="f-m">curated subset (harmful removed)</text>
+<line x1="280" y1="60" x2="280" y2="80" class="f-arrow" marker-end="url(#ah)"/>
+<rect x="150" y="80" width="260" height="34" rx="8" class="f-box acc"/>
+<text x="162" y="99" class="f-t">attribute-ti-ens</text>
+<text x="162" y="116" class="f-m">ensemble of two seeds</text>
+<line x1="240" y1="114" x2="135" y2="138" class="f-arrow" marker-end="url(#ah)"/>
+<line x1="320" y1="114" x2="425" y2="138" class="f-arrow" marker-end="url(#ah)"/>
+<rect x="20" y="138" width="240" height="34" rx="8" class="f-box "/>
+<text x="32" y="157" class="f-t">attribute-ti-s0</text>
+<text x="32" y="174" class="f-m">+ 6 feature-file digests</text>
+<rect x="50" y="190" width="180" height="30" rx="8" class="f-box "/>
+<text x="62" y="209" class="f-t">returns-ti-s0</text>
+<rect x="50" y="228" width="180" height="30" rx="8" class="f-box "/>
+<text x="62" y="247" class="f-t">eval-ti-s0</text>
+<rect x="50" y="266" width="180" height="30" rx="8" class="f-box "/>
+<text x="62" y="285" class="f-t">train-ti-s0</text>
+<line x1="40" y1="172" x2="40" y2="281" class="f-arrow"/>
+<line x1="40" y1="205" x2="50" y2="205" class="f-arrow" marker-end="url(#ah)"/>
+<line x1="40" y1="243" x2="50" y2="243" class="f-arrow" marker-end="url(#ah)"/>
+<line x1="40" y1="281" x2="50" y2="281" class="f-arrow" marker-end="url(#ah)"/>
+<rect x="300" y="138" width="240" height="34" rx="8" class="f-box "/>
+<text x="312" y="157" class="f-t">attribute-ti-s1</text>
+<text x="312" y="174" class="f-m">+ 6 feature-file digests</text>
+<rect x="330" y="190" width="180" height="30" rx="8" class="f-box "/>
+<text x="342" y="209" class="f-t">returns-ti-s1</text>
+<rect x="330" y="228" width="180" height="30" rx="8" class="f-box "/>
+<text x="342" y="247" class="f-t">eval-ti-s1</text>
+<rect x="330" y="266" width="180" height="30" rx="8" class="f-box "/>
+<text x="342" y="285" class="f-t">train-ti-s1</text>
+<line x1="320" y1="172" x2="320" y2="281" class="f-arrow"/>
+<line x1="320" y1="205" x2="330" y2="205" class="f-arrow" marker-end="url(#ah)"/>
+<line x1="320" y1="243" x2="330" y2="243" class="f-arrow" marker-end="url(#ah)"/>
+<line x1="320" y1="281" x2="330" y2="281" class="f-arrow" marker-end="url(#ah)"/>
+<text x="20" y="318" class="f-m">10 runs and 12 feature-file digests reached; the training subset (308ff4d8d805) is in the record. 5 stages: attribute, eval, returns, select, train.</text>
+</svg>
+  <figcaption><b>The lineage trace from a curated subset back to its evidence (SYNTHETIC fixture).</b> Start at the top box (the select run that removed the 'harmful' episodes) and follow the arrows: it was ranked on an ensemble of two seeds, each seed's attribution rests on a returns run, an eval run and a train run, and every feature file's fingerprint is recorded along the way. Notice that no box is orphaned. This is what lets a reader ask, for any curated subset, which rollouts justified it. Run names and counts are from <code>artifacts/s8_trace_select_SYNTHETIC.json</code>.</figcaption>
+</figure>
+<h2>Divergences and limitations</h2>
+<ul>
+  <li>The integration inputs are synthetic; it proves the plumbing and the refusals, not any attribution result.</li>
+  <li><b>The smoke run is not attribution-grade:</b> a 2-step toy checkpoint, 2 rollouts (0 successes), 1 training sample per episode. 15 metric pairs each have n = 2 episodes with rollouts, so Kendall's τ is undefined (NaN) and nothing about agreement can be read from it. Its per-task columns are NaN for tasks without rollouts, so its select used the global column.</li>
+  <li>The <code>trace</code> has three intended dead ends (<code>features</code>, <code>subset</code>, <code>score_table</code>): inputs with no producing run in the fixture.</li>
+  <li>The <code>score</code> stage needs a score table keyed exactly to the named subset (the full <code>v3/candidate</code> on the server; the integration uses a small named subset).</li>
+  <li>Not verified here: anything needing the GPU server (see the report's "Out of scope" list).</li>
+</ul>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S6 Make the chain testable and portable — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+/* page-specific styling: every colour comes from tracker.css variables */
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}
+.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.good{border-left-color:var(--good)}
+.note.bad{border-left-color:var(--bad)}
+.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}
+code{overflow-wrap:anywhere}
+pre code{overflow-wrap:normal}
+table.gloss th.grp{background:var(--surface-2);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+table.gloss td:first-child{min-width:11em}
+td.mono{font-family:var(--mono)}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.tag-syn{display:inline-block;font:600 11px/1.6 var(--mono);padding:1px 8px;border-radius:999px;border:1px solid var(--warn);color:var(--warn);margin-left:6px}
+/* figure vocabulary */
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+.f-box.dash{stroke-dasharray:6 4}
+.f-box.acc{stroke:var(--accent);stroke-width:1.8}
+.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
+.f-box.warn{stroke:var(--warn)}
+.f-t{fill:var(--text);font:600 12.5px var(--sans)}
+.f-m{fill:var(--muted);font:10.5px var(--mono)}
+.f-mt{fill:var(--text);font:10.5px var(--mono)}
+.f-n{fill:var(--muted);font:600 10px var(--mono);letter-spacing:.05em}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}
+.f-ah{fill:var(--muted)}
+.f-axis{stroke:var(--border);stroke-width:1.2}
+.f-grid{stroke:var(--border);stroke-width:1;opacity:.6}
+.f-ref{stroke:var(--muted);stroke-width:1.2;stroke-dasharray:4 3}
+.f-bar{fill:var(--accent)}
+.f-bar2{fill:var(--muted)}
+.f-barw{fill:var(--warn)}
+.f-dot{fill:var(--accent);fill-opacity:.8}
+.f-med{stroke:var(--text);stroke-width:1.6}
+.f-good{fill:var(--good);fill-opacity:.28;stroke:var(--good)}
+.f-bad{fill:var(--bad);fill-opacity:.28;stroke:var(--bad)}
+.f-zero{fill:var(--surface-2);stroke:var(--border)}
+.f-gate{fill:var(--warn);fill-opacity:.25;stroke:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Training and attribution: checking the ported influence code</a></p>
+  <h1>S6 · Make the chain testable and portable</h1>
+  <p class="dek">The job chain can be submitted from any cluster account by copying one settings file, cannot pick up another run's results, and creates its own log folder.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">7/7</span></span>
+    <span><b>Depends on</b> —</span>
+    <span><b>Glossary</b> <a href="report.html#glossary">report.html#glossary</a></span>
+  </div>
+</header>
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>The whole experiment is submitted to the cluster's scheduler as a <b>chain</b> of jobs. <b>SLURM</b> is the scheduler most shared GPU clusters use: you submit jobs, they wait in a queue and run on a free machine. <code>sbatch</code> is the command that submits one job, and <code>--dependency=afterok</code> means "start this job only after the named jobs finished successfully". The ported scripts had the owner's cluster folders written into them, always picked up "the latest" finished run by name (which could be an older experiment's), and could not be pointed at a throwaway store for testing.</p>
+  <p>This story moves every machine-specific setting into one example file, makes run names resolve only inside their own experiment, lets every command use a scratch store, and keeps temporary files inside the project.</p>
+  <p>In round 1 the analyzer also found that the chain never created its log folder: SLURM opens a job's output file before the job starts and does not create missing folders, so on a fresh cluster account every job would have failed silently. That is fixed and tested with a stubbed <code>sbatch</code> (nothing was submitted anywhere).</p>
+  <p class="small">Terms (SLURM, sbatch, afterok, MLflow, lineage) are in the <a href="report.html#glossary">report glossary</a>.</p>
+</div>
+<h2>Why</h2>
+<p>The brief's lead 10 (hard-coded environment) and lead 9 (lineage and records) asked whether the cluster paths were acceptable and whether every stage could be re-verified without touching the real store. PoC §2.1 item 1 requires each run to be tied to exact inputs, and a name that can silently resolve to another chain's run breaks that.</p>
+<blockquote>"Every training run should be tied to exact dataset versions (content hashes), episode IDs, ... the config, the git SHA, and the resulting checkpoints." — §2.1 item 1, p. 3</blockquote>
+<h2>What was built</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>File / function</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>slurm/site.env.example</code> (tracked), <code>slurm/site.env</code> (gitignored)</td><td>Machine settings: project folder, scratch root, partition, log folder (must be on a filesystem the compute nodes share), FFmpeg library path. <code>docs/site-profile-cluster.env</code> keeps the owner's cluster values as a documented profile.</td></tr>
+    <tr><td><code>slurm/env.sh</code>, <code>gpu.sbatch</code>, <code>cpu.sbatch</code></td><td>No absolute paths. <code>env.sh</code> sources the site file and fails naming <code>site.env.example</code> when it is missing.</td></tr>
+    <tr><td><code>scripts/server_pipeline.py::load_site, Chain.submit</code></td><td>Passes <code>--partition</code> and <code>--output</code> on the command line; the dry run prints the full <code>sbatch</code> argv; <b>(round 2)</b> creates <code>LOG_DIR</code> with <code>mkdir -p</code> before every real <code>sbatch</code>.</td></tr>
+    <tr><td><code>scripts/stage.py::run_id, --lineage-root, --latest</code></td><td>Run names resolve only among runs of the same chain (<code>vlapoc.chain</code> starting with <code>&lt;tag&gt;-</code>); two in scope raise unless <code>--latest</code>. Every tracked stage accepts a scratch store.</td></tr>
+    <tr><td><code>scripts/verify_attribution.py</code></td><td>Cluster paths became arguments; temporary directories live under <code>data/scratch/</code>.</td></tr>
+  </tbody>
+</table>
+</div>
+<h2>Acceptance criteria</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead>
+  <tbody>
+    <tr><td>6.1 No machine-specific cluster path in <code>slurm</code>, <code>scripts</code>, <code>vlapoc</code></td><td>brief lead 10</td><td>met</td><td><code>git grep -n -E '/raid|/auto/home' -- slurm scripts vlapoc</code> → no output (analyzer: only <code>docs/site-profile-cluster.env</code>, by design)</td></tr>
+    <tr><td>6.2 <code>bash -n</code> passes on every slurm file; <code>env.sh</code> without a site file fails with a clear message</td><td>brief lead 10</td><td>met</td><td>4 files; <code>rc=2: [env.sh] missing .../does_not_exist.env: copy slurm/site.env.example to slurm/site.env and edit it</code></td></tr>
+    <tr><td>6.3 A chain-prefixed name resolves only within its chain; two in scope raise unless <code>--latest</code></td><td>PoC §2.1 item 1</td><td>met</td><td>scope <code>u-</code> → the <code>u-bbbb2222</code> run; scope <code>t-</code> raises <code>2 FINISHED train runs named 'train-t-s0' in chains [...]; pass --latest</code></td></tr>
+    <tr><td>6.4 Every <code>stage.py</code> command accepts <code>--lineage-root</code>; the whole chain runs on a scratch store</td><td>R7 (real store unchanged)</td><td>met</td><td><code>bare client(): []; calls missing lineage_root: []</code>; the chain itself ran in S8</td></tr>
+    <tr><td>6.5 Dry run shows <code>--output=&lt;LOG_DIR&gt;/...</code> and <code>--partition=&lt;PARTITION&gt;</code> from the example file</td><td>brief lead 10</td><td>met</td><td>60 sbatch lines, e.g. <code>sbatch --parsable --job-name=train-t-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out .../slurm/gpu.sbatch</code></td></tr>
+    <tr><td>6.6 <code>verify_attribution.py</code> creates nothing outside <code>data/scratch/</code></td><td>CLAUDE.md scratch rule</td><td>met</td><td>TMPDIR set to an empty dir under <code>data/scratch/</code>: rc 0, entries left <code>[]</code>, <code>pass: True (29/29)</code></td></tr>
+    <tr><td>6.7 <b>(added in round 2)</b> A real, non-dry submission creates <code>LOG_DIR</code> first</td><td>SchedMD behaviour (quoted by the analyzer)</td><td>met</td><td><code>dir existed at the sbatch call: True</code> (stubbed <code>subprocess.run</code>, nothing submitted)</td></tr>
+  </tbody>
+</table>
+</div>
+<h2>Example</h2>
+<p>The first six jobs of the dry run (one seed). Each is a single <code>stage.py</code> command; the <code>deps=</code> field is what becomes <code>--dependency=afterok</code>:</p>
+<pre><code>.venv/bin/python scripts/server_pipeline.py --tag demo --dry-run | head
+J1 train-t-s0 deps= :: python scripts/stage.py --chain t-b22fe7bd train --subset v0/candidate --name train-t-s0 --seed 0
+J2 eval-t-s0 deps=train-t-s0 :: ... eval --train train-t-s0 --name eval-t-s0 --batch-size 50
+J6 attribute-t-s0 deps=returns-t-s0,feat-t-s0-train,feat-t-s0-roll :: ... attribute --train train-t-s0 --eval eval-t-s0 --returns returns-t-s0
+...
+would submit 313 jobs; chain demo-6b49d1cf; arms: [...]</code></pre>
+<p class="small">The first lines are from the committed <code>artifacts/s4_dry_run_default.txt</code>; the last line is the output of the command re-run now.</p>
+<h2>Visual</h2>
+<figure>
+<svg viewBox="0 0 560 250" role="img" aria-label="The six jobs of one seed and their dependencies, from the dry run">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="f-ah"/></marker></defs>
+<text x="20" y="16" class="f-n">ONE SEED, JOBS J1 TO J6 OF THE DRY RUN (ARROW = STARTS AFTER)</text>
+<rect x="20" y="40" width="160" height="36" rx="8" class="f-box "/>
+<text x="32" y="59" class="f-t">J1 train-t-s0</text>
+<rect x="200" y="40" width="160" height="36" rx="8" class="f-box "/>
+<text x="212" y="59" class="f-t">J2 eval-t-s0</text>
+<rect x="380" y="40" width="160" height="36" rx="8" class="f-box "/>
+<text x="392" y="59" class="f-t">J3 returns-t-s0</text>
+<rect x="20" y="130" width="160" height="36" rx="8" class="f-box "/>
+<text x="32" y="149" class="f-t">J4 feat-t-s0-train</text>
+<rect x="200" y="130" width="160" height="36" rx="8" class="f-box "/>
+<text x="212" y="149" class="f-t">J5 feat-t-s0-roll</text>
+<rect x="380" y="190" width="160" height="36" rx="8" class="f-box acc"/>
+<text x="392" y="209" class="f-t">J6 attribute-t-s0</text>
+<line x1="180" y1="58" x2="200" y2="58" class="f-arrow" marker-end="url(#ah)"/>
+<line x1="360" y1="58" x2="380" y2="58" class="f-arrow" marker-end="url(#ah)"/>
+<line x1="100" y1="76" x2="100" y2="130" class="f-arrow" marker-end="url(#ah)"/>
+<line x1="280" y1="76" x2="280" y2="130" class="f-arrow" marker-end="url(#ah)"/>
+
+<path d="M 100 166 L 100 208 L 380 208" class="f-arrow" marker-end="url(#ah)"/>
+<path d="M 280 166 L 280 190 L 380 196" class="f-arrow" marker-end="url(#ah)"/>
+<path d="M 460 76 L 460 190" class="f-arrow" marker-end="url(#ah)"/>
+<text x="20" y="240" class="f-m">attribute waits for returns, the train features and the rollout features (deps=returns-t-s0,feat-t-s0-train,feat-t-s0-roll).</text>
+</svg>
+  <figcaption><b>One seed's six jobs and what each waits for.</b> Notice that <code>attribute</code> starts only after three parents finish, and that the two feature jobs depend on different parents (the training run and the evaluation), so they can run in parallel with <code>returns</code>. Job names and dependencies are parsed from the committed dry-run artifact, not drawn by hand.</figcaption>
+</figure>
+<h2>Divergences and limitations</h2>
+<ul>
+  <li>A dry run without <code>slurm/site.env</code> falls back to the example file; a real submission without one exits with an instruction.</li>
+  <li>That <code>#SBATCH</code> directive lines do not expand variables is from the sbatch manual (inferred here, not re-read), which is why the chain passes the flags on the command line.</li>
+  <li>The chain refuses to submit from a dirty tree and each job refuses a different commit (<code>slurm/guard.sh</code>); that was already true.</li>
+  <li><b>Not available here:</b> running the chain for real on the server, and SQLite behaviour under concurrent jobs (out of scope, needs the server).</li>
+</ul>
+
+</div>
+</body>
+</html>
