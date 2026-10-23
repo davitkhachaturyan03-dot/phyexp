@@ -38,6 +38,7 @@ The label depends only on what the lineage store recorded, never on a code switc
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 from pathlib import Path
 
@@ -46,6 +47,7 @@ import pandas as pd
 
 from vlapoc.libero_convert import REPO_ROOT
 
+os.environ.setdefault("MLFLOW_ENABLE_ARTIFACTS_PROGRESS_BAR", "false")  # artifact reads here are small and frequent; no progress bars
 LABELS = ("REAL", "SMOKE", "SYNTHETIC")
 
 

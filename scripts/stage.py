@@ -31,6 +31,8 @@ Stages (docs/dataflow.md; PoC §9.1 pp. 18-19):
                catalog column, episode x metric heatmap, throughput-vs-reliability scatter (``vlapoc.analysis``).
 - ``score``    ground-truth recovery (``vlapoc.recovery``): AUROC / recall@k per corruption type and harm column next to
                each type's best simple heuristic; only for a version with an answer key (v3), after attribution exists.
+- ``discrepancy`` dashboard S9, ground-truth side: where "looks bad" (planted labels; H1-H8 filter as a secondary layer) and "hurts"
+               (per-metric influence) disagree (PoC §9.2), estimated, with a bounded wording (``vlapoc.discrepancy``); after attribution exists.
 - ``score-clusters`` dashboard S3, ground-truth side: precision / recall / lift / Fisher p of each discovered cluster against each planted
                corruption type of an answer-key version, only after the cluster run exists (``vlapoc.recovery.cluster_recovery_run``).
 - ``clusters`` dashboard S2: clusters of training episodes from an attribute or ensemble run's scores, three lenses (label groups,
@@ -298,6 +300,14 @@ def cmd_score_clusters(a) -> dict:
     return cluster_recovery_run(rid(a.clusters, "cluster"), a.version, a.name, subset=a.subset, chain=a.chain, lineage_root=LR, synthetic=a.synthetic)
 
 
+def cmd_discrepancy(a) -> dict:
+    """Ground-truth side (stage ``score``): PoC §9.2, where "looks bad" (planted labels; H1-H8 filter as a secondary layer) and "hurts" (per-metric influence) disagree, estimated (``vlapoc.discrepancy``)."""
+    from vlapoc.discrepancy import discrepancy_run
+
+    return discrepancy_run(rid(a.scores, "attribute"), a.version, a.name, subset=a.subset, metrics=a.metrics, chain=a.chain, lineage_root=LR,
+                           synthetic=a.synthetic, heuristics=not a.no_heuristics)
+
+
 def cmd_analyze(a) -> dict:
     """The §4.2 / §4.5 outputs of an attribute or ensemble run (``vlapoc.analysis``): groups, aggregation, heatmap, scatter."""
     from vlapoc.analysis import analyze_run
@@ -427,6 +437,15 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--version", required=True, help="a version with an answer key (e.g. v3)")
     s.add_argument("--subset", default="candidate", help="subset of that version the clusters must belong to")
     s.add_argument("--synthetic", action="store_true", help="the clusters are test data (also inferred from a synthetic cluster run)")
+    s.add_argument("--name", required=True)
+
+    s = sub.add_parser("discrepancy")
+    s.add_argument("--scores", required=True, help="the attribute or ensemble run (name or id) whose score table to read")
+    s.add_argument("--version", required=True, help="a version with an answer key (e.g. v3)")
+    s.add_argument("--subset", default="candidate", help="subset of that version the table must key exactly")
+    s.add_argument("--metrics", nargs="+", default=None, help="metrics (harm_<m> columns); default f30 rmst60 auc_expected hrt60_lin censored60")
+    s.add_argument("--synthetic", action="store_true", help="the scores are test data (also inferred from a synthetic score run)")
+    s.add_argument("--no-heuristics", action="store_true", help="skip the H1-H8 filter layer (the frame scan takes ~85 s per 960 episodes the first time)")
     s.add_argument("--name", required=True)
 
     s = sub.add_parser("analyze")

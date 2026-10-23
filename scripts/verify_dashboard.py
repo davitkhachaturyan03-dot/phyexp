@@ -707,7 +707,210 @@ def planted_mode() -> int:
     return C.finish({"SYNTHETIC": True})
 
 
-MODES = {"results": results, "clusters": clusters_mode, "planted": planted_mode}
+# ---------------------------------------------------------------------------------------------
+# S9: where "looks bad" and "hurts" disagree (estimated)
+# ---------------------------------------------------------------------------------------------
+
+READING_RE = r"no detectable harm on (\w+) \(estimated; CI \[-?\d+\.\d+, -?\d+\.\d+\]\)"
+WORD = "harm" + "less"  # the word no output may contain (the verifier itself must not trip over it in its own source)
+
+
+def output_text(paths: list[Path]) -> str:
+    """Every string in the given output files (JSON text, parquet string cells, column names), joined, for the wording scan."""
+    chunks = []
+    for p in paths:
+        if p.suffix == ".json":
+            chunks.append(p.read_text())
+        elif p.suffix == ".parquet":
+            df = pd.read_parquet(p)
+            chunks.append(" ".join(map(str, df.columns)))
+            for c in df.columns:
+                if df[c].dtype == object:
+                    chunks.extend(map(str, df[c].dropna().unique()))
+    return "\n".join(chunks)
+
+
+def discrepancy_mode() -> int:
+    """S9, AC9.1-AC9.6."""
+    import re
+    import subprocess
+
+    from vlapoc import discrepancy as dc
+    from vlapoc import results as res
+    from vlapoc.groundtruth import load_answer_key
+    from vlapoc.lineage import LineageError, Subset
+    from vlapoc.method_data import _reset_session
+    from vlapoc.runs import client, scratch_lineage_copy, stage_run
+
+    C = Checker("discrepancy")
+    shutil.rmtree(SCRATCH / "discrepancy", ignore_errors=True)
+    base = SCRATCH / "discrepancy"
+    base.mkdir(parents=True)
+    made = [REPO_ROOT / "data" / "attribution" / "discrepancy-dash-cli"]
+    try:
+        lr = scratch_lineage_copy(base / "lineage")
+        v3 = Subset.load("v3/candidate", lr)
+        labels = load_answer_key("v3", lr)
+        eps = v3.episodes(lr)
+        typ = dict(zip(labels["episode_id"], labels["corruption_type"]))
+        metrics = ["f30", "rmst60", "auc_expected", "hrt60_lin", "censored60"]
+        order = eps.sort_values("episode_index")["episode_id"].tolist()
+        idle = np.array([typ.get(e) == "idle_padding" for e in order])
+        clean_ids = sorted(e for e in order if e not in typ)[:10]
+        clean_pl = np.array([e in set(clean_ids) for e in order])
+        planted = {"harm_hrt60_lin": 2.0 * idle.astype(float), "harm_f30": 4.0 * clean_pl.astype(float)}
+        tab = synthetic_table(eps, metrics, 0, planted)
+        note = "SYNTHETIC: idle_padding members +2 sd on harm_hrt60_lin only; action_noise members unshifted; 10 clean episodes +4 sd on harm_f30"
+        sid = synthetic_score_run(lr, v3, tab, "attribute-dash-synth-s9", note=note)
+        out_dir = base / "out"
+        t0 = time.time()
+        out = dc.discrepancy_run(sid, "v3", "discrepancy-dash-synth", out_dir=out_dir, lineage_root=lr, allow_dirty=True, synthetic=True, cache_dir=None if False else dc.DEFAULT_CACHE if hasattr(dc, "DEFAULT_CACHE") else None)
+        print(f"discrepancy stage in {time.time() - t0:.0f}s")
+        ty = pd.read_parquet(out_dir / "discrepancy_types.parquet")
+        ep = pd.read_parquet(out_dir / "discrepancy_episodes.parquet")
+        chd = pd.read_parquet(out_dir / "clean_harmful.parquet")
+        fl = pd.read_parquet(out_dir / "discrepancy_filter.parquet")
+        ex = json.loads((out_dir / "examples.json").read_text())
+        sm = json.loads((out_dir / "discrepancy_summary.json").read_text())
+        rd = lambda t, m: ty[(ty["planted_type"] == t) & (ty["metric"] == m)].iloc[0]  # noqa: E731
+        c1 = rd("idle_padding", "hrt60_lin")["reading"] == "harmful" and rd("idle_padding", "hrt60_lin")["estimated_reading"].startswith("harmful on hrt60_lin")
+        c2 = rd("idle_padding", "f30")["estimated_reading"].startswith("no detectable harm on f30 (estimated")
+        c3 = all(r_["estimated_reading"].startswith(f"no detectable harm on {r_['metric']} (estimated") for _, r_ in ty[ty["planted_type"] == "action_noise"].iterrows())
+        top20 = chd[chd["metric"] == "f30"]["episode_id"].tolist()
+        c4 = set(clean_ids) <= set(top20)
+        qs = {m: set(ep[f"quadrant__{m}"]) for m in metrics}
+        c5 = any(len(v) == 4 for v in qs.values())
+        C.check("9.1 SYNTHETIC over the real v3 key: idle_padding 'harmful on hrt60_lin' and 'no detectable harm on f30 (estimated)'; action_noise 'no detectable harm' on all five metrics; the 10 planted clean episodes are in clean_harmful top-20 for f30; all four quadrants non-empty for a metric",
+                c1 and c2 and c3 and c4 and c5,
+                f"idle_padding/hrt: {rd('idle_padding', 'hrt60_lin')['estimated_reading']}; idle_padding/f30: {rd('idle_padding', 'f30')['estimated_reading']}; "
+                f"action_noise: {[r_['reading'] for _, r_ in ty[ty['planted_type'] == 'action_noise'].iterrows()]}; planted clean in f30 top-20: {len(set(clean_ids) & set(top20))}/10; "
+                f"quadrant counts hrt60_lin {sm['quadrant_counts']['labels']['hrt60_lin']}, f30 {sm['quadrant_counts']['labels']['f30']}")
+        # --- AC9.2: wording guard ---
+        outs = sorted(out_dir.glob("*"))
+        text = output_text(outs)
+        sents = [x for x in ty["estimated_reading"] if x.startswith("no detectable")] + [x for x in fl["estimated_reading"] if x.startswith("no detectable")]
+        C.check("9.2 the word 'harm'+'less' appears in no output file; every non-excluding CI reads 'no detectable harm on <metric> (estimated; CI [lo, hi])'",
+                WORD not in text.lower() and all(re.fullmatch(READING_RE, x) for x in sents) and len(sents) > 0 and WORD not in (REPO_ROOT / "vlapoc" / "discrepancy.py").read_text().lower(),
+                f"{len(outs)} output files scanned, {len(sents)} 'no detectable' sentences all well-formed, e.g. {sents[0]!r}")
+        # --- AC9.3: the visibly-bad evidence, read from the recorded score runs, equals the ground-truth feature's published bands ---
+        ev = dc.heuristic_evidence("v3", "candidate", lr)
+        best = dc.best_heuristics(ev)
+        bands = pd.read_csv(REPO_ROOT / "tracker" / "features" / "2026-10-15-ground-truth" / "artifacts" / "s5_v3_r3_bands.csv").set_index("type")
+        bb = best.set_index("planted_type")
+        same = all(abs(bb.loc[t, "auroc"] - bands.loc[t, "best_auroc_as_scored"]) < 1e-3 for t in bands.index if t in bb.index) and set(bands.index) <= set(bb.index)
+        lab = labels.set_index("episode_id")
+        pairs_ok = all(m_["most_harmful"]["original_content_hash"] == lab.loc[m_["most_harmful"]["episode_id"], "parent_content_hash"]
+                       and m_["least_harmful"]["original_content_hash"] == lab.loc[m_["least_harmful"]["episode_id"], "parent_content_hash"]
+                       and m_["most_harmful"]["content_hash"] != m_["most_harmful"]["original_content_hash"]
+                       for e in ex["types"].values() for m_ in e["by_metric"].values())
+        ev_ok = all(e["visibly_bad_evidence"] and abs(e["visibly_bad_evidence"]["auroc"] - bands.loc[t, "best_auroc_as_scored"]) < 1e-3 for t, e in ex["types"].items())
+        C.check("9.3 per type: best-heuristic AUROC read from the recorded ground-truth `score` runs (not re-typed) equals the published bands (s5_v3_r3_bands.csv, tol 1e-3); examples.json pairs every example with its clean original (parent_content_hash, differs from the corrupted hash)",
+                same and pairs_ok and ev_ok and len(ev["run_id"].unique()) == 9,
+                f"{ev['run_id'].nunique()} recorded score runs; best per type: " + ", ".join(f"{t}={bb.loc[t, 'heuristic']}({bb.loc[t, 'auroc']:.3f})" for t in bb.index))
+        # --- AC9.4: blindness / ordering ---
+        run = client(lr).get_run(out["run_id"])
+        srun = client(lr).get_run(sid)
+        score_sha = srun.data.tags["output.attribution_scores.sha256"]
+        refusals = []
+
+        def n_score() -> int:
+            return len(res.find_runs("score", lr))
+
+        def refuse(label, fn, exc, contains):
+            before = n_score()
+            try:
+                fn()
+                refusals.append((label, False, "did not raise"))
+            except exc as e:
+                refusals.append((label, contains in str(e) and n_score() == before, f"{type(e).__name__}: {str(e)[:100]}"))
+            except Exception as e:  # noqa: BLE001
+                refusals.append((label, False, f"wrong error {type(e).__name__}: {str(e)[:100]}"))
+
+        try:
+            with stage_run("attribute", "attribute-failed", lr, allow_dirty=True) as r:
+                failed_id = r.run_id
+                raise RuntimeError("fixture: failed attribute run")
+        except RuntimeError:
+            pass
+        att_f = client(lr).get_run(sid)
+        refuse("a FAILED attribute run", lambda: dc.discrepancy_run(failed_id, "v3", "d-bad", out_dir=base / "bad", lineage_root=lr, allow_dirty=True, heuristics=False), ValueError, "FINISHED attribute run")
+        with stage_run("cluster", "fake-cluster-for-refusal", lr, allow_dirty=True) as r:
+            cl_id = r.run_id
+        refuse("a non-attribute run (a cluster run)", lambda: dc.discrepancy_run(cl_id, "v3", "d-bad", out_dir=base / "bad", lineage_root=lr, allow_dirty=True, heuristics=False), ValueError, "FINISHED attribute run")
+        v1c = Subset.load("v0/candidate", lr)
+        t_v0 = synthetic_table(v1c.episodes(lr), ["f30"], 0, {})
+        sid_v0 = synthetic_score_run(lr, v1c, t_v0, "attribute-synth-v0-for-s9")
+        refuse("a version without an answer key (v0)", lambda: dc.discrepancy_run(sid_v0, "v0", "d-bad", out_dir=base / "bad", lineage_root=lr, allow_dirty=True, heuristics=False), LineageError, "no labels")
+        small = Subset(v3.dataset_version_id, tuple(v3.episode_ids[:50]), {"op": "synthetic_small", "parent_subset_id": v3.subset_id})
+        small.save(lr)
+        t_small = synthetic_table(small.episodes(lr), metrics, 0, {})
+        sid_small = synthetic_score_run(lr, small, t_small, "attribute-synth-small-for-s9")
+        refuse("a score table that does not key exactly v3/candidate", lambda: dc.discrepancy_run(sid_small, "v3", "d-bad", out_dir=base / "bad", lineage_root=lr, allow_dirty=True, heuristics=False), LineageError, "keys")
+        del att_f
+        method_files = [REPO_ROOT / "vlapoc" / f for f in ("attribution.py", "clusters.py", "results.py", "analysis.py")]
+        bad_imp = {f.name: forbidden_imports(f) for f in method_files if forbidden_imports(f)}
+        C.check("9.4 refuses (nothing written): a FAILED attribute run, a non-attribute run, a version without an answer key, a table that does not key v3/candidate; the run consumes the score table's sha256 and was created after it; attribution/clusters/results/analysis import nothing from discrepancy, groundtruth or recovery",
+                all(r_[1] for r_ in refusals) and run.data.tags["input.score_table" if "input.score_table" in run.data.tags else "input.scores"] == f"score_table:{score_sha}"
+                and run.info.start_time >= srun.info.end_time and not bad_imp,
+                "; ".join(f"{a}: {'REFUSED' if b else 'WRONG'} ({c})" for a, b, c in refusals) + f"; importers of the GT side among method files: {bad_imp}")
+        # --- AC9.5: declarations and synthetic on every row ---
+        def declared(df):
+            return all(c in df.columns for c in ("functional", "tau", "rollout_subset", "good_sign", "harm_column", "synthetic")) and df["synthetic"].all() and df["functional"].notna().all()
+
+        ep_ok = ep["synthetic"].all() and ep["declarations"].map(lambda x: set(json.loads(x)) == {f"harm_{m}" for m in metrics} and all("functional" in d for d in json.loads(x).values())).all()
+        ex_ok = ex["synthetic"] and all("functional" in m_["declaration"] and "tau" in m_["declaration"] for e in ex["types"].values() for m_ in e["by_metric"].values())
+        C.check("9.5 every row of discrepancy_types, discrepancy_filter and clean_harmful carries functional/tau/rollout_subset/good_sign of its harm column and synthetic; episodes rows carry the JSON declarations; examples.json entries carry the declaration",
+                declared(ty) and declared(fl) and declared(chd) and ep_ok and ex_ok,
+                f"types {len(ty)} rows, filter {len(fl)}, clean_harmful {len(chd)}, episodes {len(ep)}; e.g. {ty['functional'].iloc[0]!r} tau {ty['tau'].iloc[0]!r}")
+        doc = (REPO_ROOT / "vlapoc" / "discrepancy.py").read_text().split('"""')[1]
+        C.check("9.6 grounding docstring cites §9.2 p.19, §9.1 Step 1 p.18, §4.5 p.11 and CUPID Fig. 4 p.8", all(x in doc for x in ("§9.2 (p. 19)", "§9.1 Step 1 (p. 18)", "§4.5 (p. 11)", "Fig. 4 caption, p. 8")))
+        # --- the secondary layer, in numbers ---
+        anyf = fl[fl["filter"] == "any_H1_H8"].iloc[0]
+        print(f"secondary layer (SYNTHETIC scores): any-of-H1-H8 filter flags {anyf['n_flagged']} of {sm['n']} episodes ({100 * anyf['share_flagged']:.0f}%), of which {anyf['n_flagged_planted']} planted "
+              f"(precision {anyf['precision_vs_planted']:.2f}, recall of the 91 planted {anyf['recall_of_planted']:.2f}); per-heuristic: "
+              + ", ".join(f"{r_['filter']} {r_['n_flagged']}/{r_['n_flagged_planted']}" for _, r_ in fl[fl['metric'] == 'f30'].iterrows() if r_['filter'] != "any_H1_H8"))
+        C.check("9.7 the filter layer exists: 10 filters (any + 9 heuristics) x 5 metrics, quadrant counts per filter sum to N", len(fl) == 10 * 5 and all(
+            (r_[[f'n_{q}' for q in dc.QUADRANTS]].sum() == sm["n"]) for _, r_ in fl.iterrows()), f"{len(fl)} rows; any-filter flagged {sm['n_flagged_filter']} (q = {sm['filter_q']:.4f})")
+        # --- stage CLI (needs a clean tree) ---
+        dirty = subprocess.run(["git", "status", "--porcelain", "--", "vlapoc", "scripts"], cwd=REPO_ROOT, capture_output=True, text=True).stdout.strip()
+        if not dirty:
+            _reset_session()
+            p_ = subprocess.run([sys.executable, "scripts/stage.py", "--lineage-root", str(lr), "discrepancy", "--scores", "attribute-dash-synth-s9", "--version", "v3",
+                                 "--subset", "candidate", "--name", "discrepancy-dash-cli"], cwd=REPO_ROOT, capture_output=True, text=True)
+            ok_cli = p_.returncode == 0 and (REPO_ROOT / "data" / "attribution" / "discrepancy-dash-cli" / "discrepancy_types.parquet").is_file()
+            C.check("9.8 the stage CLI (scripts/stage.py discrepancy) runs on the scratch store", ok_cli, f"rc={p_.returncode}" + ("" if ok_cli else p_.stderr[-300:]))
+        else:
+            print("stage CLI check skipped: vlapoc/scripts tree is dirty (the CLI refuses a dirty tree); re-run after committing")
+        # --- measured: false-alarm rate of the readings on null cells (information) ---
+        cells, hits, hits_w = 0, 0, 0
+        for seed in range(20):
+            t2 = synthetic_table(eps, metrics, 1000 + seed, {})
+            e2 = dc.episode_table(t2, labels, [f"harm_{m}" for m in metrics], pd.DataFrame({"none": np.zeros(len(t2), bool)}), res.functionals(sid, lr), True)
+            ty2 = dc.type_table(e2, labels, [f"harm_{m}" for m in metrics], res.functionals(sid, lr), pd.DataFrame(), True, n_boot=1000)
+            cells += len(ty2)
+            hits += int((ty2["reading"] != "no_detectable_harm").sum())
+            hits_w += int((ty2["reading_welch"] != "no_detectable_harm").sum())
+        print(f"null calibration (SYNTHETIC, 20 seeds, no planted structure, 13 vs 869): {hits}/{cells} cells read harmful or helpful by the percentile bootstrap, "
+              f"{hits_w}/{cells} by the Welch cross-check (nominal two-sided 5%: {0.05 * cells:.0f})")
+        ARTIFACTS.mkdir(parents=True, exist_ok=True)
+        (ARTIFACTS / "s9_null_calibration_SYNTHETIC.json").write_text(json.dumps({"SYNTHETIC": True, "seeds": 20, "cells": cells, "bootstrap_cells_reading_harmful_or_helpful": hits,
+                                                                                  "bootstrap_rate": hits / cells, "welch_cells_reading_harmful_or_helpful": hits_w, "welch_rate": hits_w / cells,
+                                                                                  "nominal_two_sided": 0.05, "note": "n_boot=1000; 13 episodes per type vs 869 clean; cells within a seed share the clean group, so they are not independent",
+                                                                                  "single_cell_simulation": "13 vs 869 normal null, 1500 trials: percentile bootstrap 0.0853, Welch 0.0487 (data/scratch/dash_exec/draft/calib.py, artifacts/probes/calib.py)"}, indent=1))
+        ty.drop(columns=["declarations"] if "declarations" in ty else []).to_csv(ARTIFACTS / "s9_discrepancy_types_SYNTHETIC.csv", index=False)
+        fl.to_csv(ARTIFACTS / "s9_discrepancy_filter_SYNTHETIC.csv", index=False)
+        (ARTIFACTS / "s9_discrepancy_summary_SYNTHETIC.json").write_text(json.dumps({"planted_structure": note, **sm}, indent=1))
+        (ARTIFACTS / "s9_examples_SYNTHETIC.json").write_text(json.dumps(ex, indent=1))
+        chd.to_csv(ARTIFACTS / "s9_clean_harmful_SYNTHETIC.csv", index=False)
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+        shutil.rmtree(SCRATCH / "synthetic_runs", ignore_errors=True)
+        for d in made:
+            shutil.rmtree(d, ignore_errors=True)
+    return C.finish({"SYNTHETIC": True})
+
+
+MODES = {"results": results, "clusters": clusters_mode, "planted": planted_mode, "discrepancy": discrepancy_mode}
 
 
 def main() -> int:

@@ -1,0 +1,12 @@
+{
+ "SYNTHETIC": true,
+ "seeds": 20,
+ "cells": 700,
+ "bootstrap_cells_reading_harmful_or_helpful": 65,
+ "bootstrap_rate": 0.09285714285714286,
+ "welch_cells_reading_harmful_or_helpful": 41,
+ "welch_rate": 0.05857142857142857,
+ "nominal_two_sided": 0.05,
+ "note": "n_boot=1000; 13 episodes per type vs 869 clean; cells within a seed share the clean group, so they are not independent",
+ "single_cell_simulation": "13 vs 869 normal null, 1500 trials: percentile bootstrap 0.0853, Welch 0.0487 (data/scratch/dash_exec/draft/calib.py, artifacts/probes/calib.py)"
+}

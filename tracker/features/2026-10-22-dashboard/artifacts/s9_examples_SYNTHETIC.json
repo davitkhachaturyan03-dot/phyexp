@@ -1,0 +1,1174 @@
+{
+ "synthetic": true,
+ "types": {
+  "action_noise": {
+   "hypothesis": "none stated",
+   "n": 13,
+   "visibly_bad_evidence": {
+    "best_heuristic": "smoothness",
+    "direction": "highest",
+    "auroc": 1.0,
+    "source_run_id": "4d1fcade64254acbbc47c24ea6fe3dc0"
+   },
+   "by_metric": {
+    "f30": {
+     "declaration": {
+      "harm_column": "harm_f30",
+      "functional": "F(30) = P(T <= 30 s)",
+      "tau": "30 s",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_10/KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer_of_the_cabinet_and_close_it/demo_26",
+      "content_hash": "d0cc5f108395e7d61959a3ca2ae7bf06483ca3a74d2034a19fda91d9b3cfc330",
+      "original_episode_id": "libero_10/KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer_of_the_cabinet_and_close_it/demo_26",
+      "original_content_hash": "3b6c88f550f044ac02bd615138627e92fe8be487660e8214b8d91ac2f8eace31",
+      "z": 1.3959249684255757,
+      "harm": 1.4499687804848278,
+      "task_name": "KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer_of_the_cabinet_and_close_it",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_37",
+      "content_hash": "78b6845e79c540cd54321e51c9cac25ced34fa5fc24f5852672bf6acccd856f0",
+      "original_episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_37",
+      "original_content_hash": "6730e84c2baba884d871be0af6f83a1bfd01103bf15e57f0c43775648a55b2d9",
+      "z": -2.8350222308920756,
+      "harm": -2.9280901725683814,
+      "task_name": "KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "rmst60": {
+     "declaration": {
+      "harm_column": "harm_rmst60",
+      "functional": "RMST(60) = \u222b_0^60 (1 - F(t)) dt",
+      "tau": "60 s = \u03c4_episode",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate/demo_5",
+      "content_hash": "80c626eda60f01c3caca221fc6b7c3eef892cb26f513820fd200cc734aeb299f",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate/demo_5",
+      "original_content_hash": "9e8ef8a714d4ec794ed6ac11314c7f0e03c659107cfd26e06da057b1361756c0",
+      "z": 1.6100443770471224,
+      "harm": 1.6332624160584217,
+      "task_name": "pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_37",
+      "content_hash": "78b6845e79c540cd54321e51c9cac25ced34fa5fc24f5852672bf6acccd856f0",
+      "original_episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_37",
+      "original_content_hash": "6730e84c2baba884d871be0af6f83a1bfd01103bf15e57f0c43775648a55b2d9",
+      "z": -1.957922019095047,
+      "harm": -2.0183767314742744,
+      "task_name": "KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "auc_expected": {
+     "declaration": {
+      "harm_column": "harm_auc_expected",
+      "functional": "AUC_h = P(T < T_h) + \u00bd P(T = T_h) (Mann-Whitney; ties \u00bd because model and human share the 20 Hz grid)",
+      "tau": "none (humans all < 60 s)",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_10/LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate/demo_24",
+      "content_hash": "0fe7887f46c377589b720bf5f6c7ab48a1929c0d6fce88a6599acd187035ac8c",
+      "original_episode_id": "libero_10/LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate/demo_24",
+      "original_content_hash": "50de19da7fe5f1f8b59565996b6527f0c1298134100168589e8d3d6303d8e8b1",
+      "z": 1.5134182531832885,
+      "harm": 1.453145863117965,
+      "task_name": "LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_in_the_top_drawer_of_the_wooden_cabinet_and_place_it_on_the_plate/demo_31",
+      "content_hash": "b3942e7fd5bd63f048ce0c8c7b599e38cfcd98367c68dedf1b0ea1377228bf69",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_in_the_top_drawer_of_the_wooden_cabinet_and_place_it_on_the_plate/demo_31",
+      "original_content_hash": "105c0a5ebbc5854fd5e975880176b9715dc451a93f1c13a39a537caec082b82f",
+      "z": -1.1252037998451314,
+      "harm": -1.1611172573391737,
+      "task_name": "pick_up_the_black_bowl_in_the_top_drawer_of_the_wooden_cabinet_and_place_it_on_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "hrt60_lin": {
+     "declaration": {
+      "harm_column": "harm_hrt60_lin",
+      "functional": "HRT(60) = (1/J) \u03a3_o RMST_h,o(60) / RMST_m,o(60)",
+      "tau": "60 s",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_37",
+      "content_hash": "78b6845e79c540cd54321e51c9cac25ced34fa5fc24f5852672bf6acccd856f0",
+      "original_episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_37",
+      "original_content_hash": "6730e84c2baba884d871be0af6f83a1bfd01103bf15e57f0c43775648a55b2d9",
+      "z": 1.7230774621505573,
+      "harm": 1.824578054930774,
+      "task_name": "KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate/demo_21",
+      "content_hash": "d2446732e2ac83db010b8c1f0f864b556879aa8d47e28e39278e290b2f5501b3",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate/demo_21",
+      "original_content_hash": "3343ad42e72ccd532bad5c2b27edac66df07f18c11eb0fbbe8f7e1290825677a",
+      "z": -1.5308496262278233,
+      "harm": -1.5294663354463633,
+      "task_name": "pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "censored60": {
+     "declaration": {
+      "harm_column": "harm_censored60",
+      "functional": "1 - F(60) (no ghosts on LIBERO)",
+      "tau": "60 s = \u03c4_episode",
+      "rollout_subset": "all",
+      "good_sign": -1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_37",
+      "content_hash": "78b6845e79c540cd54321e51c9cac25ced34fa5fc24f5852672bf6acccd856f0",
+      "original_episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_37",
+      "original_content_hash": "6730e84c2baba884d871be0af6f83a1bfd01103bf15e57f0c43775648a55b2d9",
+      "z": 1.4585717457925909,
+      "harm": 1.494301557383697,
+      "task_name": "KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_next_to_the_cookie_box_and_place_it_on_the_plate/demo_33",
+      "content_hash": "4f6afced77983baafc10f53e9e678b196042b997178c8abf205efd12fe281bdf",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_next_to_the_cookie_box_and_place_it_on_the_plate/demo_33",
+      "original_content_hash": "1810780d236fa5e79a55a252419ecbfd3a4e50201c9dd5a5e9b43df17620b65d",
+      "z": -1.3727465396292153,
+      "harm": -1.30799090794788,
+      "task_name": "pick_up_the_black_bowl_next_to_the_cookie_box_and_place_it_on_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     }
+    }
+   }
+  },
+  "detour": {
+   "hypothesis": "none stated",
+   "n": 13,
+   "visibly_bad_evidence": {
+    "best_heuristic": "length_vs_task",
+    "direction": "highest",
+    "auroc": 0.9595910418695229,
+    "source_run_id": "87d597fc13e74ecab1daef537bbbcdd9"
+   },
+   "by_metric": {
+    "f30": {
+     "declaration": {
+      "harm_column": "harm_f30",
+      "functional": "F(30) = P(T <= 30 s)",
+      "tau": "30 s",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate/demo_42",
+      "content_hash": "c52d4a6013fba028c02b61da433f0b2f48e1ccc650d594a7f08d01dd3b6f226a",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate/demo_42",
+      "original_content_hash": "555c3ab4a3ed600434b6747b0c2ceba6953ee3687d4ea5e38aca71b3e768d790",
+      "z": 1.349823965328141,
+      "harm": 1.4022648267725224,
+      "task_name": "pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_wooden_cabinet_and_place_it_on_the_plate/demo_40",
+      "content_hash": "89d167fedaf7b721ae341f688c096fa4934f79109214af937c29ad51fc4608e6",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_wooden_cabinet_and_place_it_on_the_plate/demo_40",
+      "original_content_hash": "cf5846e7a06f450da93b4e3e14aab3d890171bd35e31a9194811a71b0fe69229",
+      "z": -2.427182643842318,
+      "harm": -2.506069837315632,
+      "task_name": "pick_up_the_black_bowl_on_the_wooden_cabinet_and_place_it_on_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "rmst60": {
+     "declaration": {
+      "harm_column": "harm_rmst60",
+      "functional": "RMST(60) = \u222b_0^60 (1 - F(t)) dt",
+      "tau": "60 s = \u03c4_episode",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_10/LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate/demo_18",
+      "content_hash": "0c7b7cba7e9416dcc776800b77d2e243f4be7c256fbfbfb930e1aba07d9260b8",
+      "original_episode_id": "libero_10/LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate/demo_18",
+      "original_content_hash": "0bbd7be35c15785baf56e76db6c476aabd38bcfc201cd65b11a2351d58cd6e07",
+      "z": 2.192716144534443,
+      "harm": 2.2295984798227364,
+      "task_name": "LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_14",
+      "content_hash": "67f6dc990b5edc934152839361128c8ceed2b8e6ad5c70e1c82ca21a3b593d6f",
+      "original_episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_14",
+      "original_content_hash": "6239c33e609d7bbacc947a9cd55d6361c2467e127f80451580da2d9f1f1da1bc",
+      "z": -2.3235953359443835,
+      "harm": -2.3926254913445897,
+      "task_name": "KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "auc_expected": {
+     "declaration": {
+      "harm_column": "harm_auc_expected",
+      "functional": "AUC_h = P(T < T_h) + \u00bd P(T = T_h) (Mann-Whitney; ties \u00bd because model and human share the 20 Hz grid)",
+      "tau": "none (humans all < 60 s)",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_18",
+      "content_hash": "7d43b1fdab70585809f42bdc70129fc4b3768f91f7158a2668d3b124b410613c",
+      "original_episode_id": "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_18",
+      "original_content_hash": "29dffe353493b03e1a4d91d893e70aad5d7ed15743f075c973d4d8232c163c06",
+      "z": 1.982456910350662,
+      "harm": 1.917854502270765,
+      "task_name": "KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_ramekin_and_place_it_on_the_plate/demo_29",
+      "content_hash": "4c3c2f491b01b2a2320ba2f89ad45de5f16b9e7f08709ceea0e822a1e361ef00",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_ramekin_and_place_it_on_the_plate/demo_29",
+      "original_content_hash": "ad2d5944cdfbfc21389e279d0950bc8779bb0face6253a694549ecf94f50705a",
+      "z": -1.0803056570977245,
+      "harm": -1.1166336001868162,
+      "task_name": "pick_up_the_black_bowl_on_the_ramekin_and_place_it_on_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "hrt60_lin": {
+     "declaration": {
+      "harm_column": "harm_hrt60_lin",
+      "functional": "HRT(60) = (1/J) \u03a3_o RMST_h,o(60) / RMST_m,o(60)",
+      "tau": "60 s",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_10/KITCHEN_SCENE8_put_both_moka_pots_on_the_stove/demo_32",
+      "content_hash": "518adc378c22c81f334ca1f30dd850555bf7d0d379e924cf247ef6fc6a00d371",
+      "original_episode_id": "libero_10/KITCHEN_SCENE8_put_both_moka_pots_on_the_stove/demo_32",
+      "original_content_hash": "1e02963b8f7f252f229fe1bedc3a23991ce5a960717b069e7bcaab1c8fe29961",
+      "z": 1.8333534081265923,
+      "harm": 1.9382469872542638,
+      "task_name": "KITCHEN_SCENE8_put_both_moka_pots_on_the_stove",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_next_to_the_ramekin_and_place_it_on_the_plate/demo_4",
+      "content_hash": "46b63faa973ab41228726dd3c4b1e872fc3b1efddba49df1acd6a1997321c13c",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_next_to_the_ramekin_and_place_it_on_the_plate/demo_4",
+      "original_content_hash": "fed5161c74058f941b15e3bb80aa8811a17703b81e6bfdc8803c972d96040145",
+      "z": -1.0379329415695089,
+      "harm": -1.021383518530686,
+      "task_name": "pick_up_the_black_bowl_next_to_the_ramekin_and_place_it_on_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "censored60": {
+     "declaration": {
+      "harm_column": "harm_censored60",
+      "functional": "1 - F(60) (no ghosts on LIBERO)",
+      "tau": "60 s = \u03c4_episode",
+      "rollout_subset": "all",
+      "good_sign": -1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_18",
+      "content_hash": "7d43b1fdab70585809f42bdc70129fc4b3768f91f7158a2668d3b124b410613c",
+      "original_episode_id": "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_18",
+      "original_content_hash": "29dffe353493b03e1a4d91d893e70aad5d7ed15743f075c973d4d8232c163c06",
+      "z": 2.032667098752708,
+      "harm": 2.062511458144584,
+      "task_name": "KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_10/LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket/demo_13",
+      "content_hash": "768a21eadadc41f439fd60ae05ef173f04d04d365d55b3fe6c531d4157c706c0",
+      "original_episode_id": "libero_10/LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket/demo_13",
+      "original_content_hash": "a38abc07368ee306ed10570bc9e29c0d2ad326c9185afd0314bfab93445b2e0c",
+      "z": -1.362481577615197,
+      "harm": -1.2978311792247235,
+      "task_name": "LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket",
+      "quadrant": "bad_but_not_harmful"
+     }
+    }
+   }
+  },
+  "dropped_frames": {
+   "hypothesis": "none stated",
+   "n": 13,
+   "visibly_bad_evidence": {
+    "best_heuristic": "duplicate_frame_pairs",
+    "direction": "highest",
+    "auroc": 1.0,
+    "source_run_id": "10a22593f4b34a98be3a5f929ac5a664"
+   },
+   "by_metric": {
+    "f30": {
+     "declaration": {
+      "harm_column": "harm_f30",
+      "functional": "F(30) = P(T <= 30 s)",
+      "tau": "30 s",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_31",
+      "content_hash": "fd7581b6b01d601611b2429a9884b2f05183260be60875ee4712216eb5030de1",
+      "original_episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_31",
+      "original_content_hash": "05da0ce33d3c82238fa05f9768ba6dffaf67fd9099b1cbfaf90a76e62a73a9be",
+      "z": 1.1122284559885105,
+      "harm": 1.156408025005446,
+      "task_name": "KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate/demo_14",
+      "content_hash": "6a29066f29215c2f088acf9f47573f05131a4df48e91670eb7f5e68a1b9f79c2",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate/demo_14",
+      "original_content_hash": "3d44eb9ded35e9bb627bff8663305222bef581da035a82514e2fc9747d867704",
+      "z": -1.483034109723734,
+      "harm": -1.5290928749284465,
+      "task_name": "pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "rmst60": {
+     "declaration": {
+      "harm_column": "harm_rmst60",
+      "functional": "RMST(60) = \u222b_0^60 (1 - F(t)) dt",
+      "tau": "60 s = \u03c4_episode",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_ramekin_and_place_it_on_the_plate/demo_27",
+      "content_hash": "6e456ecea87e5709aaea913b8de1fb4400ec2434a4cf6579951a7ede4de1aa4a",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_ramekin_and_place_it_on_the_plate/demo_27",
+      "original_content_hash": "57f1b472784270df81e2ed09544927e6231362a6f09ccdfdfffb4cf93d3d13e0",
+      "z": 1.1080610326774762,
+      "harm": 1.119507008022189,
+      "task_name": "pick_up_the_black_bowl_on_the_ramekin_and_place_it_on_the_plate",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate/demo_20",
+      "content_hash": "f9fb493bb8b54a5d3953304ffefb95c804885d3546be0aef0dc251094ec9040a",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate/demo_20",
+      "original_content_hash": "769480defccc66ec5111c0d9a0e1d79ad2e4dcf23cf2dde09f84ac6592cd3935",
+      "z": -2.3102094463075336,
+      "harm": -2.3789256878163596,
+      "task_name": "pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "auc_expected": {
+     "declaration": {
+      "harm_column": "harm_auc_expected",
+      "functional": "AUC_h = P(T < T_h) + \u00bd P(T = T_h) (Mann-Whitney; ties \u00bd because model and human share the 20 Hz grid)",
+      "tau": "none (humans all < 60 s)",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate/demo_47",
+      "content_hash": "6bf2cbcb1d078b998356d1ac58da6d5b55fa194fc0237ed9f3e8e5229ce92504",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate/demo_47",
+      "original_content_hash": "d661489ecac7073d3e2e497101b50c35882a7f3493ee8c0d62dde3611507c2a6",
+      "z": 1.5978704478009034,
+      "harm": 1.5368184215190834,
+      "task_name": "pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_10/LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket/demo_12",
+      "content_hash": "b1b64a632bfb77ac3d081369badb09262b5529d64f7c16cf55b46474247dc0a9",
+      "original_episode_id": "libero_10/LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket/demo_12",
+      "original_content_hash": "e99e8a71342aebf7e29777a5773694a8a45a3ac8b2b494f9bc49bca4fe15951f",
+      "z": -1.273494956113671,
+      "harm": -1.308039436086921,
+      "task_name": "LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "hrt60_lin": {
+     "declaration": {
+      "harm_column": "harm_hrt60_lin",
+      "functional": "HRT(60) = (1/J) \u03a3_o RMST_h,o(60) / RMST_m,o(60)",
+      "tau": "60 s",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate/demo_14",
+      "content_hash": "6a29066f29215c2f088acf9f47573f05131a4df48e91670eb7f5e68a1b9f79c2",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate/demo_14",
+      "original_content_hash": "3d44eb9ded35e9bb627bff8663305222bef581da035a82514e2fc9747d867704",
+      "z": 0.7301998567468722,
+      "harm": 0.8011514469317228,
+      "task_name": "pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_in_the_top_drawer_of_the_wooden_cabinet_and_place_it_on_the_plate/demo_16",
+      "content_hash": "0ccd1ac7318a56f6cfb466c7b0f01024f67df391bd93ec49b26e6bb2cdcd9c38",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_in_the_top_drawer_of_the_wooden_cabinet_and_place_it_on_the_plate/demo_16",
+      "original_content_hash": "1fc635e54981f7e5246bd0c704ee5c668e22eb821f0eac00721aa2a1640295a3",
+      "z": -2.287564891745315,
+      "harm": -2.309464326331448,
+      "task_name": "pick_up_the_black_bowl_in_the_top_drawer_of_the_wooden_cabinet_and_place_it_on_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "censored60": {
+     "declaration": {
+      "harm_column": "harm_censored60",
+      "functional": "1 - F(60) (no ghosts on LIBERO)",
+      "tau": "60 s = \u03c4_episode",
+      "rollout_subset": "all",
+      "good_sign": -1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_10/LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket/demo_25",
+      "content_hash": "dc5b941b9e223fe627e6454c71a3625c77e2f1ea13dc1d79bdafd2d0dc4a9d0a",
+      "original_episode_id": "libero_10/LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket/demo_25",
+      "original_content_hash": "3a8b7c804ff6e460bfe52af161a3a00b29b0f0e5d2b5270e8d7bfccaca069d49",
+      "z": 2.1594994701015313,
+      "harm": 2.188043582321854,
+      "task_name": "LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate/demo_20",
+      "content_hash": "f9fb493bb8b54a5d3953304ffefb95c804885d3546be0aef0dc251094ec9040a",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate/demo_20",
+      "original_content_hash": "769480defccc66ec5111c0d9a0e1d79ad2e4dcf23cf2dde09f84ac6592cd3935",
+      "z": -1.8999583384623937,
+      "harm": -1.8297978906213315,
+      "task_name": "pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     }
+    }
+   }
+  },
+  "gripper_release": {
+   "hypothesis": "reliability (drops), not speed (PoC \u00a78.10 p.17; \u00a74.5 p.11)",
+   "n": 13,
+   "visibly_bad_evidence": {
+    "best_heuristic": "post_release_share_vs_task",
+    "direction": "highest",
+    "auroc": 0.9639727361246349,
+    "source_run_id": "a07ea5c48ed84f1d931b7805879f9eca"
+   },
+   "by_metric": {
+    "f30": {
+     "declaration": {
+      "harm_column": "harm_f30",
+      "functional": "F(30) = P(T <= 30 s)",
+      "tau": "30 s",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_5",
+      "content_hash": "935f21aaea697b8d9ae28d9bc28da848a139b573f469f130a2e686418a80d716",
+      "original_episode_id": "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_5",
+      "original_content_hash": "c474a4e8a8d76ff33b2cc746c5599b99177992565d8935d614fd654cf3e685af",
+      "z": 1.28186351941234,
+      "harm": 1.3319413685305603,
+      "task_name": "KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_10/KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer_of_the_cabinet_and_close_it/demo_3",
+      "content_hash": "33004a7a6eb1a646e949baa3ff544b8fc808980b9d63d59dcf4e1aa7ae8ef6d3",
+      "original_episode_id": "libero_10/KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer_of_the_cabinet_and_close_it/demo_3",
+      "original_content_hash": "9a80a50e88ccbcdd074ca7607dbe8407c9cfb578fda994bc664a27e825bdd346",
+      "z": -1.7083093213667224,
+      "harm": -1.7622009972405384,
+      "task_name": "KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer_of_the_cabinet_and_close_it",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "rmst60": {
+     "declaration": {
+      "harm_column": "harm_rmst60",
+      "functional": "RMST(60) = \u222b_0^60 (1 - F(t)) dt",
+      "tau": "60 s = \u03c4_episode",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate/demo_37",
+      "content_hash": "98dce703ab1fe68ecb53eb7e6e7c7c7aecf6d19cf5a9510d38dfddba3ab19e50",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate/demo_37",
+      "original_content_hash": "f106ef822c992c62309c63cbcae554e098a1473a8d34e04bfe2d1503d56a69c7",
+      "z": 1.5645315660772234,
+      "harm": 1.5866822794204654,
+      "task_name": "pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_10/LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate/demo_38",
+      "content_hash": "dc6409d1fef4bd238c66ddde174a384c38fdabd8943ae55bd28a04be0059bba5",
+      "original_episode_id": "libero_10/LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate/demo_38",
+      "original_content_hash": "f9fa3f5fb690c0faac0591800639bbde51977580f83ea05a31b0b6d43abd8470",
+      "z": -1.375671998126854,
+      "harm": -1.4224723046506123,
+      "task_name": "LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "auc_expected": {
+     "declaration": {
+      "harm_column": "harm_auc_expected",
+      "functional": "AUC_h = P(T < T_h) + \u00bd P(T = T_h) (Mann-Whitney; ties \u00bd because model and human share the 20 Hz grid)",
+      "tau": "none (humans all < 60 s)",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate/demo_43",
+      "content_hash": "608053e8587074ed6157a62f038c1eb0a2f23735a3b78bc36265b2410761cd9c",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate/demo_43",
+      "original_content_hash": "5549b224735de6f1b6cae016725c763cef8a3d29cb1dd3b7d886158a32c81347",
+      "z": 1.6709636633742417,
+      "harm": 1.6092368634136656,
+      "task_name": "pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_5",
+      "content_hash": "935f21aaea697b8d9ae28d9bc28da848a139b573f469f130a2e686418a80d716",
+      "original_episode_id": "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_5",
+      "original_content_hash": "c474a4e8a8d76ff33b2cc746c5599b99177992565d8935d614fd654cf3e685af",
+      "z": -0.8197021748706271,
+      "harm": -0.858435927705804,
+      "task_name": "KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "hrt60_lin": {
+     "declaration": {
+      "harm_column": "harm_hrt60_lin",
+      "functional": "HRT(60) = (1/J) \u03a3_o RMST_h,o(60) / RMST_m,o(60)",
+      "tau": "60 s",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_10/LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket/demo_27",
+      "content_hash": "833eb4a3518a884c9f75ab7d6ee17bbe7a6ddf2770a2aeec4b65cab405b75474",
+      "original_episode_id": "libero_10/LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket/demo_27",
+      "original_content_hash": "6aaa95440972617e0a4bb75fbecfa889582cd537a2d7c65beace926a9bb2bb79",
+      "z": 0.7998253078572862,
+      "harm": 0.8729191440502043,
+      "task_name": "LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket",
+      "quadrant": "bad_but_not_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_10/LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate/demo_38",
+      "content_hash": "dc6409d1fef4bd238c66ddde174a384c38fdabd8943ae55bd28a04be0059bba5",
+      "original_episode_id": "libero_10/LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate/demo_38",
+      "original_content_hash": "f9fa3f5fb690c0faac0591800639bbde51977580f83ea05a31b0b6d43abd8470",
+      "z": -1.8681301162485875,
+      "harm": -1.877124320647736,
+      "task_name": "LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "censored60": {
+     "declaration": {
+      "harm_column": "harm_censored60",
+      "functional": "1 - F(60) (no ghosts on LIBERO)",
+      "tau": "60 s = \u03c4_episode",
+      "rollout_subset": "all",
+      "good_sign": -1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate/demo_43",
+      "content_hash": "608053e8587074ed6157a62f038c1eb0a2f23735a3b78bc36265b2410761cd9c",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate/demo_43",
+      "original_content_hash": "5549b224735de6f1b6cae016725c763cef8a3d29cb1dd3b7d886158a32c81347",
+      "z": 1.860100827789714,
+      "harm": 1.8917142844817427,
+      "task_name": "pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_next_to_the_cookie_box_and_place_it_on_the_plate/demo_25",
+      "content_hash": "e4297c122eb1aa70b8b9b12ed4bec91f3f46dbd066eab46bafbe75c45dde4a94",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_next_to_the_cookie_box_and_place_it_on_the_plate/demo_25",
+      "original_content_hash": "04a04f96492f007565cad113707785c0abf50cd7ca87cc09c0339bc56fa2442f",
+      "z": -1.078480535636008,
+      "harm": -1.0167416301682375,
+      "task_name": "pick_up_the_black_bowl_next_to_the_cookie_box_and_place_it_on_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     }
+    }
+   }
+  },
+  "idle_padding": {
+   "hypothesis": "speed (time-based metrics), not reliability (PoC \u00a78.10 p.17; \u00a74.5 p.11)",
+   "n": 13,
+   "visibly_bad_evidence": {
+    "best_heuristic": "duplicate_frame_pairs",
+    "direction": "highest",
+    "auroc": 1.0,
+    "source_run_id": "10a22593f4b34a98be3a5f929ac5a664"
+   },
+   "by_metric": {
+    "f30": {
+     "declaration": {
+      "harm_column": "harm_f30",
+      "functional": "F(30) = P(T <= 30 s)",
+      "tau": "30 s",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_10/LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket/demo_6",
+      "content_hash": "fb22e13390fb2df5a2d21e8c6f84545e6f26fa3ea879d6fb639726e2b9b2d091",
+      "original_episode_id": "libero_10/LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket/demo_6",
+      "original_content_hash": "48167de4ea64b8ab03af7d811e87c1e92cd93265cf71ed4db405653546e30bee",
+      "z": 1.7477100901717444,
+      "harm": 1.8139856138927497,
+      "task_name": "LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_next_to_the_ramekin_and_place_it_on_the_plate/demo_3",
+      "content_hash": "14da94232ab631fa66a05a58b7560f5ba72e9877fb56a8b5560694fe6b9bfbd3",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_next_to_the_ramekin_and_place_it_on_the_plate/demo_3",
+      "original_content_hash": "d04d02e68e2f3587da9b8932f49e15f8f2fad955b4c463b4868a101fd182c409",
+      "z": -1.1730385390631297,
+      "harm": -1.2083186322821715,
+      "task_name": "pick_up_the_black_bowl_next_to_the_ramekin_and_place_it_on_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "rmst60": {
+     "declaration": {
+      "harm_column": "harm_rmst60",
+      "functional": "RMST(60) = \u222b_0^60 (1 - F(t)) dt",
+      "tau": "60 s = \u03c4_episode",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate/demo_11",
+      "content_hash": "9103574acb03830a3cafd1d356ca78042ca627cc7a4b3673c4fa00ee54c12f13",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate/demo_11",
+      "original_content_hash": "0f65b845a616c7af9c848df873ce0396fc729220c9acc7817f75fcd4666aae4e",
+      "z": 2.156664626509384,
+      "harm": 2.192701513895415,
+      "task_name": "pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_10/LIVING_ROOM_SCENE6_put_the_white_mug_on_the_plate_and_put_the_chocolate_pudding_to_the_right_of_the_plate/demo_28",
+      "content_hash": "f45823605d525521a8c456f98ccb87f7a9b360e8741abfa81513a8861551daf2",
+      "original_episode_id": "libero_10/LIVING_ROOM_SCENE6_put_the_white_mug_on_the_plate_and_put_the_chocolate_pudding_to_the_right_of_the_plate/demo_28",
+      "original_content_hash": "5fe22224cb11c3ace99764a40cbc0236abe9bbe7f99e0b80a9da94c0e3ef9e28",
+      "z": -2.069537120587309,
+      "harm": -2.132609330331054,
+      "task_name": "LIVING_ROOM_SCENE6_put_the_white_mug_on_the_plate_and_put_the_chocolate_pudding_to_the_right_of_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "auc_expected": {
+     "declaration": {
+      "harm_column": "harm_auc_expected",
+      "functional": "AUC_h = P(T < T_h) + \u00bd P(T = T_h) (Mann-Whitney; ties \u00bd because model and human share the 20 Hz grid)",
+      "tau": "none (humans all < 60 s)",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_10/LIVING_ROOM_SCENE6_put_the_white_mug_on_the_plate_and_put_the_chocolate_pudding_to_the_right_of_the_plate/demo_28",
+      "content_hash": "f45823605d525521a8c456f98ccb87f7a9b360e8741abfa81513a8861551daf2",
+      "original_episode_id": "libero_10/LIVING_ROOM_SCENE6_put_the_white_mug_on_the_plate_and_put_the_chocolate_pudding_to_the_right_of_the_plate/demo_28",
+      "original_content_hash": "5fe22224cb11c3ace99764a40cbc0236abe9bbe7f99e0b80a9da94c0e3ef9e28",
+      "z": 2.387526824020596,
+      "harm": 2.31918493733579,
+      "task_name": "LIVING_ROOM_SCENE6_put_the_white_mug_on_the_plate_and_put_the_chocolate_pudding_to_the_right_of_the_plate",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_ramekin_and_place_it_on_the_plate/demo_43",
+      "content_hash": "248a670ee492d1cf625222fbca67634bfefe9c2e575c0053de87f6b31e966053",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_ramekin_and_place_it_on_the_plate/demo_43",
+      "original_content_hash": "a273a1ac0e6c800f11675da100d7b0eaab5bdab8689abf3cda4bc1a8b304bbc2",
+      "z": -1.7043350224352485,
+      "harm": -1.7349021218236254,
+      "task_name": "pick_up_the_black_bowl_on_the_ramekin_and_place_it_on_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "hrt60_lin": {
+     "declaration": {
+      "harm_column": "harm_hrt60_lin",
+      "functional": "HRT(60) = (1/J) \u03a3_o RMST_h,o(60) / RMST_m,o(60)",
+      "tau": "60 s",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate/demo_16",
+      "content_hash": "5aebf1fcad1f1dbf9c5c0a999c4a19ff759db94b0439114a325df2063e8ecf57",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate/demo_16",
+      "original_content_hash": "61d605728f9315bdd8bddb28d2ec270b48cb73770b9ff48d10c7abf76536e345",
+      "z": 4.4888477057202465,
+      "harm": 4.675445919686757,
+      "task_name": "pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_10/LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket/demo_6",
+      "content_hash": "fb22e13390fb2df5a2d21e8c6f84545e6f26fa3ea879d6fb639726e2b9b2d091",
+      "original_episode_id": "libero_10/LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket/demo_6",
+      "original_content_hash": "48167de4ea64b8ab03af7d811e87c1e92cd93265cf71ed4db405653546e30bee",
+      "z": 0.42430116681052127,
+      "harm": 0.48584082160482067,
+      "task_name": "LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "censored60": {
+     "declaration": {
+      "harm_column": "harm_censored60",
+      "functional": "1 - F(60) (no ghosts on LIBERO)",
+      "tau": "60 s = \u03c4_episode",
+      "rollout_subset": "all",
+      "good_sign": -1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_10/LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate/demo_33",
+      "content_hash": "13a8cf02a8bf75ea5a766bed0ce0112abfcd99c58982842e8e95980eb1a748db",
+      "original_episode_id": "libero_10/LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate/demo_33",
+      "original_content_hash": "6163031b4990f5caaef90a4883aa1f095701d1236de995a3cde579ac345d5116",
+      "z": 1.949182369491999,
+      "harm": 1.9798825891184093,
+      "task_name": "LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_10/LIVING_ROOM_SCENE1_put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket/demo_45",
+      "content_hash": "0618a257896dd20eaf9c785606ce144bc6d789eb0a0ea763e35846e297799db9",
+      "original_episode_id": "libero_10/LIVING_ROOM_SCENE1_put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket/demo_45",
+      "original_content_hash": "2de49d1bd724ba58ba7ef9cd1701540e4ddd4d4cd2cced3d044992848c1805c5",
+      "z": -1.642361504259687,
+      "harm": -1.5748418613764703,
+      "task_name": "LIVING_ROOM_SCENE1_put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket",
+      "quadrant": "bad_but_not_harmful"
+     }
+    }
+   }
+  },
+  "instruction_swap": {
+   "hypothesis": "none stated",
+   "n": 13,
+   "visibly_bad_evidence": {
+    "best_heuristic": "instruction_mismatch",
+    "direction": "highest",
+    "auroc": 1.0,
+    "source_run_id": "97943e5ac79a4b9b840b01d12cf2d5bd"
+   },
+   "by_metric": {
+    "f30": {
+     "declaration": {
+      "harm_column": "harm_f30",
+      "functional": "F(30) = P(T <= 30 s)",
+      "tau": "30 s",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate/demo_23",
+      "content_hash": "01718bbe87bea4eed6d1457ebedef43f6cb4ffeedd2024d41df3f9ce48950624",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate/demo_23",
+      "original_content_hash": "5f8fc6c622258bb164f4d73615c2fc815a17b580b0a96ffca4fa9c3bc603f383",
+      "z": 0.9546361828221082,
+      "harm": 0.9933362044496503,
+      "task_name": "pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_next_to_the_cookie_box_and_place_it_on_the_plate/demo_6",
+      "content_hash": "736e6a6d4a7367ef4a667df2d061c30360f88f07fe8612a5d48539d0d5c5ade1",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_next_to_the_cookie_box_and_place_it_on_the_plate/demo_6",
+      "original_content_hash": "abf57fc6f3e4ea1cd4706bd87df686620c01e20dc2e130dabff28f2a966c916e",
+      "z": -0.9320334591570003,
+      "harm": -0.958933707794222,
+      "task_name": "pick_up_the_black_bowl_next_to_the_cookie_box_and_place_it_on_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "rmst60": {
+     "declaration": {
+      "harm_column": "harm_rmst60",
+      "functional": "RMST(60) = \u222b_0^60 (1 - F(t)) dt",
+      "tau": "60 s = \u03c4_episode",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate/demo_36",
+      "content_hash": "bcc13131ba733a887ddc3a6dd5370919f6a34dcc7fdab79259130dccc64ead08",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate/demo_36",
+      "original_content_hash": "b75c3ca0770c873d53034b0946695d24a434015de56fade6ed0e129c491b07b2",
+      "z": 1.8534129573045122,
+      "harm": 1.8823382582267307,
+      "task_name": "pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_next_to_the_plate_and_place_it_on_the_plate/demo_14",
+      "content_hash": "fc0f32ce4f01206f408e1a4b5ba980f60e80cbe9d84728e98c9b15c457ad6443",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_next_to_the_plate_and_place_it_on_the_plate/demo_14",
+      "original_content_hash": "586b4ac2a41245c70cf3273c954b8831f778894287fe18a6ed9ccf7c1cd59b58",
+      "z": -1.88122092279373,
+      "harm": -1.9398769097788113,
+      "task_name": "pick_up_the_black_bowl_next_to_the_plate_and_place_it_on_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "auc_expected": {
+     "declaration": {
+      "harm_column": "harm_auc_expected",
+      "functional": "AUC_h = P(T < T_h) + \u00bd P(T = T_h) (Mann-Whitney; ties \u00bd because model and human share the 20 Hz grid)",
+      "tau": "none (humans all < 60 s)",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_10/LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket/demo_20",
+      "content_hash": "d39f33c9f5f94c53d80d09bab7db305206a4d056ed7b6175dc64826515f47855",
+      "original_episode_id": "libero_10/LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket/demo_20",
+      "original_content_hash": "4fb99e531f35cd9397411024bea8f84716003fd0452e49ef230845cabc3ffa09",
+      "z": 1.441650170190411,
+      "harm": 1.3820403205947949,
+      "task_name": "LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_17",
+      "content_hash": "d4176d4596ebbdaf0d91ee190e2ac98f9043b30df3100cb9df66c7798a20748c",
+      "original_episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_17",
+      "original_content_hash": "dbb0734f008334c1cc4ab64c53277052ed040e2bfb6ff24d99798a3735873e20",
+      "z": -1.8911083201307444,
+      "harm": -1.9199511869184505,
+      "task_name": "KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "hrt60_lin": {
+     "declaration": {
+      "harm_column": "harm_hrt60_lin",
+      "functional": "HRT(60) = (1/J) \u03a3_o RMST_h,o(60) / RMST_m,o(60)",
+      "tau": "60 s",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_next_to_the_cookie_box_and_place_it_on_the_plate/demo_6",
+      "content_hash": "736e6a6d4a7367ef4a667df2d061c30360f88f07fe8612a5d48539d0d5c5ade1",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_next_to_the_cookie_box_and_place_it_on_the_plate/demo_6",
+      "original_content_hash": "abf57fc6f3e4ea1cd4706bd87df686620c01e20dc2e130dabff28f2a966c916e",
+      "z": 1.5597989443194593,
+      "harm": 1.656275759911186,
+      "task_name": "pick_up_the_black_bowl_next_to_the_cookie_box_and_place_it_on_the_plate",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_10/LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket/demo_4",
+      "content_hash": "a8311228d0ce0126bdaddfb49ec08dc8e769c61aafa8d92b149cd4f7dd2a79c0",
+      "original_episode_id": "libero_10/LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket/demo_4",
+      "original_content_hash": "5a17a6a5543b8a28c08cf387e672571ac1f15a3d6e5062f9d27b81629ed749a0",
+      "z": -1.7791829107439097,
+      "harm": -1.7854403745850835,
+      "task_name": "LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "censored60": {
+     "declaration": {
+      "harm_column": "harm_censored60",
+      "functional": "1 - F(60) (no ghosts on LIBERO)",
+      "tau": "60 s = \u03c4_episode",
+      "rollout_subset": "all",
+      "good_sign": -1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_17",
+      "content_hash": "d4176d4596ebbdaf0d91ee190e2ac98f9043b30df3100cb9df66c7798a20748c",
+      "original_episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_17",
+      "original_content_hash": "dbb0734f008334c1cc4ab64c53277052ed040e2bfb6ff24d99798a3735873e20",
+      "z": 1.3202951549024031,
+      "harm": 1.3574425363479952,
+      "task_name": "KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_next_to_the_cookie_box_and_place_it_on_the_plate/demo_6",
+      "content_hash": "736e6a6d4a7367ef4a667df2d061c30360f88f07fe8612a5d48539d0d5c5ade1",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_next_to_the_cookie_box_and_place_it_on_the_plate/demo_6",
+      "original_content_hash": "abf57fc6f3e4ea1cd4706bd87df686620c01e20dc2e130dabff28f2a966c916e",
+      "z": -1.4199918179016677,
+      "harm": -1.3547518418941187,
+      "task_name": "pick_up_the_black_bowl_next_to_the_cookie_box_and_place_it_on_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     }
+    }
+   }
+  },
+  "time_shift": {
+   "hypothesis": "none stated",
+   "n": 13,
+   "visibly_bad_evidence": {
+    "best_heuristic": "length_vs_task",
+    "direction": "lowest",
+    "auroc": 0.8484996016641586,
+    "source_run_id": "29874f2ae23549ccae9449c43730c71a"
+   },
+   "by_metric": {
+    "f30": {
+     "declaration": {
+      "harm_column": "harm_f30",
+      "functional": "F(30) = P(T <= 30 s)",
+      "tau": "30 s",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate/demo_18",
+      "content_hash": "dad33df28e6e5b5e07f71e9253bcfdcccf4c21a2c6d8526a80d61cfacfbd13e8",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate/demo_18",
+      "original_content_hash": "b091314b10fd1fe52846829676d06119e5f1ce01cd847dda54b455d15f97740a",
+      "z": 1.4199436990033572,
+      "harm": 1.4748226520869099,
+      "task_name": "pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_41",
+      "content_hash": "9729d5e8402ed408006549c2c786c678e462df4d288816df82ce5ab62778cad5",
+      "original_episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_41",
+      "original_content_hash": "642f9fc5c13fffdb7e98c02a124866572e54f0f01aea5f3f72589e98ec49ebee",
+      "z": -1.5359737308157957,
+      "harm": -1.5838732281625223,
+      "task_name": "KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "rmst60": {
+     "declaration": {
+      "harm_column": "harm_rmst60",
+      "functional": "RMST(60) = \u222b_0^60 (1 - F(t)) dt",
+      "tau": "60 s = \u03c4_episode",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_in_the_top_drawer_of_the_wooden_cabinet_and_place_it_on_the_plate/demo_33",
+      "content_hash": "2fe171074e8fb2b7a0f73755770b5244280fd0b3869a80a645f6ab5f64b10b69",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_in_the_top_drawer_of_the_wooden_cabinet_and_place_it_on_the_plate/demo_33",
+      "original_content_hash": "a201eab91941abb74d8e24b44e24c286163cf5d323a6abbefce8b22f8dfe1f85",
+      "z": 0.945213657721895,
+      "harm": 0.9528406823236886,
+      "task_name": "pick_up_the_black_bowl_in_the_top_drawer_of_the_wooden_cabinet_and_place_it_on_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_10/KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer_of_the_cabinet_and_close_it/demo_18",
+      "content_hash": "30d7ff3ac97ea856a6071be0a8c3913ee6d916ecc0aae4f2e128ef4b8b5d8862",
+      "original_episode_id": "libero_10/KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer_of_the_cabinet_and_close_it/demo_18",
+      "original_content_hash": "acbff8734646887828079893803f3c13ba2099a534165ce14c904938b2605b42",
+      "z": -1.4988922625000511,
+      "harm": -1.5485822202711759,
+      "task_name": "KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer_of_the_cabinet_and_close_it",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "auc_expected": {
+     "declaration": {
+      "harm_column": "harm_auc_expected",
+      "functional": "AUC_h = P(T < T_h) + \u00bd P(T = T_h) (Mann-Whitney; ties \u00bd because model and human share the 20 Hz grid)",
+      "tau": "none (humans all < 60 s)",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate/demo_18",
+      "content_hash": "dad33df28e6e5b5e07f71e9253bcfdcccf4c21a2c6d8526a80d61cfacfbd13e8",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate/demo_18",
+      "original_content_hash": "b091314b10fd1fe52846829676d06119e5f1ce01cd847dda54b455d15f97740a",
+      "z": 2.0317417968095826,
+      "harm": 1.9666844060902964,
+      "task_name": "pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_next_to_the_plate_and_place_it_on_the_plate/demo_34",
+      "content_hash": "f42da03ba21ecd0f98c0ab12b94db7a381189cbe05c6f40c4bd6a4a060025654",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_next_to_the_plate_and_place_it_on_the_plate/demo_34",
+      "original_content_hash": "a25b185d601da5c9bc06a41d9777d6da41f8bb8e660fa3efb6e374c8a978e878",
+      "z": -2.0669580272951817,
+      "harm": -2.0941775046495352,
+      "task_name": "pick_up_the_black_bowl_next_to_the_plate_and_place_it_on_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "hrt60_lin": {
+     "declaration": {
+      "harm_column": "harm_hrt60_lin",
+      "functional": "HRT(60) = (1/J) \u03a3_o RMST_h,o(60) / RMST_m,o(60)",
+      "tau": "60 s",
+      "rollout_subset": "all",
+      "good_sign": 1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate/demo_49",
+      "content_hash": "8bdb68344bae07ec8de06f668803c939a94bc6730ab3db221f1a36cd19e0bfbf",
+      "original_episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate/demo_49",
+      "original_content_hash": "07b94b5b77117866ecca783e71217453d890a32384af5132f3921893d7165b61",
+      "z": 0.47715486819203357,
+      "harm": 0.5403207333589821,
+      "task_name": "pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate",
+      "quadrant": "bad_but_not_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_41",
+      "content_hash": "9729d5e8402ed408006549c2c786c678e462df4d288816df82ce5ab62778cad5",
+      "original_episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_41",
+      "original_content_hash": "642f9fc5c13fffdb7e98c02a124866572e54f0f01aea5f3f72589e98ec49ebee",
+      "z": -2.730063624695922,
+      "harm": -2.7655779246670567,
+      "task_name": "KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it",
+      "quadrant": "bad_but_not_harmful"
+     }
+    },
+    "censored60": {
+     "declaration": {
+      "harm_column": "harm_censored60",
+      "functional": "1 - F(60) (no ghosts on LIBERO)",
+      "tau": "60 s = \u03c4_episode",
+      "rollout_subset": "all",
+      "good_sign": -1.0
+     },
+     "most_harmful": {
+      "which": "most harmful member",
+      "episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_41",
+      "content_hash": "9729d5e8402ed408006549c2c786c678e462df4d288816df82ce5ab62778cad5",
+      "original_episode_id": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it/demo_41",
+      "original_content_hash": "642f9fc5c13fffdb7e98c02a124866572e54f0f01aea5f3f72589e98ec49ebee",
+      "z": 1.1729076766338855,
+      "harm": 1.2115660300001556,
+      "task_name": "KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it",
+      "quadrant": "bad_and_harmful"
+     },
+     "least_harmful": {
+      "which": "least harmful member",
+      "episode_id": "libero_10/LIVING_ROOM_SCENE1_put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket/demo_41",
+      "content_hash": "f73864f4e42bb06ab648625a3b96de859d6d912bfdd51209eb2d6da29d8cb627",
+      "original_episode_id": "libero_10/LIVING_ROOM_SCENE1_put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket/demo_41",
+      "original_content_hash": "46a6581c8e0208820e0747c18e44f1739109e5d9d9a1395679f22eb15853c4a0",
+      "z": -1.8386688264500555,
+      "harm": -1.7691367001785772,
+      "task_name": "LIVING_ROOM_SCENE1_put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket",
+      "quadrant": "bad_but_not_harmful"
+     }
+    }
+   }
+  }
+ }
+}

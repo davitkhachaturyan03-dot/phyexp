@@ -1,0 +1,117 @@
+{
+ "planted_structure": "SYNTHETIC: idle_padding members +2 sd on harm_hrt60_lin only; action_noise members unshifted; 10 clean episodes +4 sd on harm_f30",
+ "synthetic": true,
+ "bad_definition": {
+  "primary": "planted corruption label of the answer key (read after attribution)",
+  "secondary": "flagged by any of H1-H8 at the top q of each heuristic, q = injection rate"
+ },
+ "harmful_z": 1.0,
+ "filter_q": 0.09479166666666666,
+ "n_flagged_filter": 438,
+ "n": 960,
+ "n_planted": 91,
+ "quadrant_counts": {
+  "labels": {
+   "f30": {
+    "bad_and_harmful": 13,
+    "bad_but_not_harmful": 78,
+    "clean_but_harmful": 134,
+    "clean_and_not_harmful": 735
+   },
+   "rmst60": {
+    "bad_and_harmful": 12,
+    "bad_but_not_harmful": 79,
+    "clean_but_harmful": 138,
+    "clean_and_not_harmful": 731
+   },
+   "auc_expected": {
+    "bad_and_harmful": 17,
+    "bad_but_not_harmful": 74,
+    "clean_but_harmful": 147,
+    "clean_and_not_harmful": 722
+   },
+   "hrt60_lin": {
+    "bad_and_harmful": 13,
+    "bad_but_not_harmful": 78,
+    "clean_but_harmful": 122,
+    "clean_and_not_harmful": 747
+   },
+   "censored60": {
+    "bad_and_harmful": 16,
+    "bad_but_not_harmful": 75,
+    "clean_but_harmful": 149,
+    "clean_and_not_harmful": 720
+   }
+  },
+  "filter": {
+   "f30": {
+    "bad_and_harmful": 63,
+    "bad_but_not_harmful": 375,
+    "clean_but_harmful": 84,
+    "clean_and_not_harmful": 438
+   },
+   "rmst60": {
+    "bad_and_harmful": 61,
+    "bad_but_not_harmful": 377,
+    "clean_but_harmful": 89,
+    "clean_and_not_harmful": 433
+   },
+   "auc_expected": {
+    "bad_and_harmful": 78,
+    "bad_but_not_harmful": 360,
+    "clean_but_harmful": 86,
+    "clean_and_not_harmful": 436
+   },
+   "hrt60_lin": {
+    "bad_and_harmful": 56,
+    "bad_but_not_harmful": 382,
+    "clean_but_harmful": 79,
+    "clean_and_not_harmful": 443
+   },
+   "censored60": {
+    "bad_and_harmful": 68,
+    "bad_but_not_harmful": 370,
+    "clean_but_harmful": 97,
+    "clean_and_not_harmful": 425
+   }
+  }
+ },
+ "readings": {
+  "action_noise|f30": "no detectable harm on f30 (estimated; CI [-0.79, 0.50])",
+  "action_noise|rmst60": "no detectable harm on rmst60 (estimated; CI [-0.80, 0.41])",
+  "action_noise|auc_expected": "no detectable harm on auc_expected (estimated; CI [-0.26, 0.64])",
+  "action_noise|hrt60_lin": "no detectable harm on hrt60_lin (estimated; CI [-0.40, 0.55])",
+  "action_noise|censored60": "no detectable harm on censored60 (estimated; CI [-0.85, 0.16])",
+  "detour|f30": "no detectable harm on f30 (estimated; CI [-0.64, 0.39])",
+  "detour|rmst60": "no detectable harm on rmst60 (estimated; CI [-0.38, 0.94])",
+  "detour|auc_expected": "no detectable harm on auc_expected (estimated; CI [-0.36, 0.53])",
+  "detour|hrt60_lin": "no detectable harm on hrt60_lin (estimated; CI [-0.34, 0.59])",
+  "detour|censored60": "no detectable harm on censored60 (estimated; CI [-0.16, 0.85])",
+  "dropped_frames|f30": "no detectable harm on f30 (estimated; CI [-0.43, 0.32])",
+  "dropped_frames|rmst60": "no detectable harm on rmst60 (estimated; CI [-0.70, 0.23])",
+  "dropped_frames|auc_expected": "no detectable harm on auc_expected (estimated; CI [-0.58, 0.48])",
+  "dropped_frames|hrt60_lin": "no detectable harm on hrt60_lin (estimated; CI [-0.88, 0.01])",
+  "dropped_frames|censored60": "no detectable harm on censored60 (estimated; CI [-0.80, 0.62])",
+  "gripper_release|f30": "no detectable harm on f30 (estimated; CI [-0.61, 0.46])",
+  "gripper_release|rmst60": "no detectable harm on rmst60 (estimated; CI [-0.51, 0.39])",
+  "gripper_release|auc_expected": "no detectable harm on auc_expected (estimated; CI [-0.02, 0.84])",
+  "gripper_release|hrt60_lin": "no detectable harm on hrt60_lin (estimated; CI [-0.70, 0.11])",
+  "gripper_release|censored60": "harmful on censored60 (estimated; CI [0.08, 1.13])",
+  "idle_padding|f30": "no detectable harm on f30 (estimated; CI [-0.45, 0.52])",
+  "idle_padding|rmst60": "no detectable harm on rmst60 (estimated; CI [-0.79, 0.30])",
+  "idle_padding|auc_expected": "no detectable harm on auc_expected (estimated; CI [-0.42, 0.85])",
+  "idle_padding|hrt60_lin": "harmful on hrt60_lin (estimated; CI [1.39, 2.69])",
+  "idle_padding|censored60": "no detectable harm on censored60 (estimated; CI [-0.21, 0.82])",
+  "instruction_swap|f30": "no detectable harm on f30 (estimated; CI [-0.24, 0.41])",
+  "instruction_swap|rmst60": "no detectable harm on rmst60 (estimated; CI [-0.64, 0.50])",
+  "instruction_swap|auc_expected": "no detectable harm on auc_expected (estimated; CI [-0.06, 0.95])",
+  "instruction_swap|hrt60_lin": "no detectable harm on hrt60_lin (estimated; CI [-0.63, 0.36])",
+  "instruction_swap|censored60": "no detectable harm on censored60 (estimated; CI [-0.58, 0.30])",
+  "time_shift|f30": "no detectable harm on f30 (estimated; CI [-0.42, 0.43])",
+  "time_shift|rmst60": "no detectable harm on rmst60 (estimated; CI [-0.52, 0.23])",
+  "time_shift|auc_expected": "no detectable harm on auc_expected (estimated; CI [-0.79, 0.38])",
+  "time_shift|hrt60_lin": "helpful on hrt60_lin (estimated; CI [-1.02, -0.16])",
+  "time_shift|censored60": "no detectable harm on censored60 (estimated; CI [-0.64, 0.24])"
+ },
+ "claim_limit": "estimated from first-order influence (CUPID p. 11); an interval spanning zero is not proof of no harm; Round B tests removal"
+}
