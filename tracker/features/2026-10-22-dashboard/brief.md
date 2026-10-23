@@ -134,6 +134,20 @@ strategies. Orchestrator's proposed shape (inferred, for the planner to verify a
   claim carefully (e.g. an effect-size bound / CI, not "harmless"). Round B in the runbook then includes these arms.
 - On synthetic data it is only a demo of the view; the real claim needs the server.
 
+**Owner follow-up (2026-10-22, verbatim):** "can't we use the planted bad episodes instead of screening? be open minded
+and thoughtful". Orchestrator's answer to the owner, now the direction for the plan (owner may still override):
+- **Primary definition of "bad" = the planted corruption labels on v3** (answer key, read only after attribution by
+  scoring code; blindness unchanged). Both halves of §9.2: planted-but-harmless (neutral/helpful influence; causal: "remove
+  all of type X" does not beat matched random) and clean-but-harmful (original LIBERO demos with high harm; causal: their
+  removal beats random).
+- **The H1–H8 heuristics** (already built) are an optional secondary "what a practical filter would do" layer. **No new
+  screening method** (DemInf / RoboDrop) in this feature.
+- Caveats the plan must handle: (1) "corruption too mild" — show the corruption is visibly bad (videos; the ground-truth
+  feature's measured ≥0.85 best-heuristic AUROC per type); (2) power — 13 episodes per type (~1.4%); the claim is a CI /
+  effect-size bound, at least one type must show a real effect for "harmless" to mean anything, and an all-null result
+  is reported as inconclusive; (3) cost (inferred, 4 h per train): 7 types × 3 seeds = 21 trainings plus matched
+  13-episode random controls (~6), ≈108 GPU-h on top of Round A — check whether existing random arms can serve.
+
 ## Owner rulings
 
 (none yet)
