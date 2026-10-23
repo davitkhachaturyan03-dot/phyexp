@@ -1,5 +1,13 @@
 # Changelog: training and attribution
 
+## 2026-10-22: the documented first server run is now Round A on `v3/candidate` (dashboard feature, owner answer Q1)
+- **Why:** the dashboard feature's owner answer Q1 ("Planted-bad-data v3 (Recommended)", `tracker/features/2026-10-22-dashboard/brief.md`) replaces the first-run ruling of the entry below ("112 jobs, ~96 GPU-h" on `v0/candidate`).
+- **Grounding:** PoC §2.1 item 4 p.3 (planted ground truth), §9.1 Steps 3-4 p.19, §9.2 p.19; the dashboard plan (AC8.2b).
+- **Prior art:** nothing new: only the documented command and the counts change; the chain code is the same plus three CPU jobs.
+- **Files:** `scripts/server_pipeline.py` (module docstring "FIRST SERVER RUN" now `--tag v3cand --subset v3/candidate --curation per_task --metrics f30 hrt60_lin`; the chain also runs `clusters` after the ensemble and, with an answer key, `score-clusters` and `discrepancy`), `scripts/verify_training_attribution.py` (`--pipeline` check 4.7 asserts the v3 count; 4.6/4.7 default count 313 -> 314), `artifacts/s4_dry_run_first_run.txt` (regenerated for v3), `report.html` ("Changes since first release").
+- **Evidence:** `.venv/bin/python scripts/server_pipeline.py --tag v3cand --subset v3/candidate --curation per_task --metrics f30 hrt60_lin --dry-run` -> `would submit 116 jobs` (24 training runs; the dashboard plan's measured 113 plus `clusters`, `score-clusters`, `discrepancy`). The `v0/candidate` variant is 113 jobs (112 plus `clusters`), 24 trainings. The script default (`--curation both`, four metrics, v0/candidate) is 314 jobs (313 plus `clusters`). `verify_training_attribution.py --pipeline` check 4.7 passes (see the dashboard execution log, batch B2).
+- **Divergence:** the first-run size changes from 112 to 116 jobs and the dataset from v0/candidate to v3/candidate by the owner's answer; training count (24) and GPU-hours (~96, inferred) are unchanged.
+
 ## 2026-10-22: owner rulings applied (±1 returns by default, first-run command, group rule approved)
 - **Why:** owner rulings after round 2 PASS, recorded in `brief.md` "Owner rulings" (commit `47632aa`): "CUPID's +1/−1" for return weighting; "112 jobs, ~96 GPU-h"
   as the first server run; "Keep 2-of-5, documented" for the group rule. (A fourth, "Merge: not yet", needs no change; nothing merged or pushed.)
