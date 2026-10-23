@@ -54,8 +54,15 @@ KINDS = ("vs_base", "curated_vs_random", "head_to_head")
 ALPHA = 0.05  # the verdict's own alpha (compare_policies default); recorded per verdict as v["alpha"]
 
 
-def expected_direction(kind: str, arm_direction: str | None, metric: str, treated: str, control: str) -> str | None:
-    """The declared expectation for one metric (module docstring): ``treated_better``, ``treated_worse`` or ``None``."""
+def expected_direction(kind: str, arm_direction: str | None, metric: str, treated: str, control: str,
+                       expected_by_metric: dict | None = None) -> str | None:
+    """The declared expectation for one metric (module docstring): ``treated_better``, ``treated_worse`` or ``None``.
+
+    ``expected_by_metric`` (dashboard S4/S10): when the treated arm's select run recorded one (a ``drop_cluster`` arm: the estimated sign per
+    metric whose interval excludes zero; a planted-type arm whose label names metrics), the expectation is exactly that mapping and every
+    metric it does not name reads ``None``, for ``vs_base`` and ``curated_vs_random`` alike."""
+    if expected_by_metric is not None and kind != "head_to_head":
+        return expected_by_metric.get(metric)
     if kind == "head_to_head":
         if metric == "hrt60" and "hrt60" in treated:
             return "treated_better"
@@ -109,7 +116,7 @@ def summarize(records: list[dict], arms: dict[str, dict]) -> pd.DataFrame:
         keys = list(g["verdict"].iloc[0]["metrics"])
         for m in keys:
             calls = [call(v["metrics"][m], v.get("alpha", ALPHA), bool(v["gate"]["fires"])) for v in g["verdict"]]
-            exp = expected_direction(kind, arm.get("direction"), m, treated, control)
+            exp = expected_direction(kind, arm.get("direction"), m, treated, control, arm.get("expected_by_metric"))
             want = {"treated_better": "T", "treated_worse": "C"}.get(exp)
             n_t, n_c = calls.count("T"), calls.count("C")
             supports = sum(c == want for c in calls) if want else None
@@ -158,7 +165,10 @@ def collect(tag: str, chain: str | None = None, lineage_root: Path | None = None
         if sel:
             p = sel[0].data.params
             decl = p.get("metric_declaration")
-            arms[treated] = {"op": p.get("op", ""), "direction": p.get("direction", ""), "metric": p.get("metric", ""),
+            ebm = p.get("expected_by_metric")
+            arms[treated] = {"expected_by_metric": json.loads(ebm) if ebm and ebm.startswith("{") else None, "groundtruth_arm": p.get("groundtruth_arm") == "True", "cluster_run_id": p.get("cluster_run_id"), "cluster_id": p.get("cluster_id"),
+                             "definition": p.get("definition"), "arm_kind": p.get("arm_kind"), "corruption_type": p.get("corruption_type"),
+                             "n_dropped": p.get("n_dropped"), "child_n_episodes": p.get("child_n_episodes"), "op": p.get("op", ""), "direction": p.get("direction", ""), "metric": p.get("metric", ""),
                              "curation": p.get("curation", ""),
                              "declaration": json.loads(decl) if decl and decl.startswith("{") else None}
     return records, arms, chain

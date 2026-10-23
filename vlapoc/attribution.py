@@ -591,12 +591,13 @@ def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, trai
     Returns ``{"run_id", "scores", "n_episodes", "n_rollouts", "agreement"}``.
     """
     from vlapoc.lineage import file_digests, rel, sha256_json
-    from vlapoc.method_data import open_for_method
+    from vlapoc.method_data import open_for_method, refuse_groundtruth_arm
     from vlapoc.returns import load_eval_rollouts
     from vlapoc.runs import _training_subset, check_scores, client, stage_run
 
     c = client(lineage_root)
     tr = c.get_run(train_run_id)
+    refuse_groundtruth_arm(tr, "attribute")  # a retrained ground-truth arm (dashboard S10) is never attributed
     subset = _training_subset(tr, lineage_root)
     view = open_for_method(subset.subset_id, lineage_root)  # refuses fenced / leaky / ground-truth-derived / tampered input
     ev, rr = c.get_run(eval_run_id), c.get_run(returns_run_id)

@@ -643,6 +643,23 @@ def drop_random_k_per_task(parent: Subset, k_per_task: int, seed: int, lineage_r
     return child
 
 
+def drop_ids(parent: Subset, ids, op: str, extra: dict | None = None, lineage_root: Path | None = None) -> Subset:
+    """Child subset without an explicit list of episode ids, with the derivation recording how (dashboard S4/S10: a cluster's members, a
+    planted type, a matched random draw). ``ids`` must all be in ``parent`` and leave at least one episode; the derivation holds ``op``,
+    ``parent_subset_id``, the sorted ``dropped`` ids and ``extra`` (a ground-truth builder puts ``groundtruth: True`` there, which makes
+    ``method_data.open_for_method`` refuse the child)."""
+    dropped = sorted(set(ids))
+    unknown = sorted(set(dropped) - set(parent.episode_ids))
+    if unknown:
+        raise ValueError(f"{len(unknown)} ids to drop are not in the parent subset, e.g. {unknown[:3]}")
+    if not dropped or len(dropped) >= len(parent.episode_ids):
+        raise ValueError(f"dropping {len(dropped)} of {len(parent.episode_ids)} episodes is out of range")
+    deriv = {"op": op, "parent_subset_id": parent.subset_id, "n_dropped": len(dropped), **(extra or {}), "dropped": dropped}
+    child = Subset(parent.dataset_version_id, tuple(sorted(set(parent.episode_ids) - set(dropped))), deriv)
+    child.save(lineage_root)
+    return child
+
+
 def drop_random_k(parent: Subset, k: int, seed: int, lineage_root: Path | None = None) -> Subset:
     """Random-k control (PoC §9.1 Step 4 p.19): ``default_rng(seed).choice(n, k, replace=False)`` over
     the parent's sorted episode_ids. The dropped IDs are recorded too, so the child is reproducible

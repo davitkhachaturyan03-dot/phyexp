@@ -199,9 +199,19 @@ def verdict_metrics(family: str) -> list[dict]:
     return [entry(k) for k in VERDICT_FAMILIES[family]]
 
 
+def verdict_key_of(harm_column: str) -> str | None:
+    """The verdict metric key (``f30``, ``rmst60``, ``auc_h``, ``hrt60``, ``censored60``) of a score column such as ``harm_hrt60_lin`` or
+    ``harm_f30__same_task`` (dashboard S4: Round B expectations are stated per verdict metric); ``None`` for per-failure-type columns."""
+    base = harm_column.partition("_")[2].partition("__")[0]
+    for e in ENTRIES:
+        if e["family"] == "W" and e["verdict"] is not None and f"ret_{base}" in e["return_columns"]:
+            return e["key"]
+    return None
+
+
 def to_json() -> list[dict]:
     """Shallow copies of every entry: the content of ``metrics_registry.json`` written with every returns run."""
     return [dict(e) for e in ENTRIES]
 
 
-__all__ = ["ENTRIES", "VERDICT_FAMILIES", "FAMILY_TAU_S", "entry", "return_columns", "verdict_metrics", "to_json"]
+__all__ = ["ENTRIES", "VERDICT_FAMILIES", "FAMILY_TAU_S", "entry", "return_columns", "verdict_metrics", "verdict_key_of", "to_json"]

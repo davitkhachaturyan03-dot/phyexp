@@ -207,7 +207,10 @@ def analyze_run(score_run_id: str, name: str, z: float = 1.0, columns: list[str]
     from vlapoc.lineage import Subset, rel
     from vlapoc.runs import client, stage_run
 
+    from vlapoc.method_data import refuse_groundtruth_arm
+
     run = client(lineage_root).get_run(score_run_id)
+    refuse_groundtruth_arm(run, "analyze")
     table = _artifact_table(run, "attribution_scores", lineage_root)
     decls = {r["column"]: r for r in _artifact_json(run, "functionals", lineage_root)}
     cols = [f"harm_{m}" for m in (columns or DEFAULT_METRICS)]

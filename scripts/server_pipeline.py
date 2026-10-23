@@ -28,6 +28,8 @@ Each job runs one ``scripts/stage.py`` subcommand (one MLflow stage run), in the
     score   (only when the base subset's version has an answer key, e.g. ``--subset v3/candidate``) one CPU job after the
             ensemble: ``stage.py score`` = recovery of the planted corruptions per type and metric, next to each type's best
             heuristic (``vlapoc.recovery``; PoC §2.1 item 4, §4.5). The injection run is ``--subset v3/candidate``.
+    clusters (always) one CPU job after the ensemble: ``stage.py clusters`` (dashboard S2: label groups, rule-like slices, the four metric groups, each with a
+            pattern and an *estimated* effect); with an answer key also ``score-clusters`` (S3, after ``clusters``) and ``discrepancy`` (S9, PoC §9.2)
     summary one CPU job after every verify: ``stage.py step4-summary`` (seed-consistency table, ``vlapoc.step4``)
 
 Grounding: PoC §9.1 Steps 3-4 (p. 19): "Rank training episodes by harmful influence ... Retrain without the
@@ -50,22 +52,42 @@ Run names are ``<stage>-<tag>[-<arm>]-s<S>``; ``stage.py`` resolves them to run 
 chain can be submitted before any run exists. The chain refuses to submit from a dirty tree and every job refuses
 to start on a commit other than the one it was submitted from (``slurm/guard.sh``).
 
-FIRST SERVER RUN (owner ruling 2026-10-22, "112 jobs, ~96 GPU-h"): per-task curation with metrics F30 and HRT only::
+FIRST SERVER RUN (owner answers 2026-10-22: Round A is the planted-bad-data ``v3/candidate``; the earlier ruling "112 jobs, ~96 GPU-h" on ``v0/candidate``
+is replaced, dashboard AC8.2b): per-task curation with metrics F30 and HRT only::
 
-    .venv/bin/python scripts/server_pipeline.py --tag v0cand --curation per_task --metrics f30 hrt60_lin
+    .venv/bin/python scripts/server_pipeline.py --tag v3cand --subset v3/candidate --curation per_task --metrics f30 hrt60_lin
 
-That is 112 jobs, 24 of them training runs (3 base seeds + 7 arms x 3 seeds), about 96 training GPU-hours (inferred: 4 h per
-train, runbook; eval time not included). The script's own defaults are unchanged (``--curation both``, four metrics: 313 jobs); the owner
-ruled the size of the first run, not the default. Global curation (``--curation global``, the PoC §9.1 Step 4.1 literal version) runs later,
-reusing the finished base with ``--from select``. ``scripts/verify_training_attribution.py --pipeline`` checks the 112 / 24 counts and
-writes the dry run to ``artifacts/s4_dry_run_first_run.txt``.
+That is 116 jobs (measured by ``--dry-run``), 24 of them training runs (3 base seeds + 7 arms x 3 seeds), about 96 training GPU-hours (inferred: 4 h per
+train, runbook; eval time not included). On v3 the chain also runs the CPU jobs ``clusters`` (dashboard S2), ``score`` (recovery), ``score-clusters`` (S3)
+and ``discrepancy`` (S9) after the ensemble: the measured 113 jobs of the plan's first count plus ``clusters`` + ``score-clusters`` + ``discrepancy``.
+The clean variant ``--subset v0/candidate`` (``--tag v0cand``) is 113 jobs (112 plus the ``clusters`` job), 24 trainings. The script's own defaults are unchanged
+(``--curation both``, four metrics, ``v0/candidate``: 314 jobs); the owner ruled the size of the first run, not the default. Global curation
+(``--curation global``, the PoC §9.1 Step 4.1 literal version) runs later, reusing the finished base with ``--from select``.
+``scripts/verify_training_attribution.py --pipeline`` checks these counts and writes the dry run to ``artifacts/s4_dry_run_first_run.txt``.
+
+ROUND B (dashboard S4 and S10; PoC §9.1 Step 4 p.19, §2.1 item 5 p.3, §9.2 p.19), each its own chain after Round A, same ``--tag`` (names resolve within ``<tag>-``)::
+
+    # discovered clusters: the owner picks cluster ids (the dashboard lists them); optional matched random arm per cluster
+    .venv/bin/python scripts/server_pipeline.py --tag v3cand --subset v3/candidate --round-b --clusters clusters-v3cand \\
+        --pick 'slice:hrt60_lin:harm:1' 'label:task_name=<task>' [--matched-random]
+    # the planted data (v3 only; owner answer Q2 option a): 7 type arms, cleanharm-f30, cleanrandom0, the oracle and its control
+    .venv/bin/python scripts/server_pipeline.py --tag v3cand --subset v3/candidate --round-b-planted [--no-oracle] [--random-draws N]
+
+``--round-b``: per picked cluster one ``select --op drop_cluster`` (and with ``--matched-random`` a ``drop_random_matched`` arm with the same per-task counts),
+then per arm and seed train -> eval (no trajectories) -> ``verify`` vs the base policy (family W declared, O alongside), per cluster a curated_vs_random
+verify against its matched arm, ``step4-summary`` and ``confirm`` (status confirmed / refuted / not confirmed per cluster and metric, ``vlapoc.confirm``).
+Two clusters: 21 jobs, 6 trainings; with ``--matched-random``: 45 jobs, 12 trainings (measured; each matched arm also gets a vs_base verify).
+``--round-b-planted``: ground-truth-side arms (``select-planted``, trained with ``train --groundtruth-arm``; every method entry point refuses them), each type
+and the clean-but-harmful arm against each clean random control, the oracle against its control, ``step4-summary`` and ``discrepancy-verdict`` (the bounded
+sentences of ``vlapoc.planted_arms``). Default: 11 arms, 33 trainings, 129 jobs (~132 GPU-h inferred at 4 h per training); ``--no-oracle``: 27 trainings,
+108 jobs; ``--random-draws 2``: 36 trainings, 162 jobs. All counts measured by ``--dry-run``.
 
 Usage::
 
     cp slurm/site.env.example slurm/site.env                                   # once per machine; edit it
-    .venv/bin/python scripts/server_pipeline.py --tag v0cand --dry-run       # print every job with its full sbatch argv
-    .venv/bin/python scripts/server_pipeline.py --tag v0cand                  # submit everything
-    .venv/bin/python scripts/server_pipeline.py --tag v0cand --from select    # base already done: arms only
+    .venv/bin/python scripts/server_pipeline.py --tag v3cand --subset v3/candidate --curation per_task --metrics f30 hrt60_lin --dry-run  # print every job
+    .venv/bin/python scripts/server_pipeline.py --tag v3cand --subset v3/candidate --curation per_task --metrics f30 hrt60_lin          # submit everything
+    .venv/bin/python scripts/server_pipeline.py --tag v3cand --subset v3/candidate --from select    # base already done: arms only
 """
 
 from __future__ import annotations
@@ -187,6 +209,101 @@ def head_to_head(plan: list[dict], metrics: list[str]) -> list[tuple[dict, dict]
             for (mode, kind, m, k) in sorted(by) if kind == "harm" and m == "hrt60_lin" and (mode, "harm", "f30", k) in by]
 
 
+PLANTED_TYPES = ("action_noise", "detour", "dropped_frames", "gripper_release", "idle_padding", "instruction_swap", "time_shift")  # the v3 injection's types
+
+
+def _retrain_arm(ch: Chain, a, arm: str, sel: str, gt: bool, ev_of: dict, verifies: list, eval_base: dict) -> None:
+    """Jobs of one retrained arm per seed: train on ``select:select-<tag>-<arm>`` (``--groundtruth-arm`` for planted arms), eval without trajectories,
+    and the vs_base verdicts (family W declared, O alongside), as in the Round A chain's ``arms`` phase."""
+    t, eb = a.tag, a.eval_batch
+    for s in a.seeds:
+        tr = ch.submit("gpu.sbatch", f"{PY} train --subset select:select-{t}-{arm} --name train-{t}-{arm}-s{s} --seed {s}" + (" --groundtruth-arm" if gt else ""),
+                       f"train-{t}-{arm}-s{s}", [sel])
+        ev = ch.submit("gpu.sbatch", f"{PY} eval --train train-{t}-{arm}-s{s} --name eval-{t}-{arm}-s{s} --batch-size {eb} --no-trajectories",
+                       f"eval-{t}-{arm}-s{s}", [tr])
+        ev_of[(arm, s)] = ev
+        tag = f"--comparison vs_base --treated {arm} --control base --seed-id {s}"
+        cmd = " && ".join(f"{PY} verify --a eval-{t}-s{s} --b eval-{t}-{arm}-s{s} --family {f} --name verify-{t}-{arm}-s{s}-{f} {tag}" for f in ("W", "O"))
+        verifies.append(ch.submit("cpu.sbatch", cmd, f"verify-{t}-{arm}-s{s}", [ev, eval_base.get(s, "")]))
+
+
+def _vs_random(ch: Chain, a, arm: str, ctrl: str, ev_of: dict, verifies: list) -> None:
+    """Per seed: ``arm`` (treated, B) against ``ctrl`` (control, A), kind curated_vs_random, family W (PoC §2.6)."""
+    t = a.tag
+    for s in a.seeds:
+        cmd = (f"{PY} verify --a eval-{t}-{ctrl}-s{s} --b eval-{t}-{arm}-s{s} --family W --name verify-{t}-{arm}-vs-{ctrl}-s{s}-W "
+               f"--comparison curated_vs_random --treated {arm} --control {ctrl} --seed-id {s}")
+        verifies.append(ch.submit("cpu.sbatch", cmd, f"verify-{t}-{arm}-vs-{ctrl}-s{s}", [ev_of[(arm, s)], ev_of[(ctrl, s)]]))
+
+
+def round_b(ch: Chain, a) -> list[str]:
+    """Round B for discovered clusters (dashboard S4; PoC §2.1 item 5 p.3 leave-group-out, §9.1 Step 4 p.19): per picked cluster one ``drop_cluster``
+    select, 3 seeds of train -> eval (no trajectories) -> vs_base verify, optionally a matched random arm (same per-task counts, ``--matched-random``)
+    with its own arms and a curated_vs_random verify, then ``step4-summary`` and ``confirm``. Returns the arm names."""
+    t = a.tag
+    if not a.clusters or not a.pick:
+        sys.exit("--round-b needs --clusters <cluster run name> and --pick <cluster_id> ...")
+    arms_, cmds = [], []
+    wt = " --allow-whole-task" if a.allow_whole_task else ""
+    for i, cid in enumerate(a.pick):
+        base = f"--parent {a.subset} --clusters {a.clusters} --cluster-id {shlex.quote(cid)}{wt}"
+        cmds.append(f"{PY} select --name select-{t}-cluster{i} --op drop_cluster {base}")
+        arms_.append(f"cluster{i}")
+        if a.matched_random:
+            cmds.append(f"{PY} select --name select-{t}-crandom{i} --op drop_random_matched --seed 0 {base}")
+            arms_.append(f"crandom{i}")
+    sel = ch.submit("cpu.sbatch", " && ".join(cmds), f"select-{t}-roundb")
+    ev_of: dict = {}
+    verifies: list[str] = []
+    eval_base = {s: "" for s in a.seeds}
+    for arm in arms_:
+        _retrain_arm(ch, a, arm, sel, False, ev_of, verifies, eval_base)
+    if a.matched_random:
+        for i in range(len(a.pick)):
+            _vs_random(ch, a, f"cluster{i}", f"crandom{i}", ev_of, verifies)
+    sm = ch.submit("cpu.sbatch", f"{PY} step4-summary --tag {t} --name step4-summary-{t}-roundb --chain-id {ch.chain}", f"step4-summary-{t}-roundb", verifies)
+    ch.submit("cpu.sbatch", f"{PY} confirm --clusters {a.clusters} --tag {t} --name confirm-{t} --chain-id {ch.chain}", f"confirm-{t}", [sm])
+    return arms_
+
+
+def round_b_planted(ch: Chain, a) -> list[str]:
+    """Round B for the planted data (dashboard S10; PoC §9.2 p.19): ground-truth-side removal arms of ``v3/candidate``: ``type-<T>`` per planted type,
+    ``cleanharm-<m>`` (the most harmful clean episodes), ``cleanrandom<r>`` (13 clean episodes: the control), and unless ``--no-oracle`` the oracle (all
+    planted episodes) with ``cleanrandom91-0`` (its control). Each arm: ``select-planted``, 3 seeds of ``train --groundtruth-arm`` -> eval -> vs_base verify;
+    each type / cleanharm arm against each cleanrandom (curated_vs_random), the oracle against its control; then ``step4-summary`` and ``discrepancy-verdict``."""
+    t = a.tag
+    cmds, effect, ctrls = [], [], []
+    for ty in a.types:
+        cmds.append(f"{PY} select-planted --parent {a.subset} --kind type --type {ty} --name select-{t}-type-{ty}")
+        effect.append(f"type-{ty}")
+    for m in a.clean_harm_metrics:
+        cmds.append(f"{PY} select-planted --parent {a.subset} --kind cleanharm --metric {m} --scores attribute-{t}-ens --name select-{t}-cleanharm-{m}")
+        effect.append(f"cleanharm-{m}")
+    for r in range(a.random_draws):
+        cmds.append(f"{PY} select-planted --parent {a.subset} --kind cleanrandom --seed {r} --name select-{t}-cleanrandom{r}")
+        ctrls.append(f"cleanrandom{r}")
+    oracle = []
+    if a.oracle:
+        cmds.append(f"{PY} select-planted --parent {a.subset} --kind oracle --name select-{t}-oracle")
+        cmds.append(f"{PY} select-planted --parent {a.subset} --kind cleanrandom_oracle --seed 0 --name select-{t}-cleanrandom91-0")
+        oracle = ["oracle", "cleanrandom91-0"]
+    sel = ch.submit("cpu.sbatch", " && ".join(cmds), f"select-{t}-planted")
+    ev_of: dict = {}
+    verifies: list[str] = []
+    eval_base = {s: "" for s in a.seeds}
+    all_arms = [*effect, *ctrls, *oracle]
+    for arm in all_arms:
+        _retrain_arm(ch, a, arm, sel, True, ev_of, verifies, eval_base)
+    for arm in effect:
+        for c in ctrls:
+            _vs_random(ch, a, arm, c, ev_of, verifies)
+    if a.oracle:
+        _vs_random(ch, a, "oracle", "cleanrandom91-0", ev_of, verifies)
+    ch.submit("cpu.sbatch", f"{PY} step4-summary --tag {t} --name step4-summary-{t}-planted --chain-id {ch.chain}", f"step4-summary-{t}-planted", verifies)
+    ch.submit("cpu.sbatch", f"{PY} discrepancy-verdict --tag {t} --name discrepancy-verdict-{t} --chain-id {ch.chain}", f"discrepancy-verdict-{t}", verifies)
+    return all_arms
+
+
 def main(argv: list[str] | None = None) -> int:
     """Parse the flags, build the arm lists, and submit (or dry-run print) every job in dependency order."""
     p = argparse.ArgumentParser(prog="scripts/server_pipeline.py", description=__doc__.split("\n\n")[0])
@@ -200,7 +317,17 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--curation", choices=["per_task", "global", "both"], default="both",
                    help="owner answer Q1 (2026-10-20): both, per-task is the headline; global = PoC §9.1 Step 4.1 literal")
     p.add_argument("--n-tasks", type=int, default=20, help="tasks in the base subset (v0/candidate: 20); global arms drop k x this")
-    p.add_argument("--random-draws", type=int, default=2, help="matched random arms per k")
+    p.add_argument("--random-draws", type=int, default=None, help="matched random arms per k (default 2); with --round-b-planted the number of cleanrandom "
+                   "controls (default 1)")
+    p.add_argument("--round-b", action="store_true", help="dashboard S4: confirmation arms for discovered clusters (needs --clusters and --pick)")
+    p.add_argument("--clusters", default=None, help="--round-b: the cluster run (name) whose clusters to remove, e.g. clusters-v3cand")
+    p.add_argument("--pick", nargs="+", default=[], help="--round-b: cluster ids to remove, e.g. 'slice:hrt60_lin:harm:1' (the owner picks; see the dashboard)")
+    p.add_argument("--matched-random", action="store_true", help="--round-b: also train a matched random arm per picked cluster (needed to claim 'more than random removal')")
+    p.add_argument("--allow-whole-task", action="store_true", help="--round-b: allow a cluster that holds every episode of a task (leave-one-task-out)")
+    p.add_argument("--round-b-planted", action="store_true", help="dashboard S10 (v3 only): planted-type arms, a clean-but-harmful arm, clean random controls, the oracle")
+    p.add_argument("--types", nargs="+", default=list(PLANTED_TYPES), help="--round-b-planted: the planted corruption types")
+    p.add_argument("--clean-harm-metrics", nargs="+", default=["f30"], help="--round-b-planted: metrics for the clean-but-harmful arms (harm_<m>__same_task)")
+    p.add_argument("--no-oracle", dest="oracle", action="store_false", help="--round-b-planted: skip the oracle arm and its matched control (the positive control)")
     p.add_argument("--no-ac75", dest="ac75", action="store_false", help="skip AC7.5's drop-random-20 arm")
     p.add_argument("--train-shards", type=int, default=4)
     p.add_argument("--rollout-shards", type=int, default=4)
@@ -228,6 +355,17 @@ def main(argv: list[str] | None = None) -> int:
     site = load_site(site_path)
     ch = Chain(a.dry_run, [x for x in a.after.split(",") if x], sha, f"{a.tag}-{sha[:8]}", a.partition or site["PARTITION"],
                site["LOG_DIR"], str(a.site) if a.site else "")
+    if a.round_b and a.round_b_planted:
+        sys.exit("--round-b and --round-b-planted are separate chains; submit one at a time")
+    if a.random_draws is None:
+        a.random_draws = 1 if a.round_b_planted else 2
+    if a.round_b_planted and not has_answer_key(a.subset):
+        sys.exit(f"--round-b-planted needs a subset of a version with an answer key (e.g. v3/candidate); {a.subset!r} has none")
+    if a.round_b or a.round_b_planted:
+        names = round_b(ch, a) if a.round_b else round_b_planted(ch, a)
+        n_train = sum(1 for _ in names) * len(a.seeds)
+        print(f"{'would submit' if a.dry_run else 'submitted'} {ch.n} jobs; chain {ch.chain}; {n_train} training runs; arms: {names}")
+        return 0
     on = set(PHASES[PHASES.index(a.start): PHASES.index(a.stop) + 1])
     t, eb = a.tag, a.eval_batch
 
@@ -253,10 +391,15 @@ def main(argv: list[str] | None = None) -> int:
         runs = " ".join(f"attribute-{t}-s{s}" for s in a.seeds)
         ens = ch.submit("cpu.sbatch", f"{PY} ensemble --runs {runs} --name attribute-{t}-ens", f"ensemble-{t}", attr_jobs)
         ch.submit("cpu.sbatch", f"{PY} analyze --scores attribute-{t}-ens --name analyze-{t}", f"analyze-{t}", [ens])  # PoC §4.2, §4.5 outputs
+        cl = ch.submit("cpu.sbatch", f"{PY} clusters --scores attribute-{t}-ens --name clusters-{t}", f"clusters-{t}", [ens])  # dashboard S2: clusters + patterns
         if has_answer_key(a.subset):  # injection run (e.g. --subset v3/candidate): score the ranking against the planted truth
             vname, _, sname = a.subset.partition("/")
             ch.submit("cpu.sbatch", f"{PY} score --scores attribute-{t}-ens --version {vname} --subset {sname} --name score-{t}",
                       f"score-{t}", [ens])
+            ch.submit("cpu.sbatch", f"{PY} score-clusters --clusters clusters-{t} --version {vname} --subset {sname} --name score-clusters-{t}",
+                      f"score-clusters-{t}", [cl])  # dashboard S3: do the discovered clusters land on the planted types?
+            ch.submit("cpu.sbatch", f"{PY} discrepancy --scores attribute-{t}-ens --version {vname} --subset {sname} --name discrepancy-{t}",
+                      f"discrepancy-{t}", [ens])  # dashboard S9: PoC §9.2, where "looks bad" and "hurts" disagree (estimated)
     sel = ""
     plan = arms(a)
     if "select" in on:

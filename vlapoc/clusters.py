@@ -466,10 +466,11 @@ def clusters_run(score_run_id: str, name: str, metrics: list[str] | None = None,
     (the binned table, for audit) and ``bins`` (JSON). Returns ``{"run_id", "out_dir", "n_clusters", ...}``."""
     from vlapoc import results
     from vlapoc.lineage import Subset, rel
-    from vlapoc.method_data import open_for_method
+    from vlapoc.method_data import open_for_method, refuse_groundtruth_arm
     from vlapoc.runs import client, stage_run
 
     run = client(lineage_root).get_run(score_run_id)
+    refuse_groundtruth_arm(run, "clusters")
     table = results.score_table(score_run_id, lineage_root)
     decls = results.functionals(score_run_id, lineage_root)  # NotRecordedError for a run that declares none
     subset = Subset.load(run.data.tags["input.training"].split(":", 1)[1], lineage_root)

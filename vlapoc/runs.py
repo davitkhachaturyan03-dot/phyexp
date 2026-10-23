@@ -412,7 +412,8 @@ def train_run(subset_ref: str, name: str, seed: int = 0, steps: int = 5, batch_s
               policy_type: str = "act", policy_overrides: dict | None = None, device: str = "mps",
               dataset_root: Path | None = None, runs_root: Path | None = None, lineage_root: Path | None = None,
               chain: str | None = None, allow_dirty: bool = False, normalization: str = "per_subset",
-              pretrained_path: Path | None = None, smoke: bool | None = None, pretrained_ref: str | None = None) -> dict:
+              pretrained_path: Path | None = None, smoke: bool | None = None, pretrained_ref: str | None = None,
+              extra_tags: dict | None = None) -> dict:
     """Verify the dataset copy, then run LeRobot training on exactly ``subset`` and record every §2.1 field.
 
     Refuses to launch (raises ``VersionIntegrityError``, no MLflow run is created) if any file of the
@@ -483,7 +484,7 @@ def train_run(subset_ref: str, name: str, seed: int = 0, steps: int = 5, batch_s
 
         sub_stats = subset_stats(root, episodes)
         spec["subset_stats_json"] = rel(out_dir / "subset_stats.json")
-    with stage_run("train", name, lineage_root, chain=chain, allow_dirty=allow_dirty) as r:
+    with stage_run("train", name, lineage_root, chain=chain, allow_dirty=allow_dirty, extra_tags=extra_tags) as r:
         r.input_subset(subset, "training", subset_ref if "/" in subset_ref else None)
         r.params({"dataset_version_id": vid, "subset_id": subset.subset_id, "n_episodes": len(episodes),
                   "n_frames": int(subset.episodes(lineage_root)["length_steps"].sum()), "seed": seed, "steps": steps,
@@ -776,14 +777,15 @@ def eval_run(policy: str, tasks: list[tuple[str, int]], n_init: int, name: str, 
 # ---------------------------------------------------------------------------------------------
 
 
-SELECT_OPS = ("drop_top_k", "drop_random_k", "drop_group", "drop_top_k_per_task", "drop_random_k_per_task")
+SELECT_OPS = ("drop_top_k", "drop_random_k", "drop_group", "drop_top_k_per_task", "drop_random_k_per_task", "drop_cluster", "drop_random_matched")
 
 
 def select_run(parent: str, name: str, op: str, k: int | None = None, seed: int | None = None,
                score_path: Path | None = None, metric: str | None = None, score_run_id: str | None = None,
                direction: str = "highest", column: str | None = None, value=None,
                lineage_root: Path | None = None, chain: str | None = None, allow_dirty: bool = False,
-               require_declaration: bool = False, extra_params: dict | None = None) -> tuple[str, Subset]:
+               require_declaration: bool = False, extra_params: dict | None = None, cluster_run_id: str | None = None,
+               cluster_id: str | None = None, allow_whole_task: bool = False) -> tuple[str, Subset]:
     """Stage ``select``: derive a child subset from ``parent`` and record how, as one MLflow run.
 
     Ops (all children are selections recorded in the lineage store, never data rewrites):
@@ -802,6 +804,16 @@ def select_run(parent: str, name: str, op: str, k: int | None = None, seed: int 
       episodes dropped from *every* (suite, libero_task_id), so a curated subset and its random control keep
       identical per-task counts (``vlapoc.lineage.drop_top_k_per_task``). ``k`` is per task here.
 
+    - ``drop_cluster`` (dashboard S4; PoC §2.1 item 5 p.3 leave-group-out, §9.1 Step 4 p.19): drop the members of one cluster
+      (``cluster_id``) of a ``cluster`` stage run (``vlapoc.clusters``). Records ``cluster_run_id``, ``cluster_id``, the cluster's definition
+      and ``expected_by_metric`` = ``treated_better`` for each verdict metric whose estimated reading is harmful (removing harmful data
+      should help) and ``treated_worse`` where it reads helpful; stated here, before any retraining. The run consumes the cluster run's
+      ``members`` and ``clusters`` entities, so ``trace`` reaches the cluster run and the score run. Refused (before any run): a
+      cluster run that is not FINISHED, one found on another subset than ``parent``, an unknown ``cluster_id``, and a cluster that holds
+      every episode of some task unless ``allow_whole_task`` (that is leave-one-task-out, §2.1 item 5, and is recorded as a param).
+    - ``drop_random_matched`` (the control of ``drop_cluster``): drop, for each (suite, libero_task_id), as many random episodes as the
+      cluster has there, drawn from the parent's episodes outside the cluster (``seed``): the same per-task counts.
+
     Ranking ops record which functional the ranked column explains (PoC §3.4 p. 7 "Every attribution result states which
     functional it explains"): param ``metric_declaration`` is the ``functionals.json`` row of ``metric`` in the score run
     (``vlapoc.attribution.declaration_of``). A score run that declares functionals but not this column is refused; one
@@ -818,6 +830,9 @@ def select_run(parent: str, name: str, op: str, k: int | None = None, seed: int 
     if op == "drop_top_k" and direction not in ("highest", "lowest"):
         raise ValueError("direction must be 'highest' or 'lowest'")
     ps = Subset.load(parent, lineage_root)
+    cl = None
+    if op in ("drop_cluster", "drop_random_matched"):
+        cl = _cluster_selection(ps, op, cluster_run_id, cluster_id, allow_whole_task, seed, lineage_root)
     # Refusals before any run exists (a refused select leaves nothing in the store): the key contract (PoC §9.2 p.19) and k's bounds.
     if op in ("drop_top_k", "drop_top_k_per_task"):
         from vlapoc.lineage import check_score_keys
@@ -839,7 +854,18 @@ def select_run(parent: str, name: str, op: str, k: int | None = None, seed: int 
                              f"{metric!r} explains is undeclared (PoC §3.4 p. 7); re-run the attribute stage")
     with stage_run("select", name, lineage_root, chain=chain, allow_dirty=allow_dirty) as r:
         r.input_subset(ps, "parent", parent if "/" in parent else None)
-        if op in ("drop_top_k", "drop_top_k_per_task"):
+        if cl is not None:
+            from vlapoc.lineage import drop_ids
+
+            child = drop_ids(ps, cl["ids"], op, {"cluster_run_id": cluster_run_id, "cluster_id": cluster_id, "seed": seed,
+                                                 "allow_whole_task": allow_whole_task}, lineage_root)
+            r.input_entity("members", cl["members_sha"], "cluster_members")
+            r.input_entity("clusters", cl["clusters_sha"], "cluster_clusters")
+            r.params({"op": op, "cluster_run_id": cluster_run_id, "cluster_id": cluster_id, "definition": cl["definition"],
+                      "n_dropped": len(cl["ids"]), "seed": seed, "allow_whole_task": allow_whole_task,
+                      "per_task_counts": json.dumps(cl["per_task"], sort_keys=True), "expected_by_metric": cl["expected"],
+                      "expected_by_metric_status": "stated before any retraining: estimated reading harmful -> treated_better, helpful -> treated_worse"})
+        elif op in ("drop_top_k", "drop_top_k_per_task"):
             table = pd.read_parquet(score_path)
             fn = drop_top_k if op == "drop_top_k" else drop_top_k_per_task
             child = fn(ps, table, metric, k, direction, score_source=f"mlflow run {score_run_id}", lineage_root=lineage_root)
@@ -861,6 +887,58 @@ def select_run(parent: str, name: str, op: str, k: int | None = None, seed: int 
         r.tags({"select.dropped": json.dumps(child.derivation["dropped"])[:7900]})
         r.produced("subset", child.subset_id, "subset")
         return r.run_id, child
+
+
+def _cluster_selection(ps: Subset, op: str, cluster_run_id: str | None, cluster_id: str | None, allow_whole_task: bool, seed: int | None,
+                       lineage_root: Path | None) -> dict:
+    """The episode ids a ``drop_cluster`` / ``drop_random_matched`` select removes, with every refusal checked before any run exists
+    (see ``select_run``). Returns ``{"ids", "definition", "expected", "per_task", "members_sha", "clusters_sha"}``."""
+    import numpy as np
+
+    from vlapoc import results
+    from vlapoc.lineage import TASK_GROUP
+    from vlapoc.metrics_registry import verdict_key_of
+
+    if not cluster_run_id or not cluster_id:
+        raise ValueError(f"{op} needs cluster_run_id and cluster_id")
+    if op == "drop_random_matched" and seed is None:
+        raise ValueError("drop_random_matched needs a seed")
+    crun = client(lineage_root).get_run(cluster_run_id)
+    if crun.info.status != "FINISHED" or crun.data.tags.get("stage") != "cluster":
+        raise ValueError(f"run {cluster_run_id[:12]} is not a FINISHED cluster run (status {crun.info.status}, stage {crun.data.tags.get('stage')!r})")
+    if crun.data.tags["input.training"] != f"subset:{ps.subset_id}":
+        raise ValueError(f"cluster run {cluster_run_id[:12]} was found on another subset than the parent {ps.subset_id[:12]}")
+    clusters = results.output_table(cluster_run_id, "clusters", lineage_root)
+    members = results.output_table(cluster_run_id, "members", lineage_root)
+    row = clusters[clusters["cluster_id"] == cluster_id]
+    if row.empty:
+        raise ValueError(f"unknown cluster_id {cluster_id!r} in cluster run {cluster_run_id[:12]}")
+    row = row.iloc[0]
+    ids = list(members.loc[members["cluster_id"] == cluster_id, "episode_id"])
+    eps = ps.episodes(lineage_root).set_index("episode_id")
+    task = eps[list(TASK_GROUP)].astype(str).agg("/".join, axis=1)
+    size, inside = task.value_counts(), task.loc[ids].value_counts()
+    whole = sorted(t for t, n in inside.items() if n >= size[t])
+    if whole and not allow_whole_task:
+        raise ValueError(f"cluster {cluster_id!r} holds every episode of task(s) {whole[:3]}: removing them is leave-one-task-out (PoC §2.1 item 5), "
+                         "refused unless allow_whole_task is set")
+    expected = {}
+    for c in [c.removesuffix("__reading") for c in clusters.columns if c.endswith("__reading")]:
+        k, rd = verdict_key_of(c), row[f"{c}__reading"]
+        if k and rd in ("harmful", "helpful"):
+            expected[k] = "treated_better" if rd == "harmful" else "treated_worse"
+    per_task = {t: int(n) for t, n in inside.items()}
+    if op == "drop_random_matched":
+        rng = np.random.default_rng(seed)
+        picked = []
+        for t, n in sorted(per_task.items()):
+            pool = sorted(set(task[task == t].index) - set(ids))
+            if len(pool) < n:
+                raise ValueError(f"task {t}: only {len(pool)} episodes outside the cluster, {n} needed for the matched random draw")
+            picked += [pool[i] for i in rng.choice(len(pool), size=n, replace=False)]
+        ids = picked
+    return {"ids": ids, "definition": str(row["definition"]), "expected": expected, "per_task": per_task,
+            "members_sha": crun.data.tags["output.members.sha256"], "clusters_sha": crun.data.tags["output.clusters.sha256"]}
 
 
 # ---------------------------------------------------------------------------------------------

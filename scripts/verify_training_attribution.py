@@ -689,14 +689,21 @@ def pipeline(dry_path: Path | None) -> int:
         key = re.sub(r"-(s\d|t-.*)$", "", j["name"].split("-")[0])
         n_by[key] = n_by.get(key, 0) + 1
     check("4.6 job count and arm list of the default dry run recorded", True, f"{len(jobs)} jobs ({n_by}); arms ({len(arm_list)}): {arm_list}")
-    # owner ruling 2026-10-22: the first server run is per-task, metrics f30 and hrt60_lin (112 jobs, 24 trainings)
-    fj, fsum = dry_run("--curation", "per_task", "--metrics", "f30", "hrt60_lin")
+    # owner answer Q1 (dashboard, 2026-10-22) replaces the training-attribution first-run ruling: Round A is v3/candidate, per-task, metrics f30 and hrt60_lin
+    # (116 jobs = the plan's 113 + the clusters, score-clusters and discrepancy CPU jobs; 24 trainings). v0/candidate stays a labelled variant (113 jobs).
+    fj, fsum = dry_run("--subset", "v3/candidate", "--curation", "per_task", "--metrics", "f30", "hrt60_lin")
     ftrain = [j for j in fj if j["name"].startswith("train-")]
-    check("4.7 first server run (--curation per_task --metrics f30 hrt60_lin): 112 jobs, 24 training runs, and it is documented in the module docstring",
-          len(fj) == 112 and len(ftrain) == 24 and "--curation per_task --metrics f30 hrt60_lin" in (REPO_ROOT / "scripts" / "server_pipeline.py").read_text()
-          and len(jobs) == 313, f"{len(fj)} jobs, {len(ftrain)} trains; script default unchanged at {len(jobs)} jobs")
+    cpu = [j["name"] for j in fj if j["name"].startswith(("clusters-", "score-clusters-", "discrepancy-"))]
+    vj, _ = dry_run("--curation", "per_task", "--metrics", "f30", "hrt60_lin")
+    vtrain = [j for j in vj if j["name"].startswith("train-")]
+    check("4.7 first server run (--tag v3cand --subset v3/candidate --curation per_task --metrics f30 hrt60_lin): 116 jobs, 24 training runs, the clusters / "
+          "score-clusters / discrepancy CPU jobs present, and it is documented in the module docstring; v0/candidate variant 113 jobs, 24 trainings",
+          len(fj) == 116 and len(ftrain) == 24 and sorted(cpu) == ["clusters-t", "discrepancy-t", "score-clusters-t"]
+          and "--tag v3cand --subset v3/candidate --curation per_task --metrics f30 hrt60_lin" in (REPO_ROOT / "scripts" / "server_pipeline.py").read_text()
+          and len(vj) == 113 and len(vtrain) == 24 and len(jobs) == 314,
+          f"v3: {len(fj)} jobs, {len(ftrain)} trains, CPU jobs {sorted(cpu)}; v0 variant {len(vj)} jobs, {len(vtrain)} trains; script default {len(jobs)} jobs")
     ARTIFACTS.mkdir(parents=True, exist_ok=True)
-    (ARTIFACTS / "s4_dry_run_first_run.txt").write_text("# first server run: server_pipeline.py --tag t --dry-run --curation per_task --metrics f30 hrt60_lin\n" + "\n".join(f"{j['id']} {j['name']} deps={','.join(j['dep_names'])} :: {j['cmd']}" for j in fj) + "\n" + fsum + "\n")
+    (ARTIFACTS / "s4_dry_run_first_run.txt").write_text("# first server run (owner answer Q1, dashboard): server_pipeline.py --tag t --dry-run --subset v3/candidate --curation per_task --metrics f30 hrt60_lin\n" + "\n".join(f"{j['id']} {j['name']} deps={','.join(j['dep_names'])} :: {j['cmd']}" for j in fj) + "\n" + fsum + "\n")
     (ARTIFACTS / "s4_dry_run_default.txt").write_text("\n".join(f"{j['id']} {j['name']} deps={','.join(j['dep_names'])} :: {j['cmd']}" for j in jobs) + "\n" + summary + "\n")
     ok_all = all(r[1] for r in results)
     (ARTIFACTS / "s4_pipeline.json").write_text(json.dumps({"pass": ok_all, "n_jobs": len(jobs), "arms": arm_list, "checks": [{"name": n, "pass": p_, "detail": d} for n, p_, d in results]}, indent=1))

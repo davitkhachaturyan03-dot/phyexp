@@ -99,6 +99,21 @@ def _groundtruth_in_chain(subset: Subset, lineage_root: Path | None, depth: int 
     return None
 
 
+def is_groundtruth_subset(subset_ref: str, lineage_root: Path | None = None) -> bool:
+    """Is this subset ground-truth-derived (an ``oracle_drop`` / ``groundtruth*`` op or tag anywhere in its derivation chain)? The check
+    ``open_for_method`` refuses by; ``stage.py train --groundtruth-arm`` uses it to accept *only* such subsets (dashboard S10)."""
+    return _groundtruth_in_chain(Subset.load(subset_ref, lineage_root), lineage_root) is not None
+
+
+def refuse_groundtruth_arm(run, what: str) -> None:
+    """``LineageError`` if ``run`` (an MLflow run) is tagged ``vlapoc.groundtruth_arm=true``: a retrained arm built from the answer key
+    (dashboard S10). Attribution, features, selection by scores, clustering and analysis refuse such a run even though the flag that
+    trains it exists (PoC §2.1 item 4 p. 3; owner decision 3)."""
+    if run.data.tags.get("vlapoc.groundtruth_arm") == "true":
+        raise LineageError(f"{what}: run {run.info.run_id[:12]} ({run.info.run_name}) is a ground-truth arm (tag vlapoc.groundtruth_arm=true), "
+                           "built from the answer key; a method under test must not consume it")
+
+
 def _check_lineage_isolation(vid: str, lineage_root: Path | None) -> None:
     """Raise if ``vid`` is an ancestor or descendant of a version already opened in this process."""
     key_root = str(lineage_root)
@@ -170,4 +185,4 @@ def open_for_method(subset_ref: str, lineage_root: Path | None = None) -> Method
                       tuple(int(i) for i in subset.resolve(lineage_root)), cat, refs)
 
 
-__all__ = ["open_for_method", "MethodView"]
+__all__ = ["open_for_method", "MethodView", "is_groundtruth_subset", "refuse_groundtruth_arm"]

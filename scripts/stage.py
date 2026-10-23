@@ -35,6 +35,9 @@ Stages (docs/dataflow.md; PoC §9.1 pp. 18-19):
                (per-metric influence) disagree (PoC §9.2), estimated, with a bounded wording (``vlapoc.discrepancy``); after attribution exists.
 - ``score-clusters`` dashboard S3, ground-truth side: precision / recall / lift / Fisher p of each discovered cluster against each planted
                corruption type of an answer-key version, only after the cluster run exists (``vlapoc.recovery.cluster_recovery_run``).
+- ``confirm`` dashboard S4: ``confirmed`` / ``refuted`` / ``not confirmed`` per discovered cluster and metric from the Round B verdicts (``vlapoc.confirm``).
+- ``select-planted`` / ``discrepancy-verdict`` dashboard S10, ground-truth side: the planted removal arms (``train --groundtruth-arm`` trains them) and the bounded
+               verdict sentences per arm and metric (``vlapoc.planted_arms``; PoC §9.2). Method entry points refuse these arms.
 - ``clusters`` dashboard S2: clusters of training episodes from an attribute or ensemble run's scores, three lenses (label groups,
                rule-like slices via sliceline, the four metric groups), each with a pattern and an *estimated* effect
                (``vlapoc.clusters``; PoC §1 p.3, §4.2, §9.2); method side, opens the subset through ``method_view``.
@@ -163,10 +166,18 @@ def cmd_train(a) -> dict:
     """Stage ``train``: SmolVLA on a subset opened through ``method_view`` (blind). Returns ``train_run``'s summary."""
     from vlapoc.runs import train_run
 
-    method_view(a.subset)
+    extra = None
+    if a.groundtruth_arm:  # dashboard S10: Round B planted arms train on ground-truth-derived subsets, on this path only
+        from vlapoc.method_data import is_groundtruth_subset
+
+        if not is_groundtruth_subset(subset_ref(a.subset), LR):
+            raise SystemExit(f"--groundtruth-arm is only for ground-truth-derived subsets (planted arms); {a.subset!r} is not one, train it without the flag")
+        extra = {"vlapoc.groundtruth_arm": "true"}
+    else:
+        method_view(a.subset)
     return train_run(subset_ref(a.subset), a.name, seed=a.seed, steps=a.steps, batch_size=a.batch_size, policy_type="smolvla",
                      policy_overrides={"load_vlm_weights": False}, device=a.device, pretrained_path=PRETRAINED_DIR,
-                     pretrained_ref=a.pretrained_ref, smoke=a.smoke, chain=a.chain, lineage_root=LR)
+                     pretrained_ref=a.pretrained_ref, smoke=a.smoke, chain=a.chain, lineage_root=LR, extra_tags=extra)
 
 
 def cmd_eval(a) -> dict:
@@ -203,6 +214,9 @@ def cmd_features(a) -> dict:
     c = client(LR)
     tid = rid(a.train, "train")
     tr = c.get_run(tid)
+    from vlapoc.method_data import refuse_groundtruth_arm
+
+    refuse_groundtruth_arm(tr, "features")  # a ground-truth arm (dashboard S10) is never featurized
     ckpt = REPO_ROOT / tr.data.tags["checkpoint.path"]
     if a.which == "train":
         view = method_view(_training_subset(tr, LR).subset_id)  # S1: root and episodes come from the MethodView
@@ -246,7 +260,7 @@ def select_params(op: str, headline: bool = False, pipeline_curation: str | None
     """Params every select run of the chain records besides the op's own: the curation unit of the arm (``per_task`` for
     the ``*_per_task`` ops, ``global`` for ``drop_top_k``/``drop_random_k``), whether it is a headline arm, and the pipeline's
     ``--curation`` setting (owner answer Q1, 2026-10-20: both, per-task headline; PoC §9.1 Step 4.1 p.19)."""
-    mode = "per_task" if op.endswith("_per_task") else ("global" if op in ("drop_top_k", "drop_random_k") else "group")
+    mode = "per_task" if op.endswith("_per_task") else ("global" if op in ("drop_top_k", "drop_random_k") else "cluster" if op in ("drop_cluster", "drop_random_matched") else "group")
     return {"curation": mode, "headline": bool(headline), "pipeline_curation": pipeline_curation or "unspecified"}
 
 
@@ -257,10 +271,16 @@ def cmd_select(a) -> dict:
     from vlapoc.attribution import _artifact_table
     from vlapoc.runs import client, select_run
 
+    from vlapoc.method_data import refuse_groundtruth_arm
+
     method_view(a.parent)  # S1: the parent opens through the method loader (fence / integrity / ground-truth chain)
     score_path, sid = None, None
+    cluster_kw = {}
+    if a.op in ("drop_cluster", "drop_random_matched"):  # dashboard S4: Round B arms built from a discovered cluster
+        cluster_kw = {"cluster_run_id": rid(a.clusters, "cluster"), "cluster_id": a.cluster_id, "allow_whole_task": a.allow_whole_task}
     if a.op.startswith("drop_top_k"):
         sid = rid(a.scores, "attribute")
+        refuse_groundtruth_arm(client(LR).get_run(sid), "select --scores")
         (REPO_ROOT / "data" / "scratch").mkdir(parents=True, exist_ok=True)
         tmp = tempfile.mkdtemp(prefix="select_", dir=REPO_ROOT / "data" / "scratch")
         score_path = Path(tmp) / "attribution_scores.parquet"
@@ -268,8 +288,32 @@ def cmd_select(a) -> dict:
     extra = select_params(a.op, a.headline, a.pipeline_curation)
     sel_id, child = select_run(subset_ref(a.parent), a.name, a.op, k=a.k, seed=a.seed, score_path=score_path,
                             metric=a.metric, score_run_id=sid, direction=a.direction, chain=a.chain,
-                            require_declaration=a.op.startswith("drop_top_k"), extra_params=extra, lineage_root=LR)
+                            require_declaration=a.op.startswith("drop_top_k"), extra_params=extra, lineage_root=LR, **cluster_kw)
     return {"run_id": sel_id, "subset_id": child.subset_id, "n_episodes": len(child.episode_ids)}
+
+
+def cmd_select_planted(a) -> dict:
+    """Ground-truth side (stage ``select``, tagged ``vlapoc.groundtruth_arm=true``): a Round B planted arm's child subset (``vlapoc.planted_arms``)."""
+    from vlapoc.planted_arms import planted_select_run
+
+    sid = rid(a.scores, "attribute") if a.scores else None
+    run, child = planted_select_run(subset_ref(a.parent), a.name, a.kind, corruption_type=a.type, scores_run_id=sid, metric=a.metric, seed=a.seed,
+                                    n=a.n, chain=a.chain, lineage_root=LR)
+    return {"run_id": run, "subset_id": child.subset_id, "n_episodes": len(child.episode_ids)}
+
+
+def cmd_confirm(a) -> dict:
+    """Round B status of discovered clusters (stage ``summarize``): ``confirmed`` / ``refuted`` / ``not confirmed`` per cluster and metric (``vlapoc.confirm``)."""
+    from vlapoc.confirm import confirm_run
+
+    return confirm_run(rid(a.clusters, "cluster"), a.tag, a.name, chain=a.chain_id, run_chain=a.chain, lineage_root=LR)
+
+
+def cmd_discrepancy_verdict(a) -> dict:
+    """Round B planted verdict sentences (stage ``summarize``): per planted arm and metric, the bounded status (``vlapoc.planted_arms``; PoC §9.2)."""
+    from vlapoc.planted_arms import discrepancy_verdict_run
+
+    return discrepancy_verdict_run(a.tag, a.name, chain=a.chain_id, run_chain=a.chain, lineage_root=LR, synthetic=a.synthetic)
 
 
 def cmd_verify(a) -> dict:
@@ -352,6 +396,9 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--device", default="cuda")
     s.add_argument("--pretrained-ref", default=PRETRAINED_REF)
     s.add_argument("--smoke", action="store_true")
+    s.add_argument("--groundtruth-arm", action="store_true",
+                   help="dashboard S10: train a Round B planted arm (a ground-truth-derived subset); the run is tagged vlapoc.groundtruth_arm=true "
+                        "and nothing else changes; refused for any other subset")
 
     s = sub.add_parser("eval")
     s.add_argument("--train", required=True)
@@ -404,8 +451,12 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("select")
     s.add_argument("--parent", required=True)
     s.add_argument("--name", required=True)
-    s.add_argument("--op", default="drop_top_k_per_task")
-    s.add_argument("--k", type=int, required=True, help="episodes to drop (per task for the *_per_task ops)")
+    s.add_argument("--op", default="drop_top_k_per_task", choices=["drop_top_k", "drop_random_k", "drop_top_k_per_task", "drop_random_k_per_task",
+                                                                   "drop_cluster", "drop_random_matched"])
+    s.add_argument("--clusters", default=None, help="the cluster run (drop_cluster / drop_random_matched)")
+    s.add_argument("--cluster-id", default=None, help="the cluster to drop, e.g. 'slice:hrt60_lin:harm:1'")
+    s.add_argument("--allow-whole-task", action="store_true", help="allow a cluster that holds every episode of a task (leave-one-task-out, recorded)")
+    s.add_argument("--k", type=int, default=None, help="episodes to drop (per task for the *_per_task ops); not used by drop_cluster / drop_random_matched")
     s.add_argument("--scores", default=None, help="attribute run (drop_top_k*)")
     s.add_argument("--metric", default=None)
     s.add_argument("--direction", default="highest")
@@ -413,6 +464,28 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--headline", action="store_true", help="record that this arm is a headline arm (per-task arms; owner Q1)")
     s.add_argument("--pipeline-curation", default=None, choices=["per_task", "global", "both"],
                    help="the pipeline's --curation setting, recorded with the arm (PoC §9.1 Step 4.1; owner Q1)")
+
+    s = sub.add_parser("select-planted")
+    s.add_argument("--parent", required=True, help="a subset of a version with an answer key, e.g. v3/candidate")
+    s.add_argument("--name", required=True)
+    s.add_argument("--kind", required=True, choices=["type", "cleanharm", "cleanrandom", "oracle", "cleanrandom_oracle"])
+    s.add_argument("--type", default=None, help="planted corruption type (kind type)")
+    s.add_argument("--scores", default=None, help="attribute or ensemble run (kind cleanharm)")
+    s.add_argument("--metric", default=None, help="metric of the harm_<m>__same_task column (kind cleanharm)")
+    s.add_argument("--seed", type=int, default=0)
+    s.add_argument("--n", type=int, default=13)
+
+    s = sub.add_parser("confirm")
+    s.add_argument("--clusters", required=True, help="the cluster run whose Round B arms to judge")
+    s.add_argument("--tag", required=True, help="the Round B chain's tag")
+    s.add_argument("--name", required=True)
+    s.add_argument("--chain-id", default=None, help="full chain id <tag>-<sha8> if the tag matches several chains")
+
+    s = sub.add_parser("discrepancy-verdict")
+    s.add_argument("--tag", required=True, help="the Round B planted chain's tag")
+    s.add_argument("--name", required=True)
+    s.add_argument("--chain-id", default=None)
+    s.add_argument("--synthetic", action="store_true")
 
     s = sub.add_parser("verify")
     s.add_argument("--a", required=True)
