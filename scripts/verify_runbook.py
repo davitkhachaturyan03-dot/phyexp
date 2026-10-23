@@ -34,9 +34,10 @@ COUNT_ARGS = {  # key -> server_pipeline.py arguments (after --tag v3cand --dry-
     "round_b_clusters_2_matched": ["--subset", "v3/candidate", "--round-b", "--clusters", "clusters-v3cand", "--pick", "a", "b", "--matched-random"],
     "round_b_planted": ["--subset", "v3/candidate", "--round-b-planted"],
     "round_b_planted_no_oracle": ["--subset", "v3/candidate", "--round-b-planted", "--no-oracle"],
+    "round_b_planted_draws2": ["--subset", "v3/candidate", "--round-b-planted", "--random-draws", "2"],
 }
 REQUIRED_STOPS = {"preflight failure": "preflight", "revision mismatch": "revision", "failed job": "failed job", "disk below threshold": "disk", "any needed code change": "code change",
-                  "the Round B cluster pick": "cluster pick", "SYNTHETIC or SMOKE banner on real results": "banner"}
+                  "the Round B cluster pick": "cluster pick", "SYNTHETIC or SMOKE banner on real results": "banner", "store relocation read check": "relocation"}
 
 
 def fenced_blocks(text: str) -> list[tuple[str, str]]:
@@ -59,6 +60,37 @@ def commands(code: str) -> list[str]:
 def run(cmd: list[str], timeout: int = 180) -> tuple[int, str]:
     p = subprocess.run(cmd, cwd=REPO, capture_output=True, text=True, timeout=timeout)
     return p.returncode, (p.stdout + p.stderr)[-300:]
+
+
+HARNESS = """
+import argparse, json, runpy, sys
+kind, target, argv = sys.argv[1], sys.argv[2], sys.argv[3:]
+class Stop(Exception): pass
+orig = argparse.ArgumentParser.parse_known_args
+def parse_args(self, args=None, namespace=None):
+    ns, unknown = orig(self, args, namespace)  # exits with status 2 on a missing required flag or a bad value
+    print("UNKNOWN " + json.dumps(unknown))
+    raise Stop
+argparse.ArgumentParser.parse_args = parse_args
+sys.argv = [target] + argv
+try:
+    runpy.run_module(target, run_name="__main__", alter_sys=True) if kind == "module" else runpy.run_path(target, run_name="__main__")
+    print("NOPARSE")
+except Stop:
+    pass
+except SystemExit as e:
+    print("EXIT " + str(e.code))
+"""
+
+
+def parser_check(kind: str, target: str, argv: list[str]) -> tuple[bool, str]:
+    """Run the command's real argparse parser (the script's ``main`` up to ``parse_args``, patched to ``parse_known_args`` and then stopped before anything executes) and require an empty unknown-flag list."""
+    p = subprocess.run([PY, "-c", HARNESS, kind, target, *argv], cwd=REPO, capture_output=True, text=True, timeout=240)
+    line = next((ln for ln in p.stdout.splitlines() if ln.startswith(("UNKNOWN", "EXIT", "NOPARSE"))), "")
+    if line.startswith("UNKNOWN"):
+        unk = json.loads(line.removeprefix("UNKNOWN "))
+        return not unk, f"unknown flags/args {unk}" if unk else "all flags accepted"
+    return False, line or p.stderr[-200:]
 
 
 def main() -> int:
@@ -133,6 +165,36 @@ def main() -> int:
                 rows.append((f"{kind} {sub}", False, f"`{sub} --help` rc={rc}; top-level --help rc={rc2}"))
             else:
                 rows.append((f"{kind}{' ' + sub if sub else ''}", rc == 0, f"--help rc={rc}"))
+    # --- AC8.1 (round 2): every flag of every command is accepted by its real parser ---
+    parsed, bad_flags = [], []
+    for step, code in fenced_blocks(text):
+        code = re.sub(r'python -c ".*?"(?=\s*\n|\s*$)', "", code, flags=re.S)
+        for cmd in commands(code):
+            cmd = re.sub(r"<[^>]*>", "PLACEHOLDER", cmd.replace("$PWD", ".")).replace("[", "").replace("]", "")
+            try:
+                toks = shlex.split(cmd)
+            except ValueError:
+                continue
+            toks = [t for t in toks if not re.match(r"^[A-Za-z_]+=", t)]
+            i = next((k for k, t in enumerate(toks) if re.match(r"(\.venv/bin/python\S*|python)$", t)), None)
+            if i is None:
+                continue
+            rest = toks[i + 1:]
+            if rest[:1] == ["-m"] and rest[1].startswith("vlapoc."):
+                kind, target, argv = "module", rest[1], rest[2:]
+            elif rest and rest[0].startswith("scripts/") and rest[0].endswith(".py"):
+                kind, target, argv = "script", rest[0], rest[1:]
+            else:
+                continue
+            ok_, msg = parser_check(kind, target, argv)
+            label = "executed locally" if ("[verified locally]" in step or "--dry-run" in cmd) else "parsed only"
+            parsed.append((f"{target} {' '.join(argv)[:60]}", ok_, label, msg))
+            if not ok_:
+                bad_flags.append((target, ' '.join(argv)[:80], msg))
+    for r in parsed:
+        print(f"      {'ok ' if r[1] else 'BAD'} [{r[2]}] {r[0]}  {r[3]}")
+    check("8.1b every flag used in a fenced command is accepted by that command's real argparse parser (parse_known_args on the substituted argv, unknown list empty)", parsed and not bad_flags,
+          f"{sum(1 for r in parsed if r[1])}/{len(parsed)} commands; {sum(r[2] == 'executed locally' for r in parsed)} labelled executed locally, {sum(r[2] == 'parsed only' for r in parsed)} parsed only; rejected: {bad_flags}")
     ok = [r for r in rows if r[1]]
     for r in rows:
         print(f"      {'ok ' if r[1] else 'BAD'} {r[0]}  {r[2]}")
@@ -176,6 +238,63 @@ def main() -> int:
     missing = [k for k, w in REQUIRED_STOPS.items() if not any(w in s for s in stops)]
     check("8.4 at least 7 STOP AND ASK markers, covering preflight failure, revision mismatch, any FAILED job, disk below threshold, any needed code change, the Round B cluster pick and a SYNTHETIC/SMOKE banner on real results",
           len(stops) >= 7 and not missing, f"{len(stops)} markers: {stops}; missing {missing}")
+    # --- AC8.7 ---
+    import shutil
+    import sys as _sys
+
+    _sys.path.insert(0, str(REPO))
+    _sys.path.insert(0, str(REPO / "scripts"))
+    from repoint_lineage_store import repoint
+
+    from vlapoc import results as res
+
+    demo = REPO / "data" / "lineage_demo"
+    work = REPO / "data" / "scratch" / "runbook_repoint"
+    shutil.rmtree(work, ignore_errors=True)
+    work.mkdir(parents=True)
+    store = work / "store"
+    shutil.copytree(demo, store)
+    man = json.loads((demo / "demo_manifest.json").read_text())
+    moved = work / "elsewhere" / "data" / "lineage_demo"  # a root that does not exist, like the Mac's path seen from the server
+    repoint(store / "mlflow.db", str(demo), str(moved))
+    for r in store.glob("**/mlflow.db-*"):
+        r.unlink()
+    try:
+        res.score_table(man["scores_run_id"], store)
+        before = "read ok (unexpected)"
+    except Exception as e:  # noqa: BLE001
+        before = f"{type(e).__name__}: {str(e)[:70]}"
+    counts = repoint(store / "mlflow.db", str(moved), str(store))
+    try:
+        t = res.score_table(man["scores_run_id"], store)
+        after = f"read ok {t.shape}"
+    except Exception as e:  # noqa: BLE001
+        after = f"{type(e).__name__}: {str(e)[:70]}"
+    shutil.rmtree(work, ignore_errors=True)
+    step2 = text.split("## Step 2")[1].split("## Step 3")[0]
+    step14 = text.split("## Step 14")[1].split("## Step 15")[0]
+    check("8.7 store relocation: in a scratch copy of the demo store moved to a root that does not exist the read fails before the repoint and works after it; Step 2 runs the repoint tool (dry run, then real) with a read check (results.score_table of an attribute run, results.output_json of a ground-truth score run, lineage trace) "
+          "that is a STOP AND ASK point; Step 14 repoints once more from the server prefix",
+          before.startswith("MlflowException") and after.startswith("read ok") and step2.count("scripts/repoint_lineage_store.py") == 2 and "--dry-run" in step2 and "results.score_table" in step2 and "vlapoc.lineage trace" in step2
+          and "STOP AND ASK (store relocation read check)" in step2 and "scripts/repoint_lineage_store.py" in step14 and "new runs on the server write server paths" not in text,
+          f"moved copy before: {before}; after: {after}; rewritten counts {counts['experiments']} {counts['runs']}")
+    # --- executed probe (Step 3 commands, on this Mac with the scratch store and MPS) ---
+    work = REPO / "data" / "scratch" / "runbook_probe"
+    shutil.rmtree(work, ignore_errors=True)
+    work.mkdir(parents=True)
+    from vlapoc.runs import scratch_lineage_copy
+
+    lr = scratch_lineage_copy(work / "lineage")
+    outs = []
+    for tag in ("tp1", "tp2"):
+        pr = subprocess.run([PY, "scripts/eval_smoke.py", "--policy", "train:0a33bc75bb71433ca2def5220014dde0", "--tasks", "libero_spatial:0", "--n", "2", "--batch-size", "2", "--tau", "30", "--device", "mps",
+                             "--track", "--smoke", "--name", f"eval-smoke-{tag}", "--out", str(work / tag), "--lineage-root", str(lr)], cwd=REPO, capture_output=True, text=True)
+        outs.append(pr.returncode)
+    cmp_ = subprocess.run([PY, "-c", "import sys; sys.path.insert(0, 'scripts'); import pandas as pd, verify_rollouts_s5 as v; "
+                           f"print(v._compare(pd.read_parquet('{work}/tp1/rollouts.parquet'), pd.read_parquet('{work}/tp2/rollouts.parquet')))"], cwd=REPO, capture_output=True, text=True)
+    shutil.rmtree(work, ignore_errors=True)
+    check("8.1c the Step 3 probe commands run (executed locally on MPS with --n 2 --batch-size 2 and a scratch --lineage-root; the skill's server form differs only in --device cuda, --n 10 --batch-size 10 and no --lineage-root) and the comparison snippet prints the differing columns",
+          outs == [0, 0] and cmp_.returncode == 0 and "differing" in cmp_.stdout, f"eval_smoke rc {outs}; compare: {cmp_.stdout.strip()[:120]}")
     # --- AC8.5 ---
     now = subprocess.run(["git", "diff", "--stat", "CLAUDE.md"], cwd=REPO, capture_output=True, text=True).stdout
     before = (ART / "b1_claude_md_diffstat_before.txt").read_text()

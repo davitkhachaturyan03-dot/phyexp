@@ -67,8 +67,23 @@ export MLFLOW_DISABLE_AGENT_HINT=1
 .venv/bin/python -m vlapoc.lineage version verify v0
 ```
 
-Expected (inferred): both verifications report every file matching its recorded sha256 (about 3 s each in the data+lineage record, measured on the Mac); the lineage store was
-copied with its absolute MLflow artifact paths from the Mac, so new runs on the server write server paths (this matters in Step 14).
+Expected (inferred): both verifications report every file matching its recorded sha256 (about 3 s each in the data+lineage record, measured on the Mac).
+
+**Repoint the copied lineage store at the server's path, now.** MLflow keeps absolute artifact locations in `mlflow.db`, for the experiment and for every run (measured on the Mac: the experiment's location is
+`file:///Users/davit_khachaturyan/Projects/personal/vlaExp/data/lineage/mlartifacts`). A store copied from the Mac therefore still points at `/Users/davit_khachaturyan/...`: nothing can be read from it and every new stage run would try to log
+under that path (inferred from `runs.experiment_id`, which reuses the existing experiment's location). The repoint tool rewrites the prefixes and keeps `mlflow.db.bak`; dry run first, then for real:
+
+```bash
+sqlite3 data/lineage/mlflow.db "select artifact_location from experiments"
+.venv/bin/python scripts/repoint_lineage_store.py --root data/lineage --old /Users/davit_khachaturyan/Projects/personal/vlaExp/data/lineage --new $PWD/data/lineage --dry-run
+.venv/bin/python scripts/repoint_lineage_store.py --root data/lineage --old /Users/davit_khachaturyan/Projects/personal/vlaExp/data/lineage --new $PWD/data/lineage
+.venv/bin/python -c "from vlapoc import results; s = results.find_runs('score')[0]; print(s['name'], list(results.output_json(s['run_id'], 'recovery'))[:3]); a = results.find_runs('attribute')[0]; print(a['name'], results.score_table(a['run_id']).shape)"
+.venv/bin/python -m vlapoc.lineage trace <the run id printed for the ground-truth score run>
+```
+
+Expected (measured on the Mac with the demo store moved to another root: the read fails with `MlflowException: Failed to download artifacts` before the repoint and works after it, `scripts/verify_runbook.py` AC8.7; inferred for the server): the dry run lists the rewritten counts (the experiment and about all runs), the real run prints the same counts and `run_artifact_dirs_existing`, the read check prints a ground-truth score run's `recovery` keys and the attribute run's table shape, and `trace` ends at the raw files.
+
+**STOP AND ASK (store relocation read check):** if the read check or the trace fails, stop; do not edit `mlflow.db` by hand and do not run any stage.
 
 Check the `smolvla_base` revision. The code pins `lerobot/smolvla_base@d9f33c94a60fb382c90dea2164c96845bd955e28` (`scripts/stage.py` `PRETRAINED_REF`); the cluster's Hugging Face cache may
 hold a different one (`5e8d12a6`, quoted from the owner's brief):
@@ -96,10 +111,14 @@ score table with 40 rows (`n_episodes 40`, the v0/reference subset) and `all_fin
 (evaluation-layer runbook rules 4 and 5; `<run>` is a train run id the smoke created):
 
 ```bash
-.venv/bin/python scripts/eval_smoke.py --policy train:<run> --tasks libero_spatial:0 --n 10 --batch-size 10 --tau 30 --device cuda --out data/scratch/tp
+.venv/bin/python scripts/eval_smoke.py --policy train:0a33bc75bb71433ca2def5220014dde0 --tasks libero_spatial:0 --n 10 --batch-size 10 --tau 30 --device cuda --track --smoke --name eval-smoke-tp1 --out data/scratch/tp1
+.venv/bin/python scripts/eval_smoke.py --policy train:0a33bc75bb71433ca2def5220014dde0 --tasks libero_spatial:0 --n 10 --batch-size 10 --tau 30 --device cuda --track --smoke --name eval-smoke-tp2 --out data/scratch/tp2
+.venv/bin/python -c "import sys; sys.path.insert(0, 'scripts'); import pandas as pd, verify_rollouts_s5 as v; print(v._compare(pd.read_parquet('data/scratch/tp1/rollouts.parquet'), pd.read_parquet('data/scratch/tp2/rollouts.parquet')))"
 ```
 
-Run that probe twice (two processes) and compare the two `rollouts.parquet` files as the evaluation-layer runbook rule 5 says; expect no differing columns (inferred: unmeasured on CUDA).
+`0a33bc75...` is the tracked 2-step SmolVLA train run of the copied lineage store (the one `--local-smoke` evaluates); `--track` is required for a `train:<run id>` policy (the untracked mode refuses it), and `--smoke` keeps the probe runs from being mistaken for attribution-grade evals. Executed on the Mac (measured: the same two commands on `--device mps` with `--n 2 --batch-size 2` and a scratch `--lineage-root`, 23 s each).
+
+The probe runs twice in two processes and the snippet compares the two `rollouts.parquet` files as the evaluation-layer runbook rule 5 says; expect `differing: {}` (measured on MPS in the evaluation-layer record; inferred, unmeasured, on CUDA).
 Write the seconds per env step down: they size every later step.
 
 **STOP AND ASK (failed check):** a smoke stage fails, the trace shows a stand-in or fewer than 20 raw files, or the two probes differ.
@@ -170,13 +189,13 @@ An interrupted job leaves its MLflow run RUNNING; close it with `MlflowClient().
 The chain already runs these as CPU jobs after the ensemble. Run them by hand only if those jobs failed or you are asked to re-run them (they only read the score table and write new runs):
 
 ```bash
-.venv/bin/python scripts/stage.py --chain v3cand-<sha8> clusters --scores attribute-v3cand-ens --name clusters-v3cand
+.venv/bin/python scripts/stage.py --chain v3cand-<sha8> clusters --scores attribute-v3cand-ens --name clusters-v3cand --min-sup-fraction 0.01
 .venv/bin/python scripts/stage.py --chain v3cand-<sha8> score-clusters --clusters clusters-v3cand --version v3 --subset candidate --name score-clusters-v3cand
 .venv/bin/python scripts/stage.py --chain v3cand-<sha8> discrepancy --scores attribute-v3cand-ens --version v3 --subset candidate --name discrepancy-v3cand
 ```
 
 Expected (measured on SYNTHETIC scores on the Mac): `clusters` prints a JSON with `n_clusters` around 80-100 and `n_by_lens` for `label`, `slice`, `metric_group`; `score-clusters` prints one row per (cluster, planted type) incl. `any_planted`;
-`discrepancy` prints the per-metric quadrant counts. Cluster discovery reads the data only through the blind loader; the two ground-truth stages read the answer key afterwards. Every cluster is **estimated** at this point.
+`discrepancy` prints the per-metric quadrant counts. Cluster discovery reads the data only through the blind loader; the two ground-truth stages read the answer key afterwards. Every cluster is **estimated** at this point. The slice minimum size is **10 episodes** (`--min-sup-fraction 0.01`, which the chain passes), below the 13 episodes of one planted type; slices are built on quintile bins of about 192 episodes, so a slice isolates a planted type only through a conjunction of conditions. Read the S3 precision and recall with that in mind, and say so to the owner next to the table, before the owner picks clusters for Round B.
 
 ## Step 9: The real dashboard [verified locally]
 
@@ -236,7 +255,11 @@ default (owner option a): **129 jobs, 33 trainings** (about 132 GPU-h, inferred 
 
 ## Step 13: Round B planted, submit and verdict [unverified until a server session]
 
-**STOP AND ASK (cost approval):** show the owner the cost table (33 trainings, about 132 GPU-h inferred) and submit only after an explicit yes.
+The default compares every type with **one** fixed clean random draw shared by all types and seeds, so the 3 seeds are not independent replicates of the control. Recommend `--random-draws 2` to the owner:
+<!-- count: round_b_planted_draws2 162 36 -->
+**162 jobs, 36 trainings** (about 144 GPU-h, inferred), measured by `--dry-run`.
+
+**STOP AND ASK (cost approval):** show the owner the cost table (33 trainings, about 132 GPU-h inferred; 36 and about 144 with `--random-draws 2`) and submit only after an explicit yes.
 
 ```bash
 .venv/bin/python scripts/server_pipeline.py --tag v3cand --subset v3/candidate --round-b-planted
@@ -249,7 +272,7 @@ a type is "harmless", and never turn a non-significant gate into "no effect".
 
 ## Step 14: Results back [unverified until a server session]
 
-Copy to the owner's Mac (never delete on the server): the lineage store including `mlflow.db` and `mlartifacts/`, `data/attribution/<tag>*`, `data/eval/returns-*` and the `rollouts.parquet` of each eval, but **not** the eval `trajectories/` (11-22 GB per base seed, inferred in the evaluation-layer runbook):
+Copy to the owner's Mac (never delete on the server): the lineage store including `mlflow.db` and `mlartifacts/` (every stage output the dashboard reads is an MLflow artifact there, so nothing else is needed), and `data/attribution/<tag>*` for the figures and tables written beside the runs, but **not** the eval `trajectories/` (11-22 GB per base seed, inferred in the evaluation-layer runbook):
 
 ```bash
 rsync -a --info=progress2 <user>@<server>:<repo>/data/lineage/ data/lineage_from_server/
@@ -257,8 +280,8 @@ rsync -a <user>@<server>:<repo>/data/attribution/ data/attribution_from_server/
 shasum -a 256 data/lineage_from_server/mlflow.db
 ```
 
-then compare that sha256 with the same command run on the server (they must be equal). MLflow stores **absolute** artifact paths in `mlflow.db`, so the copied store still points at the server's directories: rewrite them on the Mac
-(measured to make a copied demo store read from its new location; it keeps a `mlflow.db.bak`):
+then compare that sha256 with the same command run on the server (they must be equal). The copied store points at the server's directories (Step 2): repoint it once more on the Mac, from the server prefix
+(measured on a copied demo store; it keeps a `mlflow.db.bak`):
 
 ```bash
 .venv/bin/python scripts/repoint_lineage_store.py --root data/lineage_from_server --old <server repo>/data/lineage --new $PWD/data/lineage_from_server --dry-run
