@@ -154,3 +154,6 @@ GPU-hours (inferred, 4 h per training): Round B planted default ~132 h; Round B 
 - **F16 (S10):** a type arm is compared with one clean random control by default (`--random-draws 1`); with 13 episodes per arm that is a single control draw per type, so a control draw that happens to be unusual affects every type's verdict. `--random-draws 2` is available (+33 jobs).
 - **F17 (guarded path):** `--groundtruth-arm` is a new hole in the method boundary by construction (plan R12); it is closed by `is_groundtruth_subset` (flag refuses other subsets), the derivation fence on the subsets, and `refuse_groundtruth_arm` at five entry points, all asserted. `analysis.py` and `attribution.py` gained an import of `method_data` (method side; no ground-truth import, boundary scans pass).
 - No plan premise was false; nothing blocked.
+
+## Round 1 / Batch B3: S5, S6, S7, S8 (executor, 2026-10-23)
+Start: HEAD `1d8e7e9`, mlflow.db sha256 `306af4123fda7e635892d459a2e34008ba1cb62f6c4fce152c546e0da7bdde79`. Coordinator: use F3 (filter slices on `<col>__reading`), F6 (Rollouts page uses per-seed runs via `results.seed_runs`), F7 (`__main__` guard where `open_for_method` is called); do not touch CLAUDE.md.
