@@ -31,6 +31,9 @@ Stages (docs/dataflow.md; PoC §9.1 pp. 18-19):
                catalog column, episode x metric heatmap, throughput-vs-reliability scatter (``vlapoc.analysis``).
 - ``score``    ground-truth recovery (``vlapoc.recovery``): AUROC / recall@k per corruption type and harm column next to
                each type's best simple heuristic; only for a version with an answer key (v3), after attribution exists.
+- ``clusters`` dashboard S2: clusters of training episodes from an attribute or ensemble run's scores, three lenses (label groups,
+               rule-like slices via sliceline, the four metric groups), each with a pattern and an *estimated* effect
+               (``vlapoc.clusters``; PoC §1 p.3, §4.2, §9.2); method side, opens the subset through ``method_view``.
 - ``step4-summary``  one table over a chain's verify runs: per arm and comparison, how many seeds went each way per
                metric (``vlapoc.step4``; PoC §9.1 Step 4, §2.6, §4.5).
 
@@ -293,6 +296,16 @@ def cmd_analyze(a) -> dict:
     return analyze_run(rid(a.scores, "attribute"), a.name, z=a.z, by=tuple(a.by), chain=a.chain, lineage_root=LR, synthetic=a.synthetic)
 
 
+def cmd_clusters(a) -> dict:
+    """Stage ``clusters`` (``vlapoc.clusters``): the cluster/pattern discovery over an attribute or ensemble run's score table."""
+    from vlapoc.clusters import clusters_run
+
+    params = {k: v for k, v in {"n_bins": a.n_bins, "k": a.k, "max_l": a.max_l, "alpha": a.alpha, "min_sup_fraction": a.min_sup_fraction,
+                                "z": a.z}.items() if v is not None}
+    return clusters_run(rid(a.scores, "attribute"), a.name, metrics=a.metrics, chain=a.chain, lineage_root=LR, synthetic=a.synthetic,
+                        params=params, heuristics=not a.no_heuristics)
+
+
 def cmd_step4_summary(a) -> dict:
     """Step 4's table over the chain's verify runs (``vlapoc.step4``): seed consistency per arm and comparison."""
     from vlapoc.step4 import summary_run
@@ -406,6 +419,19 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--z", type=float, default=1.0, help="group threshold on the z-scored harm columns (declared, inferred default 1)")
     s.add_argument("--by", nargs="+", default=["task_name"], help="catalog columns to aggregate by (PoC §1 p.3)")
     s.add_argument("--synthetic", action="store_true", help="the scores are test data: put SYNTHETIC in every figure title")
+
+    s = sub.add_parser("clusters")
+    s.add_argument("--scores", required=True, help="the attribute or ensemble run (name or id)")
+    s.add_argument("--name", required=True)
+    s.add_argument("--metrics", nargs="+", default=None, help="metrics (harm_<m> columns); default f30 rmst60 auc_expected hrt60_lin censored60")
+    s.add_argument("--synthetic", action="store_true", help="the scores are test data: tag the run vlapoc.synthetic=true")
+    s.add_argument("--n-bins", type=int, default=None, help="quantile bins per descriptor (declared, default 5)")
+    s.add_argument("--k", type=int, default=None, help="slices per metric and side (default 5)")
+    s.add_argument("--max-l", type=int, default=None, help="max predicates per slice (default 2)")
+    s.add_argument("--alpha", type=float, default=None, help="sliceline alpha (default 0.95)")
+    s.add_argument("--min-sup-fraction", type=float, default=None, help="sliceline min_sup as a share of N, floor 10 (default 0.02)")
+    s.add_argument("--z", type=float, default=None, help="metric-group threshold (default 1)")
+    s.add_argument("--no-heuristics", action="store_true", help="skip the label-free heuristic descriptors (H5/H6/H7/H8; the frame scan takes ~85 s per 960 episodes)")
 
     s = sub.add_parser("step4-summary")
     s.add_argument("--tag", required=True, help="the chain's tag (runs are named <stage>-<tag>-...)")

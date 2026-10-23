@@ -103,8 +103,9 @@ from vlapoc.lineage import (  # noqa: E402
 )
 
 STAGES = ("build", "split", "derive", "screen", "select", "train", "eval", "returns", "verify", "attribute",
-          "score", "summarize")  # returns: S6; verify: S7 gate; score: ground-truth recovery scoring (ground-truth feature S5);
-# summarize: Step 4's seed-consistency table over a chain's verify runs (training-attribution S4, ``vlapoc.step4``)
+          "score", "summarize", "cluster")  # returns: S6; verify: S7 gate; score: ground-truth recovery scoring (ground-truth feature S5);
+# summarize: Step 4's seed-consistency table over a chain's verify runs (training-attribution S4, ``vlapoc.step4``);
+# cluster: the dashboard feature's cluster/pattern discovery over an attribution table (``vlapoc.clusters``, dashboard S2)
 EXPERIMENT = "vlapoc-lineage"
 SOURCE_DIRS = ("vlapoc", "scripts")
 DIGEST_LEN = 32  # MLflow MAX_DATASET_DIGEST_SIZE = 36

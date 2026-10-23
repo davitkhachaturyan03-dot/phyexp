@@ -1,0 +1,150 @@
+{
+ "seeds": [
+  {
+   "seed": 100,
+   "slice_a_rank_hrt": 1,
+   "slice_a_rank_f30": NaN,
+   "slice_b_boost_rank_f30": 1,
+   "small_slice_n": 37,
+   "small_slice_rank_censored60": 1,
+   "task_rank_hrt": 1,
+   "task_rank_f30": 14
+  },
+  {
+   "seed": 101,
+   "slice_a_rank_hrt": 1,
+   "slice_a_rank_f30": NaN,
+   "slice_b_boost_rank_f30": 1,
+   "small_slice_n": 37,
+   "small_slice_rank_censored60": 1,
+   "task_rank_hrt": 1,
+   "task_rank_f30": 2
+  },
+  {
+   "seed": 102,
+   "slice_a_rank_hrt": 1,
+   "slice_a_rank_f30": NaN,
+   "slice_b_boost_rank_f30": 1,
+   "small_slice_n": 37,
+   "small_slice_rank_censored60": 1,
+   "task_rank_hrt": 1,
+   "task_rank_f30": 12
+  },
+  {
+   "seed": 103,
+   "slice_a_rank_hrt": 1,
+   "slice_a_rank_f30": NaN,
+   "slice_b_boost_rank_f30": 1,
+   "small_slice_n": 37,
+   "small_slice_rank_censored60": 1,
+   "task_rank_hrt": 1,
+   "task_rank_f30": 17
+  },
+  {
+   "seed": 104,
+   "slice_a_rank_hrt": 1,
+   "slice_a_rank_f30": NaN,
+   "slice_b_boost_rank_f30": 1,
+   "small_slice_n": 37,
+   "small_slice_rank_censored60": 1,
+   "task_rank_hrt": 1,
+   "task_rank_f30": 20
+  },
+  {
+   "seed": 105,
+   "slice_a_rank_hrt": 1,
+   "slice_a_rank_f30": NaN,
+   "slice_b_boost_rank_f30": 1,
+   "small_slice_n": 37,
+   "small_slice_rank_censored60": 1,
+   "task_rank_hrt": 1,
+   "task_rank_f30": 10
+  },
+  {
+   "seed": 106,
+   "slice_a_rank_hrt": 1,
+   "slice_a_rank_f30": NaN,
+   "slice_b_boost_rank_f30": 1,
+   "small_slice_n": 37,
+   "small_slice_rank_censored60": 1,
+   "task_rank_hrt": 1,
+   "task_rank_f30": 5
+  },
+  {
+   "seed": 107,
+   "slice_a_rank_hrt": 1,
+   "slice_a_rank_f30": NaN,
+   "slice_b_boost_rank_f30": 1,
+   "small_slice_n": 37,
+   "small_slice_rank_censored60": 1,
+   "task_rank_hrt": 1,
+   "task_rank_f30": 7
+  },
+  {
+   "seed": 108,
+   "slice_a_rank_hrt": 1,
+   "slice_a_rank_f30": NaN,
+   "slice_b_boost_rank_f30": NaN,
+   "small_slice_n": 37,
+   "small_slice_rank_censored60": 1,
+   "task_rank_hrt": 1,
+   "task_rank_f30": 19
+  },
+  {
+   "seed": 109,
+   "slice_a_rank_hrt": 1,
+   "slice_a_rank_f30": NaN,
+   "slice_b_boost_rank_f30": 1,
+   "small_slice_n": 37,
+   "small_slice_rank_censored60": 1,
+   "task_rank_hrt": 1,
+   "task_rank_f30": 8
+  }
+ ],
+ "note": "SYNTHETIC. n_boot=50 to keep this fast; the slice finder does not use the bootstrap.",
+ "summary": {
+  "slice_a_in_top3_hrt": 10,
+  "slice_a_in_top3_f30 (false alarm)": 0,
+  "slice_b_boost_in_top3_f30": 9,
+  "task_top3_hrt": 10,
+  "task_top3_f30 (false alarm)": 1,
+  "small_slice_(n=37)_in_top3_censored60": 10,
+  "of_seeds": 10
+ },
+ "truth": {
+  "slice_a": {
+   "predicates": [
+    {
+     "feature": "length_vs_task",
+     "code": 4
+    },
+    {
+     "feature": "scene",
+     "code": 9
+    }
+   ],
+   "n": 98,
+   "text": "length_vs_task > 1.113 AND scene = libero_tabletop_manipulation"
+  },
+  "task": {
+   "task_name": "KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it",
+   "n": 48,
+   "overlap_with_slice_a": 0
+  },
+  "slice_b": {
+   "predicates": [
+    {
+     "feature": "smoothness",
+     "code": 4
+    },
+    {
+     "feature": "gripper_toggles",
+     "code": 2
+    }
+   ],
+   "n": 25,
+   "text": "smoothness > 0.1052 AND gripper_toggles (3, 4]"
+  },
+  "shift_sd": 1.5
+ }
+}

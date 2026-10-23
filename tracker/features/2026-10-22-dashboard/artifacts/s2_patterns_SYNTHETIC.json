@@ -1,0 +1,773 @@
+{
+ "SYNTHETIC": "noise plus planted structure; not a result about any policy",
+ "planted": {
+  "slice_a": {
+   "predicates": [
+    {
+     "feature": "length_vs_task",
+     "code": 4
+    },
+    {
+     "feature": "scene",
+     "code": 9
+    }
+   ],
+   "n": 98,
+   "text": "length_vs_task > 1.113 AND scene = libero_tabletop_manipulation"
+  },
+  "task": {
+   "task_name": "KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it",
+   "n": 48,
+   "overlap_with_slice_a": 0
+  },
+  "slice_b": {
+   "predicates": [
+    {
+     "feature": "smoothness",
+     "code": 4
+    },
+    {
+     "feature": "gripper_toggles",
+     "code": 2
+    }
+   ],
+   "n": 25,
+   "text": "smoothness > 0.1052 AND gripper_toggles (3, 4]"
+  },
+  "shift_sd": 1.5
+ },
+ "patterns": [
+  {
+   "cluster_id": "label:task_name=KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it",
+   "lens": "label",
+   "definition": "task_name = KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it",
+   "direction": "harm",
+   "status": "estimated",
+   "n": 48,
+   "share_of_subset": 0.05,
+   "primary_metric": "harm_hrt60_lin",
+   "metrics": [
+    {
+     "metric": "f30",
+     "column": "harm_f30",
+     "reading": "no detectable shift",
+     "mean": -0.22051323527982536,
+     "ci95": [
+      -0.48359650269805443,
+      0.04215801805451879
+     ],
+     "z": -0.14615520627616824,
+     "subset_mean": -0.07522223311572082
+    },
+    {
+     "metric": "rmst60",
+     "column": "harm_rmst60",
+     "reading": "no detectable shift",
+     "mean": 0.17233924083850638,
+     "ci95": [
+      -0.08978562585000881,
+      0.41836780700877263
+     ],
+     "z": 0.18259643218325924,
+     "subset_mean": -0.014539279284646748
+    },
+    {
+     "metric": "auc_expected",
+     "column": "harm_auc_expected",
+     "reading": "no detectable shift",
+     "mean": -0.2104268426172161,
+     "ci95": [
+      -0.4560068617275791,
+      0.054577551113606376
+     ],
+     "z": -0.1656551322842911,
+     "subset_mean": -0.046300986643175036
+    },
+    {
+     "metric": "hrt60_lin",
+     "column": "harm_hrt60_lin",
+     "reading": "harmful",
+     "mean": 1.3579331136031467,
+     "ci95": [
+      1.104084125806499,
+      1.619641289607913
+     ],
+     "z": 0.9786794064012321,
+     "subset_mean": 0.2495263614381328
+    },
+    {
+     "metric": "censored60",
+     "column": "harm_censored60",
+     "reading": "no detectable shift",
+     "mean": -0.1313029478221513,
+     "ci95": [
+      -0.4310856641417606,
+      0.1647747498661128
+     ],
+     "z": -0.1838705821921829,
+     "subset_mean": 0.05068264868471476
+    }
+   ],
+   "descriptor_contrasts": [
+    {
+     "descriptor": "gripper_toggles",
+     "mean_in": 4.1875,
+     "mean_out": 2.763157894736842,
+     "std_diff": 1.1214272370056237
+    },
+    {
+     "descriptor": "duration_s",
+     "mean_in": 13.353125,
+     "mean_out": 9.87532894736842,
+     "std_diff": 0.7703392423119064
+    },
+    {
+     "descriptor": "length_steps",
+     "mean_in": 267.0625,
+     "mean_out": 197.5065789473684,
+     "std_diff": 0.7703392423119063
+    },
+    {
+     "descriptor": "smoothness",
+     "mean_in": 0.05938742555400145,
+     "mean_out": 0.08351761196644768,
+     "std_diff": -0.7624205958370652
+    },
+    {
+     "descriptor": "post_release_share_vs_task",
+     "mean_in": 0.05217547793126757,
+     "mean_out": -0.0002795307458534746,
+     "std_diff": 0.6361658167870999
+    },
+    {
+     "descriptor": "instruction_mismatch",
+     "mean_in": 0.0,
+     "mean_out": 0.01425438596491228,
+     "std_diff": -0.1233312352707739
+    },
+    {
+     "descriptor": "idle_steps",
+     "mean_in": 1.4375,
+     "mean_out": 0.9144736842105263,
+     "std_diff": 0.10666601123121837
+    },
+    {
+     "descriptor": "length_vs_task",
+     "mean_in": 1.0173809523809523,
+     "mean_out": 1.0250215669072715,
+     "std_diff": -0.05681046389348432
+    },
+    {
+     "descriptor": "idle_fraction",
+     "mean_in": 0.005118994640603698,
+     "mean_out": 0.004260428407441695,
+     "std_diff": 0.035996745236355016
+    },
+    {
+     "descriptor": "duplicate_frame_pairs",
+     "mean_in": 1.6666666666666667,
+     "mean_out": 1.6611842105263157,
+     "std_diff": 0.0005137726183426854
+    }
+   ],
+   "label_composition": {
+    "task_name": [
+     {
+      "value": "KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it",
+      "share_in_cluster": 1.0,
+      "share_in_subset": 0.05,
+      "lift": 20.0
+     }
+    ],
+    "scene": [
+     {
+      "value": "KITCHEN_SCENE3",
+      "share_in_cluster": 1.0,
+      "share_in_subset": 0.05,
+      "lift": 20.0
+     }
+    ]
+   },
+   "top_members": [
+    {
+     "episode_id": "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_8",
+     "content_hash": "ada2dc93dec7ace8fb62e43ee64586b00f0e30e39c3796ad56ac5eec87de1d10",
+     "harm": 3.3233698923898785,
+     "harm_z": 2.7140824939636063
+    },
+    {
+     "episode_id": "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_23",
+     "content_hash": "6dbbe9424947e3ce4cfeefe35b8616a0884469fc023df801d3b37b455ac8b6ea",
+     "harm": 3.2129083636871867,
+     "harm_z": 2.616549324727888
+    },
+    {
+     "episode_id": "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_19",
+     "content_hash": "333547fc5a5f554be7a3c9732c42a6b33e57cdffc0b1d88d498da083804e05aa",
+     "harm": 2.968489751192976,
+     "harm_z": 2.4007373386298148
+    },
+    {
+     "episode_id": "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_29",
+     "content_hash": "b0f2cae4853a46a03d6dc4114c66d0a3cefd94435336a9b075b4d687f923c880",
+     "harm": 2.6458308448328385,
+     "harm_z": 2.115842261682829
+    },
+    {
+     "episode_id": "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_20",
+     "content_hash": "e1f0c89ad4d4982c4a4d2c27c07d528e670d38e4b3994f6b359cf896f9824b13",
+     "harm": 2.599494751985419,
+     "harm_z": 2.0749293208745128
+    }
+   ],
+   "declarations": {
+    "harm_f30": {
+     "column": "harm_f30",
+     "functional": "F(30) = P(T <= 30 s)",
+     "tau": "30 s",
+     "rollout_subset": "all",
+     "good_sign": 1.0,
+     "return_definition": "per-rollout return ret_f30 (metrics_registry: per cell: mean(ret_f30) = F(30))",
+     "weighting": "CUPID \u00b11, uncentred (success +1, otherwise \u22121)"
+    },
+    "harm_rmst60": {
+     "column": "harm_rmst60",
+     "functional": "RMST(60) = \u222b_0^60 (1 - F(t)) dt",
+     "tau": "60 s = \u03c4_episode",
+     "rollout_subset": "all",
+     "good_sign": 1.0,
+     "return_definition": "per-rollout return ret_rmst60 (metrics_registry: per cell: mean(ret_rmst60) = -RMST(60))",
+     "weighting": "centred (R \u2212 mean R)"
+    },
+    "harm_auc_expected": {
+     "column": "harm_auc_expected",
+     "functional": "AUC_h = P(T < T_h) + \u00bd P(T = T_h) (Mann-Whitney; ties \u00bd because model and human share the 20 Hz grid)",
+     "tau": "none (humans all < 60 s)",
+     "rollout_subset": "all",
+     "good_sign": 1.0,
+     "return_definition": "per-rollout return ret_auc_expected (metrics_registry: per cell: mean(ret_auc_expected) = AUC_h; mean(ret_auc_sampled) = AUC_h up to sampling noise)",
+     "weighting": "centred (R \u2212 mean R)"
+    },
+    "harm_hrt60_lin": {
+     "column": "harm_hrt60_lin",
+     "functional": "HRT(60) = (1/J) \u03a3_o RMST_h,o(60) / RMST_m,o(60)",
+     "tau": "60 s",
+     "rollout_subset": "all",
+     "good_sign": 1.0,
+     "return_definition": "per-rollout return ret_hrt60_lin (metrics_registry: \u03a3_cells mean(ret_hrt60_lin) = -HRT(60) at the evaluated policy (first-order weights w_o = RMST_h,o / (J RMST_m,o\u00b2)))",
+     "weighting": "centred (R \u2212 mean R)"
+    },
+    "harm_censored60": {
+     "column": "harm_censored60",
+     "functional": "1 - F(60) (no ghosts on LIBERO)",
+     "tau": "60 s = \u03c4_episode",
+     "rollout_subset": "all",
+     "good_sign": -1.0,
+     "return_definition": "per-rollout return ret_censored60 (metrics_registry: per cell: mean(ret_censored60) = 1 - F(60))",
+     "weighting": "CUPID \u00b11, uncentred (success +1, otherwise \u22121)"
+    }
+   },
+   "text": "task_name = KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it: n = 48 (5.0% of the subset). Estimated harmful on hrt60_lin. No detectable shift on f30, rmst60, auc_expected, censored60. Most different descriptor: gripper_toggles (4.19 inside vs 2.76 outside, +1.12 s.d.). Status: estimated: first-order sum of individual influence (CUPID p. 11); a cluster is confirmed only after removing it, retraining and passing the two-step verdict (PoC \u00a74.4, \u00a79.1 Step 4)."
+  },
+  {
+   "cluster_id": "slice:f30:boost:1",
+   "lens": "slice",
+   "definition": "smoothness > 0.1052 AND gripper_toggles (3, 4]",
+   "direction": "boost",
+   "status": "estimated",
+   "n": 25,
+   "share_of_subset": 0.026041666666666668,
+   "primary_metric": "harm_f30",
+   "metrics": [
+    {
+     "metric": "f30",
+     "column": "harm_f30",
+     "reading": "helpful",
+     "mean": -1.339684756143171,
+     "ci95": [
+      -1.7318416430036203,
+      -0.9476631618128705
+     ],
+     "z": -1.2719836612650164,
+     "subset_mean": -0.07522223311572082
+    },
+    {
+     "metric": "rmst60",
+     "column": "harm_rmst60",
+     "reading": "no detectable shift",
+     "mean": -0.06477711859829323,
+     "ci95": [
+      -0.4045648503347023,
+      0.32703190315464775
+     ],
+     "z": -0.04908670195602226,
+     "subset_mean": -0.014539279284646748
+    },
+    {
+     "metric": "auc_expected",
+     "column": "harm_auc_expected",
+     "reading": "no detectable shift",
+     "mean": 0.013609531019787045,
+     "ci95": [
+      -0.3985434919018619,
+      0.42577467521786044
+     ],
+     "z": 0.06046874619345807,
+     "subset_mean": -0.046300986643175036
+    },
+    {
+     "metric": "hrt60_lin",
+     "column": "harm_hrt60_lin",
+     "reading": "harmful",
+     "mean": 0.9685977967864444,
+     "ci95": [
+      0.5723210223402828,
+      1.3278029280421115
+     ],
+     "z": 0.6349116911568564,
+     "subset_mean": 0.2495263614381328
+    },
+    {
+     "metric": "censored60",
+     "column": "harm_censored60",
+     "reading": "no detectable shift",
+     "mean": -0.1523503836940426,
+     "ci95": [
+      -0.5199940233284361,
+      0.24126237137497616
+     ],
+     "z": -0.20513602496183245,
+     "subset_mean": 0.05068264868471476
+    }
+   ],
+   "descriptor_contrasts": [
+    {
+     "descriptor": "length_vs_task",
+     "mean_in": 1.2880412651772721,
+     "mean_out": 1.0175967092024443,
+     "std_diff": 2.0108435819492594
+    },
+    {
+     "descriptor": "smoothness",
+     "mean_in": 0.1387140151203031,
+     "mean_out": 0.0808030033818019,
+     "std_diff": 1.8297640689763468
+    },
+    {
+     "descriptor": "gripper_toggles",
+     "mean_in": 4.0,
+     "mean_out": 2.8032085561497326,
+     "std_diff": 0.9422697799845008
+    },
+    {
+     "descriptor": "duplicate_frame_pairs",
+     "mean_in": 7.6,
+     "mean_out": 1.5026737967914439,
+     "std_diff": 0.5713933988920789
+    },
+    {
+     "descriptor": "idle_fraction",
+     "mean_in": 0.017438598794080027,
+     "mean_out": 0.00395214703795059,
+     "std_diff": 0.5654407886737622
+    },
+    {
+     "descriptor": "idle_steps",
+     "mean_in": 3.6,
+     "mean_out": 0.8695187165775401,
+     "std_diff": 0.556854480265586
+    },
+    {
+     "descriptor": "post_release_share_vs_task",
+     "mean_in": -0.03323296484656553,
+     "mean_out": 0.003294454568606004,
+     "std_diff": -0.44299860382089534
+    },
+    {
+     "descriptor": "duration_s",
+     "mean_in": 8.411999999999999,
+     "mean_out": 10.092994652406418,
+     "std_diff": -0.3723439003518548
+    },
+    {
+     "descriptor": "length_steps",
+     "mean_in": 168.24,
+     "mean_out": 201.85989304812836,
+     "std_diff": -0.3723439003518545
+    },
+    {
+     "descriptor": "instruction_mismatch",
+     "mean_in": 0.0,
+     "mean_out": 0.013903743315508022,
+     "std_diff": -0.12029741878817733
+    }
+   ],
+   "label_composition": {
+    "task_name": [
+     {
+      "value": "pick_up_the_black_bowl_on_the_ramekin_and_place_it_on_the_plate",
+      "share_in_cluster": 0.2,
+      "share_in_subset": 0.05,
+      "lift": 4.0
+     },
+     {
+      "value": "pick_up_the_black_bowl_next_to_the_plate_and_place_it_on_the_plate",
+      "share_in_cluster": 0.16,
+      "share_in_subset": 0.05,
+      "lift": 3.1999999999999997
+     },
+     {
+      "value": "pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate",
+      "share_in_cluster": 0.12,
+      "share_in_subset": 0.05,
+      "lift": 2.4
+     }
+    ],
+    "scene": [
+     {
+      "value": "libero_tabletop_manipulation",
+      "share_in_cluster": 0.84,
+      "share_in_subset": 0.5,
+      "lift": 1.68
+     },
+     {
+      "value": "KITCHEN_SCENE3",
+      "share_in_cluster": 0.04,
+      "share_in_subset": 0.05,
+      "lift": 0.7999999999999999
+     },
+     {
+      "value": "LIVING_ROOM_SCENE5",
+      "share_in_cluster": 0.04,
+      "share_in_subset": 0.05,
+      "lift": 0.7999999999999999
+     }
+    ]
+   },
+   "top_members": [
+    {
+     "episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate/demo_15",
+     "content_hash": "d2601a6070d7cc6717242ced43202a220e092fc34cb2ac4d4670527a7776b9d3",
+     "harm": -3.8982328653977714,
+     "harm_z": -3.8457502476723397
+    },
+    {
+     "episode_id": "libero_spatial/pick_up_the_black_bowl_next_to_the_ramekin_and_place_it_on_the_plate/demo_3",
+     "content_hash": "14da94232ab631fa66a05a58b7560f5ba72e9877fb56a8b5560694fe6b9bfbd3",
+     "harm": -2.7083186322821717,
+     "harm_z": -2.6487582963364464
+    },
+    {
+     "episode_id": "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate/demo_37",
+     "content_hash": "56972e1ed9c1ec33eecd955426e57912ee9da7207bbd54e147b7b14202c53d96",
+     "harm": -2.1538286094183396,
+     "harm_z": -2.0909701163209693
+    },
+    {
+     "episode_id": "libero_spatial/pick_up_the_black_bowl_next_to_the_plate_and_place_it_on_the_plate/demo_3",
+     "content_hash": "2bf02111f48c95e46f5df84125aa20a52cdb824397f0291e2b247b28a67cee02",
+     "harm": -2.120429144594903,
+     "harm_z": -2.0573719884391792
+    },
+    {
+     "episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate/demo_18",
+     "content_hash": "9dbd429163ba1d1d04693e68386782243e65fdbada8de7fcabb94fb2a472a83d",
+     "harm": -2.0300084132181584,
+     "harm_z": -1.9664134263178759
+    }
+   ],
+   "declarations": {
+    "harm_f30": {
+     "column": "harm_f30",
+     "functional": "F(30) = P(T <= 30 s)",
+     "tau": "30 s",
+     "rollout_subset": "all",
+     "good_sign": 1.0,
+     "return_definition": "per-rollout return ret_f30 (metrics_registry: per cell: mean(ret_f30) = F(30))",
+     "weighting": "CUPID \u00b11, uncentred (success +1, otherwise \u22121)"
+    },
+    "harm_rmst60": {
+     "column": "harm_rmst60",
+     "functional": "RMST(60) = \u222b_0^60 (1 - F(t)) dt",
+     "tau": "60 s = \u03c4_episode",
+     "rollout_subset": "all",
+     "good_sign": 1.0,
+     "return_definition": "per-rollout return ret_rmst60 (metrics_registry: per cell: mean(ret_rmst60) = -RMST(60))",
+     "weighting": "centred (R \u2212 mean R)"
+    },
+    "harm_auc_expected": {
+     "column": "harm_auc_expected",
+     "functional": "AUC_h = P(T < T_h) + \u00bd P(T = T_h) (Mann-Whitney; ties \u00bd because model and human share the 20 Hz grid)",
+     "tau": "none (humans all < 60 s)",
+     "rollout_subset": "all",
+     "good_sign": 1.0,
+     "return_definition": "per-rollout return ret_auc_expected (metrics_registry: per cell: mean(ret_auc_expected) = AUC_h; mean(ret_auc_sampled) = AUC_h up to sampling noise)",
+     "weighting": "centred (R \u2212 mean R)"
+    },
+    "harm_hrt60_lin": {
+     "column": "harm_hrt60_lin",
+     "functional": "HRT(60) = (1/J) \u03a3_o RMST_h,o(60) / RMST_m,o(60)",
+     "tau": "60 s",
+     "rollout_subset": "all",
+     "good_sign": 1.0,
+     "return_definition": "per-rollout return ret_hrt60_lin (metrics_registry: \u03a3_cells mean(ret_hrt60_lin) = -HRT(60) at the evaluated policy (first-order weights w_o = RMST_h,o / (J RMST_m,o\u00b2)))",
+     "weighting": "centred (R \u2212 mean R)"
+    },
+    "harm_censored60": {
+     "column": "harm_censored60",
+     "functional": "1 - F(60) (no ghosts on LIBERO)",
+     "tau": "60 s = \u03c4_episode",
+     "rollout_subset": "all",
+     "good_sign": -1.0,
+     "return_definition": "per-rollout return ret_censored60 (metrics_registry: per cell: mean(ret_censored60) = 1 - F(60))",
+     "weighting": "CUPID \u00b11, uncentred (success +1, otherwise \u22121)"
+    }
+   },
+   "text": "smoothness > 0.1052 AND gripper_toggles (3, 4]: n = 25 (2.6% of the subset). Estimated harmful on hrt60_lin. Estimated helpful on f30. No detectable shift on rmst60, auc_expected, censored60. Most different descriptor: length_vs_task (1.29 inside vs 1.02 outside, +2.01 s.d.). Status: estimated: first-order sum of individual influence (CUPID p. 11); a cluster is confirmed only after removing it, retraining and passing the two-step verdict (PoC \u00a74.4, \u00a79.1 Step 4); slices are selected for extreme harm, so their intervals are optimistic; treat them as estimates to confirm. Readings compare a cluster's mean with the subset mean, per metric, uncorrected for the number of metrics and clusters."
+  },
+  {
+   "cluster_id": "slice:hrt60_lin:harm:1",
+   "lens": "slice",
+   "definition": "length_vs_task > 1.113 AND scene = libero_tabletop_manipulation",
+   "direction": "harm",
+   "status": "estimated",
+   "n": 98,
+   "share_of_subset": 0.10208333333333333,
+   "primary_metric": "harm_hrt60_lin",
+   "metrics": [
+    {
+     "metric": "f30",
+     "column": "harm_f30",
+     "reading": "helpful",
+     "mean": -0.3769151683654089,
+     "ci95": [
+      -0.5825841193231343,
+      -0.1853650163994817
+     ],
+     "z": -0.30348743230277375,
+     "subset_mean": -0.07522223311572082
+    },
+    {
+     "metric": "rmst60",
+     "column": "harm_rmst60",
+     "reading": "no detectable shift",
+     "mean": 0.009909157882150235,
+     "ci95": [
+      -0.16764469678855093,
+      0.186491735497168
+     ],
+     "z": 0.023888231757035583,
+     "subset_mean": -0.014539279284646748
+    },
+    {
+     "metric": "auc_expected",
+     "column": "harm_auc_expected",
+     "reading": "no detectable shift",
+     "mean": -0.02822825420687011,
+     "ci95": [
+      -0.2274029507122833,
+      0.1591675579235835
+     ],
+     "z": 0.01824112882584577,
+     "subset_mean": -0.046300986643175036
+    },
+    {
+     "metric": "hrt60_lin",
+     "column": "harm_hrt60_lin",
+     "reading": "harmful",
+     "mean": 1.5648690787485247,
+     "ci95": [
+      1.3669093922889801,
+      1.7604392327605427
+     ],
+     "z": 1.1613956945652668,
+     "subset_mean": 0.2495263614381328
+    },
+    {
+     "metric": "censored60",
+     "column": "harm_censored60",
+     "reading": "no detectable shift",
+     "mean": 0.13103323526463465,
+     "ci95": [
+      -0.0531083340706616,
+      0.31160645792152963
+     ],
+     "z": 0.08118284862931921,
+     "subset_mean": 0.05068264868471476
+    }
+   ],
+   "descriptor_contrasts": [
+    {
+     "descriptor": "length_vs_task",
+     "mean_in": 1.2574202092680369,
+     "mean_out": 0.9981749120944892,
+     "std_diff": 1.927573435867121
+    },
+    {
+     "descriptor": "smoothness",
+     "mean_in": 0.10721271521607384,
+     "mean_out": 0.07948006084549548,
+     "std_diff": 0.8762446550538789
+    },
+    {
+     "descriptor": "idle_fraction",
+     "mean_in": 0.020127737680985434,
+     "mean_out": 0.002504297166588435,
+     "std_diff": 0.7388905758015107
+    },
+    {
+     "descriptor": "length_steps",
+     "mean_in": 149.77551020408163,
+     "mean_out": 206.8062645011601,
+     "std_diff": -0.6316216849525241
+    },
+    {
+     "descriptor": "duration_s",
+     "mean_in": 7.488775510204083,
+     "mean_out": 10.340313225058004,
+     "std_diff": -0.6316216849525237
+    },
+    {
+     "descriptor": "idle_steps",
+     "mean_in": 3.326530612244898,
+     "mean_out": 0.6693735498839907,
+     "std_diff": 0.5419007352031291
+    },
+    {
+     "descriptor": "duplicate_frame_pairs",
+     "mean_in": 6.020408163265306,
+     "mean_out": 1.165893271461717,
+     "std_diff": 0.4549269091983642
+    },
+    {
+     "descriptor": "post_release_share_vs_task",
+     "mean_in": 0.01599044442744879,
+     "mean_out": 0.0007916790563718033,
+     "std_diff": 0.18432815531424968
+    },
+    {
+     "descriptor": "gripper_toggles",
+     "mean_in": 2.7448979591836733,
+     "mean_out": 2.8445475638051043,
+     "std_diff": -0.07845712091665479
+    },
+    {
+     "descriptor": "instruction_mismatch",
+     "mean_in": 0.01020408163265306,
+     "mean_out": 0.013921113689095127,
+     "std_diff": -0.032160357955123335
+    }
+   ],
+   "label_composition": {
+    "task_name": [
+     {
+      "value": "pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate",
+      "share_in_cluster": 0.14285714285714285,
+      "share_in_subset": 0.05,
+      "lift": 2.8571428571428568
+     },
+     {
+      "value": "pick_up_the_black_bowl_on_the_ramekin_and_place_it_on_the_plate",
+      "share_in_cluster": 0.12244897959183673,
+      "share_in_subset": 0.05,
+      "lift": 2.4489795918367343
+     },
+     {
+      "value": "pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate",
+      "share_in_cluster": 0.12244897959183673,
+      "share_in_subset": 0.05,
+      "lift": 2.4489795918367343
+     }
+    ],
+    "scene": [
+     {
+      "value": "libero_tabletop_manipulation",
+      "share_in_cluster": 1.0,
+      "share_in_subset": 0.5,
+      "lift": 2.0
+     }
+    ]
+   },
+   "top_members": [
+    {
+     "episode_id": "libero_spatial/pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate/demo_16",
+     "content_hash": "5aebf1fcad1f1dbf9c5c0a999c4a19ff759db94b0439114a325df2063e8ecf57",
+     "harm": 4.175445919686757,
+     "harm_z": 3.4664319892863134
+    },
+    {
+     "episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate/demo_3",
+     "content_hash": "bf1b59e6a4147f0cee6662abc7b8d0293f1d81be393342cc34a5fd04b4597e23",
+     "harm": 3.716438936995267,
+     "harm_z": 3.0611469434517584
+    },
+    {
+     "episode_id": "libero_spatial/pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate/demo_48",
+     "content_hash": "501ebc687a03d5cb37d603f445d6beb6c70a4fcbac6499a69cc07a69f0fd19ac",
+     "harm": 3.709360370190684,
+     "harm_z": 3.0548968483987022
+    },
+    {
+     "episode_id": "libero_spatial/pick_up_the_black_bowl_next_to_the_plate_and_place_it_on_the_plate/demo_13",
+     "content_hash": "e33373188028b46e65a91ab52c85e74a8a2ae3a79f8b21a08acdd06bb847e786",
+     "harm": 3.3389756240215607,
+     "harm_z": 2.7278617389383593
+    },
+    {
+     "episode_id": "libero_spatial/pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate/demo_43",
+     "content_hash": "b2b0ed3b1b313543aa6c89d026946934cc494d9ac94847e9780a344f16ff455e",
+     "harm": 3.0538139344030575,
+     "harm_z": 2.4760752241241106
+    }
+   ],
+   "declarations": {
+    "harm_f30": {
+     "column": "harm_f30",
+     "functional": "F(30) = P(T <= 30 s)",
+     "tau": "30 s",
+     "rollout_subset": "all",
+     "good_sign": 1.0,
+     "return_definition": "per-rollout return ret_f30 (metrics_registry: per cell: mean(ret_f30) = F(30))",
+     "weighting": "CUPID \u00b11, uncentred (success +1, otherwise \u22121)"
+    },
+    "harm_rmst60": {
+     "column": "harm_rmst60",
+     "functional": "RMST(60) = \u222b_0^60 (1 - F(t)) dt",
+     "tau": "60 s = \u03c4_episode",
+     "rollout_subset": "all",
+     "good_sign": 1.0,
+     "return_definition": "per-rollout return ret_rmst60 (metrics_registry: per cell: mean(ret_rmst60) = -RMST(60))",
+     "weighting": "centred (R \u2212 mean R)"
+    },
+    "harm_auc_expected": {
+     "column": "harm_auc_expected",
+     "functional": "AUC_h = P(T < T_h) + \u00bd P(T = T_h) (Mann-Whitney; ties \u00bd because model and human share the 20 Hz grid)",
+     "tau": "none (humans all < 60 s)",
+     "rollout_subset": "all",
+     "good_sign": 1.0,
+     "return_definition": "per-rollout return ret_auc_expected (metrics_registry: per cell: mean(ret_auc_expected) = AUC_h; mean(ret_auc_sampled) = AUC_h up to sampling noise)",
+     "weighting": "centred (R \u2212 mean R)"
+    },
+    "harm_hrt60_lin": {
+     "column": "harm_hrt60_lin",
+     "functional": "HRT(60) = (1/J) \u03a3_o RMST_h,o(60) / RMST_m,o(60)",
+     "tau": "60 s",
+     "rollout_subset": "all",
+     "good_sign": 1.0,
+     "return_definition": "per-rollout return ret_hrt60_lin (metrics_registry: \u03a3_cells mean(ret_hrt60_lin) = -HRT(60) at the evaluated policy (first-order weights w_o = RMST_h,o / (J RMST_m,o\u00b2)))",
+     "weighting": "centred (R \u2212 mean R)"
+    },
+    "harm_censored60": {
+     "column": "harm_censored60",
+     "functional": "1 - F(60) (no ghosts on LIBERO)",
+     "tau": "60 s = \u03c4_episode",
+     "rollout_subset": "all",
+     "good_sign": -1.0,
+     "return_definition": "per-rollout return ret_censored60 (metrics_registry: per cell: mean(ret_censored60) = 1 - F(60))",
+     "weighting": "CUPID \u00b11, uncentred (success +1, otherwise \u22121)"
+    }
+   },
+   "text": "length_vs_task > 1.113 AND scene = libero_tabletop_manipulation: n = 98 (10.2% of the subset). Estimated harmful on hrt60_lin. Estimated helpful on f30. No detectable shift on rmst60, auc_expected, censored60. Most different descriptor: length_vs_task (1.26 inside vs 0.998 outside, +1.93 s.d.). Status: estimated: first-order sum of individual influence (CUPID p. 11); a cluster is confirmed only after removing it, retraining and passing the two-step verdict (PoC \u00a74.4, \u00a79.1 Step 4); slices are selected for extreme harm, so their intervals are optimistic; treat them as estimates to confirm. Readings compare a cluster's mean with the subset mean, per metric, uncorrected for the number of metrics and clusters."
+  }
+ ]
+}

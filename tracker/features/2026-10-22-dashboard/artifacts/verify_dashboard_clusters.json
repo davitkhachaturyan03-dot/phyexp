@@ -1,0 +1,107 @@
+{
+ "mode": "clusters",
+ "pass": true,
+ "n_pass": 12,
+ "n": 12,
+ "seconds": 14,
+ "checks": [
+  {
+   "name": "2.1a planted slice (SYNTHETIC) is among the top-3 harm slices for harm_hrt60_lin",
+   "pass": true,
+   "detail": "top-3 for hrt60_lin: [(1, 'length_vs_task > 1.113 AND scene = libero_tabletop_manipulation', 98), (2, 'gripper_toggles <= 2 AND length_vs_task > 1.113', 84), (3, 'duration_s (7.1, 11.7] AND length_vs_task > 1.113', 62)]"
+  },
+  {
+   "name": "2.1b planted task group is among the top-3 label groups (task_name) for harm_hrt60_lin",
+   "pass": true,
+   "detail": "rank of KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it: {'f30': 17, 'rmst60': 3, 'auc_expected': 20, 'hrt60_lin': 1, 'censored60': 19}"
+  },
+  {
+   "name": "2.1c on harm_f30 neither the planted slice nor the planted task is in the top 3",
+   "pass": true,
+   "detail": "top-3 harm slices for f30: [(1, 'gripper_toggles <= 2 AND duplicate_frame_pairs = 0', 556), (2, 'gripper_toggles <= 2 AND instruction_mismatch = 0', 561), (3, 'gripper_toggles <= 2', 569)]; task rank on f30 = 17"
+  },
+  {
+   "name": "2.2 planted boost slice (negative harm on f30) found on the boost side (top 3) and on no harm side of f30",
+   "pass": true,
+   "detail": "top-3 boost slices for f30: [(1, 'smoothness > 0.1052 AND gripper_toggles (3, 4]', 25), (2, 'smoothness > 0.1052 AND length_vs_task > 1.113', 46), (3, 'smoothness > 0.1052 AND instruction_mismatch = 0', 190)]; in the f30 harm list: False"
+  },
+  {
+   "name": "2.3 every clusters row and patterns entry carries functional/tau/rollout_subset/good_sign of each reported column; status == estimated everywhere",
+   "pass": true,
+   "detail": "84 rows, 84 patterns, e.g. 'HRT(60) = (1/J) \u03a3_o RMST_h,o(60) / RMST_m,o(60)' tau '60 s'"
+  },
+  {
+   "name": "2.4 cluster-stage run: input entity = the score table's sha256, params hold lens settings, descriptors, bin edges and synthetic; trace reaches the attribute run",
+   "pass": true,
+   "detail": "trace reaches ['attribute-dash-synth-s2', 'build-v0', 'clusters-dash-synth', 'derive-v3', 'split-v0']; lenses [\"label\", \"slice\", \"metric_group\"]; 12 descriptors"
+  },
+  {
+   "name": "2.4b results.provenance of the cluster run is SYNTHETIC (tag from the producing attribute run)",
+   "pass": true,
+   "detail": "['synthetic: clusters-dash-synth (cluster, 8ed29a22): tag vlapoc.synthetic=true']"
+  },
+  {
+   "name": "2.5a clusters.py imports nothing from groundtruth / recovery / discrepancy, and reads the subset only via open_for_method (no Subset.episodes, no labels)",
+   "pass": true,
+   "detail": "forbidden imports: []"
+  },
+  {
+   "name": "2.5b clusters_run refuses fenced v1, fenced v2 and a ground-truth-derived subset (LineageError naming the reason), nothing written",
+   "pass": true,
+   "detail": "fenced v1: REFUSED (version v1 (16076b9c5cb2) is not blind to its edits: fenced=True, offending=['episode_inde); fenced v2: REFUSED (version v2 (eaeed043455a) is fenced: superseded by v3 (002a68e4caf2); use the superseding ); ground-truth-derived: REFUSED (subset 'a05b2fc9e7d447aedfcae85bffce23501d236ca91699eb16b591107705c9874f' is ground-truth-)"
+  },
+  {
+   "name": "2.6 label-group n sum to N for task_name, scene and suite; every slice's members equal its definition re-evaluated from the raw descriptors and recorded edges; group members belong to their group",
+   "pass": true,
+   "detail": "label n sums {'task_name': 960, 'scene': 960, 'suite': 960} (N=960); 39 slices re-evaluated, mismatches []; 13 group clusters, mismatches []"
+  },
+  {
+   "name": "2.7 sliceline==0.3.0 installed in .venv; imports and finds the planted slice on Python 3.14 with numba and with numba blocked, same slices",
+   "pass": true,
+   "detail": "sliceline 0.3.0; python 3.14.0; numba used: True / False; top slice [1, 2, None]"
+  },
+  {
+   "name": "R real data/lineage/mlflow.db sha256 unchanged by this mode",
+   "pass": true,
+   "detail": "306af4123fda7e63..."
+  }
+ ],
+ "SYNTHETIC": true,
+ "planted": {
+  "slice_a": {
+   "predicates": [
+    {
+     "feature": "length_vs_task",
+     "code": 4
+    },
+    {
+     "feature": "scene",
+     "code": 9
+    }
+   ],
+   "n": 98,
+   "text": "length_vs_task > 1.113 AND scene = libero_tabletop_manipulation"
+  },
+  "task": {
+   "task_name": "KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it",
+   "n": 48,
+   "overlap_with_slice_a": 0
+  },
+  "slice_b": {
+   "predicates": [
+    {
+     "feature": "smoothness",
+     "code": 4
+    },
+    {
+     "feature": "gripper_toggles",
+     "code": 2
+    }
+   ],
+   "n": 25,
+   "text": "smoothness > 0.1052 AND gripper_toggles (3, 4]"
+  },
+  "shift_sd": 1.5
+ },
+ "stage_seconds": 4
+}
