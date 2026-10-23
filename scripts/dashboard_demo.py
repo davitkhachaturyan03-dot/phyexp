@@ -165,11 +165,13 @@ def build(with_smoke: bool, force: bool) -> int:
             print(f"{DEMO} exists; pass --force to rebuild it")
             return 2
         old_returns = None
-        try:  # the smoke chain keeps files outside the store (stage.py writes eval and attribution outputs under data/); remove only those the builder named itself
-            from vlapoc.runs import client as _client, experiment_id as _exp
+        try:  # the smoke chain keeps files outside the store (stage.py writes eval and attribution outputs under data/); remove only those the builder named itself.
+            import sqlite3  # plain sqlite, not MLflow: MLflow caches an engine per store path, which would break the store re-created below
 
-            for r in _client(DEMO).search_runs([_exp(DEMO)], "tags.mlflow.runName = 'returns-demo-smoke'", max_results=5):
-                old_returns = REPO_ROOT / "data" / "eval" / f"returns-{r.data.params['eval_run_id'][:12]}"
+            con = sqlite3.connect(DEMO / "mlflow.db")
+            row = con.execute("select p.value from params p join runs r on r.run_uuid = p.run_uuid where r.name = 'returns-demo-smoke' and p.key = 'eval_run_id'").fetchone()
+            con.close()
+            old_returns = REPO_ROOT / "data" / "eval" / f"returns-{row[0][:12]}" if row else None
         except Exception:  # noqa: BLE001 - an incomplete earlier build has no such run
             pass
         for d in (REPO_ROOT / "data" / "eval" / f"eval-{TAG}-smoke", REPO_ROOT / "data" / "attribution" / f"attribute-{TAG}-smoke", old_returns):
