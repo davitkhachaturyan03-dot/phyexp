@@ -210,7 +210,7 @@ def build(with_smoke: bool, force: bool) -> int:
         print(f"synthetic seed {s}: matrix {M.shape}, table {table.shape}")
     ens = at.ensemble_run(seed_ids, f"attribute-{TAG}-ens", out_dir=out / f"attribute-{TAG}-ens", lineage_root=lr)["run_id"]
     an = analyze_run(ens, f"analyze-{TAG}", out_dir=out / f"analyze-{TAG}", lineage_root=lr, synthetic=True)
-    cr = cl.clusters_run(ens, f"clusters-{TAG}", out_dir=out / f"clusters-{TAG}", lineage_root=lr, synthetic=True)
+    cr = cl.clusters_run(ens, f"clusters-{TAG}", out_dir=out / f"clusters-{TAG}", lineage_root=lr, synthetic=True, params={"min_sup_fraction": 0.01})  # as the Round A chain runs it (min_sup 10)
     sc = rc.cluster_recovery_run(cr["run_id"], "v3", f"score-clusters-{TAG}", out_dir=out / f"score-clusters-{TAG}", lineage_root=lr)
     dr = discrepancy_run(ens, "v3", f"discrepancy-{TAG}", out_dir=out / f"discrepancy-{TAG}", lineage_root=lr)
     print(f"stages: analyze {an['run_id'][:8]}, clusters {cr['n_clusters']} ({cr['n_by_lens']}), score-clusters {sc['n_clusters']}, discrepancy {dr['run_id'][:8]}")

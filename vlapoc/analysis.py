@@ -155,6 +155,9 @@ def plot_heatmap(table: pd.DataFrame, columns: list[str], groups: pd.Series, dec
     fig.colorbar(im, ax=ax, label="z-scored harm score (positive = harmful)")
     ax.set_title(txt["title"], fontsize=8)
     fig.tight_layout()
+    fig.canvas.draw()
+    bb = ax.get_window_extent()  # pixels of the main axes at the saved dpi: written beside the PNG so a test can check the plot area is not squeezed
+    Path(path).with_suffix(".axes.json").write_text(json.dumps({"axes_width_px": float(bb.width), "axes_height_px": float(bb.height), "figure_px": [float(x) for x in fig.get_size_inches() * 130]}))
     fig.savefig(path, dpi=130)
     plt.close(fig)
     return Path(path)
