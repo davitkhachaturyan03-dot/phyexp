@@ -148,6 +148,17 @@ and thoughtful". Orchestrator's answer to the owner, now the direction for the p
   is reported as inconclusive; (3) cost (inferred, 4 h per train): 7 types × 3 seeds = 21 trainings plus matched
   13-episode random controls (~6), ≈108 GPU-h on top of Round A — check whether existing random arms can serve.
 
+## Owner answers to plan questions (2026-10-22)
+
+- **Q1 Round A dataset: "Planted-bad-data v3 (Recommended)".** Round A is `--subset v3/candidate` (113 jobs, 24
+  trainings, measured dry run). This replaces the training-attribution first-run command (v0/candidate, 112 jobs); the
+  runbook and `server_pipeline.py`'s documented first run must say v3.
+- **Q2 Round B budget: "33 trainings, ~132 GPU-h (Rec.)".** Option (a): 7 planted-type arms + 1 clean-but-harmful arm +
+  clean random-13 controls + the all-91 oracle arm as positive control.
+- **CLAUDE.md pointer: "Add it at the end of the feature".** The orchestrator adds the plan's proposed line under
+  "## Required workflow" after the runbook exists, committing only that hunk, never the owner's other uncommitted edits.
+  Agents do not touch `CLAUDE.md`.
+
 ## Owner rulings
 
 (none yet)
