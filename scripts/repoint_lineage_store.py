@@ -8,7 +8,7 @@ prefix is rewritten. ``runs.scratch_lineage_copy`` does this for the experiment 
 
 Usage (stop every process that uses the store first; the script edits ``mlflow.db`` in place after writing ``mlflow.db.bak``)::
 
-    .venv/bin/python scripts/repoint_lineage_store.py --root data/lineage_from_server --old /raid/chem/gor/phyexp/data/lineage --new $PWD/data/lineage_from_server [--dry-run]
+    .venv/bin/python scripts/repoint_lineage_store.py --root data/lineage_from_server --old /path/on/server/data/lineage --new $PWD/data/lineage_from_server [--dry-run]
 
 ``--old`` / ``--new`` are directory prefixes (the store root on the old and the new machine); every ``file://<old>...`` and plain ``<old>...`` location that starts with
 ``--old`` is rewritten. Prints how many experiment and run locations changed and how many of the run artifact directories exist afterwards (an artifact

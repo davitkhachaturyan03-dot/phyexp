@@ -164,6 +164,17 @@ def build(with_smoke: bool, force: bool) -> int:
         if not force:
             print(f"{DEMO} exists; pass --force to rebuild it")
             return 2
+        old_returns = None
+        try:  # the smoke chain keeps files outside the store (stage.py writes eval and attribution outputs under data/); remove only those the builder named itself
+            from vlapoc.runs import client as _client, experiment_id as _exp
+
+            for r in _client(DEMO).search_runs([_exp(DEMO)], "tags.mlflow.runName = 'returns-demo-smoke'", max_results=5):
+                old_returns = REPO_ROOT / "data" / "eval" / f"returns-{r.data.params['eval_run_id'][:12]}"
+        except Exception:  # noqa: BLE001 - an incomplete earlier build has no such run
+            pass
+        for d in (REPO_ROOT / "data" / "eval" / f"eval-{TAG}-smoke", REPO_ROOT / "data" / "attribution" / f"attribute-{TAG}-smoke", old_returns):
+            if d is not None and d.exists():
+                shutil.rmtree(d)
         shutil.rmtree(DEMO)
     lr = scratch_lineage_copy(DEMO)
     out = DEMO / "outputs"
