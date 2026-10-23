@@ -4,6 +4,39 @@ Round 1 (planner, 2026-10-22). Branch `dashboard` at `046c38d`. Evidence labels:
 **measured** (a command run in this session; scratch outputs under `data/scratch/dash_plan/`, reproducible), **inferred**
 (my reasoning, unverified).
 
+## Round 2 changes (analyzer `analysis-r1.md`, commit `0657c68`, "Feedback: planner" items 1-5)
+1. **S9 reading method (F1):** the per-type `reading`/`estimated_reading` now uses the Welch interval,
+   `scipy.stats.ttest_ind(member, clean, equal_var=False).confidence_interval(0.95)`, not the percentile bootstrap.
+   Evidence (measured, stored artifact `artifacts/s9_null_calibration_SYNTHETIC.json`, 20 seeds × 700 cells): bootstrap
+   0.0929 false-call rate vs Welch 0.0586, against 0.05 nominal. Single-cell simulation: 0.0853 vs 0.0487. The call
+   exists in the installed scipy 1.18.1 (measured: it returns a `ConfidenceInterval`). **Decision on Holm:** the
+   reading stays the uncorrected Welch call (descriptive, estimated). Each (type, metric) row also gets
+   `p_holm_metrics`: Holm across the 5 metrics of that type, as PoC §4.4 p.10 asks "correct for it (e.g. Bonferroni or
+   Holm across metrics)". The sentence says whether the reading "holds after Holm across metrics". Holm is not used to
+   pick the reading, because the Welch reading is already calibrated per cell and the across-type multiplicity is
+   disclosed in words. New AC9.7; AC9.1 and AC9.2 amended.
+2. **F2 decided: option (a).** The Round A `clusters` job runs with `--min-sup-fraction 0.01`, which gives min_sup
+   `max(10, round(9.6)) = 10` (`clusters.py` line 276), below the 13 members of a planted type. Why: at 19 a slice can
+   never consist of one planted type, so S3's precision is capped at 13/19 = 0.68 by construction. That would make
+   the "did clusters land on planted data" test partly an artifact of a parameter. The cost is more small, noisier
+   slices (more selection bias, R1). Those are labelled estimated anyway, and the panel states the min_sup used.
+   Quintile bins (192 episodes each) still limit isolation to conjunctions, and the page and runbook say so (AC2.8,
+   AC8.2c).
+3. **Plain-language presentation layer:** new AC5.9. AC5.4 now accepts "functional reachable from the element"
+   (tooltip, help text or caption).
+4. **Rendering check:** new AC5.10, headless Chrome. Each chart's plot area is ≥ 200 px tall at 1400 px wide, a real
+   row click on Rollouts changes the selection, and `st.metric` values are not truncated.
+5. **Runbook:** AC8.1 strengthened (every flag in fenced commands accepted by its target parser). New AC8.7 adds
+   server-side store relocation with a read check (STOP AND ASK).
+6. **Folded non-blocking items:**
+   - F16: the S10 sentence states that the control draw is shared across types and seeds, and the cost table offers
+     `--random-draws 2`.
+   - Positive-control wording: the sentence names the oracle's 91 episodes.
+   - Duplicate member-set clusters are de-duplicated (AC2.9).
+   - `st.metric` truncation is covered by AC5.10.
+   - Measured cross-check: the S10 dry-run counts (129 / 108 / 162 jobs; 33 / 27 / 36 trainings,
+     `artifacts/s10_dry_run_counts.json`) equal the plan's inferred figures.
+
 ## Changes in this revision (round 1, folded in mid-planning)
 - The owner addition and follow-up (brief.md, "Addition from the owner" and "Owner follow-up") are folded in. The
   §9.2 discrepancy ("bad episodes are not always harmful") is now first-class. **New S9** covers the estimated half
@@ -240,7 +273,8 @@ finished before S7.
      `duplicate_frame_pairs`, `instruction_mismatch` (through `open_for_method`); plus `task_name`, `scene` as
      categorical. Error vectors are `max(z, 0)` (harm slices) and `max(-z, 0)` (boost slices) of each z-scored `harm_`
      column. Defaults (inferred, declared as params): 5 quantile bins, `max_l=2`, `k=5`, `alpha=0.95`, `min_sup=max(10,
-     2% of N)`.
+     2% of N)`. **Round 2:** the Round A chain's `clusters` job on v3 passes `--min-sup-fraction 0.01` (min_sup 10 < 13,
+     F2 option a). The code default stays 0.02 for other datasets.
   3. *Metric groups:* `metric_groups` (≥2-of-5, owner-approved). Each non-neutral group is a cluster.
   - *Estimated effect* = member mean of each harm column with the existing percentile bootstrap CI (`aggregate_by`
     method), plus the member sum (CUPID p.11 first-order group estimate). It is labelled "estimated (first-order sum of
@@ -261,6 +295,13 @@ finished before S7.
   - [ ] AC2.5 Blindness: `clusters.py` imports nothing from `vlapoc.groundtruth`/`vlapoc.recovery`, reads data only via
     `open_for_method`, and is refused on a fenced version (reuse the S1 refusal fixture of training-attribution). [PoC
     §2.1 item 4 p.3]
+  - [ ] AC2.8 (round 2, F2) `server_pipeline.py` Round A on v3 passes `--min-sup-fraction 0.01` to the `clusters`
+    job (dry-run argv check). The cluster run's params record `min_sup = 10`. The Clusters page's ground-truth panel
+    shows "slice minimum size: 10 episodes (a planted type has 13); bins are quintiles of 192, so a slice isolates a
+    type only through conjunctions". [analysis-r1 F2; PoC §2.1 item 4 p.3]
+  - [ ] AC2.9 (round 2) Clusters with identical member sets are reported once. The kept row lists all equivalent
+    definitions (e.g. `scene = KITCHEN_SCENE3` ≡ `task_name = KITCHEN_SCENE3_turn_on_the_stove…`, 48 episodes in the
+    demo). The verifier asserts no two rows of `clusters.parquet` have the same member set. [analysis-r1 non-blocking]
   - [ ] AC2.6 Members of every cluster sum correctly: label-group `n` values sum to N per column; every slice member
     satisfies its definition (re-evaluated from `descriptors.parquet`). [PoC §1 p.3]
   - [ ] AC2.7 `sliceline==0.3.0` is installed into `.venv` and recorded in the report with the reason. The import works
@@ -367,8 +408,34 @@ finished before S7.
   - [ ] AC5.3 Episodes page: the ranked list equals the score table sorted by the chosen `harm_` column; "aggregate by"
     offers exactly the groupable catalog columns (`CATALOG_COLUMNS` minus `GROUP_COLUMNS_EXCLUDED`), and the table equals
     `aggregate_by` output. [PoC §2.7 p.5, §1 p.3]
-  - [ ] AC5.4 Every displayed score column label contains its declared functional and τ (scan of all rendered
-    dataframe column names, captions and chart titles; none bare). [PoC §3.4 p.7; §4.4 p.10-11]
+  - [ ] AC5.4 Every displayed score column has its declared functional and τ **reachable from the element**: in the
+    label, its `help` tooltip, the column config `help`, or an adjacent caption. The scan covers every rendered
+    dataframe column, metric, chart title and axis; none may be bare (no functional anywhere on the element). [PoC §3.4
+    p.7; §4.4 p.10-11; analysis-r1 planner item 3]
+  - [ ] AC5.9 (round 2) Plain-language layer for stakeholders:
+    - The provenance banner is one line (e.g. "SYNTHETIC scores: a demonstration, not a result about any policy"),
+      with the reasons in an `st.expander` below it.
+    - Metric names shown are short and in words, from one mapping in code ("Success within 30 s", "Speed vs human
+      (HRT)", "Mean time to success (RMST)", "Beats human (AUC)", "Timed out (censored)"). The full declared
+      functional goes in the tooltip or caption (AC5.4).
+    - Quadrants show as "looks bad, hurts" / "looks bad, no detectable harm" / "looks clean, hurts" / "looks clean, no
+      detectable harm". Group names show in words, never snake_case.
+    - The sentence and status columns of recorded synthetic verdicts begin with "SYNTHETIC:" because
+      `discrepancy_verdict_run`/`confirm_run` write them that way when `synthetic=True`, so the app still shows them
+      verbatim.
+    - AppTest scan: no rendered label matches `[a-z]+_[a-z_]+`, except run names and ids in the lineage expander.
+
+    [brief: "present the project to any future stakeholders"; PoC §3.4 p.7; analysis-r1 planner item 3]
+  - [ ] AC5.10 (round 2) Rendering, measured in headless Chrome at a 1400 px window width (the
+    `scripts/dashboard_screenshots.py` driver):
+    - Every Altair chart's plot area (SVG `path.background` height) and every matplotlib figure's axes area is
+      ≥ 200 px tall.
+    - Clicking a row in the Rollouts table makes the page show that row's `rollout_id` as the selected rollout.
+    - No `st.metric` value on Rollouts is truncated (rendered text equals the full value, or the value is shown as text
+      instead).
+    - Screenshots are re-captured and looked at, with their paths listed in the execution log.
+
+    [analysis-r1 planner item 4, F22; PoC §2.7 p.5]
   - [ ] AC5.5 Clusters page shows the heatmap, the scatter with four quadrant labels, the cluster list with `status`
     from S4's `confirm` run when one exists (else `estimated`), and a lineage link per cluster. [PoC §4.5 p.11; brief]
   - [ ] AC5.5b Bad-vs-harmful page: the quadrant counts equal `discrepancy_episodes.parquet`'s, statuses and sentences are
@@ -495,8 +562,29 @@ finished before S7.
   Each step is tagged **[verified locally]** or **[unverified until a server session]**.
 - **Acceptance criteria:**
   - [ ] AC8.1 `scripts/verify_runbook.py` extracts every fenced shell command from `SKILL.md`. For every `scripts/*.py`
-    or `python -m vlapoc.*` invocation, the file or module exists and the named subcommand's `--help` exits 0 on this
-    Mac. Reported as n/n. [vla-build: commands exist]
+    or `python -m vlapoc.*` invocation:
+    - the file or module exists, and the named subcommand's `--help` exits 0 on this Mac;
+    - **(round 2)** every flag used in the command is accepted by that subcommand's argparse parser. The verifier
+      builds the real parser, calls `parse_known_args` on the command's argv (placeholders substituted), and requires
+      the unknown list to be empty.
+
+    Commands that only run on the server (`sbatch`, `squeue`, `nvidia-smi`, `rsync`) are listed as not checked. Each
+    command is labelled "executed locally" or "parsed only". Reported as n/n. [vla-build: commands exist; analysis-r1
+    planner item 5]
+  - [ ] AC8.2c (round 2, F2) Runbook Step 8 (Round B cluster pick) states the slice minimum size used (10) and the
+    quintile-bin limit, next to the S3 table the owner reads before picking. [analysis-r1 F2]
+  - [ ] AC8.7 (round 2) Store relocation on the server, right after the lineage store is copied (Step 2):
+    - Step 2 runs `scripts/repoint_lineage_store.py --root data/lineage --old <Mac repo>/data/lineage --new
+      $PWD/data/lineage`, first with `--dry-run` and then for real.
+    - A read check follows as a **STOP AND ASK** point: `results.score_table` of an existing attribute run, and
+      `lineage trace` of a ground-truth `score` run, must succeed.
+    - The results-back step repoints once more on the Mac, from the server prefix.
+    - Locally: in a scratch copy of the demo store moved to another root, the read fails before repointing (reproducing
+      the analyzer's `MlflowException`, measured) and succeeds after it.
+    - The runbook no longer says new server runs write server paths without a repoint. The results-back prose names
+      only what the rsync commands copy.
+
+    [analysis-r1 executor item 4, planner item 5; PoC §2.1 item 1 p.3]
   - [ ] AC8.2 Every dry-run count written in the skill equals a fresh local dry run. That covers three runs:
     - Round A on **`v3/candidate`** (owner Q1 answer). Measured today: 113 jobs, 24 trainings, before S2/S3/S9 add
       CPU jobs; the skill carries the post-build number and the same 24 trainings.
@@ -545,10 +633,14 @@ finished before S7.
     which heuristic flagged it, per-metric z-scored harm, and per-metric `quadrant` ∈ {`bad_and_harmful`,
     `bad_but_not_harmful`, `clean_but_harmful`, `clean_and_not_harmful`} (harmful = harm z ≥ 1, the `metric_groups`
     threshold, declared).
-  - `discrepancy_types.parquet`: per (planted type, metric), the member mean harm z with a percentile bootstrap 95% CI;
-    the same for clean episodes; the difference and its CI; the share of members in each quadrant; the label's
-    `hypothesis` text; and a per-type `estimated_reading`: "harmful on M" / "no detectable harm on M (estimated)" /
-    "helpful on M", decided by whether the type-vs-clean CI excludes 0.
+  - `discrepancy_types.parquet`: per (planted type, metric), the member mean harm z and the clean mean; the
+    difference with its **Welch 95% CI** (`scipy.stats.ttest_ind(member, clean, equal_var=False).confidence_interval(0.95)`;
+    round 2, F1; the percentile bootstrap over-calls at 13 vs 869, measured); the Welch p; and `p_holm_metrics` (Holm
+    across the 5 metrics of that type, PoC §4.4 p.10). Also the share of members in each quadrant, the label's
+    `hypothesis` text, and a per-type `estimated_reading`: "harmful on M" / "no detectable harm on M (estimated)" /
+    "helpful on M", decided by whether the Welch CI excludes 0. Each reading's sentence ends with "uncorrected across
+    7 types × 5 metrics (about 1.75 false readings expected under no effect at 5%); holds / does not hold after Holm
+    across this type's 5 metrics".
   - `clean_harmful.parquet`: per metric, the top-20 clean episodes by harm (candidates for "looks clean but hurts").
   - `examples.json`: per type, the most and the least harmful members, with the clean original's `content_hash`, for
     side-by-side video.
@@ -561,7 +653,17 @@ finished before S7.
     planted clean episodes among `clean_harmful` top-20 for f30. All four quadrants are non-empty for at least one metric.
     [PoC §9.2 p.19; §4.5 p.11]
   - [ ] AC9.2 Wording guard: the string "harmless" never appears in any output. A non-excluding CI is always written as
-    "no detectable harm on <metric> (estimated; CI [lo, hi])". [orchestrator: non-significance is not proof of no harm]
+    "no detectable harm on <metric> (estimated; Welch 95% CI [lo, hi])". Every reading sentence carries the
+    "uncorrected across 7 types × 5 metrics" clause and the Holm-across-metrics clause, in the table and verbatim on the
+    page. [orchestrator: non-significance is not proof of no harm; analysis-r1 F1; PoC §4.4 p.10]
+  - [ ] AC9.7 (round 2) Calibration:
+    - The reading's difference CI equals `scipy.stats.ttest_ind(..., equal_var=False).confidence_interval(0.95)` to
+      1e-12 (no hand-rolled Welch).
+    - Re-running the stored null calibration (`artifacts/probes/calib.py` setup: 20 seeds × 7 types × 5 metrics, no
+      planted effect) gives a reading false-call rate ≤ 0.06. The stored figure is 0.0586, measured.
+    - The rate is written back to `s9_null_calibration_SYNTHETIC.json` with the Holm-across-metrics rate alongside.
+
+    [analysis-r1 planner item 1]
   - [ ] AC9.3 "Corruption is visibly bad" evidence is attached per type: the ground-truth feature's best-heuristic
     AUROC (read from the recorded `score` runs of the ground-truth feature in the lineage store, not re-typed), and
     `examples.json` pairs each example with its clean original. [brief caveat (1): "corruption too mild"]
@@ -607,7 +709,11 @@ finished before S7.
     control (at least one arm in this Round B, a type, cleanharm or oracle arm, confirmed on some metric). Wording:
     "No detectable harm on <metric>: removing the 13 <type> episodes did not improve it relative to removing 13 clean
     episodes in any of 3 seeds; the 95% CI on the difference spanned [lo, hi] (union over seeds), so a benefit from
-    removal larger than <hi> on this metric is not supported by this experiment. This is not proof of no harm."
+    removal larger than <hi> on this metric is not supported by this experiment. This is not proof of no harm. The
+    positive control removed 91 episodes, so it does not show the test can detect effects of 13. The 3 seeds share
+    one clean random draw, so they are not independent replicates of the control." (round 2: positive-control and F16
+    wording). The runbook's cost table offers `--random-draws 2` (+3 trainings, +33 jobs, measured) for independent
+    control draws.
   - **inconclusive**: everything else, and **all** arms when no arm in the round shows any confirmed effect ("no arm
     showed an effect; with 13 episodes (1.4% of the data) per arm the test may lack power").
   - "Clean but harmful" is claimed only for `cleanharm-<m>` arms confirmed harmful in this sense.
@@ -690,7 +796,7 @@ passing, `data/lineage/mlflow.db` sha256 unchanged, and a local commit. The anal
   3. **Confirmation rule** (S4): ≥ 2 of 3 seeds meeting the expectation with a fired gate and none contradicting.
      Inferred, stated before results, recorded as a param.
   4. **Slice-finder defaults** (S2): 5 quantile bins, `max_l=2`, `k=5`, `alpha=0.95`, `min_sup=max(10, 2%)`. Inferred,
-     declared params.
+     declared params. Round A on v3 uses `--min-sup-fraction 0.01` (round 2, F2 option a).
   5. **The clusters, score-clusters and discrepancy jobs join the Round A chain** (CPU only, after the ensemble). The
      owner's Q1 answer fixed 113 jobs / 24 trainings as the measured pre-build count. These additions change only the
      CPU job count. S8 prints the new counts.
