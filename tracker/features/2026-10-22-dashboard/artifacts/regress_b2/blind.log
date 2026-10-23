@@ -1,0 +1,76 @@
+=== blind: .venv/bin/python scripts/verify_training_attribution.py --blind
+objc[28604]: Class AVFFrameReceiver is implemented in both /Users/davit_khachaturyan/Projects/personal/vlaExp/.venv/lib/python3.14/site-packages/av/.dylibs/libavdevice.61.3.100.dylib (0x12db343a8) and /opt/homebrew/Cellar/ffmpeg/8.1.1/lib/libavdevice.62.3.101.dylib (0x13d5c8328). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+objc[28604]: Class AVFAudioReceiver is implemented in both /Users/davit_khachaturyan/Projects/personal/vlaExp/.venv/lib/python3.14/site-packages/av/.dylibs/libavdevice.61.3.100.dylib (0x12db343f8) and /opt/homebrew/Cellar/ffmpeg/8.1.1/lib/libavdevice.62.3.101.dylib (0x13d5c8378). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+Map:   0%|          | 0/98 [00:00<?, ? examples/s]Map: 100%|██████████| 98/98 [00:00<00:00, 2903.47 examples/s]
+Map:   0%|          | 0/152 [00:00<?, ? examples/s]Map: 100%|██████████| 152/152 [00:00<00:00, 3045.67 examples/s]
+Map:   0%|          | 0/103 [00:00<?, ? examples/s]Map: 100%|██████████| 103/103 [00:00<00:00, 2996.37 examples/s]
+Map:   0%|          | 0/99 [00:00<?, ? examples/s]Map: 100%|██████████| 99/99 [00:00<00:00, 2834.24 examples/s]
+Map:   0%|          | 0/153 [00:00<?, ? examples/s]Map: 100%|██████████| 153/153 [00:00<00:00, 2648.67 examples/s]
+Map:   0%|          | 0/137 [00:00<?, ? examples/s]Map: 100%|██████████| 137/137 [00:00<00:00, 2262.44 examples/s]
+Map:   0%|          | 0/123 [00:00<?, ? examples/s]Map: 100%|██████████| 123/123 [00:00<00:00, 2318.88 examples/s]
+Map:   0%|          | 0/155 [00:00<?, ? examples/s]Map: 100%|██████████| 155/155 [00:00<00:00, 1834.01 examples/s]
+Map:   0%|          | 0/115 [00:00<?, ? examples/s]Map: 100%|██████████| 115/115 [00:00<00:00, 1623.82 examples/s]
+Map:   0%|          | 0/136 [00:00<?, ? examples/s]Map: 100%|██████████| 136/136 [00:00<00:00, 1616.00 examples/s]
+Map:   0%|          | 0/388 [00:00<?, ? examples/s]Map:  48%|████▊     | 187/388 [00:00<00:00, 1850.51 examples/s]Map: 100%|██████████| 388/388 [00:00<00:00, 1728.21 examples/s]Map: 100%|██████████| 388/388 [00:00<00:00, 1736.83 examples/s]
+Map:   0%|          | 0/258 [00:00<?, ? examples/s]Map:  88%|████████▊ | 228/258 [00:00<00:00, 2261.23 examples/s]Map: 100%|██████████| 258/258 [00:00<00:00, 2151.52 examples/s]
+Map:   0%|          | 0/272 [00:00<?, ? examples/s]Map:  83%|████████▎ | 225/272 [00:00<00:00, 2234.63 examples/s]Map: 100%|██████████| 272/272 [00:00<00:00, 2147.13 examples/s]
+Map:   0%|          | 0/261 [00:00<?, ? examples/s]Map:  97%|█████████▋| 253/261 [00:00<00:00, 2511.92 examples/s]Map: 100%|██████████| 261/261 [00:00<00:00, 2379.83 examples/s]
+Map:   0%|          | 0/275 [00:00<?, ? examples/s]Map:  96%|█████████▌| 263/275 [00:00<00:00, 2614.75 examples/s]Map: 100%|██████████| 275/275 [00:00<00:00, 2516.66 examples/s]
+Map:   0%|          | 0/234 [00:00<?, ? examples/s]Map: 100%|██████████| 234/234 [00:00<00:00, 2383.17 examples/s]
+Map:   0%|          | 0/203 [00:00<?, ? examples/s]Map: 100%|██████████| 203/203 [00:00<00:00, 2752.85 examples/s]
+Map:   0%|          | 0/242 [00:00<?, ? examples/s]Map: 100%|█████████▉| 241/242 [00:00<00:00, 2390.14 examples/s]Map: 100%|██████████| 242/242 [00:00<00:00, 2270.92 examples/s]
+Map:   0%|          | 0/457 [00:00<?, ? examples/s]Map:  55%|█████▌    | 253/457 [00:00<00:00, 2512.47 examples/s]Map: 100%|██████████| 457/457 [00:00<00:00, 2386.21 examples/s]
+Map:   0%|          | 0/329 [00:00<?, ? examples/s]Map:  75%|███████▍  | 246/329 [00:00<00:00, 2445.82 examples/s]Map: 100%|██████████| 329/329 [00:00<00:00, 2367.20 examples/s]
+[convert] 20/20 episodes, 4190 frames, 14s elapsed, 308 frames/s
+scratch parent small20: 20 episodes; stored content hash == v0's for the same episode_id: 20/20
+Map:   0%|          | 0/98 [00:00<?, ? examples/s]Map: 100%|██████████| 98/98 [00:00<00:00, 1795.40 examples/s]
+Map:   0%|          | 0/152 [00:00<?, ? examples/s]Map: 100%|██████████| 152/152 [00:00<00:00, 2136.78 examples/s]
+Map:   0%|          | 0/103 [00:00<?, ? examples/s]Map: 100%|██████████| 103/103 [00:00<00:00, 2304.70 examples/s]
+Map:   0%|          | 0/59 [00:00<?, ? examples/s]Map: 100%|██████████| 59/59 [00:00<00:00, 2229.93 examples/s]
+Map:   0%|          | 0/153 [00:00<?, ? examples/s]Map: 100%|██████████| 153/153 [00:00<00:00, 2593.13 examples/s]
+Map:   0%|          | 0/137 [00:00<?, ? examples/s]Map: 100%|██████████| 137/137 [00:00<00:00, 2624.83 examples/s]
+Map:   0%|          | 0/123 [00:00<?, ? examples/s]Map: 100%|██████████| 123/123 [00:00<00:00, 2728.92 examples/s]
+Map:   0%|          | 0/155 [00:00<?, ? examples/s]Map: 100%|██████████| 155/155 [00:00<00:00, 2151.32 examples/s]
+Map:   0%|          | 0/115 [00:00<?, ? examples/s]Map: 100%|██████████| 115/115 [00:00<00:00, 1986.98 examples/s]
+Map:   0%|          | 0/176 [00:00<?, ? examples/s]Map: 100%|██████████| 176/176 [00:00<00:00, 2615.58 examples/s]
+Map:   0%|          | 0/388 [00:00<?, ? examples/s]Map:  91%|█████████ | 354/388 [00:00<00:00, 3521.48 examples/s]Map: 100%|██████████| 388/388 [00:00<00:00, 3348.23 examples/s]
+Map:   0%|          | 0/298 [00:00<?, ? examples/s]Map: 100%|██████████| 298/298 [00:00<00:00, 3274.72 examples/s]
+Map:   0%|          | 0/272 [00:00<?, ? examples/s]Map: 100%|██████████| 272/272 [00:00<00:00, 3354.55 examples/s]
+Map:   0%|          | 0/261 [00:00<?, ? examples/s]Map: 100%|██████████| 261/261 [00:00<00:00, 3422.16 examples/s]
+Map:   0%|          | 0/275 [00:00<?, ? examples/s]Map: 100%|██████████| 275/275 [00:00<00:00, 3255.44 examples/s]
+Map:   0%|          | 0/234 [00:00<?, ? examples/s]Map: 100%|██████████| 234/234 [00:00<00:00, 3178.53 examples/s]
+Map:   0%|          | 0/203 [00:00<?, ? examples/s]Map: 100%|██████████| 203/203 [00:00<00:00, 3152.37 examples/s]
+Map:   0%|          | 0/242 [00:00<?, ? examples/s]Map: 100%|██████████| 242/242 [00:00<00:00, 2974.15 examples/s]
+Map:   0%|          | 0/457 [00:00<?, ? examples/s]Map:  79%|███████▉  | 361/457 [00:00<00:00, 3588.46 examples/s]Map: 100%|██████████| 457/457 [00:00<00:00, 3448.51 examples/s]
+Map:   0%|          | 0/329 [00:00<?, ? examples/s]Map:  86%|████████▌ | 282/329 [00:00<00:00, 2807.17 examples/s]Map: 100%|██████████| 329/329 [00:00<00:00, 2741.24 examples/s]
+2026/10/22 23:49:47 INFO mlflow.store.db.utils: Creating initial MLflow database tables...
+2026/10/22 23:49:47 INFO mlflow.store.db.utils: Updating database tables
+AC1.3 stage commands call method_view / attribute_run uses open_for_method: {'cmd_train': True, 'cmd_features': True, 'cmd_select': True, 'attribute_run uses open_for_method, not assert_blind': True}
+AC1.5 boundary scan over ['method_data.py', '__init__.py', 'heuristics.py', 'influence.py', 'attribution.py']: violations []
+              entry_point                              input                        result  names_reason  runs_before  runs_after  as_expected
+                attribute                          fenced v1          REFUSED LineageError          True           79          79         True
+   features --which train                          fenced v1          REFUSED LineageError          True           79          79         True
+                    train                          fenced v1          REFUSED LineageError          True           79          79         True
+          select (parent)                          fenced v1          REFUSED LineageError          True           79          79         True
+                attribute             fenced v2 (superseded)          REFUSED LineageError          True           79          79         True
+   features --which train             fenced v2 (superseded)          REFUSED LineageError          True           79          79         True
+                    train             fenced v2 (superseded)          REFUSED LineageError          True           79          79         True
+          select (parent)             fenced v2 (superseded)          REFUSED LineageError          True           79          79         True
+                attribute ground-truth-derived (oracle_drop)          REFUSED LineageError          True           79          79         True
+   features --which train ground-truth-derived (oracle_drop)          REFUSED LineageError          True           79          79         True
+                    train ground-truth-derived (oracle_drop)          REFUSED LineageError          True           79          79         True
+          select (parent) ground-truth-derived (oracle_drop)          REFUSED LineageError          True           79          79         True
+                attribute          descendant of oracle_drop          REFUSED LineageError          True           79          79         True
+   features --which train          descendant of oracle_drop          REFUSED LineageError          True           79          79         True
+                    train          descendant of oracle_drop          REFUSED LineageError          True           79          79         True
+          select (parent)          descendant of oracle_drop          REFUSED LineageError          True           79          79         True
+open_for_method (control)               v3/candidate (blind)                        OPENED          True            0           0         True
+                attribute  tampered version (1 byte flipped) REFUSED VersionIntegrityError          True            1           1         True
+   features --which train  tampered version (1 byte flipped) REFUSED VersionIntegrityError          True            1           1         True
+                    train  tampered version (1 byte flipped) REFUSED VersionIntegrityError          True            1           1         True
+          select (parent)  tampered version (1 byte flipped) REFUSED VersionIntegrityError          True            1           1         True
+open_for_method (control)  same small version, byte restored                        OPENED          True            0           0         True
+real mlflow.db sha256 before 306af4123fda7e63... after 306af4123fda7e63... unchanged: True
+S1 pass: True (47s)
+  78.38s user 15.54s system 193% cpu 48.508 total
+rc=0

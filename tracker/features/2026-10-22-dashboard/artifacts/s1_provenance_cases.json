@@ -13,7 +13,7 @@
    "expected": "SYNTHETIC",
    "label": "SYNTHETIC",
    "reasons": [
-    "synthetic: fake-attribute-p1 (attribute, 3205ed1f): tag vlapoc.synthetic=true"
+    "synthetic: fake-attribute-p1 (attribute, 1bbba27b): tag vlapoc.synthetic=true"
    ],
    "ok": true
   },
@@ -22,7 +22,7 @@
    "expected": "SMOKE",
    "label": "SMOKE",
    "reasons": [
-    "smoke: fake-train-p2 (train, a11874d5): tag vlapoc.smoke is 'true', not 'false'"
+    "smoke: fake-train-p2 (train, 6f7a2671): tag vlapoc.smoke is 'true', not 'false'"
    ],
    "ok": true
   },
@@ -31,7 +31,7 @@
    "expected": "SMOKE",
    "label": "SMOKE",
    "reasons": [
-    "smoke: fake-eval-p3 (eval, 2ec1387a): tag eval.attribution_grade is 'false', not 'true'"
+    "smoke: fake-eval-p3 (eval, 2a6f2314): tag eval.attribution_grade is 'false', not 'true'"
    ],
    "ok": true
   },
@@ -40,7 +40,7 @@
    "expected": "SMOKE",
    "label": "SMOKE",
    "reasons": [
-    "smoke: fake-train-p4 (train, c5e6a914): tag vlapoc.smoke is None, not 'false'"
+    "smoke: fake-train-p4 (train, 394995ac): tag vlapoc.smoke is None, not 'false'"
    ],
    "ok": true
   },
@@ -49,7 +49,7 @@
    "expected": "SMOKE",
    "label": "SMOKE",
    "reasons": [
-    "smoke: fake-attribute-p5 (attribute, 5946bcdd): tag vlapoc.stand_in=true (a stand-in, not the real stage)"
+    "smoke: fake-attribute-p5 (attribute, 2ba56bc1): tag vlapoc.stand_in=true (a stand-in, not the real stage)"
    ],
    "ok": true
   },
@@ -58,7 +58,7 @@
    "expected": "SYNTHETIC",
    "label": "SYNTHETIC",
    "reasons": [
-    "synthetic: fake-attribute-p6 (attribute, c04cfdfe): param synthetic=True"
+    "synthetic: fake-attribute-p6 (attribute, ffe2a75c): param synthetic=True"
    ],
    "ok": true
   }

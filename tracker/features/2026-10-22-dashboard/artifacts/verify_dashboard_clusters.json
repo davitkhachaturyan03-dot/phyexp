@@ -3,7 +3,7 @@
  "pass": true,
  "n_pass": 12,
  "n": 12,
- "seconds": 12,
+ "seconds": 13,
  "checks": [
   {
    "name": "2.1a planted slice (SYNTHETIC) is among the top-3 harm slices for harm_hrt60_lin",
@@ -38,7 +38,7 @@
   {
    "name": "2.4b results.provenance of the cluster run is SYNTHETIC (tag from the producing attribute run)",
    "pass": true,
-   "detail": "['synthetic: clusters-dash-synth (cluster, 8f783715): tag vlapoc.synthetic=true']"
+   "detail": "['synthetic: clusters-dash-synth (cluster, c1e852f4): tag vlapoc.synthetic=true']"
   },
   {
    "name": "2.5a clusters.py imports nothing from groundtruth / recovery / discrepancy, and reads the subset only via open_for_method (no Subset.episodes, no labels)",

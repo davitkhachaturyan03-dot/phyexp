@@ -1,0 +1,75 @@
+=== method_boundary_s3: .venv/bin/python scripts/verify_method_boundary_s3.py
+AC3.1 (r3) v2/candidate refusal says superseded: True: version v2 (eaeed043455a) is fenced: superseded by v3 (002a68e4caf2); use the superseding version (ground-truth feature 
+objc[30255]: Class AVFFrameReceiver is implemented in both /Users/davit_khachaturyan/Projects/personal/vlaExp/.venv/lib/python3.14/site-packages/av/.dylibs/libavdevice.61.3.100.dylib (0x125e843a8) and /opt/homebrew/Cellar/ffmpeg/8.1.1/lib/libavdevice.62.3.101.dylib (0x1388dc328). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+objc[30255]: Class AVFAudioReceiver is implemented in both /Users/davit_khachaturyan/Projects/personal/vlaExp/.venv/lib/python3.14/site-packages/av/.dylibs/libavdevice.61.3.100.dylib (0x125e843f8) and /opt/homebrew/Cellar/ffmpeg/8.1.1/lib/libavdevice.62.3.101.dylib (0x1388dc378). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+AC3.1 v0/candidate view: 960 episodes, 40 reference ids, catalog columns == CATALOG_COLUMNS: True, root data/lerobot/libero_spatial_10
+AC3.1 iter_episodes first: demo_0 action (98, 7) image (98, 128, 128, 3)
+AC3.1 v1/candidate refusal names the fence: True
+Map:   0%|          | 0/98 [00:00<?, ? examples/s]Map: 100%|██████████| 98/98 [00:00<00:00, 2908.53 examples/s]
+Map:   0%|          | 0/152 [00:00<?, ? examples/s]Map: 100%|██████████| 152/152 [00:00<00:00, 2851.19 examples/s]
+Map:   0%|          | 0/103 [00:00<?, ? examples/s]Map: 100%|██████████| 103/103 [00:00<00:00, 3026.49 examples/s]
+Map:   0%|          | 0/99 [00:00<?, ? examples/s]Map: 100%|██████████| 99/99 [00:00<00:00, 3078.08 examples/s]
+Map:   0%|          | 0/153 [00:00<?, ? examples/s]Map: 100%|██████████| 153/153 [00:00<00:00, 3012.39 examples/s]
+Map:   0%|          | 0/137 [00:00<?, ? examples/s]Map: 100%|██████████| 137/137 [00:00<00:00, 3336.64 examples/s]
+Map:   0%|          | 0/123 [00:00<?, ? examples/s]Map: 100%|██████████| 123/123 [00:00<00:00, 2821.94 examples/s]
+Map:   0%|          | 0/155 [00:00<?, ? examples/s]Map: 100%|██████████| 155/155 [00:00<00:00, 3054.54 examples/s]
+Map:   0%|          | 0/115 [00:00<?, ? examples/s]Map: 100%|██████████| 115/115 [00:00<00:00, 1981.33 examples/s]
+Map:   0%|          | 0/136 [00:00<?, ? examples/s]Map: 100%|██████████| 136/136 [00:00<00:00, 3077.91 examples/s]
+Map:   0%|          | 0/388 [00:00<?, ? examples/s]Map:  89%|████████▉ | 346/388 [00:00<00:00, 3441.25 examples/s]Map: 100%|██████████| 388/388 [00:00<00:00, 3274.98 examples/s]
+Map:   0%|          | 0/258 [00:00<?, ? examples/s]Map: 100%|██████████| 258/258 [00:00<00:00, 3232.23 examples/s]
+Map:   0%|          | 0/272 [00:00<?, ? examples/s]Map: 100%|██████████| 272/272 [00:00<00:00, 3159.04 examples/s]
+Map:   0%|          | 0/261 [00:00<?, ? examples/s]Map: 100%|██████████| 261/261 [00:00<00:00, 2974.80 examples/s]
+Map:   0%|          | 0/275 [00:00<?, ? examples/s]Map: 100%|██████████| 275/275 [00:00<00:00, 3043.48 examples/s]
+Map:   0%|          | 0/234 [00:00<?, ? examples/s]Map: 100%|██████████| 234/234 [00:00<00:00, 2968.07 examples/s]
+Map:   0%|          | 0/203 [00:00<?, ? examples/s]Map: 100%|██████████| 203/203 [00:00<00:00, 3228.99 examples/s]
+Map:   0%|          | 0/242 [00:00<?, ? examples/s]Map: 100%|██████████| 242/242 [00:00<00:00, 2918.05 examples/s]
+Map:   0%|          | 0/457 [00:00<?, ? examples/s]Map:  70%|███████   | 320/457 [00:00<00:00, 3165.56 examples/s]Map: 100%|██████████| 457/457 [00:00<00:00, 3061.05 examples/s]
+Map:   0%|          | 0/329 [00:00<?, ? examples/s]Map:  98%|█████████▊| 324/329 [00:00<00:00, 3225.58 examples/s]Map: 100%|██████████| 329/329 [00:00<00:00, 3038.03 examples/s]
+[convert] 20/20 episodes, 4190 frames, 10s elapsed, 417 frames/s
+scratch parent small20: 20 episodes; stored content hash == v0's for the same episode_id: 20/20
+Map:   0%|          | 0/98 [00:00<?, ? examples/s]Map: 100%|██████████| 98/98 [00:00<00:00, 2745.39 examples/s]
+Map:   0%|          | 0/152 [00:00<?, ? examples/s]Map: 100%|██████████| 152/152 [00:00<00:00, 3008.40 examples/s]
+Map:   0%|          | 0/103 [00:00<?, ? examples/s]Map: 100%|██████████| 103/103 [00:00<00:00, 2501.39 examples/s]
+Map:   0%|          | 0/59 [00:00<?, ? examples/s]Map: 100%|██████████| 59/59 [00:00<00:00, 2460.27 examples/s]
+Map:   0%|          | 0/153 [00:00<?, ? examples/s]Map: 100%|██████████| 153/153 [00:00<00:00, 1621.00 examples/s]
+Map:   0%|          | 0/137 [00:00<?, ? examples/s]Map: 100%|██████████| 137/137 [00:00<00:00, 3013.56 examples/s]
+Map:   0%|          | 0/123 [00:00<?, ? examples/s]Map: 100%|██████████| 123/123 [00:00<00:00, 3008.83 examples/s]
+Map:   0%|          | 0/155 [00:00<?, ? examples/s]Map: 100%|██████████| 155/155 [00:00<00:00, 3197.99 examples/s]
+Map:   0%|          | 0/115 [00:00<?, ? examples/s]Map: 100%|██████████| 115/115 [00:00<00:00, 3035.26 examples/s]
+Map:   0%|          | 0/176 [00:00<?, ? examples/s]Map: 100%|██████████| 176/176 [00:00<00:00, 3144.53 examples/s]
+Map:   0%|          | 0/388 [00:00<?, ? examples/s]Map:  87%|████████▋ | 336/388 [00:00<00:00, 3346.55 examples/s]Map: 100%|██████████| 388/388 [00:00<00:00, 3175.41 examples/s]
+Map:   0%|          | 0/298 [00:00<?, ? examples/s]Map: 100%|██████████| 298/298 [00:00<00:00, 3161.03 examples/s]
+Map:   0%|          | 0/272 [00:00<?, ? examples/s]Map: 100%|██████████| 272/272 [00:00<00:00, 3155.41 examples/s]
+Map:   0%|          | 0/261 [00:00<?, ? examples/s]Map: 100%|██████████| 261/261 [00:00<00:00, 3175.92 examples/s]
+Map:   0%|          | 0/275 [00:00<?, ? examples/s]Map: 100%|██████████| 275/275 [00:00<00:00, 3069.64 examples/s]
+Map:   0%|          | 0/234 [00:00<?, ? examples/s]Map: 100%|██████████| 234/234 [00:00<00:00, 2805.15 examples/s]
+Map:   0%|          | 0/203 [00:00<?, ? examples/s]Map: 100%|██████████| 203/203 [00:00<00:00, 2970.36 examples/s]
+Map:   0%|          | 0/242 [00:00<?, ? examples/s]Map: 100%|██████████| 242/242 [00:00<00:00, 2889.03 examples/s]
+Map:   0%|          | 0/457 [00:00<?, ? examples/s]Map:  73%|███████▎  | 335/457 [00:00<00:00, 3326.94 examples/s]Map: 100%|██████████| 457/457 [00:00<00:00, 3161.78 examples/s]
+Map:   0%|          | 0/329 [00:00<?, ? examples/s]Map: 100%|██████████| 329/329 [00:00<00:00, 3189.28 examples/s]Map: 100%|██████████| 329/329 [00:00<00:00, 3169.16 examples/s]
+AC3.3 real store: v0/candidate then v1/candidate refused: True
+
+AC3.5 catalog columns documented in the module docstring: True; view columns == CATALOG_COLUMNS and within the compared tables: True; check_blind(scratch child) = []
+
+AC3.4 scanned ['vlapoc/method_data.py', 'vlapoc/methods/__init__.py', 'vlapoc/methods/heuristics.py', 'vlapoc/influence.py', 'vlapoc/attribution.py']: violations []
+AC3.4 planted violations detected: {'import groundtruth': True, 'import module': True, 'load_labels': True, 'parent_hashes attr': True, 'labels path': True, 'fence path': True}
+
+refusal table (can a method open it?)
+                                                             case                        result                                                                                                                                                 reason  as_expected
+                                v1/candidate (fenced, real store)          REFUSED LineageError                                    version v1 (16076b9c5cb2) is not blind to its edits: fenced=True, offending=['episode_index'] (PoC §2.1 item 4 p.3)         True
+                      v2/candidate (superseded by v3, real store)          REFUSED LineageError                            version v2 (eaeed043455a) is fenced: superseded by v3 (002a68e4caf2); use the superseding version (ground-truth feature r3)         True
+                                        v0/candidate (real store)                        opened                                                                                                                                           960 episodes         True
+                      S2 scratch derived version (7 edits, blind)                        opened                                                                                                                                            20 episodes         True
+                 scratch child with 1 byte of a data file changed REFUSED VersionIntegrityError dataset copy at /Users/davit_khachaturyan/Projects/personal/vlaExp/data/scratch/gt_s3/lerobot/small20_gt does not match version small20_gt (dbb9f38a47         True
+        oracle subset (op oracle_drop, labelled episodes removed)          REFUSED LineageError subset 'small20_gt/oracle' is ground-truth-derived (op 'oracle_drop'); a method under test must not be given a subset built from the labels (owner dec         True
+random-k subset of the oracle subset (chain contains oracle_drop)          REFUSED LineageError subset 'small20_gt/oracle_then_random' is ground-truth-derived (op 'oracle_drop'); a method under test must not be given a subset built from the label         True
+                                               (open) child, then                        opened                                                                                                                                            20 episodes         True
+                               ... its PARENT in the same process          REFUSED LineageError refusing to open a second version of one lineage in this process: 'small20_gt/all' (dbb9f38a473f) was opened and bafb211603dd is its ancestor or desce         True
+                                              (open) parent, then                        opened                                                                                                                                            20 episodes         True
+                                ... its CHILD in the same process          REFUSED LineageError refusing to open a second version of one lineage in this process: 'small20/all' (bafb211603dd) was opened and dbb9f38a473f is its ancestor or descenda         True
+                          (open) child, then the same child again                        opened                                                                                                                                            20 episodes         True
+                        ... same version, another subset (reopen)                        opened                                                                                                                                            20 episodes         True
+
+all S3 checks pass: True (40s)
+  73.13s user 15.09s system 214% cpu 41.066 total
+rc=0

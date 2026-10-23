@@ -1,0 +1,23 @@
+=== results: .venv/bin/python scripts/verify_dashboard.py --results
+[PASS] 1.1a attribute_run records outputs influence_matrix and influence_index  recorded outputs: ['agreement', 'attribution_scores', 'functionals', 'influence_index', 'influence_matrix']
+[PASS] 1.1b results.influence matrix shape == (attribute.n_rollouts, attribute.n_episodes); index column order == score table episode_id order  matrix (12, 14), tags (12, 14), index 12 rollouts x 14 episodes
+[PASS] 1.1c results.rollouts joins eval record and returns, with matrix_row == position in index['rollout_id']  12 rollouts, failure types ['success', 'timeout']
+[PASS] 1.1d results.functionals declares every score column (PoC §3.4)  28 declared columns
+[PASS] 1.2a a tampered matrix artifact is refused (ValueError naming the sha256)  run 738b9797e8e246fab4310e831f4b3b23: artifact rollout_episode_influence.npy differs from its recorded sha256 (output.influence_matrix.sha25
+[PASS] 1.2b the real store's stand-in attribute run: 'not recorded (run predates dashboard S1)'  attribute-train-full-s0 [stand-in]: influence matrix not recorded (run babbdb329ed6 'attribute-train-full-s0 [stand-in]' predates dashboard S1; re-run the attribute stage to record it)
+      all real (server-written tags): REAL  []
+      one vlapoc.synthetic=true: SYNTHETIC  ['synthetic: fake-attribute-p1 (attribute, 1bbba27b): tag vlapoc.synthetic=true']
+      one vlapoc.smoke=true (train run): SMOKE  ["smoke: fake-train-p2 (train, 6f7a2671): tag vlapoc.smoke is 'true', not 'false'"]
+      one eval.attribution_grade=false: SMOKE  ["smoke: fake-eval-p3 (eval, 2a6f2314): tag eval.attribution_grade is 'false', not 'true'"]
+      one missing tag (train run has no vlapoc.smoke): SMOKE  ["smoke: fake-train-p4 (train, 394995ac): tag vlapoc.smoke is None, not 'false'"]
+      one stand-in (attribute run): SMOKE  ['smoke: fake-attribute-p5 (attribute, 2ba56bc1): tag vlapoc.stand_in=true (a stand-in, not the real stage)']
+      extra: synthetic param True: SYNTHETIC  ['synthetic: fake-attribute-p6 (attribute, ffe2a75c): param synthetic=True']
+[PASS] 1.3 provenance unit check: 7/7 cases (6 required + 1 extra), each non-REAL case names its reason
+[PASS] 1.3b a fixture attribute run (train/eval without server tags) is not REAL  SMOKE: ["smoke: train-dash-s0 (train, 18d7ca98): tag vlapoc.smoke is None, not 'false'", "smoke: eval-dash-s0 (eval, a9580754): tag eval.attribution_grade is None, not 'true'"]
+[PASS] 1.3c seed_runs of a seed run is itself
+[PASS] 1.4 results.py imports nothing from vlapoc.groundtruth / recovery / discrepancy  forbidden imports: []
+[PASS] 1.6 grounding docstrings cite §2.7 p. 5, §3.4 p. 7, §2.1 items 1 and 4 p. 3
+[PASS] R real data/lineage/mlflow.db sha256 unchanged by this mode  306af4123fda7e63...
+results: pass=True (12/12, 7s)
+  9.36s user 3.32s system 150% cpu 8.456 total
+rc=0

@@ -1,31 +1,31 @@
 cluster_id,definition,arm,comparison,control,metric,expected,status,n_seeds,met,contradicted,gate_fired,calls_by_seed,seeds,synthetic,cluster_run_id
-cA,hand-built cA,cA,vs_matched_random,crandom,f30,-,no expectation,3,0,0,3,"T,T,0","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cA,hand-built cA,cA,vs_matched_random,crandom,auc_h,-,no expectation,3,0,0,3,"T,T,0","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cA,hand-built cA,cA,vs_matched_random,crandom,rmst60,-,no expectation,3,0,0,3,"T,T,0","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cA,hand-built cA,cA,vs_matched_random,crandom,hrt60,treated_better,confirmed,3,2,0,3,"T,T,0","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cA,hand-built cA,cA,vs_matched_random,crandom,censored60,-,no expectation,3,0,0,3,"T,T,0","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cA,hand-built cA,cA,vs_base,base,f30,-,no expectation,3,0,0,3,"T,T,T","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cA,hand-built cA,cA,vs_base,base,auc_h,-,no expectation,3,0,0,3,"T,T,T","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cA,hand-built cA,cA,vs_base,base,rmst60,-,no expectation,3,0,0,3,"T,T,T","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cA,hand-built cA,cA,vs_base,base,hrt60,treated_better,confirmed,3,3,0,3,"T,T,T","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cA,hand-built cA,cA,vs_base,base,censored60,-,no expectation,3,0,0,3,"T,T,T","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cB,hand-built cB,cB,vs_base,base,f30,-,no expectation,3,0,0,3,"T,0,0","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cB,hand-built cB,cB,vs_base,base,auc_h,-,no expectation,3,0,0,3,"T,0,0","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cB,hand-built cB,cB,vs_base,base,rmst60,-,no expectation,3,0,0,3,"T,0,0","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cB,hand-built cB,cB,vs_base,base,hrt60,treated_better,not confirmed,3,1,0,3,"T,0,0","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cB,hand-built cB,cB,vs_base,base,censored60,-,no expectation,3,0,0,3,"T,0,0","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cC,hand-built cC,cC,vs_base,base,f30,-,no expectation,3,0,0,1,"g,g,T","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cC,hand-built cC,cC,vs_base,base,auc_h,-,no expectation,3,0,0,1,"g,g,T","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cC,hand-built cC,cC,vs_base,base,rmst60,-,no expectation,3,0,0,1,"g,g,T","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cC,hand-built cC,cC,vs_base,base,hrt60,treated_better,not confirmed,3,1,0,1,"g,g,T","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cC,hand-built cC,cC,vs_base,base,censored60,-,no expectation,3,0,0,1,"g,g,T","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cD,hand-built cD,cD,vs_base,base,f30,-,no expectation,3,0,0,3,"C,C,0","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cD,hand-built cD,cD,vs_base,base,auc_h,-,no expectation,3,0,0,3,"C,C,0","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cD,hand-built cD,cD,vs_base,base,rmst60,-,no expectation,3,0,0,3,"C,C,0","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cD,hand-built cD,cD,vs_base,base,hrt60,treated_better,refuted,3,0,2,3,"C,C,0","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cD,hand-built cD,cD,vs_base,base,censored60,-,no expectation,3,0,0,3,"C,C,0","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cE,hand-built cE,cE,vs_base,base,f30,treated_worse,confirmed,3,3,0,3,"C,C,C","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cE,hand-built cE,cE,vs_base,base,auc_h,-,no expectation,3,0,0,3,"0,0,0","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cE,hand-built cE,cE,vs_base,base,rmst60,-,no expectation,3,0,0,3,"0,0,0","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cE,hand-built cE,cE,vs_base,base,hrt60,treated_better,confirmed,3,3,0,3,"T,T,T","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
-cE,hand-built cE,cE,vs_base,base,censored60,-,no expectation,3,0,0,3,"0,0,0","0,1,2",True,540597285f1b455a84f65d9b6fe7d11d
+cA,hand-built cA,cA,vs_matched_random,crandom,f30,-,no expectation,3,0,0,3,"T,T,0","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cA,hand-built cA,cA,vs_matched_random,crandom,auc_h,-,no expectation,3,0,0,3,"T,T,0","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cA,hand-built cA,cA,vs_matched_random,crandom,rmst60,-,no expectation,3,0,0,3,"T,T,0","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cA,hand-built cA,cA,vs_matched_random,crandom,hrt60,treated_better,confirmed,3,2,0,3,"T,T,0","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cA,hand-built cA,cA,vs_matched_random,crandom,censored60,-,no expectation,3,0,0,3,"T,T,0","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cA,hand-built cA,cA,vs_base,base,f30,-,no expectation,3,0,0,3,"T,T,T","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cA,hand-built cA,cA,vs_base,base,auc_h,-,no expectation,3,0,0,3,"T,T,T","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cA,hand-built cA,cA,vs_base,base,rmst60,-,no expectation,3,0,0,3,"T,T,T","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cA,hand-built cA,cA,vs_base,base,hrt60,treated_better,confirmed,3,3,0,3,"T,T,T","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cA,hand-built cA,cA,vs_base,base,censored60,-,no expectation,3,0,0,3,"T,T,T","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cB,hand-built cB,cB,vs_base,base,f30,-,no expectation,3,0,0,3,"T,0,0","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cB,hand-built cB,cB,vs_base,base,auc_h,-,no expectation,3,0,0,3,"T,0,0","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cB,hand-built cB,cB,vs_base,base,rmst60,-,no expectation,3,0,0,3,"T,0,0","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cB,hand-built cB,cB,vs_base,base,hrt60,treated_better,not confirmed,3,1,0,3,"T,0,0","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cB,hand-built cB,cB,vs_base,base,censored60,-,no expectation,3,0,0,3,"T,0,0","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cC,hand-built cC,cC,vs_base,base,f30,-,no expectation,3,0,0,1,"g,g,T","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cC,hand-built cC,cC,vs_base,base,auc_h,-,no expectation,3,0,0,1,"g,g,T","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cC,hand-built cC,cC,vs_base,base,rmst60,-,no expectation,3,0,0,1,"g,g,T","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cC,hand-built cC,cC,vs_base,base,hrt60,treated_better,not confirmed,3,1,0,1,"g,g,T","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cC,hand-built cC,cC,vs_base,base,censored60,-,no expectation,3,0,0,1,"g,g,T","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cD,hand-built cD,cD,vs_base,base,f30,-,no expectation,3,0,0,3,"C,C,0","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cD,hand-built cD,cD,vs_base,base,auc_h,-,no expectation,3,0,0,3,"C,C,0","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cD,hand-built cD,cD,vs_base,base,rmst60,-,no expectation,3,0,0,3,"C,C,0","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cD,hand-built cD,cD,vs_base,base,hrt60,treated_better,refuted,3,0,2,3,"C,C,0","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cD,hand-built cD,cD,vs_base,base,censored60,-,no expectation,3,0,0,3,"C,C,0","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cE,hand-built cE,cE,vs_base,base,f30,treated_worse,confirmed,3,3,0,3,"C,C,C","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cE,hand-built cE,cE,vs_base,base,auc_h,-,no expectation,3,0,0,3,"0,0,0","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cE,hand-built cE,cE,vs_base,base,rmst60,-,no expectation,3,0,0,3,"0,0,0","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cE,hand-built cE,cE,vs_base,base,hrt60,treated_better,confirmed,3,3,0,3,"T,T,T","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3
+cE,hand-built cE,cE,vs_base,base,censored60,-,no expectation,3,0,0,3,"0,0,0","0,1,2",True,c487c194aea04ca6a3a6071f4c8aabd3

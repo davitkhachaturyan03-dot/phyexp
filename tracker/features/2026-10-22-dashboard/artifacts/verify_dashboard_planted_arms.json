@@ -3,7 +3,7 @@
  "pass": true,
  "n_pass": 8,
  "n": 8,
- "seconds": 8,
+ "seconds": 9,
  "checks": [
   {
    "name": "10.1 --round-b-planted default (owner option a): 11 arms, 33 trainings, 129 jobs (plan arithmetic); --no-oracle 27 trainings, 108 jobs; --random-draws 2: +3 trainings, +33 jobs",
@@ -33,7 +33,7 @@
   {
    "name": "10.3 stage.py train without --groundtruth-arm refuses a planted-arm subset; features, attribute, select --scores, clusters (and select parent, analyze) refuse planted arms and any vlapoc.groundtruth_arm=true run; nothing written; the flag accepts only ground-truth-derived subsets",
    "pass": true,
-   "detail": "train without --groundtruth-arm on a planted-arm subset: REFUSED (LineageError: subset 'df6f6abd55a4a9c6f463ebd138a2e02955ee201c3f4696e4db32374d2b9bd8a1' is ground-truth-); features on a ground-truth arm's train run: REFUSED (LineageError: features: run 9487600c35a8 (fake-train-gtarm) is a ground-truth arm (tag vlapoc.groundtrut); attribute on a ground-truth arm's train run: REFUSED (LineageError: attribute: run 9487600c35a8 (fake-train-gtarm) is a ground-truth arm (tag vlapoc.groundtru); select with a planted-arm subset as parent: REFUSED (LineageError: subset 'df6f6abd55a4a9c6f463ebd138a2e02955ee201c3f4696e4db32374d2b9bd8a1' is ground-truth-); select --scores from a ground-truth arm's run: REFUSED (LineageError: select --scores: run 76be414e6e89 (attribute-fake-gtarm) is a ground-truth arm (tag vlapoc); clusters on a ground-truth arm's run: REFUSED (LineageError: clusters: run 76be414e6e89 (attribute-fake-gtarm) is a ground-truth arm (tag vlapoc.ground); analyze on a ground-truth arm's run (extra): REFUSED (LineageError: analyze: run 76be414e6e89 (attribute-fake-gtarm) is a ground-truth arm (tag vlapoc.groundt); is_groundtruth_subset(planted arm, v3/candidate) = (True, False)"
+   "detail": "train without --groundtruth-arm on a planted-arm subset: REFUSED (LineageError: subset 'df6f6abd55a4a9c6f463ebd138a2e02955ee201c3f4696e4db32374d2b9bd8a1' is ground-truth-); features on a ground-truth arm's train run: REFUSED (LineageError: features: run 9d8ba4b94fb7 (fake-train-gtarm) is a ground-truth arm (tag vlapoc.groundtrut); attribute on a ground-truth arm's train run: REFUSED (LineageError: attribute: run 9d8ba4b94fb7 (fake-train-gtarm) is a ground-truth arm (tag vlapoc.groundtru); select with a planted-arm subset as parent: REFUSED (LineageError: subset 'df6f6abd55a4a9c6f463ebd138a2e02955ee201c3f4696e4db32374d2b9bd8a1' is ground-truth-); select --scores from a ground-truth arm's run: REFUSED (LineageError: select --scores: run dda4b5fedbfe (attribute-fake-gtarm) is a ground-truth arm (tag vlapoc); clusters on a ground-truth arm's run: REFUSED (LineageError: clusters: run dda4b5fedbfe (attribute-fake-gtarm) is a ground-truth arm (tag vlapoc.ground); analyze on a ground-truth arm's run (extra): REFUSED (LineageError: analyze: run dda4b5fedbfe (attribute-fake-gtarm) is a ground-truth arm (tag vlapoc.groundt); is_groundtruth_subset(planted arm, v3/candidate) = (True, False)"
   },
   {
    "name": "10.4 SYNTHETIC verdicts, positive control present: idle_padding harmful (confirmed) on hrt60 and 'no detectable harm, bounded' on f30 with the union CI in the sentence; no arm confirmed anywhere -> every status inconclusive ('no arm showed an effect ...'); the word 'harm'+'less' never appears",

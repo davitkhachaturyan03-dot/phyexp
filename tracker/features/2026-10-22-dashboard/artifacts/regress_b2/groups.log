@@ -1,0 +1,13 @@
+=== groups: .venv/bin/python scripts/verify_training_attribution.py --groups
+[PASS] 7.1 every planted helper, harmer, trade-off and metric-specific episode gets its label (4/4 groups, 20/20 episodes)  20/20 planted correct; counts {'neutral': 220, 'consistent_helper': 5, 'consistent_harmer': 5, 'trade_off': 5, 'metric_specific': 5}
+[PASS] 7.1b the unplanted noise episodes are neutral  220/220
+[PASS] 7.2 aggregate_by(task_name): one row per task, n sums to the table's rows, mean inside its CI  6 rows, n sum 240
+[PASS] 7.2b aggregate_by refuses a non-catalog column and a per-episode identifier
+[PASS] 7.3 the heatmap and scatter PNGs are written  {'tradeoff.png': 52334, 'heatmap.png': 100744}
+[PASS] 7.3b each axis label names the column's functional and τ from functionals.json, and the titles say SYNTHETIC  x: harm_rmst60: RMST(60) = ∫_0^60 (1 - F(t)) dt [τ 60 s = τ_episode, all, good_sign +1] | y: harm_f30: F(30) = P(T <= 30 s) [τ 30 s, all, good_sign +1]
+[PASS] 7.4 the analyze run's params carry the group threshold and the descriptive-unverified status, and link the score run  z=1.0, counts {"consistent_harmer": 1, "consistent_helper": 1, "metric_specific": 5, "neutral": 2, "trade_off": 6}
+[PASS] 7.5 the group module passes the ground-truth boundary scan (no groundtruth import, no label files)  violations []
+[PASS] R7 real mlflow.db sha256 unchanged  306af4123fda7e63... == 306af4123fda7e63...
+S7 pass: True (9/9, 6s)
+  9.43s user 2.63s system 168% cpu 7.154 total
+rc=0

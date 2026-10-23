@@ -1,0 +1,39 @@
+{
+ "note": "code-produced by scripts/server_pipeline.py --dry-run at the commit that wrote this file; plan arithmetic in brackets",
+ "round_a_v3_per_task_f30_hrt60_lin": {
+  "jobs": 116,
+  "trainings": 24
+ },
+ "round_a_v0_variant": {
+  "jobs": 113,
+  "trainings": 24
+ },
+ "round_b_clusters_2_picks": {
+  "jobs": 21,
+  "trainings": 6
+ },
+ "round_b_clusters_2_picks_matched_random": {
+  "jobs": 45,
+  "trainings": 12
+ },
+ "round_b_planted_default": {
+  "jobs": 129,
+  "trainings": 33
+ },
+ "round_b_planted_no_oracle": {
+  "jobs": 108,
+  "trainings": 27
+ },
+ "round_b_planted_random_draws_2": {
+  "jobs": 162,
+  "trainings": 36
+ },
+ "plan_arithmetic": {
+  "round_a_v3": "113 jobs / 24 trainings before the new CPU jobs",
+  "round_b_2_clusters": "21 jobs / 6",
+  "round_b_2_clusters_matched": "33 jobs / 12 (DIFFERS: measured 45)",
+  "planted_default": "129 / 33",
+  "planted_no_oracle": "108 / 27",
+  "planted_random_draws_2": "+33 jobs / +3 trainings"
+ }
+}
