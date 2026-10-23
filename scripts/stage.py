@@ -298,7 +298,7 @@ def cmd_select_planted(a) -> dict:
 
     sid = rid(a.scores, "attribute") if a.scores else None
     run, child = planted_select_run(subset_ref(a.parent), a.name, a.kind, corruption_type=a.type, scores_run_id=sid, metric=a.metric, seed=a.seed,
-                                    n=a.n, chain=a.chain, lineage_root=LR)
+                                    n=a.n, scope=a.scope, chain=a.chain, lineage_root=LR)
     return {"run_id": run, "subset_id": child.subset_id, "n_episodes": len(child.episode_ids)}
 
 
@@ -474,6 +474,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--metric", default=None, help="metric of the harm_<m>__same_task column (kind cleanharm)")
     s.add_argument("--seed", type=int, default=0)
     s.add_argument("--n", type=int, default=13)
+    s.add_argument("--scope", choices=["same_task", "all"], default="same_task", help="cleanharm: rank by harm_<m>__same_task (default) or the all-rollout harm_<m>")
 
     s = sub.add_parser("confirm")
     s.add_argument("--clusters", required=True, help="the cluster run whose Round B arms to judge")

@@ -231,7 +231,7 @@ def build(with_smoke: bool, force: bool) -> int:
     only_of = {"type-idle_padding": {"hrt60": "T", "rmst60": "T"}, "type-time_shift": {"f30": "C"}, "type-detour": {}, "cleanharm-f30": {"f30": "T"},
                "oracle": {"hrt60": "T", "rmst60": "T", "f30": "T", "censored60": "T"}}
     for arm, (kind, ty) in parms.items():
-        pa.planted_select_run("v3/candidate", f"select-{ptag}-{arm}", kind, corruption_type=ty or None, scores_run_id=ens if kind == "cleanharm" else None, metric="f30" if kind == "cleanharm" else None,
+        pa.planted_select_run("v3/candidate", f"select-{ptag}-{arm}", kind, corruption_type=ty or None, scores_run_id=ens if kind == "cleanharm" else None, metric="f30" if kind == "cleanharm" else None, scope="all",
                               lineage_root=lr, chain=pchain)
         ctrl = "cleanrandom91-0" if arm == "oracle" else "cleanrandom0"
         for sd in range(3):

@@ -65,7 +65,7 @@ def _clean_and_tasks(parent_eps: pd.DataFrame, labelled: set[str]) -> pd.DataFra
 
 
 def build_arm(parent, kind: str, labels: pd.DataFrame, *, corruption_type: str | None = None, scores: pd.DataFrame | None = None,
-              metric: str | None = None, seed: int = 0, n: int = 13, lineage_root: Path | None = None):
+              metric: str | None = None, seed: int = 0, n: int = 13, scope: str = "same_task", lineage_root: Path | None = None):
     """The child subset of one planted arm and its parameters ``(child, params)`` (module docstring). ``labels`` is the answer key
     (``groundtruth.load_answer_key``). ``cleanharm`` needs ``scores`` (an ensemble or seed score table keying ``parent``) and ``metric``.
     The derivation carries ``groundtruth: True``, so ``open_for_method`` refuses the child."""
@@ -83,7 +83,7 @@ def build_arm(parent, kind: str, labels: pd.DataFrame, *, corruption_type: str |
     if kind == "cleanharm":
         if scores is None or not metric:
             raise ValueError("cleanharm needs a score table and a metric")
-        col = f"harm_{metric}__same_task"
+        col = f"harm_{metric}__same_task" if scope == "same_task" else f"harm_{metric}"  # "all": the all-rollout column (a demo whose rollouts cover few tasks)
         check_score_keys(parent, scores, col, lineage_root)
         t = scores[["episode_id", col]].merge(clean[["episode_id", "task"]], on="episode_id")
         best = t.sort_values([col, "episode_id"], ascending=[False, True]).drop_duplicates("task")  # the most harmful clean episode of each task
@@ -126,7 +126,7 @@ def expected_for_type(corruption_type: str | None) -> dict | None:
 
 
 def planted_select_run(parent: str, name: str, kind: str, *, corruption_type: str | None = None, scores_run_id: str | None = None,
-                       metric: str | None = None, seed: int = 0, n: int = 13, lineage_root: Path | None = None, chain: str | None = None,
+                       metric: str | None = None, seed: int = 0, n: int = 13, scope: str = "same_task", lineage_root: Path | None = None, chain: str | None = None,
                        allow_dirty: bool = False) -> tuple[str, object]:
     """Stage ``select`` for a planted arm (ground-truth side): ``build_arm`` on ``parent`` (a subset of a version with an answer key), recorded as
     one MLflow run tagged ``vlapoc.groundtruth_arm=true`` whose output is the child subset. Params: ``op``, ``arm_kind``, ``groundtruth_arm``,
@@ -144,7 +144,7 @@ def planted_select_run(parent: str, name: str, kind: str, *, corruption_type: st
     if kind == "cleanharm":
         scores = results.score_table(scores_run_id, lineage_root)
         src = results._get_run(scores_run_id, lineage_root).data.tags["output.attribution_scores.sha256"]
-    child, p = build_arm(ps, kind, labels, corruption_type=corruption_type, scores=scores, metric=metric, seed=seed, n=n, lineage_root=lineage_root)
+    child, p = build_arm(ps, kind, labels, corruption_type=corruption_type, scores=scores, metric=metric, seed=seed, n=n, scope=scope, lineage_root=lineage_root)
     hyp = labels.groupby("corruption_type")["hypothesis"].first().to_dict().get(corruption_type) if "hypothesis" in labels and corruption_type else None
     expected = expected_for_type(corruption_type) if kind == "type" else None
     with stage_run("select", name, lineage_root, chain=chain, allow_dirty=allow_dirty, extra_tags={"vlapoc.groundtruth_arm": "true"}) as r:
