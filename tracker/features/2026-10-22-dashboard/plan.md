@@ -13,6 +13,11 @@ Round 1 (planner, 2026-10-22). Branch `dashboard` at `046c38d`. Evidence labels:
 - S5 gains a fifth page ("Bad vs harmful", §9.2). S6's demo covers it. S8's Round B covers the planted-type arms.
 - The dataset question is now decided by evidence in favour of `v3/candidate` (it stays BLOCKING only because it
   replaces a recorded owner ruling). A second BLOCKING question covers the planted-type Round B budget.
+- **Update after the owner's answers (brief.md, "Owner answers to plan questions", commit `2204bdf`):**
+  - Q1 is resolved: Round A uses v3/candidate. The new AC8.2b changes the documented first run, and AC8.2 now uses v3.
+  - Q2 is resolved: option (a). S10's default includes the oracle pair (33 trainings, 129 jobs), and AC10.1 is updated.
+  - The CLAUDE.md pointer is added by the orchestrator at the end (AC8.5 reworded).
+  - An "Execution batches" section is added.
 
 ## Request
 
@@ -462,8 +467,8 @@ finished before S7.
   2. **Smoke:** `scripts/lineage_dry_run.py --eval-smoke` (expected: the chain reaches 20 raw files, no stand-in), and
      `verify_training_attribution.py --local-smoke --device cuda` (expected: six stages finish, a [40, 30] table), plus
      the 30-step throughput probe and the two-process determinism check (eval-layer runbook rules 4-5).
-  3. **Round A submit:** `server_pipeline.py --tag <tag> --subset <dataset> --curation per_task --metrics f30 hrt60_lin
-     --dry-run` (expected count printed in the skill, measured locally), then without `--dry-run`. Record the chain id.
+  3. **Round A submit:** `server_pipeline.py --tag v3cand --subset v3/candidate --curation per_task --metrics f30
+     hrt60_lin --dry-run` (owner Q1 answer; v0/candidate shown as a labelled variant) (expected count printed in the skill, measured locally), then without `--dry-run`. Record the chain id.
   4. **Monitor:** `squeue -u $USER`, `sacct -j <ids> --format=JobID,JobName,State,Elapsed`, the log folder, MLflow run
      states (a short `results.find_runs` snippet). What "healthy" looks like per phase, with inferred durations (≈4 h
      per train, quoted LeRobot docs). On a FAILED job: stop, collect the log tail, ask.
@@ -476,8 +481,9 @@ finished before S7.
      banner on the real ensemble (S1 provenance). If a banner appears, stop and report the listed reasons.
   8. **Round B:** the owner picks clusters (stop-and-ask point), then `server_pipeline.py --round-b --clusters
      clusters-<tag> --pick ...` with dry-run count first, then the `confirm` run, and the dashboard shows statuses.
-     **Round B planted (§9.2, v3 only):** `server_pipeline.py --round-b-planted --tag <tag> --subset v3/candidate
-     [--oracle]`, dry-run count first. **STOP AND ASK** with the cost table (27-33 trainings, inferred 108-132 GPU-h),
+     **Round B planted (§9.2, v3 only):** `server_pipeline.py --round-b-planted --tag <tag> --subset v3/candidate`
+     (default includes the oracle pair, owner Q2 a), dry-run count first. **STOP AND ASK** with the cost table (33
+     trainings, inferred ~132 GPU-h),
      then submit, then `discrepancy-verdict`. The skill quotes S10's wording rule, so the server session reports
      statuses with the same sentences (never "harmless").
   9. **Results back:** what to copy to the Mac (the `data/lineage/` store including `mlflow.db` and `mlartifacts/`,
@@ -491,24 +497,39 @@ finished before S7.
   - [ ] AC8.1 `scripts/verify_runbook.py` extracts every fenced shell command from `SKILL.md`. For every `scripts/*.py`
     or `python -m vlapoc.*` invocation, the file or module exists and the named subcommand's `--help` exits 0 on this
     Mac. Reported as n/n. [vla-build: commands exist]
-  - [ ] AC8.2 Every dry-run count written in the skill equals a fresh local dry run: Round A for the chosen dataset
-    (measured today: v0/candidate 112, v3/candidate 113, before S2/S3/S9 add CPU jobs; the skill must carry the
-    post-build numbers), Round B per picked cluster (S4), and Round B planted with and without `--oracle` (S10).
-    [brief: "dry-run job counts"]
+  - [ ] AC8.2 Every dry-run count written in the skill equals a fresh local dry run. That covers three runs:
+    - Round A on **`v3/candidate`** (owner Q1 answer). Measured today: 113 jobs, 24 trainings, before S2/S3/S9 add
+      CPU jobs; the skill carries the post-build number and the same 24 trainings.
+    - Round B per picked cluster (S4).
+    - Round B planted with its default of 33 trainings (S10).
+
+    v0/candidate appears only as a labelled variant. [owner answer Q1; brief: "dry-run job counts"]
+  - [ ] AC8.2b The documented first server run is changed to v3 everywhere it is written, because the owner's Q1
+    answer replaces the training-attribution first-run ruling:
+    - `server_pipeline.py`'s module docstring "FIRST SERVER RUN" block reads `--tag v3cand --subset v3/candidate
+      --curation per_task --metrics f30 hrt60_lin`, with the measured job count.
+    - `verify_training_attribution.py --pipeline` check 4.7 asserts that v3 count and the 24 trainings.
+    - `artifacts/s4_dry_run_first_run.txt` is regenerated.
+    - A dated entry in `tracker/features/2026-10-20-training-attribution/changelog.md`, and a "Changes since first
+      release" line in its `report.html`, record the change.
+
+    [owner answer Q1 (brief); vla-build step 5]
   - [ ] AC8.3 Every step carries `[verified locally]` or `[unverified until a server session]`. The verifier counts both
     and lists the unverified ones, and none of the unverified steps claims an expected output that was not produced
     somewhere. [brief: "server-specific steps are marked unverified"]
   - [ ] AC8.4 The skill has explicit **STOP AND ASK** markers at: preflight failure, revision mismatch, any FAILED job,
     disk below threshold, any needed code change, the Round B cluster pick, and a SYNTHETIC/SMOKE banner on real
     results (≥ 7 markers, counted by the verifier). [brief]
-  - [ ] AC8.5 The plan's proposed `CLAUDE.md` pointer (below) is **not** applied by the executor. It is listed in the
-    report for the owner. [brief: owner's uncommitted `CLAUDE.md`]
+  - [ ] AC8.5 No agent touches `CLAUDE.md`: `git diff --stat` for `CLAUDE.md` is identical before and after every
+    batch. Per the owner's answer, the orchestrator adds the pointer below at the end of the feature, committing only
+    that hunk. [owner answer (brief): "Add it at the end of the feature"]
   - [ ] AC8.6 The skill's frontmatter parses (YAML `name`, `description`), and the skill appears in `.claude/skills/`.
     [vla-build]
 - **Verify by:** `.venv/bin/python scripts/verify_runbook.py`
 - **Demo value:** a one-page "what the server session will do" table (step → command → expected → verified locally?)
   in the report, and the count of locally verified vs unverified steps.
-- **Proposed CLAUDE.md line (orchestrator asks the owner; not applied):** under "## Required workflow", add:
+- **CLAUDE.md line (owner-approved; the orchestrator adds it at the end of the feature, not the executor):** under
+  "## Required workflow", add:
   `**On the GPU server, follow the \`server-run\` skill** (\`.claude/skills/server-run/SKILL.md\`): preflight → smoke → Round A → clusters → dashboard → Round B → results back, stopping to ask at every marked point.`
 
 ### S9: Show where "looks bad" and "hurts" disagree, estimated from Round A scores (PoC §9.2)
@@ -571,7 +592,7 @@ finished before S7.
     `vlapoc.groundtruth_arm=true`, and changes nothing else (same recipe). `features`, `attribute`, `select --scores`,
     `clusters` and `analyze` refuse any subset or run carrying that tag or derivation.
   - `server_pipeline.py --round-b-planted --tag <t> --subset v3/candidate [--clean-harm-metrics f30] [--random-draws 1]
-    [--oracle]`: select (ground-truth side) → per arm train ×3 seeds → eval → `verify vs_base` (W, O) → `verify
+    [--no-oracle]`. The oracle pair is **on by default** (owner Q2 answer: option a). The pipeline runs: select (ground-truth side) → per arm train ×3 seeds → eval → `verify vs_base` (W, O) → `verify
     curated_vs_random` (each type/cleanharm arm vs each `cleanrandom`, family W; the oracle vs its matched control) →
     `step4-summary` → `discrepancy-verdict`.
   - `stage.py discrepancy-verdict` (stage `summarize`): per arm and metric, the status and the sentence the dashboard
@@ -592,10 +613,14 @@ finished before S7.
   - "Clean but harmful" is claimed only for `cleanharm-<m>` arms confirmed harmful in this sense.
 - **Acceptance criteria:**
   - [ ] AC10.1 `server_pipeline.py --round-b-planted --dry-run` prints the job list and counts. Inferred from the
-    chain's per-arm pattern (the verifier measures and the skill carries the measured numbers): **default** (7 type + 1
-    cleanharm + 1 cleanrandom) = 9 arms, 27 trainings, 108 jobs; **`--oracle`** adds 2 arms (+6 trainings, +21 jobs) =
-    33 trainings, 129 jobs; **`--random-draws 2`** adds 1 arm and a second control per treated arm (+3 trainings, +33
-    jobs). [brief caveat (3): cost; PoC §2.3 p.4]
+    chain's per-arm pattern (the verifier measures and the skill carries the measured numbers):
+    - **default = the owner-approved option (a):** 7 type arms, 1 cleanharm, 1 cleanrandom, plus the oracle and its
+      matched random-91 control. That is 11 arms, **33 trainings, 129 jobs**, ~132 GPU-h (inferred, 4 h per training).
+    - `--no-oracle`: 27 trainings, 108 jobs.
+    - `--random-draws 2`: +3 trainings, +33 jobs.
+
+    A default whose measured count differs from 33 trainings is a failure, to be reported, not silently accepted.
+    [owner answer Q2 (brief); brief caveat (3): cost; PoC §2.3 p.4]
   - [ ] AC10.2 Each type arm's child has 947 episodes, exactly the 13 labelled episodes of that type removed. Each
     `cleanrandom` child has 947 with 13 clean episodes in 13 distinct tasks, and no planted episode is removed. The
     oracle child has 869 (GT-R5's expected number). [PoC §2.1 item 4 p.3; §2.6 p.5]
@@ -617,6 +642,17 @@ finished before S7.
   server. This is the "same bad data, different harm" result the owner asked for. The cost table (arms, trainings,
   jobs, GPU-h inferred at 4 h per training) goes to the owner before submission.
 
+## Execution batches
+
+Three batches in dependency order. Each batch ends with its verifier modes passing, the older-feature verifiers still
+passing, `data/lineage/mlflow.db` sha256 unchanged, and a local commit. The analyzer may gate after each batch.
+
+| Batch | Stories | What it delivers | Depends on | Ends when |
+|---|---|---|---|---|
+| **B1: read side and analysis stages** | S1, S2, S3, S9 | Influence matrix + index recorded; `results.py` with provenance label; `clusters` stage (3 lenses, `sliceline` installed); planted-type cluster scoring; §9.2 `discrepancy` stage (estimated) | — | `verify_dashboard.py --results --clusters --planted --discrepancy` pass; `verify_attribution.py` and all `verify_training_attribution.py` modes pass |
+| **B2: Round A wiring and Round B machinery** | S4, S10, plus the Round A chain additions (clusters / score-clusters / discrepancy jobs) and AC8.2b (first run = v3 in `server_pipeline.py`, check 4.7, training-attribution changelog) | `drop_cluster` + `--round-b` + `confirm`; ground-truth-side type/cleanharm/cleanrandom/oracle subsets, `--groundtruth-arm`, `--round-b-planted` (default 33 trainings), `discrepancy-verdict`; measured dry-run counts for Round A (v3), Round B cluster, Round B planted | B1 | `verify_dashboard.py --round-b --planted-arms` pass; `--pipeline` and `--blind` pass with the v3 first-run count; measured counts written to `artifacts/` |
+| **B3: surface, demo, proof, runbook** | S5, S6, S7, S8 | Streamlit app (5 pages) and video helper; `data/lineage_demo/` with SYNTHETIC scores, real videos/rollouts and the real SMOKE run; drop-in proof; `server-run` skill + `verify_runbook.py` carrying B2's measured counts | B1, B2 (S5 and S6 may interleave; S7 after both; S8 last) | `verify_dashboard.py --app --demo --dropin` and `verify_runbook.py` pass; `CLAUDE.md` untouched (the orchestrator adds the pointer afterwards) |
+
 ## Out of scope (deliberately)
 - A new screening method (DemInf mutual information, RoboDrop warm-up gradient compatibility; PoC §9.1 Step 1). Owner
   direction. The planted labels and H1-H8 serve as "looks bad" here.
@@ -633,29 +669,17 @@ finished before S7.
 - Running anything on the server (no access from here).
 
 ## Open questions
-- **BLOCKING Q1 (owner): which dataset the runbook's Round A uses. With the §9.2 addition, the evidence now points
-  clearly to (a).** It stays BLOCKING only because (a) replaces the first-run command recorded in the
-  training-attribution owner ruling.
-  - **(a) `v3/candidate`, recommended.** 113 jobs measured today, a few more CPU jobs after S2/S3/S9 (S8 measures). The
-    same 24 trainings and the same ~96 GPU-h (inferred). It is **required** for the owner's §9.2 addition: S9 and S10
-    need the planted labels, and S10's type arms are removals *from the v3 base*. Their `vs_base` verdicts compare
-    against Round A's v3 base runs, so with a v0 Round A, S10 would need a whole extra v3 base (3 trainings, evals,
-    features, attribution). It also gives `score` (recovery per type) and `score-clusters`, the PoC's "convincing demo"
-    (§2.1 item 4 p.3). Cost: results describe a dataset with 9.48% planted corruption, not clean LIBERO.
-  - **(b) `v0/candidate`.** 112 jobs measured, and it is the ruled first-run command. Clusters describe clean LIBERO.
-    There is no planted check, and the §9.2 demonstration needs an extra v3 Round A later.
-  - Either way the runbook shows the other as a variant.
-- **BLOCKING Q2 (owner): the GPU budget for the planted-type Round B (S10).** All counts are inferred from the chain
-  pattern at 4 h per training and measured by the S10 dry run.
-  - **(a) Recommended: default + `--oracle`.** 7 type arms, 1 clean-but-harmful arm, 1 clean random-13 control, plus
-    the all-91 oracle and its matched control: 33 trainings, ~132 GPU-h, 129 jobs. The oracle is the positive control.
-    If removing all 91 planted episodes shows an effect, a type-level null becomes a meaningful bound. If nothing in the
-    round shows an effect, every status reads "inconclusive", by rule.
-  - **(b) Minimal default:** 27 trainings, ~108 GPU-h, 108 jobs (the orchestrator's figure). It risks an all-inconclusive
-    round with no positive control, other than any type that happens to show an effect.
-  - **(c) (a) + a second random draw:** 36 trainings, ~144 GPU-h, 162 jobs. More robust controls.
-  - Existing Round A random arms **cannot** serve as controls: they drop 100 (5 per task) or 20 (unstratified)
-    episodes, not 13 at 1 per task (measured above).
+- **RESOLVED Q1 (owner answer 2026-10-22, brief.md): Round A = `v3/candidate`.** That is 113 jobs and 24 trainings
+  (measured dry run), plus the CPU jobs S2/S3/S9 add. It replaces the training-attribution first-run command
+  (v0/candidate, 112 jobs). AC8.2b changes the documented first run in `server_pipeline.py`, the `--pipeline` check and
+  the training-attribution record. v0/candidate stays a labelled variant in the runbook.
+- **RESOLVED Q2 (owner answer 2026-10-22, brief.md): Round B planted = option (a).** 7 type arms, 1 clean-but-harmful
+  arm, the clean random-13 control, and the all-91 oracle with its matched control as the positive control: 33
+  trainings, 129 jobs (inferred; measured by AC10.1), ~132 GPU-h (inferred). It is S10's default; `--no-oracle` exists
+  but is not the documented run.
+- **RESOLVED (owner answer): CLAUDE.md pointer.** The orchestrator adds the line from S8 at the end of the feature,
+  committing only that hunk. Agents never touch `CLAUDE.md` (AC8.5).
+- No BLOCKING questions remain.
 - Non-blocking (the executor proceeds on these; the owner may override):
   1. **Demo store location:** a separate `data/lineage_demo/` (copy of the real store) rather than writing synthetic runs
      into `data/lineage/`. This keeps the real store's sha256 stable and keeps synthetic runs out of the real
@@ -667,8 +691,9 @@ finished before S7.
      Inferred, stated before results, recorded as a param.
   4. **Slice-finder defaults** (S2): 5 quantile bins, `max_l=2`, `k=5`, `alpha=0.95`, `min_sup=max(10, 2%)`. Inferred,
      declared params.
-  5. **The clusters job joins the Round A chain** (+1 CPU job, +1 more on v3 for `score-clusters`). The owner's
-     "112 jobs" ruling was about GPU size, and these are CPU-only additions. S8 prints the new counts.
+  5. **The clusters, score-clusters and discrepancy jobs join the Round A chain** (CPU only, after the ensemble). The
+     owner's Q1 answer fixed 113 jobs / 24 trainings as the measured pre-build count. These additions change only the
+     CPU job count. S8 prints the new counts.
   6. **Real dashboard on the server via SSH tunnel.** Rollout videos need the base evals' trajectories (11-22 GB per
      seed, inferred), which we do not copy back. A local copy without trajectories shows "rollout video not on this
      machine" and everything else.
