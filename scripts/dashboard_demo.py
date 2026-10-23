@@ -54,7 +54,7 @@ def db_sha() -> str:
 def run_ids(lr: Path) -> set[str]:
     from vlapoc.runs import client, experiment_id
 
-    return {r.info.run_id for r in client(lr).search_runs([experiment_id(lr)], max_results=100000)}
+    return {r.info.run_id for r in client(lr).search_runs([experiment_id(lr)], max_results=50000)}
 
 
 def synthetic_attribute_run(lr: Path, subset, table, ret, matrix, index: dict, name: str, eval_ids: list[str], returns_ids: list[str], out: Path, truth: dict, note: str) -> str:
