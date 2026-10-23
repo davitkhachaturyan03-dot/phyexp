@@ -1,0 +1,80 @@
+{
+ "pass": true,
+ "checks": [
+  {
+   "name": "8.1 every fenced shell command naming a scripts/*.py, python -m vlapoc.* or the dashboard exists and its subcommand's --help exits 0 here",
+   "pass": true,
+   "detail": "12/12 entries ok; external commands not checked (they are server tools): ['--version', '.venv/bin/', 'cat', 'df', 'export', 'git', 'ls', 'nvidia-smi', 'python -m pip', 'rsync', 'sacct', 'shasum', 'source', 'squeue']"
+  },
+  {
+   "name": "8.2 every dry-run count in the skill equals a fresh local dry run: Round A on v3/candidate (116 jobs, 24 trainings; v0/candidate only as a labelled variant), Round B per cluster (2 picks, and with --matched-random), Round B planted (default and --no-oracle); the first server run is the v3 command in the skill and in server_pipeline.py's docstring",
+   "pass": true,
+   "detail": "fresh counts {'round_a_v3': (116, 24), 'round_a_v0_variant': (113, 24), 'round_b_clusters_2': (21, 6), 'round_b_clusters_2_matched': (45, 12), 'round_b_planted': (129, 33), 'round_b_planted_no_oracle': (108, 27)}; mismatches []"
+  },
+  {
+   "name": "8.3 every step is tagged [verified locally] or [unverified until a server session]; the verifier counts both and lists the unverified; no expected output in an unverified step lacks a measured/quoted/inferred label (and verified steps cite measured outputs)",
+   "pass": true,
+   "detail": "5 verified: ['Step 4: Round A dry run and the count', 'Step 8: Clusters, planted-type scoring and the discrepancy table, by hand', 'Step 9: The real dashboard', 'Step 10: Round B for discovered clusters, dry run', 'Step 12: Round B for the planted data, dry run']; 10 unverified: ['Step 1: Preflight', 'Step 2: Inputs and environment', 'Step 3: Smoke on the server', 'Step 5: Round A submit', 'Step 6: Monitor', 'Step 7: Recovery', 'Step 11: Round B for clusters, submit and confirm', 'Step 13: Round B planted, submit and verdict', 'Step 14: Results back', 'Step 15: Known server-only risks']; unlabelled expectations: []"
+  },
+  {
+   "name": "8.4 at least 7 STOP AND ASK markers, covering preflight failure, revision mismatch, any FAILED job, disk below threshold, any needed code change, the Round B cluster pick and a SYNTHETIC/SMOKE banner on real results",
+   "pass": true,
+   "detail": "11 markers: ['preflight failure', 'revision mismatch', 'failed check', 'odd numbers', 'failed job', 'disk below threshold', 'any needed code change', 'SYNTHETIC or SMOKE banner on real results', 'the Round B cluster pick', 'cost approval', 'database is locked']; missing []"
+  },
+  {
+   "name": "8.5 CLAUDE.md is untouched by the dashboard batches: `git diff --stat CLAUDE.md` equals the recorded value from before B1",
+   "pass": true,
+   "detail": "'CLAUDE.md | 5 +++--\\n 1 file changed, 3 insertions(+), 2 deletions(-)'"
+  },
+  {
+   "name": "8.6 the frontmatter parses (name, description) and the skill is in .claude/skills/",
+   "pass": true,
+   "detail": "name 'server-run', description 486 characters"
+  }
+ ],
+ "verified_steps": [
+  "Step 4: Round A dry run and the count",
+  "Step 8: Clusters, planted-type scoring and the discrepancy table, by hand",
+  "Step 9: The real dashboard",
+  "Step 10: Round B for discovered clusters, dry run",
+  "Step 12: Round B for the planted data, dry run"
+ ],
+ "unverified_steps": [
+  "Step 1: Preflight",
+  "Step 2: Inputs and environment",
+  "Step 3: Smoke on the server",
+  "Step 5: Round A submit",
+  "Step 6: Monitor",
+  "Step 7: Recovery",
+  "Step 11: Round B for clusters, submit and confirm",
+  "Step 13: Round B planted, submit and verdict",
+  "Step 14: Results back",
+  "Step 15: Known server-only risks"
+ ],
+ "fresh_dry_run_counts": {
+  "round_a_v3": [
+   116,
+   24
+  ],
+  "round_a_v0_variant": [
+   113,
+   24
+  ],
+  "round_b_clusters_2": [
+   21,
+   6
+  ],
+  "round_b_clusters_2_matched": [
+   45,
+   12
+  ],
+  "round_b_planted": [
+   129,
+   33
+  ],
+  "round_b_planted_no_oracle": [
+   108,
+   27
+  ]
+ }
+}
