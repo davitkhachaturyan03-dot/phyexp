@@ -208,8 +208,10 @@ def statuses(records: list[dict], arms: dict[str, dict], n_total: int | None = N
     positive = bool((t["confirmed_harmful"] | t["confirmed_helpful"]).any())
     pos_rows = t[t["confirmed_harmful"] | t["confirmed_helpful"]]
     pos_row = (pos_rows[pos_rows["arm_kind"] == "oracle"] if (pos_rows["arm_kind"] == "oracle").any() else pos_rows).iloc[0] if positive else None
-    pos_text = (f"The positive control in this round ({pos_row['arm']}) removed {int(pos_row['n_dropped'])} episodes, far more than a single type's, so its effect does not show that a "
-                "13-episode arm has the power to show one. ") if positive else ""
+    big = positive and pos_row["arm_kind"] == "oracle"
+    pos_text = ((f"The positive control in this round ({pos_row['arm']}) removed {int(pos_row['n_dropped'])} episodes, far more than a single type's, so its effect does not show that a "
+                 "13-episode arm has the power to show one. " if big else f"The positive control in this round ({pos_row['arm']}) removed {int(pos_row['n_dropped'])} episodes. ")
+                if positive else "")
     shared = "The clean control is one fixed draw shared by every type and seed, so the runs are not independent replicates of it. "
     out_status, out_sentence = [], []
     for r in t.itertuples():

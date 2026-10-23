@@ -368,6 +368,7 @@ def clusters_mode() -> int:
         n_stage0 = len(res.find_runs("cluster", lr))
         t0 = time.time()
         out = cl.clusters_run(sid, "clusters-dash-synth", out_dir=out_dir, lineage_root=lr, allow_dirty=True, synthetic=True)
+        prm_dedupe = client(lr).get_run(out["run_id"]).data.params["n_duplicate_member_sets_merged"]
         t_stage = time.time() - t0
         print(f"clusters stage: {out['n_clusters']} clusters {out['n_by_lens']} in {t_stage:.0f}s")
         clu = pd.read_parquet(out_dir / "clusters.parquet")
@@ -395,6 +396,20 @@ def clusters_mode() -> int:
         harm_f30_all = [predicates_set(r) for _, r in sl[(sl["target_metric"] == "harm_f30") & (sl["direction"] == "harm")].iterrows()]
         C.check("2.2 planted boost slice (negative harm on f30) found on the boost side (top 3) and on no harm side of f30",
                 pb_set in boost_sets and pb_set not in harm_f30_all, f"top-3 boost slices for f30: {boost_top}; in the f30 harm list: {pb_set in harm_f30_all}")
+        # AC2.9: no two clusters share a member set; AC2.8: Round A passes min-sup-fraction 0.01 and the run records min_sup
+        sets = mem.groupby("cluster_id")["episode_id"].apply(frozenset)
+        dup = int(sets.duplicated().sum())
+        eq_rows = clu[clu["n_equivalent"] > 0]
+        eq_example = (eq_rows.iloc[0]["definition"], json.loads(eq_rows.iloc[0]["equivalent_definitions"])[0]["definition"]) if len(eq_rows) else None
+        C.check("2.9 clusters with identical member sets are reported once: no two rows of clusters.parquet share a member set; the kept row lists the equivalent definitions",
+                dup == 0 and (len(eq_rows) == 0 or all(json.loads(x) for x in eq_rows["equivalent_definitions"])) and out["n_clusters"] == len(clu),
+                f"{len(clu)} clusters, duplicate member sets {dup}; {len(eq_rows)} rows list equivalents, e.g. {eq_example}; {int(prm_dedupe)} merged")
+        j_a, _ = dry_jobs("--subset", "v3/candidate", "--curation", "per_task", "--metrics", "f30", "hrt60_lin")
+        cj = next(j for j in j_a if j["name"] == "clusters-t")["cmd"]
+        out8 = cl.clusters_run(sid, "clusters-dash-synth-ms10", out_dir=base / "out_ms10", lineage_root=lr, allow_dirty=True, synthetic=True, params={"min_sup_fraction": 0.01})
+        ms = json.loads(client(lr).get_run(out8["run_id"]).data.params["slice_finder"])["min_sup"]
+        C.check("2.8 Round A on v3 passes --min-sup-fraction 0.01 to the clusters job (dry-run argv), and the cluster run's params record min_sup = 10, below the 13 members of a planted type",
+                "--min-sup-fraction 0.01" in cj and ms == 10, f"clusters job argv: {cj[:140]}...; recorded min_sup {ms}")
         # AC2.3
         cols = out["columns"]
         decl_ok = all(set(json.loads(r)) == set(cols) and all(all(k in d for k in ("functional", "tau", "rollout_subset", "good_sign")) for d in json.loads(r).values())
@@ -453,7 +468,9 @@ def clusters_mode() -> int:
         # AC2.6
         ok_n = {}
         for lc in cl.LABEL_COLUMNS:
-            ok_n[lc] = int(lab["n"].sum()) if lc == "task_name" else int(clu[(clu["lens"] == "label") & (clu["label_column"] == lc)]["n"].sum())
+            sub_ = clu[(clu["lens"] == "label") & (clu["label_column"] == lc)]
+            # identical member sets are reported once (AC2.9): a label group merged into another cluster counts through that cluster's equivalent definitions
+            ok_n[lc] = int(sub_["n"].sum()) + sum(int(r["n"]) for _, r in clu.iterrows() for e in json.loads(r["equivalent_definitions"]) if e["lens"] == "label" and e["definition"].startswith(f"{lc} = "))
         sizes_ok = all(v == len(tab) for v in ok_n.values())
         bad = []
         for _, r in sl.iterrows():
@@ -467,7 +484,7 @@ def clusters_mode() -> int:
         gclu = clu[clu["lens"] == "metric_group"]
         gbad = [r["cluster_id"] for _, r in gclu.iterrows()
                 if (set(mem.loc[mem["cluster_id"] == r["cluster_id"], "episode_id"]) - set(desc_out.loc[(groups == r["group"]).to_numpy(), "episode_id"]))]
-        C.check("2.6 label-group n sum to N for task_name, scene and suite; every slice's members equal its definition re-evaluated from the raw descriptors and recorded edges; group members belong to their group",
+        C.check("2.6 label-group n sum to N for task_name, scene and suite (counting groups merged into an equivalent cluster, AC2.9); every slice's members equal its definition re-evaluated from the raw descriptors and recorded edges; group members belong to their group",
                 sizes_ok and not bad and not gbad and len(sl) > 0, f"label n sums {ok_n} (N={len(tab)}); {len(sl)} slices re-evaluated, mismatches {bad}; {len(gclu)} group clusters, mismatches {gbad}")
         # AC2.7: sliceline installed, imports on 3.14, with and without numba, same answer
         import importlib.metadata as md
@@ -716,7 +733,7 @@ def planted_mode() -> int:
 # S9: where "looks bad" and "hurts" disagree (estimated)
 # ---------------------------------------------------------------------------------------------
 
-READING_RE = r"no detectable harm on (\w+) \(estimated; CI \[-?\d+\.\d+, -?\d+\.\d+\]\)"
+READING_RE = r"no detectable harm on (\w+) \(estimated; Welch 95% CI \[-?\d+\.\d+, -?\d+\.\d+\]\)\.( Uncorrected across \d+ types × \d+ metrics\.)? Holm across the \d+ metrics: adjusted p = \d\.\d+\."
 WORD = "harm" + "less"  # the word no output may contain (the verifier itself must not trip over it in its own source)
 
 
@@ -794,8 +811,8 @@ def discrepancy_mode() -> int:
         outs = sorted(out_dir.glob("*"))
         text = output_text(outs)
         sents = [x for x in ty["estimated_reading"] if x.startswith("no detectable")] + [x for x in fl["estimated_reading"] if x.startswith("no detectable")]
-        C.check("9.2 the word 'harm'+'less' appears in no output file; every non-excluding CI reads 'no detectable harm on <metric> (estimated; CI [lo, hi])'",
-                WORD not in text.lower() and all(re.fullmatch(READING_RE, x) for x in sents) and len(sents) > 0 and WORD not in (REPO_ROOT / "vlapoc" / "discrepancy.py").read_text().lower(),
+        C.check("9.2 the word 'harm'+'less' appears in no output file; every non-excluding CI reads 'no detectable harm on <metric> (estimated; Welch 95% CI [lo, hi]). Uncorrected across 7 types × 5 metrics. Holm across the 5 metrics: ...'",
+                WORD not in text.lower() and all(re.fullmatch(READING_RE, x) for x in sents) and all("Uncorrected across 7 types × 5 metrics." in x for x in ty["estimated_reading"]) and len(sents) > 0 and WORD not in (REPO_ROOT / "vlapoc" / "discrepancy.py").read_text().lower(),
                 f"{len(outs)} output files scanned, {len(sents)} 'no detectable' sentences all well-formed, e.g. {sents[0]!r}")
         # --- AC9.3: the visibly-bad evidence, read from the recorded score runs, equals the ground-truth feature's published bands ---
         ev = dc.heuristic_evidence("v3", "candidate", lr)
@@ -874,7 +891,7 @@ def discrepancy_mode() -> int:
         print(f"secondary layer (SYNTHETIC scores): any-of-H1-H8 filter flags {anyf['n_flagged']} of {sm['n']} episodes ({100 * anyf['share_flagged']:.0f}%), of which {anyf['n_flagged_planted']} planted "
               f"(precision {anyf['precision_vs_planted']:.2f}, recall of the 91 planted {anyf['recall_of_planted']:.2f}); per-heuristic: "
               + ", ".join(f"{r_['filter']} {r_['n_flagged']}/{r_['n_flagged_planted']}" for _, r_ in fl[fl['metric'] == 'f30'].iterrows() if r_['filter'] != "any_H1_H8"))
-        C.check("9.7 the filter layer exists: 10 filters (any + 9 heuristics) x 5 metrics, quadrant counts per filter sum to N", len(fl) == 10 * 5 and all(
+        C.check("9.7b the filter layer exists: 10 filters (any + 9 heuristics) x 5 metrics, quadrant counts per filter sum to N", len(fl) == 10 * 5 and all(
             (r_[[f'n_{q}' for q in dc.QUADRANTS]].sum() == sm["n"]) for _, r_ in fl.iterrows()), f"{len(fl)} rows; any-filter flagged {sm['n_flagged_filter']} (q = {sm['filter_q']:.4f})")
         # --- stage CLI (needs a clean tree) ---
         dirty = subprocess.run(["git", "status", "--porcelain", "--", "vlapoc", "scripts"], cwd=REPO_ROOT, capture_output=True, text=True).stdout.strip()
@@ -886,20 +903,32 @@ def discrepancy_mode() -> int:
             C.check("9.8 the stage CLI (scripts/stage.py discrepancy) runs on the scratch store", ok_cli, f"rc={p_.returncode}" + ("" if ok_cli else p_.stderr[-300:]))
         else:
             print("stage CLI check skipped: vlapoc/scripts tree is dirty (the CLI refuses a dirty tree); re-run after committing")
-        # --- measured: false-alarm rate of the readings on null cells (information) ---
-        cells, hits, hits_w = 0, 0, 0
+        # --- AC9.7: the reading's interval is scipy's Welch interval, and the null calibration is re-run ---
+        from scipy import stats as sps
+
+        cols5 = [f"harm_{m}" for m in metrics]
+        dev = 0.0
+        for _, r_ in ty.iterrows():
+            zt_ = ep.loc[ep["planted_type"] == r_["planted_type"], f"z__{r_['metric']}"].to_numpy()
+            zc_ = ep.loc[ep["planted_type"] == "clean", f"z__{r_['metric']}"].to_numpy()
+            ci_ = sps.ttest_ind(zt_, zc_, equal_var=False).confidence_interval(0.95)
+            dev = max(dev, abs(ci_.low - r_["diff_lo"]), abs(ci_.high - r_["diff_hi"]))
+        cells, hits, hits_b, holds = 0, 0, 0, 0
         for seed in range(20):
             t2 = synthetic_table(eps, metrics, 1000 + seed, {})
-            e2 = dc.episode_table(t2, labels, [f"harm_{m}" for m in metrics], pd.DataFrame({"none": np.zeros(len(t2), bool)}), res.functionals(sid, lr), True)
-            ty2 = dc.type_table(e2, labels, [f"harm_{m}" for m in metrics], res.functionals(sid, lr), pd.DataFrame(), True, n_boot=1000)
+            e2 = dc.episode_table(t2, labels, cols5, pd.DataFrame({"none": np.zeros(len(t2), bool)}), res.functionals(sid, lr), True)
+            ty2 = dc.type_table(e2, labels, cols5, res.functionals(sid, lr), pd.DataFrame(), True, n_boot=1000)
             cells += len(ty2)
             hits += int((ty2["reading"] != "no_detectable_harm").sum())
-            hits_w += int((ty2["reading_welch"] != "no_detectable_harm").sum())
-        print(f"null calibration (SYNTHETIC, 20 seeds, no planted structure, 13 vs 869): {hits}/{cells} cells read harmful or helpful by the percentile bootstrap, "
-              f"{hits_w}/{cells} by the Welch cross-check (nominal two-sided 5%: {0.05 * cells:.0f})")
+            hits_b += int((ty2["reading_boot"] != "no_detectable_harm").sum())
+            holds += int(((ty2["reading"] != "no_detectable_harm") & (ty2["p_holm_metrics"] < 0.05)).sum())
+        rate = hits / cells
+        print(f"null calibration (SYNTHETIC, 20 seeds x 7 types x 5 metrics, no planted effect): Welch reading false-call rate {rate:.4f} ({hits}/{cells}); percentile bootstrap {hits_b / cells:.4f}; Holm-across-metrics {holds / cells:.4f}")
+        C.check("9.7 the reading's difference CI equals scipy.stats.ttest_ind(..., equal_var=False).confidence_interval(0.95) to 1e-12 (no hand-rolled Welch); the stored null calibration (20 seeds x 7 types x 5 metrics, no planted effect) gives a reading false-call rate <= 0.06; written back with the Holm rate beside it",
+                dev < 1e-12 and rate <= 0.06 and "p_holm_metrics" in ty and not hasattr(dc, "welch_diff_ci"), f"max |difference| to scipy {dev:.1e}; Welch false-call rate {rate:.4f}, bootstrap {hits_b / cells:.4f}, Holm {holds / cells:.4f}")
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
-        (ARTIFACTS / "s9_null_calibration_SYNTHETIC.json").write_text(json.dumps({"SYNTHETIC": True, "seeds": 20, "cells": cells, "bootstrap_cells_reading_harmful_or_helpful": hits,
-                                                                                  "bootstrap_rate": hits / cells, "welch_cells_reading_harmful_or_helpful": hits_w, "welch_rate": hits_w / cells,
+        (ARTIFACTS / "s9_null_calibration_SYNTHETIC.json").write_text(json.dumps({"SYNTHETIC": True, "seeds": 20, "cells": cells, "setup": "20 seeds x 7 types x 5 metrics, no planted effect, 13 vs 869", "bootstrap_cells_reading_harmful_or_helpful": hits_b,
+                                                                                  "bootstrap_rate": hits_b / cells, "welch_cells_reading_harmful_or_helpful": hits, "welch_rate": rate, "holm_across_metrics_rate": holds / cells,
                                                                                   "nominal_two_sided": 0.05, "note": "n_boot=1000; 13 episodes per type vs 869 clean; cells within a seed share the clean group, so they are not independent",
                                                                                   "single_cell_simulation": "13 vs 869 normal null, 1500 trials: percentile bootstrap 0.0853, Welch 0.0487 (data/scratch/dash_exec/draft/calib.py, artifacts/probes/calib.py)"}, indent=1))
         ty.drop(columns=["declarations"] if "declarations" in ty else []).to_csv(ARTIFACTS / "s9_discrepancy_types_SYNTHETIC.csv", index=False)
@@ -1271,13 +1300,14 @@ def planted_arms_mode() -> int:
         _, ta = run_case("ta", {"type-idle_padding": None}, {"type-idle_padding": {"hrt60": "T", "rmst60": "T"}})
         g = lambda t, arm, m: t[(t["arm"] == arm) & (t["metric"] == m)].iloc[0]  # noqa: E731
         h, f = g(ta, "type-idle_padding", "hrt60"), g(ta, "type-idle_padding", "f30")
-        okA = (h["status"] == "harmful (confirmed)" and f["status"] == "no detectable harm, bounded" and re.search(r"spanned \[-?[\d.]+, -?[\d.]+\] \(union over runs\)", f["sentence"])
-               and "not proof of no harm" in f["sentence"] and g(ta, "type-detour", "f30")["status"] == "no detectable harm, bounded")
+        okA = (h["status_code"] == "harmful (confirmed)" and f["status_code"] == "no detectable harm, bounded" and f["sentence"].startswith("SYNTHETIC: ") and h["status"].startswith("SYNTHETIC: ")
+               and "positive control in this round" in f["sentence"] and "shared by every type and seed" in f["sentence"] and re.search(r"spanned \[-?[\d.]+, -?[\d.]+\] \(union over runs\)", f["sentence"])
+               and "not proof of no harm" in f["sentence"] and g(ta, "type-detour", "f30")["status_code"] == "no detectable harm, bounded")
         _, tb = run_case("tb", {})
-        okB = set(tb["status"]) == {"inconclusive"} and tb["sentence"].str.contains("no arm showed an effect").all() and not tb["positive_control_in_round"].any()
+        okB = set(tb["status_code"]) == {"inconclusive"} and tb["sentence"].str.startswith("SYNTHETIC: ").all() and tb["sentence"].str.contains("no arm showed an effect").all() and not tb["positive_control_in_round"].any()
         txt = " ".join(ta["sentence"]) + " " + " ".join(tb["sentence"]) + (base / "o_ta" / "discrepancy_verdict.json").read_text() + (base / "o_tb" / "discrepancy_verdict.json").read_text()
         C.check("10.4 SYNTHETIC verdicts, positive control present: idle_padding harmful (confirmed) on hrt60 and 'no detectable harm, bounded' on f30 with the union CI in the sentence; no arm confirmed anywhere -> every status inconclusive ('no arm showed an effect ...'); the word 'harm'+'less' never appears",
-                bool(okA) and okB and ("harm" + "less") not in txt.lower(), f"A: hrt60 '{h['sentence'][:110]}...'; f30 '{f['sentence'][:200]}...'; B: {sorted(set(tb['status']))}")
+                bool(okA) and okB and ("harm" + "less") not in txt.lower(), f"A: hrt60 '{h['sentence'][:110]}...'; f30 '{f['sentence'][:200]}...'; B: {sorted(set(tb['status_code']))}")
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
         ta.drop(columns=["verify_run_ids"]).to_csv(ARTIFACTS / "s10_discrepancy_verdict_positive_control_SYNTHETIC.csv", index=False)
         tb.drop(columns=["verify_run_ids"]).to_csv(ARTIFACTS / "s10_discrepancy_verdict_all_null_SYNTHETIC.csv", index=False)
