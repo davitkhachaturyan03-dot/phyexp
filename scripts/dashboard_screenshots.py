@@ -6,7 +6,7 @@ Usage (the dashboard must be running, see ``dashboard/app.py``)::
     .venv/bin/python scripts/dashboard_screenshots.py --url http://localhost:8765 --out tracker/features/2026-10-22-dashboard/artifacts/screens [--check]
 
 Uses only ``websockets`` (a Streamlit dependency) and the Chrome binary. ``--check`` also measures, at a 1400 px window: every Altair chart's plot area (SVG ``path.background``,
-must be >= 200 px tall), that the sidebar holds no auto-generated page links, that no ``st.metric`` value is truncated, and that clicking a row of the Rollouts table selects that
+must be >= 200 px tall; per chart, the largest background rectangle), that the sidebar holds no auto-generated page links, that no ``st.metric`` value is truncated, and that clicking a row of the Rollouts table selects that
 rollout (a real mouse click on the grid's row marker). The measurements are returned by ``measure()`` and printed as JSON.
 """
 
@@ -102,7 +102,7 @@ async def measure(url: str, port: int, profile: Path, width: int = 1400, wait: f
             for page in PAGES:
                 await c.goto_page(page, wait)
                 m = await c.js("""(() => ({
-                    plots: [...document.querySelectorAll('svg path.background')].map(p => {const b = p.getBBox(); return [Math.round(b.width), Math.round(b.height)];}),
+                    plots: [...document.querySelectorAll('.vega-embed svg')].map(svg => { let best = [0, 0]; svg.querySelectorAll('path.background').forEach(p => { const b = p.getBBox(); if (b.width * b.height > best[0] * best[1]) best = [Math.round(b.width), Math.round(b.height)]; }); return best; }),
                     metrics: [...document.querySelectorAll('[data-testid=stMetricValue]')].map(e => ({text: e.innerText, truncated: e.scrollWidth > e.clientWidth + 1})),
                     images: [...document.querySelectorAll('[data-testid=stImage] img')].map(i => [i.naturalWidth, i.naturalHeight, Math.round(i.getBoundingClientRect().height)]),
                     exceptions: document.querySelectorAll('[data-testid=stException]').length}))()""")
@@ -111,11 +111,12 @@ async def measure(url: str, port: int, profile: Path, width: int = 1400, wait: f
                 await c.goto_page("Rollouts", wait)
                 rect = await c.js("""(() => { const e = document.querySelector('[data-testid=stDataFrame]'); const r = e.getBoundingClientRect(); return {x: r.left, y: r.top}; })()""")
                 await c.js("window.scrollTo(0, 0)")
-                before = await c.js("""(() => { const l=[...document.querySelectorAll('[data-testid=stWidgetLabel]')].find(x=>x.innerText.trim()==='Selected rollout'); return l.closest('[data-testid=stSelectbox]').innerText; })()""")
+                before = await c.js("""(() => { const l=[...document.querySelectorAll('[data-testid=stWidgetLabel]')].find(x=>x.innerText.trim()==='Selected rollout'); return l.closest('[data-testid=stSelectbox]').querySelector('input[role=combobox]').value; })()""")
                 await c.click(rect["x"] + 14, rect["y"] + 35 + row * 35 + 17)
                 await asyncio.sleep(5)
-                after = await c.js("""(() => { const l=[...document.querySelectorAll('[data-testid=stWidgetLabel]')].find(x=>x.innerText.trim()==='Selected rollout'); return l.closest('[data-testid=stSelectbox]').innerText; })()""")
-                out["row_click"] = {"row": row, "expected": rollout_ids[row], "before": before, "after": after, "selected_after_click": rollout_ids[row] in (after or "")}
+                after = await c.js("""(() => { const l=[...document.querySelectorAll('[data-testid=stWidgetLabel]')].find(x=>x.innerText.trim()==='Selected rollout'); return l.closest('[data-testid=stSelectbox]').querySelector('input[role=combobox]').value; })()""")
+                norm = lambda x: (x or "").replace("_", " ")  # the page shows names with spaces
+                out["row_click"] = {"row": row, "expected": rollout_ids[row], "before": before, "after": after, "selected_after_click": norm(rollout_ids[row]) in norm(after)}
     finally:
         ch.close()
     return out

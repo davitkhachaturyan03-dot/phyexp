@@ -21,8 +21,8 @@ def groupable() -> list[str]:
 def renamed_aggregate(agg: pd.DataFrame, col: str, group: str) -> pd.DataFrame:
     """``aggregate_by``'s table with plain column names (the declared functional is in the caption above the table)."""
     lab = words.metric_name(col)
-    return agg.rename(columns={f"{col}__mean": f"mean {lab}", f"{col}__lo": f"95% CI low: {lab}", f"{col}__hi": f"95% CI high: {lab}"})[
-        [group, "n", f"mean {lab}", f"95% CI low: {lab}", f"95% CI high: {lab}"]]
+    return agg.rename(columns={f"{col}__mean": f"mean {lab}", f"{col}__lo": f"95% CI low: {lab}", f"{col}__hi": f"95% CI high: {lab}", group: words.plain(group)})[
+        [words.plain(group), "n", f"mean {lab}", f"95% CI low: {lab}", f"95% CI high: {lab}"]]
 
 
 def render(ctx: dict) -> None:
@@ -40,7 +40,7 @@ def render(ctx: dict) -> None:
         st.markdown(f"**{title}**")
         ranked = base.sort_values([col, "episode_id"], ascending=[asc, True]).head(n_show).rename(columns={col: lab}).reset_index(drop=True)
         ranked.insert(0, "rank", ranked.index + 1)
-        st.dataframe(ranked, hide_index=True, width="stretch", key=f"rank_{key}")
+        st.dataframe(ranked.rename(columns={"episode_id": "episode", "task_name": "task", "length_steps": "length (steps)"}), hide_index=True, width="stretch", key=f"rank_{key}")
     st.markdown("**Aggregate by a catalog column** (PoC §1 p. 3: findings are usually per group of metadata)")
     group = st.selectbox("Aggregate by", groupable(), index=groupable().index("task_name"), key="ep_group", format_func=words.plain)
     agg = aggregate_by(t, group, [col], cat)
@@ -52,4 +52,4 @@ def render(ctx: dict) -> None:
     eid = st.selectbox("Episode (most harmful first)", list(ranked["episode_id"]), key="ep_play", format_func=words.plain)
     st.video(common.training_video(lr, ctx["run_id"], eid), width=420)
     row = cat[cat["episode_id"] == eid].iloc[0]
-    st.caption(f"{words.plain(eid)}: {words.plain(row['task_name'])}; scene {words.plain(row['scene'])}; source file {row['source_file']}; {int(row['length_steps'])} steps")
+    st.caption(f"{words.plain(eid)}: {words.plain(row['task_name'])}; scene {words.plain(row['scene'])}; source file {words.plain(row['source_file'])}; {int(row['length_steps'])} steps")

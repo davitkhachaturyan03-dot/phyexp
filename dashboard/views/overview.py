@@ -25,6 +25,7 @@ def render(ctx: dict) -> None:
     rows = [{"metric": words.metric_name(c), "functional": d["functional"], "time cap (tau)": d["tau"], "rollouts used": d["rollout_subset"], "good sign": d["good_sign"],
              "weighting": d.get("weighting", "")} for c, d in ctx["decls"].items() if c in common.harm_cols(ctx)]
     st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    common.declared_caption(common.harm_cols(ctx), ctx["decls"])
     info = common.run_info(ctx["lr"], ctx["run_id"])
     with st.expander("Lineage of this run (ids and commands)"):
         st.code(common.trace_command(ctx, ctx["run_id"]), language="bash")

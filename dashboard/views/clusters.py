@@ -13,7 +13,7 @@ from dashboard import common, words
 from vlapoc.analysis import GROUP_COLORS, GROUPS, metric_groups, plot_heatmap
 
 DEFAULT_FIG = common.REPO_ROOT / "data" / "dashboard_cache" / "figs"
-PLOT_HEIGHT = 420  # the plot area is measured in a real browser by verify_dashboard.py --render (>= 200 px)
+PLOT_HEIGHT = 560  # the plot area is measured in a real browser by verify_dashboard.py --render (>= 200 px)
 
 
 @st.cache_data(show_spinner=False)
@@ -133,10 +133,11 @@ def render(ctx: dict) -> None:
         st.caption("The same episodes are also described as: " + "; ".join(words.plain(e["definition"]) for e in eq))
     if confirm_id and cid in overall:
         cs = cstatus[cstatus["cluster_id"] == cid][["comparison", "metric", "expected", "status_display", "calls_by_seed", "met", "contradicted"]].copy()
+        cs["expected"] = cs["expected"].map({"treated_better": "removal should help", "treated_worse": "removal should hurt", "-": "none stated"})
         cs["metric"] = [words.metric_name(m) for m in cs["metric"]]
         cs["comparison"] = cs["comparison"].map({"vs_base": "against the original policy", "vs_matched_random": "against a matched random removal"})
         st.markdown(f"Round B verdicts (confirm run `{confirm_id[:8]}`; rule: confirmed if the expectation is met in at least 2 of 3 seeds and contradicted in none; T = removal helped, C = it hurt, 0 = no significant change, g = the macro-KS gate did not fire):")
-        st.dataframe(cs.rename(columns={"status_display": "status"}), hide_index=True, width="stretch", key="cl_status")
+        st.dataframe(cs.rename(columns={"status_display": "status", "calls_by_seed": "calls by seed", "met": "seeds as expected", "contradicted": "seeds contradicting"}), hide_index=True, width="stretch", key="cl_status")
     d = pd.DataFrame(p["descriptor_contrasts"]).head(6)
     if len(d):
         d["descriptor"] = [words.plain(x) for x in d["descriptor"]]

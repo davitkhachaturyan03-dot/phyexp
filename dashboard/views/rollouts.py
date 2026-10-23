@@ -20,6 +20,10 @@ def episode_rows(order: np.ndarray, row: np.ndarray, idx: dict, cat: pd.DataFram
     return out
 
 
+DISPLAY = {"rollout_id": "rollout", "task_name": "task", "failure_type": "failure type", "T_s": "time to success (s)", "event": "succeeded (1/0)", "censored": "timed out at the cap",
+           "episode_id": "episode", "source_file": "source file"}
+
+
 def show(label: str, value) -> None:
     """A labelled value as text (st.metric truncates long values such as ``timeout_partial_1_of_2``)."""
     st.markdown(f"**{label}**  \n{value}")
@@ -67,19 +71,19 @@ def render(ctx: dict) -> None:
         st.session_state["rollout_pick"] = ids[0]
     cols = [c for c in ("rollout_id", "task_name", "failure_type", "T_s", "event", "censored") if c in view]  # an eval record may lack the timing columns
     st.caption(f"{len(view)} of {len(ro)} rollouts. Click a row to select it, or use the list below.")
-    st.dataframe(view[cols], hide_index=True, width="stretch", on_select="rerun", selection_mode="single-row", key="roll_table")
-    rid = st.selectbox("Selected rollout", ids, key="rollout_pick")
+    st.dataframe(view[cols].rename(columns=DISPLAY), hide_index=True, width="stretch", on_select="rerun", selection_mode="single-row", key="roll_table")
+    rid = st.selectbox("Selected rollout", ids, key="rollout_pick", format_func=words.plain)
     r = ro[ro["rollout_id"] == rid].iloc[0]
-    st.markdown(f"**{rid}**")
+    st.markdown(f"**{words.plain(rid)}**")
     a, b, c, d = st.columns(4)
     with a:
-        show("Failure type", r["failure_type"])
+        show("Failure type", words.plain(r["failure_type"]))
     with b:
         show("Time to success (s)", "not recorded" if "T_s" not in r else ("none (did not succeed)" if pd.isna(r["T_s"]) else f"{r['T_s']:.1f}"))
     with c:
         show("Event (1 = success)", "not recorded" if "event" not in r else int(r["event"]))
     with d:
-        show("Timed out (censored)", "not recorded" if "censored" not in r else str(bool(r["censored"])))
+        show("Timed out at the cap", "not recorded" if "censored" not in r else str(bool(r["censored"])))
     if pd.notna(r.get("traj_episode_index")):
         vid = common.rollout_video(lr, r["eval_run_id"], int(r["traj_episode_index"]))
         if vid is None:
@@ -96,8 +100,8 @@ def render(ctx: dict) -> None:
     for title, order, key in (("Pushed toward this rollout (top 10)", pos, "toward"), ("Pushed away from this rollout (top 10)", neg, "away")):
         st.markdown(f"**{title}**")
         tbl = episode_rows(order, row, idx, ctx["cat"])
-        st.dataframe(tbl, hide_index=True, width="stretch", key=f"tbl_{key}")
+        st.dataframe(tbl.rename(columns=DISPLAY), hide_index=True, width="stretch", key=f"tbl_{key}")
         pick = st.selectbox("Play episode (rank)", list(tbl["rank"]), key=f"play_{key}")
         eid = tbl.loc[tbl["rank"] == pick, "episode_id"].iloc[0]
         st.video(common.training_video(lr, seed_run, eid), width=420)
-        st.caption(f"{words.plain(eid)}: source file {tbl.loc[tbl['rank'] == pick, 'source_file'].iloc[0]}")
+        st.caption(f"{words.plain(eid)}: source file {words.plain(tbl.loc[tbl['rank'] == pick, 'source_file'].iloc[0])}")

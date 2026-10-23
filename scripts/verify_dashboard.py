@@ -13,6 +13,7 @@ Run from the repo root; each mode exits 0 when every check passes::
     .venv/bin/python scripts/verify_dashboard.py --round-b       # S4: drop_cluster arms, the Round B chain, the confirm stage
     .venv/bin/python scripts/verify_dashboard.py --planted-arms  # S10: planted-type arms, ground-truth path, bounded verdict wording
     .venv/bin/python scripts/verify_dashboard.py --app           # S5: headless AppTest of every page on the demo store, video helper, server health
+    .venv/bin/python scripts/verify_dashboard.py --render        # S5 (round 2): what a real browser draws: plot areas, row click, navigation, truncation
     .venv/bin/python scripts/verify_dashboard.py --demo          # S6: the demo store (data/lineage_demo, built by scripts/dashboard_demo.py)
     .venv/bin/python scripts/verify_dashboard.py --dropin        # S7: a real-code chain and the real smoke run render with no file changes
 
@@ -27,6 +28,7 @@ from __future__ import annotations
 import argparse
 import ast
 import hashlib
+import re
 import json
 import os
 import shutil
@@ -1370,13 +1372,36 @@ def chart_strings(at) -> list[str]:
     return out
 
 
-def bare_columns(at) -> list[str]:
-    """Strings that name a score column (``harm_*`` / ``infl_*``) without its tau: dataframe column names, chart titles, captions, markdown, widget labels (PoC §3.4 p. 7)."""
-    import re
+SNAKE = re.compile(r"[a-z]+_[a-z_]+")
 
-    pat = re.compile(r"\b(?:harm|infl)_[a-z0-9]+")
-    strings = [str(c) for df in at.dataframe for c in df.value.columns] + chart_strings(at) + texts(at)
-    return sorted({x[:90] for x in strings if pat.search(x) and "τ" not in x and "tau" not in x.lower()})
+
+def label_strings(at) -> list[str]:
+    """Rendered *labels*: dataframe column names, widget labels and options, headings, markdown and captions (code blocks and backtick spans, which hold run names and ids, are left out),
+    metric labels and chart titles. Cell values (task names, recorded sentences) are data, not labels."""
+    out = [str(c) for df in at.dataframe for c in df.value.columns] + chart_strings(at) + [f"{m.label}" for m in at.metric]
+    for kind in ("markdown", "caption", "title", "subheader", "error", "warning", "info", "success"):
+        out += [str(e.value) for e in getattr(at, kind)]
+    for kind in ("selectbox", "radio", "multiselect", "checkbox", "toggle", "slider"):
+        for w in getattr(at, kind):
+            out.append(str(w.label))
+            out += [str(o) for o in getattr(w, "options", [])]
+    return [re.sub(r"`[^`]*`", "", x) for x in out]
+
+
+def snake_labels(at) -> list[str]:
+    """AC5.9: labels that still read like code (``snake_case``) outside run names and ids."""
+    return sorted({x[:80] for x in label_strings(at) if SNAKE.search(x)})
+
+
+def unreached(at) -> list[str]:
+    """AC5.4: short metric names shown on the page whose declared functional and tau are not reachable from it: some caption, markdown or tooltip must read ``<name>: <functional> [τ ...]``."""
+    from dashboard import words
+
+    labels = label_strings(at)
+    helps = [str(w.help) for kind in ("selectbox", "radio", "multiselect", "checkbox", "toggle", "slider") for w in getattr(at, kind) if getattr(w, "help", None)]
+    declared = [str(e.value) for kind in ("markdown", "caption") for e in getattr(at, kind)] + helps
+    shown = [n for n in words.METRICS.values() if any(n in x for x in labels)]
+    return [n for n in shown if not any(f"{n}: " in d and "τ" in d for d in declared)]
 
 
 def app_mode() -> int:
@@ -1386,7 +1411,7 @@ def app_mode() -> int:
     import urllib.request
 
     import streamlit
-    from dashboard.pages.episodes import groupable
+    from dashboard.views.episodes import groupable
     from vlapoc import results as res
     from vlapoc import video
     from vlapoc.analysis import aggregate_by
@@ -1410,7 +1435,7 @@ def app_mode() -> int:
             bad_pages.append((pg, [e.value[:100] for e in at.exception]))
         if not any("SYNTHETIC" in str(e.value) for e in at.error):
             no_banner.append(pg)
-        b = bare_columns(at)
+        b = snake_labels(at) + [f"functional not reachable: {n}" for n in unreached(at)]
         if b:
             bare[pg] = b
         print(f"  page {pg}: {len(at.dataframe)} dataframes, {len(at.get('video'))} videos, {len(at.get('vega_lite_chart'))} charts, {len(at.get('imgs'))} images")
@@ -1424,27 +1449,32 @@ def app_mode() -> int:
     pick = failed[failed["task_name"].str.startswith("KITCHEN")].iloc[0] if (failed["task_name"].str.startswith("KITCHEN")).any() else failed.iloc[0]
     at.checkbox(key="only_failed").set_value(True)
     at.selectbox(key="rollout_pick").set_value(pick["rollout_id"]).run()
-    ft = [m.value for m in at.metric if m.label == "Failure type"]
+    ft = [str(e.value).split("  \n", 1)[1] for e in at.markdown if str(e.value).startswith("**Failure type**")]
     m_, idx = res.influence(seed, lr)
     row = m_[int(pick["matrix_row"])]
     want = [idx["episode_id"][j] for j in np.argsort(-row, kind="stable")[:10]]
-    tbl = next(df.value for df in at.dataframe if "influence on this rollout" in df.value.columns)
+    tbl = next(df.value for df in at.dataframe if "influence on this rollout" in df.value.columns).rename(columns={"episode": "episode_id"})
     ret = res._fetch(client(lr).get_run(json.loads(client(lr).get_run(seed).data.params["returns_run_ids"])[0 if pick["eval_run_id"] == json.loads(client(lr).get_run(seed).data.params["eval_run_ids"])[0] else 1]), "returns", lr, pd.read_parquet)
     ret_ft = ret.set_index("rollout_id").loc[pick["rollout_id"], "failure_type"]
     C.check("5.2 Rollouts: a selected failed rollout shows the failure type of returns.parquet, a video, and 10 episode rows in the order of argsort of its influence-matrix row (recomputed here)",
-            ft and ft[0] == ret_ft and len(at.get("video")) >= 1 and list(tbl["episode_id"]) == want and len(tbl) == 10,
+            ft and ft[0] == __import__("dashboard.words", fromlist=["plain"]).plain(ret_ft) and len(at.get("video")) >= 1 and list(tbl["episode_id"]) == want and len(tbl) == 10,
             f"rollout {pick['rollout_id']}: failure type {ft} (returns.parquet: {ret_ft}); {len(at.get('video'))} videos; top-10 order equal: {list(tbl['episode_id']) == want}")
     # --- AC5.3 episodes ---
     go(at, "Episodes")
     ens = man["scores_run_id"]
     t, decls = res.score_table(ens, lr), res.functionals(ens, lr)
     col = at.selectbox(key="ep_col").value
-    lab = res.__dict__ and __import__("vlapoc.analysis", fromlist=["axis_label"]).axis_label(col, decls)
-    ranked = next(df.value for df in at.dataframe if lab in df.value.columns)
+    from dashboard import words
+
+    lab = words.metric_name(col)
+    _w = words
+    ranked = next(df.value for df in at.dataframe if lab in df.value.columns).rename(columns={"episode": "episode_id"})
     exp = t.sort_values([col, "episode_id"], ascending=[False, True])["episode_id"].head(len(ranked)).tolist()
     opts = at.selectbox(key="ep_group").options
     cat = res.training_episodes(ens, lr)[1]
     agg_shown = next(df.value for df in at.dataframe if any(str(c).startswith("mean ") for c in df.value.columns))
+    agg_group = [c for c in agg_shown.columns if c not in ("n",) and not str(c).startswith(("mean ", "95%"))][0]
+    assert agg_shown.columns[2] == f"mean {lab}"
     agg = aggregate_by(t, at.selectbox(key="ep_group").value, [col], cat)
     from vlapoc.catalog import CATALOG_COLUMNS
     from vlapoc.lineage import GROUP_COLUMNS_EXCLUDED
@@ -1456,32 +1486,41 @@ def app_mode() -> int:
     except Exception as e:  # noqa: BLE001
         objects_ok, objects_err = False, type(e).__name__
     C.check("5.3 Episodes: the ranked list equals the score table sorted by the chosen harm column; 'aggregate by' offers the groupable catalog columns (CATALOG_COLUMNS minus GROUP_COLUMNS_EXCLUDED, minus the list-valued 'objects', which aggregate_by cannot group: measured); the table equals aggregate_by",
-            list(ranked["episode_id"]) == exp and list(opts) == groupable() == [c for c in full if c != "objects"] and not objects_ok
+            list(ranked["episode_id"]) == exp and list(opts) == [words.plain(c) for c in groupable()] and groupable() == [c for c in full if c != "objects"] and not objects_ok
             and np.allclose(agg_shown.iloc[:, 2].to_numpy(float), agg[f"{col}__mean"].to_numpy(float)) and list(agg_shown["n"]) == list(agg["n"]),
             f"{len(ranked)} ranked rows equal; offered {list(opts)}; objects fails with {objects_err if not objects_ok else 'nothing'}; aggregate rows {len(agg)}")
     # --- AC5.4 labels ---
-    C.check("5.4 every displayed score column label names its declared functional and tau: no dataframe column name, caption, markdown, widget label or chart title names a harm_/infl_ column without it (all 5 pages scanned)",
-            not bare, f"bare strings: {bare}")
+    C.check("5.4/5.9 plain language with the declared functional reachable: no rendered label (dataframe column, widget label or option, heading, caption, markdown, chart title) matches [a-z]+_[a-z_]+ outside run names and ids, and every metric name shown has "
+            "its '<name>: <functional> [τ ...]' declaration in a caption or tooltip on the same page (all 5 pages scanned)", not bare, f"offending labels: {bare}")
     # --- AC5.5 clusters ---
     go(at, "Clusters")
     spec = " ".join(ch.proto.spec for ch in at.get("vega_lite_chart"))  # the quadrant labels are inline data values of a text layer
-    at.selectbox(key="cl_metric").set_value("harm_hrt60_lin").run()
-    tab = next(df.value for df in at.dataframe if "definition" in df.value.columns and "status" in df.value.columns)
+    cid0 = man["picked_clusters"]["cluster0"]
+    at.selectbox(key="cl_metric").set_value(f"harm_{cid0.split(':')[1]}" if cid0.startswith("slice:") else "harm_hrt60_lin").run()
+    tab = next(df.value for df in at.dataframe if "cluster" in df.value.columns and "status" in df.value.columns)
+    from dashboard import words as _w
+
+    cdef = res.output_table(man["clusters_run_id"], "clusters", lr).set_index("cluster_id")["definition"]
     st_of = dict(zip(tab["cluster"], tab["status"]))
+    st_of = {cid_: st_of.get(_w.plain(cdef[cid_])) for cid_ in man["picked_clusters"].values() if cid_ in cdef.index} | {"_all": None}
+    st_all = set(tab["status"])
     md = " ".join(str(e.value) for e in at.markdown)
     quad = all(q in spec for q in ("consistent harmers", "consistent helpers", "trade-off"))
     conf = man["confirm_overall"]
     C.check("5.5 Clusters: heatmap, a clickable scatter with the four quadrant labels, the cluster list with status from the confirm run when one exists (else estimated) and a lineage link per cluster",
-            len(at.get("image")) >= 1 and len(at.get("vega_lite_chart")) >= 1 and quad and st_of.get("slice:hrt60_lin:harm:1") == conf["slice:hrt60_lin:harm:1"]
-            and set(st_of.values()) <= {"estimated", "confirmed", "refuted", "not confirmed", "mixed"} and "#/experiments/" in md and "vlapoc.lineage trace" in " ".join(c.value for c in at.code),
-            f"quadrant labels in the chart spec: {quad}; statuses {sorted(set(st_of.values()))}; slice:hrt60_lin:harm:1 = {st_of.get('slice:hrt60_lin:harm:1')} (confirm run: {conf['slice:hrt60_lin:harm:1']})")
+            len(at.get("image")) >= 1 and len(at.get("vega_lite_chart")) >= 1 and quad and st_of.get(cid0) == "SYNTHETIC: " + conf[cid0]
+            and all(x.removeprefix("SYNTHETIC: ") in {"estimated", "confirmed", "refuted", "not confirmed", "mixed"} for x in st_all) and "#/experiments/" in md and "vlapoc.lineage trace" in " ".join(c.value for c in at.code),
+            f"quadrant labels in the chart spec: {quad}; statuses shown {sorted(st_all)}; {cid0} = {st_of.get(cid0)} (confirm run: {conf[cid0]})")
     # --- AC5.5b bad vs harmful ---
     go(at, "Bad vs harmful")
     drun = res.runs_with_param("score", "score_run_id", ens, lr)
     drun = [r for r in drun if "discrepancy_episodes" in r["outputs"]][0]
     ep = res.output_table(drun["run_id"], "discrepancy_episodes", lr)
     metric = at.selectbox(key="bvh_metric").value
+    from dashboard import words as _w2
+
     shown = next(df.value for df in at.dataframe if "quadrant" in df.value.columns)
+    inv = {v: k for k, v in _w2.QUADRANTS.items()}
     want_q = ep[f"quadrant__{metric}"].value_counts().reindex(QUADRANTS, fill_value=0)
     vruns = [r for r in res.find_runs("summarize", lr) if "discrepancy_verdict" in r["outputs"]]
     vt = res.output_table(vruns[0]["run_id"], "discrepancy_verdict", lr)
@@ -1489,7 +1528,7 @@ def app_mode() -> int:
     alltxt = " ".join(texts(at)) + " ".join(str(c) for df in at.dataframe for c in df.value.to_numpy().ravel())
     nvid = len(at.get("video"))
     C.check("5.5b Bad-vs-harmful: quadrant counts equal discrepancy_episodes.parquet's; statuses and sentences equal the discrepancy-verdict run's verbatim; the word 'harm'+'less' appears nowhere on the page; the selected type shows two video elements (corrupted, original)",
-            dict(zip(shown["quadrant"], shown["episodes"])) == {q: int(want_q[q]) for q in QUADRANTS} and set(vshown["sentence"]) == set(vt["sentence"]) and set(vshown["status"]) == set(vt["status"])
+            {inv[k]: v for k, v in zip(shown["quadrant"], shown["episodes"])} == {q: int(want_q[q]) for q in QUADRANTS} and set(vshown["sentence"]) == set(vt["sentence"]) and set(vshown["status"]) == set(vt["status"])
             and ("harm" + "less") not in alltxt.lower() and nvid == 2,
             f"quadrant counts {dict(zip(shown['quadrant'], shown['episodes']))}; {len(vshown)} verdict rows, statuses {sorted(set(vshown['status']))}; {nvid} videos")
     # --- AC5.6 video ---
@@ -1704,12 +1743,62 @@ def dropin_mode() -> int:
     return C.finish({"SYNTHETIC": "fixture features/rollouts/returns"})
 
 
-MODES = {"results": results, "clusters": clusters_mode, "planted": planted_mode, "discrepancy": discrepancy_mode, "round_b": round_b_mode, "planted_arms": planted_arms_mode, "app": app_mode, "demo": demo_mode, "dropin": dropin_mode}
+def render_mode() -> int:
+    """S5, AC5.10: what a real browser draws, measured in headless Chrome at a 1400 px window (AppTest cannot see any of it)."""
+    import asyncio
+    import subprocess
+    import urllib.request
+
+    import dashboard_screenshots as ds
+    from vlapoc import results as res
+
+    C = Checker("render")
+    if not DEMO.exists():
+        print("data/lineage_demo is missing: run scripts/dashboard_demo.py build --with-smoke first")
+        return 2
+    man = json.loads((DEMO / "demo_manifest.json").read_text())
+    seed = res.seed_runs(man["scores_run_id"], DEMO)[0]
+    ro = res.rollouts(seed, DEMO)
+    ids = list(ro[ro["failure_type"] != "success"]["rollout_id"])  # the Rollouts table at its default filters, in display order
+    port = 8767
+    srv = subprocess.Popen([sys.executable, "-m", "streamlit", "run", str(APP), "--server.headless", "true", "--server.port", str(port), "--browser.gatherUsageStats", "false", "--",
+                            "--lineage-root", "data/lineage_demo", "--scores", "attribute-demo-ens"], cwd=REPO_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        for _ in range(60):
+            try:
+                urllib.request.urlopen(f"http://localhost:{port}/_stcore/health", timeout=2)
+                break
+            except Exception:  # noqa: BLE001
+                time.sleep(0.5)
+        m = asyncio.run(ds.measure(f"http://localhost:{port}", 9433, SCRATCH / "chrome-profile", 1400, 10.0, ids, row=4))
+    finally:
+        srv.terminate()
+        srv.wait(timeout=15)
+    ARTIFACTS.mkdir(parents=True, exist_ok=True)
+    (ARTIFACTS / "s5_render_measurements.json").write_text(json.dumps(m, indent=1))
+    plots = {pg: v["plots"] for pg, v in m["pages"].items()}
+    small = {pg: [x for x in ps if x[1] < 200] for pg, ps in plots.items() if any(x[1] < 200 for x in ps)}
+    axes = json.loads(next((REPO_ROOT / "data" / "dashboard_cache" / "figs").glob(f"{man['scores_run_id']}-heatmap-v2.axes.json")).read_text())
+    imgs = m["pages"]["Clusters"]["images"]
+    C.check("5.10a every Altair chart's plot area is at least 200 px tall at 1400 px (SVG path.background; Clusters and Bad vs harmful each have one) and the matplotlib heatmap's axes area and displayed image are at least 200 px tall",
+            not small and len(plots["Clusters"]) >= 1 and len(plots["Bad vs harmful"]) >= 1 and axes["axes_height_px"] >= 200 and all(i[2] >= 200 for i in imgs),
+            f"plot areas (w, h) {plots}; heatmap axes {axes['axes_width_px']:.0f}x{axes['axes_height_px']:.0f}px, displayed image heights {[i[2] for i in imgs]}")
+    rc = m.get("row_click", {})
+    C.check("5.10b clicking row 5 of the Rollouts table makes the page show that row's rollout_id as the selected rollout", rc.get("selected_after_click") is True and rc.get("before") != rc.get("after"),
+            f"expected {rc.get('expected')!r}; selected before {rc.get('before')!r}, after {rc.get('after')!r}")
+    trunc = [(pg, x["text"]) for pg, v in m["pages"].items() for x in v["metrics"] if x["truncated"]]
+    exc = {pg: v["exceptions"] for pg, v in m["pages"].items() if v["exceptions"]}
+    C.check("5.10c no st.metric value is truncated, the sidebar holds no auto-generated page links (only the page radio), and no page shows an exception",
+            not trunc and m["sidebar_nav_links"] == 0 and not exc, f"truncated {trunc}; sidebar page links {m['sidebar_nav_links']}; exceptions {exc}")
+    return C.finish({"measurements": m})
+
+
+MODES = {"results": results, "clusters": clusters_mode, "planted": planted_mode, "discrepancy": discrepancy_mode, "round_b": round_b_mode, "planted_arms": planted_arms_mode, "app": app_mode, "render": render_mode, "demo": demo_mode, "dropin": dropin_mode}
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    for m, h in (("results", "S1"), ("clusters", "S2"), ("planted", "S3"), ("discrepancy", "S9"), ("round_b", "S4"), ("planted_arms", "S10"), ("app", "S5"), ("demo", "S6"), ("dropin", "S7")):
+    for m, h in (("results", "S1"), ("clusters", "S2"), ("planted", "S3"), ("discrepancy", "S9"), ("round_b", "S4"), ("planted_arms", "S10"), ("app", "S5"), ("render", "S5 rendering"), ("demo", "S6"), ("dropin", "S7")):
         ap.add_argument(f"--{m.replace('_', '-')}", dest=m, action="store_true", help=h)
     a = ap.parse_args()
     ran = [m for m in MODES if getattr(a, m, False)]

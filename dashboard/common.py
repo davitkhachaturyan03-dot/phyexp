@@ -159,7 +159,7 @@ def label(col: str, decls: dict) -> str:
 
 def declared(col: str, decls: dict) -> str:
     """``Speed vs human (HRT): HRT(60) = ... [τ 60 s, all, good_sign +1]``: the short name and the declaration from ``functionals.json``."""
-    return f"{words.metric_name(col)}: {axis_label(col, decls).split(': ', 1)[1]}"
+    return f"{words.metric_name(col)}: {axis_label(col, decls).split(': ', 1)[1]}".replace("good_sign ", "good sign ")
 
 
 def declared_caption(cols: list[str], decls: dict) -> None:

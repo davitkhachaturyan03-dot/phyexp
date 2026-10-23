@@ -58,6 +58,7 @@ def render(ctx: dict) -> None:
     vr = [r for r in common.runs_from(lr, "summarize", "kind", "discrepancy-verdict (Round B planted, PoC §9.2)") if "discrepancy_verdict" in r["outputs"]]
     if vr:
         st.markdown(f"**Round B (retrained without the arm; verdict run `{vr[0]['name']}`, {vr[0]['run_id'][:8]}).** Statuses and sentences are shown as recorded.")
+        common.declared_caption([f"harm_{k}" for k in metrics], ctx["decls"])
         vt = common.table_of(lr, vr[0]["run_id"], "discrepancy_verdict")
         vv = vt[["arm", "metric", "status", "sentence", "calls", "claim_clean_but_harmful"]].copy()
         vv["arm"] = [words.plain(a.replace("type-", "").replace("-", " ")) + (" (removed)" if a.startswith("type-") else "") for a in vv["arm"]]
