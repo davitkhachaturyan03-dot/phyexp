@@ -113,6 +113,27 @@ non-specialist (summarizer rule). Model routing: planner and analyzer Opus 5.5; 
 - Agents here stall and hit usage limits: write and commit incrementally; write the first draft of any file early.
 - Refused writes: return the full content in your reply; the orchestrator saves it verbatim.
 
+## Addition from the owner (2026-10-22, mid-planning, verbatim)
+
+> can you incorporate something on the fly? I think a good point in the POC is to show a real pattern that would show
+> that bad episodes are not always harmful for a policy. how can we show that discrepancy?
+
+This is the PoC's own "most compelling output" (quoted, §9.2 p.19): "where screening and outcome attribution disagree:
+episodes that look bad but do not hurt the policy, and episodes that look clean but do." CUPID reports the same effect
+(quoted, Fig. 4 caption p.8): quality measures "degrade performance when higher-quality demonstrations induce" brittle
+strategies. Orchestrator's proposed shape (inferred, for the planner to verify and plan):
+- **"Looks bad" signal (screening):** the label-free heuristics H1–H8 from the ground-truth feature already exist (and the
+  answer-key labels on v3, used only after discovery). Full DemInf / RoboDrop screening is a larger add; the planner decides
+  whether it is needed or whether H1–H8 suffice for the PoC, and says so.
+- **"Actually hurts" signal:** outcome attribution (per-metric influence) and, for confirmation, retraining arms.
+- **The discrepancy view:** a screening-vs-influence quadrant (looks bad & harmful / looks bad & harmless / looks clean &
+  harmful / clean & harmless) per metric, in the dashboard and as a clusters-stage output, with example videos.
+- **Making "not harmful" a real claim:** on v3, per planted corruption type, the confirmation arm "remove all of type X"
+  against the matched random control and the two-step verdict. A type whose removal does not beat random is "bad but not
+  harmful *to this policy on this metric*". A non-significant gate is not proof of no effect, so the plan must state the
+  claim carefully (e.g. an effect-size bound / CI, not "harmless"). Round B in the runbook then includes these arms.
+- On synthetic data it is only a demo of the view; the real claim needs the server.
+
 ## Owner rulings
 
 (none yet)
