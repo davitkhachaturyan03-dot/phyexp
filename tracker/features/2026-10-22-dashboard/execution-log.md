@@ -97,3 +97,7 @@ Outputs of the stage (MLflow `output_file`): `discrepancy_episodes.parquet`, `di
 - **F9 (S9):** the any-of-H1-H8 "practical filter" flags 46% of the data because nine rankers each flag 9.48%; the per-heuristic rows (e.g. H5 26/26, H6 13/13 precise) are the informative layer. The plan's definition is kept and the share is reported.
 - **F10 (S2):** the cluster `reading` compares each cluster with the subset mean, which the planted (or real) structure itself shifts; null clusters can read helpful/harmful relative to it. On the server's z-scored ensemble the subset mean is 0, which removes the effect.
 - No plan premise was found false beyond F8; no story is blocked. B2 can proceed.
+
+## Round 1 / Batch B2: S4, S10, AC8.2b (executor, 2026-10-22)
+Start: HEAD `1682ff8`, `data/lineage/mlflow.db` sha256 `306af4123fda7e635892d459a2e34008ba1cb62f6c4fce152c546e0da7bdde79`. Coordinator instruction: findings F1-F10 stay for the analyzer; the bootstrap is not changed.
+(Per-story sections follow as each lands.)
