@@ -505,6 +505,24 @@ def declaration_of(score_run_id: str, column: str, lineage_root: Path | None = N
     return rows[0]
 
 
+def featurized_rollouts(rollouts: pd.DataFrame) -> pd.DataFrame:
+    """The eval record's rollouts that have a recorded trajectory, sorted by ``traj_episode_index``: the rows of the rollout ×
+    episode influence matrix, in order (``attribute`` and ``attribute_run``'s ``influence_index`` both use this one function)."""
+    ro = rollouts.dropna(subset=["traj_episode_index"]).copy()
+    ro["traj_episode_index"] = ro["traj_episode_index"].astype(int)
+    return ro.sort_values("traj_episode_index").reset_index(drop=True)
+
+
+def influence_index(table: pd.DataFrame, rollouts: pd.DataFrame) -> dict:
+    """The row/column labels of the recorded influence matrix (dashboard S1; PoC §2.7 p. 5 "select a failed rollout ... the most
+    influential training episodes"): ``rollout_id`` per row (``featurized_rollouts`` order) and ``episode_id`` + ``content_hash`` per
+    column (the score table's row order, which is ``subset.episodes()`` sorted by ``episode_index``)."""
+    return {"rows": "rollout_id, featurized rollouts sorted by traj_episode_index",
+            "columns": "episode_id and content_hash, the score table's row order",
+            "rollout_id": featurized_rollouts(rollouts)["rollout_id"].tolist(),
+            "episode_id": table["episode_id"].tolist(), "content_hash": table["content_hash"].tolist()}
+
+
 def attribute(train_feats_prefix: Path, rollout_feats_prefix: Path, episodes: pd.DataFrame, rollouts: pd.DataFrame,
               ret: pd.DataFrame, damping: float = 1e-3, center: bool = True, rollout_mean: bool = False,
               device: str | None = None, return_encoding: str = "pm1") -> tuple[pd.DataFrame, np.ndarray, dict]:
@@ -524,9 +542,7 @@ def attribute(train_feats_prefix: Path, rollout_feats_prefix: Path, episodes: pd
     missing = sorted(set(row_of_ep) - set(np.unique(tmeta["episode_index"]).tolist()))
     if missing:
         raise ValueError(f"{len(missing)} training episodes have no features, e.g. {missing[:3]}")
-    ro = rollouts.dropna(subset=["traj_episode_index"]).copy()
-    ro["traj_episode_index"] = ro["traj_episode_index"].astype(int)
-    ro = ro.sort_values("traj_episode_index").reset_index(drop=True)
+    ro = featurized_rollouts(rollouts)
     row_of_traj = {int(e): i for i, e in enumerate(ro["traj_episode_index"])}
     if set(np.unique(rmeta["episode_index"]).tolist()) != set(row_of_traj):
         raise ValueError("rollout features and the eval record's traj_episode_index disagree")
@@ -564,6 +580,10 @@ def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, trai
     in the manifest) are refused by the two data-binding checks above; regenerate them with ``scripts/stage.py features``.
     Rewriting a manifest's ``dataset_root`` by hand defeats the check, because the manifest is then no longer evidence of
     what the features were computed on.
+
+    Dashboard S1 (PoC §2.7 p. 5): also records the rollout × episode matrix (``influence_matrix``, the ``.npy``) and its labels
+    (``influence_index``: ``rollout_id`` per row, ``episode_id``/``content_hash`` per column) as outputs, read back by
+    ``vlapoc.results.influence``; runs written before this change have neither.
 
     Records (training-attribution S3, PoC §2.1 item 1 p. 3 and §3.4 p. 7): the sha256 of every feature ``.npy`` and
     ``.meta.npz`` file it read as inputs of kind ``features`` (so a regenerated feature file is distinguishable), the
@@ -625,10 +645,15 @@ def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, trai
     out_dir = Path(out_dir) if out_dir is not None else DEFAULT_OUT / name
     out_dir.mkdir(parents=True, exist_ok=True)
     paths = {"attribution_scores": out_dir / "attribution_scores.parquet", "agreement": out_dir / "agreement.json",
-             "influence_matrix": out_dir / "rollout_episode_influence.npy", "functionals": out_dir / "functionals.json"}
+             "influence_matrix": out_dir / "rollout_episode_influence.npy", "functionals": out_dir / "functionals.json",
+             "influence_index": out_dir / "influence_index.json"}
     table.to_parquet(paths["attribution_scores"], index=False)
     paths["agreement"].write_text(json.dumps(agree, indent=1))
     np.save(paths["influence_matrix"], m)
+    index = influence_index(table, rollouts)
+    if (len(index["rollout_id"]), len(index["episode_id"])) != m.shape:
+        raise ValueError(f"influence index {(len(index['rollout_id']), len(index['episode_id']))} does not match the matrix {m.shape}")
+    paths["influence_index"].write_text(json.dumps(index))
     decls = column_declarations(table, ret, center, return_encoding, tuple(shared["output_fns"]))
     paths["functionals"].write_text(json.dumps(decls, indent=1, ensure_ascii=False))
     with stage_run("attribute", name, lineage_root, chain=chain, allow_dirty=allow_dirty) as r:
@@ -660,6 +685,10 @@ def attribute_run(train_run_id: str, eval_run_id: str, returns_run_id: str, trai
         r.output_file("attribution_scores", paths["attribution_scores"], kind="score_table")
         r.output_file("agreement", paths["agreement"], kind="agreement")
         r.output_file("functionals", paths["functionals"], kind="functionals")
+        # Dashboard S1 (PoC §2.7 p. 5): the rollout × episode matrix and its row/column labels are lineage outputs, so the dashboard
+        # reads them from the store (``vlapoc.results.influence``, sha-checked) and not from an ad-hoc path.
+        r.output_file("influence_matrix", paths["influence_matrix"], kind="file")
+        r.output_file("influence_index", paths["influence_index"], kind="file")
         r.tags({"attribute.n_rollouts": int(m.shape[0]), "attribute.n_episodes": len(table)})
         return {"run_id": r.run_id, "scores": rel(paths["attribution_scores"]), "n_episodes": len(table),
                 "n_rollouts": int(m.shape[0]), "agreement": agree}

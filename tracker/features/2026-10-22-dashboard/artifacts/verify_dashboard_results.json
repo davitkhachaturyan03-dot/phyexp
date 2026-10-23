@@ -1,0 +1,69 @@
+{
+ "mode": "results",
+ "pass": true,
+ "n_pass": 12,
+ "n": 12,
+ "seconds": 7,
+ "checks": [
+  {
+   "name": "1.1a attribute_run records outputs influence_matrix and influence_index",
+   "pass": true,
+   "detail": "recorded outputs: ['agreement', 'attribution_scores', 'functionals', 'influence_index', 'influence_matrix']"
+  },
+  {
+   "name": "1.1b results.influence matrix shape == (attribute.n_rollouts, attribute.n_episodes); index column order == score table episode_id order",
+   "pass": true,
+   "detail": "matrix (12, 14), tags (12, 14), index 12 rollouts x 14 episodes"
+  },
+  {
+   "name": "1.1c results.rollouts joins eval record and returns, with matrix_row == position in index['rollout_id']",
+   "pass": true,
+   "detail": "12 rollouts, failure types ['success', 'timeout']"
+  },
+  {
+   "name": "1.1d results.functionals declares every score column (PoC \u00a73.4)",
+   "pass": true,
+   "detail": "28 declared columns"
+  },
+  {
+   "name": "1.2a a tampered matrix artifact is refused (ValueError naming the sha256)",
+   "pass": true,
+   "detail": "run 96a635dc234d4e4ab650840097251fc3: artifact rollout_episode_influence.npy differs from its recorded sha256 (output.influence_matrix.sha25"
+  },
+  {
+   "name": "1.2b the real store's stand-in attribute run: 'not recorded (run predates dashboard S1)'",
+   "pass": true,
+   "detail": "attribute-train-full-s0 [stand-in]: influence matrix not recorded (run babbdb329ed6 'attribute-train-full-s0 [stand-in]' predates dashboard S1; re-run the attribute stage to record it)"
+  },
+  {
+   "name": "1.3 provenance unit check: 7/7 cases (6 required + 1 extra), each non-REAL case names its reason",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "1.3b a fixture attribute run (train/eval without server tags) is not REAL",
+   "pass": true,
+   "detail": "SMOKE: [\"smoke: train-dash-s0 (train, b19505cd): tag vlapoc.smoke is None, not 'false'\", \"smoke: eval-dash-s0 (eval, fc0d6163): tag eval.attribution_grade is None, not 'true'\"]"
+  },
+  {
+   "name": "1.3c seed_runs of a seed run is itself",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "1.4 results.py imports nothing from vlapoc.groundtruth / recovery / discrepancy",
+   "pass": true,
+   "detail": "forbidden imports: []"
+  },
+  {
+   "name": "1.6 grounding docstrings cite \u00a72.7 p. 5, \u00a73.4 p. 7, \u00a72.1 items 1 and 4 p. 3",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "R real data/lineage/mlflow.db sha256 unchanged by this mode",
+   "pass": true,
+   "detail": "306af4123fda7e63..."
+  }
+ ]
+}

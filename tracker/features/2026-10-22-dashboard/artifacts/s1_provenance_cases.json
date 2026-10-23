@@ -1,0 +1,66 @@
+{
+ "note": "fake runs in a scratch store; no model or data",
+ "cases": [
+  {
+   "case": "all real (server-written tags)",
+   "expected": "REAL",
+   "label": "REAL",
+   "reasons": [],
+   "ok": true
+  },
+  {
+   "case": "one vlapoc.synthetic=true",
+   "expected": "SYNTHETIC",
+   "label": "SYNTHETIC",
+   "reasons": [
+    "synthetic: fake-attribute-p1 (attribute, bfe34034): tag vlapoc.synthetic=true"
+   ],
+   "ok": true
+  },
+  {
+   "case": "one vlapoc.smoke=true (train run)",
+   "expected": "SMOKE",
+   "label": "SMOKE",
+   "reasons": [
+    "smoke: fake-train-p2 (train, 9c77485d): tag vlapoc.smoke is 'true', not 'false'"
+   ],
+   "ok": true
+  },
+  {
+   "case": "one eval.attribution_grade=false",
+   "expected": "SMOKE",
+   "label": "SMOKE",
+   "reasons": [
+    "smoke: fake-eval-p3 (eval, 2cedbb0d): tag eval.attribution_grade is 'false', not 'true'"
+   ],
+   "ok": true
+  },
+  {
+   "case": "one missing tag (train run has no vlapoc.smoke)",
+   "expected": "SMOKE",
+   "label": "SMOKE",
+   "reasons": [
+    "smoke: fake-train-p4 (train, 4a911467): tag vlapoc.smoke is None, not 'false'"
+   ],
+   "ok": true
+  },
+  {
+   "case": "one stand-in (attribute run)",
+   "expected": "SMOKE",
+   "label": "SMOKE",
+   "reasons": [
+    "smoke: fake-attribute-p5 (attribute, 4ddfe213): tag vlapoc.stand_in=true (a stand-in, not the real stage)"
+   ],
+   "ok": true
+  },
+  {
+   "case": "extra: synthetic param True",
+   "expected": "SYNTHETIC",
+   "label": "SYNTHETIC",
+   "reasons": [
+    "synthetic: fake-attribute-p6 (attribute, 1ed69e79): param synthetic=True"
+   ],
+   "ok": true
+  }
+ ]
+}
