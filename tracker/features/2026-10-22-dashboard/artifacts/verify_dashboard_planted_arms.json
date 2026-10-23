@@ -1,0 +1,66 @@
+{
+ "mode": "planted_arms",
+ "pass": true,
+ "n_pass": 8,
+ "n": 8,
+ "seconds": 8,
+ "checks": [
+  {
+   "name": "10.1 --round-b-planted default (owner option a): 11 arms, 33 trainings, 129 jobs (plan arithmetic); --no-oracle 27 trainings, 108 jobs; --random-draws 2: +3 trainings, +33 jobs",
+   "pass": true,
+   "detail": "MEASURED default 129 jobs / 33 trainings; no-oracle 108 / 27; random-draws 2: 162 jobs (+33) / 36 trainings (+3); arms ['type-action_noise', 'type-detour', 'type-dropped_frames', 'type-gripper_release', 'type-idle_padding', 'type-instruction_swap', ..."
+  },
+  {
+   "name": "10.1b structure: one select job with 11 select-planted commands (7 types, cleanharm, cleanrandom, oracle, oracle control), every train job has --groundtruth-arm, 27 curated_vs_random verifies (8 effect arms x 3 seeds + oracle x 3), discrepancy-verdict depends on every verify",
+   "pass": true,
+   "detail": "11 select-planted, 27 curated_vs_random verifies, 60 verify jobs"
+  },
+  {
+   "name": "10.5 every planted arm's train argv equals the base recipe's (same seed) except --subset, --name and --groundtruth-arm",
+   "pass": true,
+   "detail": "33 train jobs compared, mismatches []"
+  },
+  {
+   "name": "10.2 each type arm's child has 947 episodes, exactly that type's 13 labelled episodes removed; cleanrandom: 947, 13 clean episodes from 13 distinct tasks; cleanharm: 947, the most harmful clean episode of each of the top 13 tasks; oracle: 869; oracle control: 869 with the oracle's per-task counts",
+   "pass": true,
+   "detail": "sizes {'type-action_noise': 947, 'type-detour': 947, 'type-dropped_frames': 947, 'type-gripper_release': 947, 'type-idle_padding': 947, 'type-instruction_swap': 947, 'type-time_shift': 947, 'cleanrandom0': 947, 'oracle': 869, 'cleanrandom91-0': 869, 'cleanharm-f30': 947}; oracle per-task counts [4, 5]"
+  },
+  {
+   "name": "10.6 expected_direction: type and cleanharm arms (and the oracle) treated_better on every metric, except where the label's hypothesis names metrics (idle_padding: rmst60, hrt60; gripper_release: f30, censored60: the others '-'); recorded in the select runs before any result",
+   "pass": true,
+   "detail": "detour {'treated_better'}; idle_padding {'f30': None, 'auc_h': None, 'rmst60': 'treated_better', 'hrt60': 'treated_better', 'censored60': None}; gripper_release {'f30': 'treated_better', 'auc_h': None, 'rmst60': None, 'hrt60': None, 'censored60': 'treated_better'}"
+  },
+  {
+   "name": "10.3 stage.py train without --groundtruth-arm refuses a planted-arm subset; features, attribute, select --scores, clusters (and select parent, analyze) refuse planted arms and any vlapoc.groundtruth_arm=true run; nothing written; the flag accepts only ground-truth-derived subsets",
+   "pass": true,
+   "detail": "train without --groundtruth-arm on a planted-arm subset: REFUSED (LineageError: subset 'df6f6abd55a4a9c6f463ebd138a2e02955ee201c3f4696e4db32374d2b9bd8a1' is ground-truth-); features on a ground-truth arm's train run: REFUSED (LineageError: features: run 9487600c35a8 (fake-train-gtarm) is a ground-truth arm (tag vlapoc.groundtrut); attribute on a ground-truth arm's train run: REFUSED (LineageError: attribute: run 9487600c35a8 (fake-train-gtarm) is a ground-truth arm (tag vlapoc.groundtru); select with a planted-arm subset as parent: REFUSED (LineageError: subset 'df6f6abd55a4a9c6f463ebd138a2e02955ee201c3f4696e4db32374d2b9bd8a1' is ground-truth-); select --scores from a ground-truth arm's run: REFUSED (LineageError: select --scores: run 76be414e6e89 (attribute-fake-gtarm) is a ground-truth arm (tag vlapoc); clusters on a ground-truth arm's run: REFUSED (LineageError: clusters: run 76be414e6e89 (attribute-fake-gtarm) is a ground-truth arm (tag vlapoc.ground); analyze on a ground-truth arm's run (extra): REFUSED (LineageError: analyze: run 76be414e6e89 (attribute-fake-gtarm) is a ground-truth arm (tag vlapoc.groundt); is_groundtruth_subset(planted arm, v3/candidate) = (True, False)"
+  },
+  {
+   "name": "10.4 SYNTHETIC verdicts, positive control present: idle_padding harmful (confirmed) on hrt60 and 'no detectable harm, bounded' on f30 with the union CI in the sentence; no arm confirmed anywhere -> every status inconclusive ('no arm showed an effect ...'); the word 'harm'+'less' never appears",
+   "pass": true,
+   "detail": "A: hrt60 'Removing the 13 idle_padding episodes improved hrt60 by 0.1 [0.05, 0.15] relative to removing the same number ...'; f30 'No detectable harm on f30: removing the 13 idle_padding episodes did not improve it relative to removing the same number of clean episodes in any of 3 runs; the 95% CI on the difference spanned [-0.12...'; B: ['inconclusive']"
+  },
+  {
+   "name": "R real data/lineage/mlflow.db sha256 unchanged by this mode",
+   "pass": true,
+   "detail": "306af4123fda7e63..."
+  }
+ ],
+ "SYNTHETIC": true,
+ "dry_run_counts": {
+  "planted_default": {
+   "jobs": 129,
+   "trainings": 33
+  },
+  "planted_no_oracle": {
+   "jobs": 108,
+   "trainings": 27
+  },
+  "planted_random_draws_2": {
+   "jobs": 162,
+   "trainings": 36,
+   "delta_jobs": 33,
+   "delta_trainings": 3
+  }
+ }
+}

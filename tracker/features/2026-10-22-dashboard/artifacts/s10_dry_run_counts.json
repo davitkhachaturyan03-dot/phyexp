@@ -1,0 +1,16 @@
+{
+ "planted_default": {
+  "jobs": 129,
+  "trainings": 33
+ },
+ "planted_no_oracle": {
+  "jobs": 108,
+  "trainings": 27
+ },
+ "planted_random_draws_2": {
+  "jobs": 162,
+  "trainings": 36,
+  "delta_jobs": 33,
+  "delta_trainings": 3
+ }
+}

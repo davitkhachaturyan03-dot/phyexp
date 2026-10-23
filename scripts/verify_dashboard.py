@@ -10,6 +10,8 @@ Run from the repo root; each mode exits 0 when every check passes::
     .venv/bin/python scripts/verify_dashboard.py --clusters      # S2: the clusters stage (three lenses), sliceline
     .venv/bin/python scripts/verify_dashboard.py --planted       # S3: discovered clusters scored against the planted types
     .venv/bin/python scripts/verify_dashboard.py --discrepancy   # S9: planted/clean x harmful/not, estimated (PoC §9.2)
+    .venv/bin/python scripts/verify_dashboard.py --round-b       # S4: drop_cluster arms, the Round B chain, the confirm stage
+    .venv/bin/python scripts/verify_dashboard.py --planted-arms  # S10: planted-type arms, ground-truth path, bounded verdict wording
 
 Every MLflow-writing check runs on a scratch lineage store under ``data/scratch/dashboard/`` (``runs.scratch_lineage_copy``); the real
 ``data/lineage/mlflow.db`` sha256 is recorded before and after and must not change. Scratch runs use ``allow_dirty=True`` because
@@ -910,13 +912,389 @@ def discrepancy_mode() -> int:
     return C.finish({"SYNTHETIC": True})
 
 
-MODES = {"results": results, "clusters": clusters_mode, "planted": planted_mode, "discrepancy": discrepancy_mode}
+# ---------------------------------------------------------------------------------------------
+# S4 / S10: Round B
+# ---------------------------------------------------------------------------------------------
+
+
+def dry_jobs(*args: str):
+    """``server_pipeline.py --tag t --dry-run <args>`` parsed: ``(jobs, summary line)`` (the training-attribution verifier's parser)."""
+    return vt().dry_run(*args)
+
+
+def argv_minus(cmd: str, drop: tuple[str, ...] = ("--subset", "--name", "--train", "--chain")) -> list[str]:
+    """A job's command split into tokens with the values of ``drop`` options removed (so two arms' argv can be compared apart from data and names)."""
+    import shlex
+
+    toks, out, skip = shlex.split(cmd), [], False
+    for tk in toks:
+        if skip:
+            skip = False
+            continue
+        if tk in drop:
+            skip = True
+            continue
+        out.append(tk)
+    return out
+
+
+def n_runs_in(lr: Path) -> int:
+    from vlapoc.runs import client, experiment_id
+
+    return len(client(lr).search_runs([experiment_id(lr)], max_results=20000))
+
+
+def verdict_json(call: str | None, gate: bool = True, keys=("f30", "auc_h", "rmst60", "hrt60", "censored60"), only: dict | None = None,
+                 mag: float = 0.1) -> dict:
+    """A SYNTHETIC ``verdict.json`` with the fields ``step4`` / ``planted_arms`` read. ``call``: ``"T"`` (treated better, significant), ``"C"`` (control
+    better), ``None`` (not significant), per metric overridable with ``only``. ``diff`` and ``ci95`` are A minus B (higher is better)."""
+    def row(c):
+        if c is None:
+            return {"p_holm": 0.4, "diff_better": 0.01, "diff": 0.01, "ci95": [-0.1, 0.12], "higher_is_better": True}
+        sgn = -1.0 if c == "T" else 1.0  # diff_better > 0: A (the control) better
+        return {"p_holm": 0.004, "diff_better": sgn * mag, "diff": sgn * mag, "ci95": [sgn * mag - 0.05, sgn * mag + 0.05], "higher_is_better": True}
+    return {"SYNTHETIC": True, "family": "W", "alpha": 0.05, "gate": {"fires": gate, "p": 0.01 if gate else 0.6},
+            "metrics": {k: row((only or {}).get(k, call)) for k in keys}, "outcome": "i" if gate else "iii"}
+
+
+def add_verify(lr: Path, base: Path, name: str, kind: str, treated: str, control: str, seed: int, verdict: dict, chain: str, family: str = "W") -> str:
+    """A FINISHED ``verify`` run in the scratch store carrying a SYNTHETIC verdict and the ``step4.*`` tags."""
+    from vlapoc.runs import stage_run
+
+    path = base / "verdicts" / f"{name}.json"
+    path.parent.mkdir(exist_ok=True, parents=True)
+    path.write_text(json.dumps({**verdict, "family": family}))
+    with stage_run("verify", name, lr, chain=chain, allow_dirty=True, extra_tags={"step4.kind": kind, "step4.treated": treated, "step4.control": control, "step4.seed": seed}) as r:
+        r.output_file("verdict", path, kind="verdict")
+        return r.run_id
+
+
+def round_b_mode() -> int:
+    """S4, AC4.1-AC4.5."""
+    from vlapoc import clusters as cl
+    from vlapoc import confirm as cf
+    from vlapoc import results as res
+    from vlapoc.lineage import Subset, drop_random_k
+    from vlapoc.method_data import _reset_session
+    from vlapoc.runs import client, scratch_lineage_copy, select_run, stage_run, trace
+
+    C = Checker("round_b")
+    shutil.rmtree(SCRATCH / "round_b", ignore_errors=True)
+    base = SCRATCH / "round_b"
+    base.mkdir(parents=True)
+    counts = {}
+    try:
+        # --- AC4.1: dry-run counts, parsed ---
+        picks = ["slice:hrt60_lin:harm:1", "label:task_name=KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it"]
+        common = ["--subset", "v3/candidate", "--round-b", "--clusters", "clusters-t", "--pick", *picks]
+        j2, s2 = dry_jobs(*common)
+        j2m, s2m = dry_jobs(*common, "--matched-random")
+        t2, t2m = [j for j in j2 if j["name"].startswith("train-")], [j for j in j2m if j["name"].startswith("train-")]
+        by = {j["name"]: j for j in j2m}
+        sm = by["step4-summary-t-roundb"]
+        cj = by["confirm-t"]
+        sel = by["select-t-roundb"]["cmd"]
+        verifies = [j["name"] for j in j2m if j["name"].startswith("verify-")]
+        counts = {"round_b_2_clusters": {"jobs": len(j2), "trainings": len(t2)}, "round_b_2_clusters_matched_random": {"jobs": len(j2m), "trainings": len(t2m)}}
+        C.check("4.1a Round B for 2 picked clusters: 2 x (3 train + 3 eval + 3 verify) + 1 select + 1 step4-summary + 1 confirm = 21 jobs, 6 trainings (plan arithmetic)",
+                len(j2) == 21 and len(t2) == 6, f"{len(j2)} jobs, {len(t2)} trainings")
+        C.check("4.1b ... and with --matched-random the plan states 33 jobs / 12 trainings; the chain's own per-arm pattern gives the count below (each matched arm also gets a vs_base verify, and each cluster a curated_vs_random verify)",
+                len(t2m) == 12, f"MEASURED {len(j2m)} jobs (plan arithmetic 33), {len(t2m)} trainings; difference: 2 matched arms x 3 vs_base verifies + 2 clusters x 3 curated_vs_random verifies = +12")
+        C.check("4.1c job structure: one select job with 2 drop_cluster and 2 drop_random_matched selects; step4-summary depends on every verify; confirm depends on step4-summary",
+                sel.count("--op drop_cluster") == 2 and sel.count("--op drop_random_matched") == 2 and sorted(sm["dep_names"]) == sorted(verifies) and cj["dep_names"] == ["step4-summary-t-roundb"]
+                and all("--chain-id" in x["cmd"] for x in (sm, cj)), f"{len(verifies)} verify jobs; confirm deps {cj['dep_names']}")
+        # --- AC4.5: argv of every arm equals the base recipe except data and names ---
+        jb, _ = dry_jobs("--subset", "v3/candidate", "--curation", "per_task", "--metrics", "f30", "hrt60_lin")
+        bad = []
+        for s_ in (0, 1, 2):
+            b_tr = argv_minus(next(j for j in jb if j["name"] == f"train-t-s{s_}")["cmd"])
+            b_ev = argv_minus(next(j for j in jb if j["name"] == f"eval-t-s{s_}")["cmd"])
+            for arm in ("cluster0", "crandom0", "cluster1", "crandom1"):
+                a_tr = argv_minus(next(j for j in j2m if j["name"] == f"train-t-{arm}-s{s_}")["cmd"])
+                a_ev = [x for x in argv_minus(next(j for j in j2m if j["name"] == f"eval-t-{arm}-s{s_}")["cmd"]) if x != "--no-trajectories"]
+                if a_tr != b_tr or a_ev != b_ev:
+                    bad.append((arm, s_))
+        C.check("4.5 every arm's train argv equals the base recipe's (same seed) except --subset and --name; eval argv equal apart from --no-trajectories (AC7.5)", not bad and len(t2m) == 12,
+                f"12 train + 12 eval jobs compared, mismatches {bad}; e.g. {argv_minus(next(j for j in j2m if j['name'] == 'train-t-cluster0-s0')['cmd'])}")
+        # --- AC4.2 / AC4.4: the drop_cluster op on a SYNTHETIC cluster run over the real v3 ---
+        lr = scratch_lineage_copy(base / "lineage")
+        v3 = Subset.load("v3/candidate", lr)
+        view = __import__("vlapoc.method_data", fromlist=["open_for_method"]).open_for_method("v3/candidate", lr)
+        desc = cl.descriptor_table(view, True)
+        codes, specs, _ = cl.bin_descriptors(desc, 5, 19)
+        planted, truth = plant_structure(desc, codes, specs)
+        eps = v3.episodes(lr)
+        tab = synthetic_table(eps, ["f30", "rmst60", "auc_expected", "hrt60_lin", "censored60"], 0, planted)
+        sid = synthetic_score_run(lr, v3, tab, "attribute-dash-synth-s4", note="SYNTHETIC planted structure (see S2)")
+        out = cl.clusters_run(sid, "clusters-dash-synth-s4", out_dir=base / "oc", lineage_root=lr, allow_dirty=True, synthetic=True)
+        crun = out["run_id"]
+        clu = pd.read_parquet(base / "oc" / "clusters.parquet")
+        mem = pd.read_parquet(base / "oc" / "members.parquet")
+        cid = "slice:hrt60_lin:harm:1"
+        ids = set(mem.loc[mem["cluster_id"] == cid, "episode_id"])
+        sel_id, child = select_run("v3/candidate", "select-s4-cluster0", "drop_cluster", lineage_root=lr, allow_dirty=True, cluster_run_id=crun, cluster_id=cid)
+        sel2_id, rnd = select_run("v3/candidate", "select-s4-crandom0", "drop_random_matched", seed=0, lineage_root=lr, allow_dirty=True, cluster_run_id=crun, cluster_id=cid)
+        task = eps.set_index("episode_id")[["suite", "libero_task_id"]].astype(str).agg("/".join, axis=1)
+        pt_c, pt_r = task.loc[list(ids)].value_counts().to_dict(), task.loc[list(set(v3.episode_ids) - set(rnd.episode_ids))].value_counts().to_dict()
+        trs = trace(sel_id, lr)
+        p_ = client(lr).get_run(sel_id).data.params
+        C.check("4.2a drop_cluster child has exactly N - n episodes, its derivation lists the cluster's members, trace(select run) reaches the cluster run and the score run",
+                len(child.episode_ids) == len(v3.episode_ids) - len(ids) and set(child.derivation["dropped"]) == ids and crun in trs["runs"] and sid in trs["runs"],
+                f"cluster {cid}: n = {len(ids)}, child {len(child.episode_ids)} of {len(v3.episode_ids)}; trace reaches {sorted(r['name'] for r in trs['runs'].values())[:3]}")
+        C.check("4.2b the matched random child has the same per-task counts as the cluster, drawn outside the cluster", pt_c == pt_r and not (set(v3.episode_ids) - set(rnd.episode_ids)) & ids,
+                f"{len(pt_c)} tasks, counts {sorted(pt_c.values())}")
+        exp = json.loads(p_["expected_by_metric"])
+        C.check("4.2c the select run records expected_by_metric (stated before any retraining) from the estimated readings: harmful -> treated_better",
+                exp.get("hrt60") == "treated_better" and all(v in ("treated_better", "treated_worse") for v in exp.values()) and "stated before" in p_["expected_by_metric_status"], f"expected_by_metric {exp}")
+        # AC4.4 refusals
+        refusals = []
+
+        def refuse(label, fn, contains):
+            before = n_runs_in(lr)
+            try:
+                fn()
+                refusals.append((label, False, "did not raise"))
+            except Exception as e:  # noqa: BLE001
+                refusals.append((label, contains in str(e) and n_runs_in(lr) == before, f"{type(e).__name__}: {str(e)[:100]}"))
+
+        other = drop_random_k(v3, 5, 0, lr)
+        whole = f"label:task_name={truth['task']['task_name']}"
+        refuse("unknown cluster_id", lambda: select_run("v3/candidate", "select-bad", "drop_cluster", lineage_root=lr, allow_dirty=True, cluster_run_id=crun, cluster_id="slice:nope:harm:9"), "unknown cluster_id")
+        refuse("a cluster run found on another subset", lambda: select_run(other.subset_id, "select-bad", "drop_cluster", lineage_root=lr, allow_dirty=True, cluster_run_id=crun, cluster_id=cid), "another subset")
+        refuse("a cluster that would empty a task (leave-one-task-out)", lambda: select_run("v3/candidate", "select-bad", "drop_cluster", lineage_root=lr, allow_dirty=True, cluster_run_id=crun, cluster_id=whole), "leave-one-task-out")
+        refuse("a run that is not a FINISHED cluster run", lambda: select_run("v3/candidate", "select-bad", "drop_cluster", lineage_root=lr, allow_dirty=True, cluster_run_id=sid, cluster_id=cid), "not a FINISHED cluster run")
+        sel3_id, whole_child = select_run("v3/candidate", "select-s4-whole", "drop_cluster", lineage_root=lr, allow_dirty=True, cluster_run_id=crun, cluster_id=whole, allow_whole_task=True)
+        pw = client(lr).get_run(sel3_id).data.params
+        C.check("4.4 refused with nothing written: unknown cluster_id, a cluster run of another subset, a cluster that would empty a task, a non-cluster run; with allow_whole_task the whole-task cluster is allowed and the flag is recorded as a param",
+                all(r_[1] for r_ in refusals) and pw["allow_whole_task"] == "True" and len(whole_child.episode_ids) == len(v3.episode_ids) - 48,
+                "; ".join(f"{a}: {'REFUSED' if b else 'WRONG'} ({c})" for a, b, c in refusals))
+        # --- AC4.3: confirm on SYNTHETIC verdicts ---
+        chain = "t-rb111111"
+        decl = "{}"
+        fcr = fake_cluster_run(lr, v3, {k: sorted(ids)[:5] for k in ("cA", "cB", "cC", "cD", "cE")}, "clusters-fake-s4", decl)
+        cases = {  # arm -> (expected_by_metric, per-seed verdict calls)
+            "cA": ({"hrt60": "treated_better"}, [verdict_json("T")] * 3),
+            "cB": ({"hrt60": "treated_better"}, [verdict_json("T"), verdict_json(None), verdict_json(None)]),
+            "cC": ({"hrt60": "treated_better"}, [verdict_json("T", gate=False), verdict_json("T", gate=False), verdict_json("T")]),
+            "cD": ({"hrt60": "treated_better"}, [verdict_json("C"), verdict_json("C"), verdict_json(None)]),
+            "cE": ({"hrt60": "treated_better", "f30": "treated_worse"}, [verdict_json(None, only={"hrt60": "T", "f30": "C"})] * 3),
+        }
+        for arm, (ebm, vds) in cases.items():
+            with stage_run("select", f"select-t-{arm}", lr, chain=chain, allow_dirty=True) as r:
+                r.params({"op": "drop_cluster", "cluster_run_id": fcr, "cluster_id": arm, "definition": f"hand-built {arm}", "expected_by_metric": ebm})
+            for sd, vd in enumerate(vds):
+                add_verify(lr, base, f"v-{arm}-s{sd}", "vs_base", arm, "base", sd, vd, chain)
+                add_verify(lr, base, f"vO-{arm}-s{sd}", "vs_base", arm, "base", sd, vd, chain, family="O")  # family O alongside: must not be counted
+        for sd in range(3):
+            add_verify(lr, base, f"v-cA-vs-rand-s{sd}", "curated_vs_random", "cA", "crandom", sd, verdict_json("T" if sd < 2 else None), chain)
+        outc = cf.confirm_run(fcr, "t", "confirm-t", chain=chain, out_dir=base / "oconf", lineage_root=lr, allow_dirty=True)
+        st = pd.read_parquet(base / "oconf" / "cluster_status.parquet")
+        get = lambda arm, m, comp="vs_base": st[(st["arm"] == arm) & (st["metric"] == m) & (st["comparison"] == comp)].iloc[0]  # noqa: E731
+        got = {a: get(a, "hrt60")["status"] for a in cases}
+        C.check("4.3a SYNTHETIC verdicts: met in 3/3 seeds -> confirmed; 1/3 -> not confirmed; gate fired in 1/3 -> not confirmed; opposite in 2/3 -> refuted",
+                got["cA"] == "confirmed" and got["cB"] == "not confirmed" and got["cC"] == "not confirmed" and got["cD"] == "refuted", f"statuses {got}; calls cA {get('cA', 'hrt60')['calls_by_seed']}, cB {get('cB', 'hrt60')['calls_by_seed']}, cC {get('cC', 'hrt60')['calls_by_seed']}, cD {get('cD', 'hrt60')['calls_by_seed']}")
+        C.check("4.3b a trade-off cluster (expected harm on HRT, boost on F30) is judged per metric: both confirmed; a metric with no expectation reads 'no expectation'; family O verdicts are not counted",
+                get("cE", "hrt60")["status"] == "confirmed" and get("cE", "f30")["status"] == "confirmed" and get("cE", "rmst60")["status"] == "no expectation"
+                and set(st["n_seeds"]) == {3} and cf.overall(st)["cE"] == "confirmed", f"cE hrt60 {get('cE', 'hrt60')['calls_by_seed']} f30 {get('cE', 'f30')['calls_by_seed']}; overall {cf.overall(st)}")
+        rnd_row = get("cA", "hrt60", "vs_matched_random")
+        C.check("4.3c the matched-random comparison is judged separately (vs_matched_random): T,T,0 -> confirmed (2 of 3, none contradicting)", rnd_row["status"] == "confirmed" and rnd_row["calls_by_seed"] == "T,T,0", f"{rnd_row['calls_by_seed']}")
+        run = client(lr).get_run(outc["run_id"])
+        C.check("4.3d the confirm run is a tracked summarize run with the table as an output, the rule as a param and the synthetic flag", run.data.tags["stage"] == "summarize" and "output.cluster_status.sha256" in run.data.tags
+                and "ceil(2n/3)" in run.data.params["rule"] and run.data.params["synthetic"] == "True" and (st["synthetic"]).all(), f"{outc['rows']} rows; overall {outc['overall']}")
+        ARTIFACTS.mkdir(parents=True, exist_ok=True)
+        st.drop(columns=["verify_run_ids"]).to_csv(ARTIFACTS / "s4_cluster_status_SYNTHETIC.csv", index=False)
+        (ARTIFACTS / "s4_dry_run_counts.json").write_text(json.dumps(counts, indent=1))
+        (ARTIFACTS / "s4_round_b_dry_run_2clusters_matched.txt").write_text(f"# server_pipeline.py --tag t --dry-run {' '.join(common)} --matched-random\n" + "\n".join(f"{j['id']} {j['name']} deps={','.join(j['dep_names'])} :: {j['cmd']}" for j in j2m) + f"\n{s2m}\n")
+        (ARTIFACTS / "s4_round_b_dry_run_2clusters.txt").write_text(f"# server_pipeline.py --tag t --dry-run {' '.join(common)}\n" + "\n".join(f"{j['id']} {j['name']} deps={','.join(j['dep_names'])} :: {j['cmd']}" for j in j2) + f"\n{s2}\n")
+        _reset_session()
+        del res
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+        shutil.rmtree(SCRATCH / "synthetic_runs", ignore_errors=True)
+        shutil.rmtree(SCRATCH / "fake_clusters", ignore_errors=True)
+    return C.finish({"SYNTHETIC": True, "dry_run_counts": counts})
+
+
+def planted_arms_mode() -> int:
+    """S10, AC10.1-AC10.6."""
+    import argparse as ap_
+    import re
+
+    import stage as stage_mod  # scripts/stage.py
+
+    from vlapoc import attribution as at
+    from vlapoc import clusters as cl
+    from vlapoc import planted_arms as pa
+    from vlapoc import results as res
+    from vlapoc import step4
+    from vlapoc.groundtruth import load_answer_key
+    from vlapoc.lineage import LineageError, Subset
+    from vlapoc.method_data import _reset_session, is_groundtruth_subset
+    from vlapoc.runs import client, scratch_lineage_copy, stage_run
+
+    C = Checker("planted_arms")
+    shutil.rmtree(SCRATCH / "planted_arms", ignore_errors=True)
+    base = SCRATCH / "planted_arms"
+    base.mkdir(parents=True)
+    counts = {}
+    try:
+        # --- AC10.1: dry-run counts ---
+        args0 = ["--subset", "v3/candidate", "--round-b-planted"]
+        jd, sd_ = dry_jobs(*args0)
+        jn, _ = dry_jobs(*args0, "--no-oracle")
+        j2, _ = dry_jobs(*args0, "--random-draws", "2")
+        tr = lambda js: len([j for j in js if j["name"].startswith("train-")])  # noqa: E731
+        counts = {"planted_default": {"jobs": len(jd), "trainings": tr(jd)}, "planted_no_oracle": {"jobs": len(jn), "trainings": tr(jn)},
+                  "planted_random_draws_2": {"jobs": len(j2), "trainings": tr(j2), "delta_jobs": len(j2) - len(jd), "delta_trainings": tr(j2) - tr(jd)}}
+        arms_d = re.search(r"arms: (\[.*\])", sd_).group(1)
+        C.check("10.1 --round-b-planted default (owner option a): 11 arms, 33 trainings, 129 jobs (plan arithmetic); --no-oracle 27 trainings, 108 jobs; --random-draws 2: +3 trainings, +33 jobs",
+                len(jd) == 129 and tr(jd) == 33 and len(jn) == 108 and tr(jn) == 27 and len(j2) - len(jd) == 33 and tr(j2) - tr(jd) == 3,
+                f"MEASURED default {len(jd)} jobs / {tr(jd)} trainings; no-oracle {len(jn)} / {tr(jn)}; random-draws 2: {len(j2)} jobs (+{len(j2) - len(jd)}) / {tr(j2)} trainings (+{tr(j2) - tr(jd)}); arms {arms_d[:130]}...")
+        by = {j["name"]: j for j in jd}
+        sel_cmd = by["select-t-planted"]["cmd"]
+        verifies = [j["name"] for j in jd if j["name"].startswith("verify-")]
+        ok_struct = (sel_cmd.count("select-planted") == 11 and "--kind type" in sel_cmd and "--kind oracle" in sel_cmd and all(
+            "--groundtruth-arm" in j["cmd"] for j in jd if j["name"].startswith("train-")) and sorted(by["discrepancy-verdict-t"]["dep_names"]) == sorted(verifies)
+            and sum("curated_vs_random" in j["cmd"] for j in jd) == 8 * 3 + 3)
+        C.check("10.1b structure: one select job with 11 select-planted commands (7 types, cleanharm, cleanrandom, oracle, oracle control), every train job has --groundtruth-arm, 27 curated_vs_random verifies (8 effect arms x 3 seeds + oracle x 3), discrepancy-verdict depends on every verify",
+                ok_struct, f"{sel_cmd.count('select-planted')} select-planted, {sum('curated_vs_random' in j['cmd'] for j in jd)} curated_vs_random verifies, {len(verifies)} verify jobs")
+        # --- AC10.5: argv equals the base recipe except --subset, --name, --groundtruth-arm ---
+        jb, _ = dry_jobs("--subset", "v3/candidate", "--curation", "per_task", "--metrics", "f30", "hrt60_lin")
+        bad = []
+        for s_ in (0, 1, 2):
+            b_tr = argv_minus(next(j for j in jb if j["name"] == f"train-t-s{s_}")["cmd"])
+            for j in jd:
+                if j["name"].startswith("train-") and j["name"].endswith(f"-s{s_}"):
+                    if [x for x in argv_minus(j["cmd"]) if x != "--groundtruth-arm"] != b_tr:
+                        bad.append(j["name"])
+        C.check("10.5 every planted arm's train argv equals the base recipe's (same seed) except --subset, --name and --groundtruth-arm", not bad and tr(jd) == 33, f"33 train jobs compared, mismatches {bad[:3]}")
+        # --- AC10.2: the arms over the real v3 answer key (scratch store) ---
+        lr = scratch_lineage_copy(base / "lineage")
+        stage_mod.LR = lr
+        v3 = Subset.load("v3/candidate", lr)
+        labels = load_answer_key("v3", lr)
+        eps = v3.episodes(lr)
+        task = eps.set_index("episode_id")[["suite", "libero_task_id"]].astype(str).agg("/".join, axis=1)
+        lab_ids = set(labels["episode_id"])
+        types = sorted(set(labels["corruption_type"]))
+        made = {}
+        for ty in types:
+            made[f"type-{ty}"] = pa.planted_select_run("v3/candidate", f"select-t-type-{ty}", "type", corruption_type=ty, lineage_root=lr, allow_dirty=True)
+        made["cleanrandom0"] = pa.planted_select_run("v3/candidate", "select-t-cleanrandom0", "cleanrandom", seed=0, lineage_root=lr, allow_dirty=True)
+        made["oracle"] = pa.planted_select_run("v3/candidate", "select-t-oracle", "oracle", lineage_root=lr, allow_dirty=True)
+        made["cleanrandom91-0"] = pa.planted_select_run("v3/candidate", "select-t-cleanrandom91-0", "cleanrandom_oracle", seed=0, lineage_root=lr, allow_dirty=True)
+        tab = synthetic_table(eps, ["f30"], 0, {})
+        for c in ("harm_f30__same_task",):
+            tab[c] = np.random.default_rng(3).normal(size=len(tab))
+        sid = synthetic_score_run(lr, v3, tab, "attribute-dash-synth-s10", note="SYNTHETIC noise for the clean-but-harmful arm's ranking")
+        made["cleanharm-f30"] = pa.planted_select_run("v3/candidate", "select-t-cleanharm-f30", "cleanharm", scores_run_id=sid, metric="f30", lineage_root=lr, allow_dirty=True)
+        sizes = {k: len(v[1].episode_ids) for k, v in made.items()}
+        type_ok = all(sizes[f"type-{ty}"] == 947 and set(made[f"type-{ty}"][1].derivation["dropped"]) == set(labels.loc[labels["corruption_type"] == ty, "episode_id"]) for ty in types)
+        cr = made["cleanrandom0"][1].derivation["dropped"]
+        cr_ok = sizes["cleanrandom0"] == 947 and len(cr) == 13 and len({task[e] for e in cr}) == 13 and not (set(cr) & lab_ids)
+        ch_ = made["cleanharm-f30"][1].derivation["dropped"]
+        top_per_task = tab.assign(task=tab["episode_id"].map(task)).loc[~tab["episode_id"].isin(lab_ids)].sort_values(["harm_f30__same_task", "episode_id"], ascending=[False, True]).drop_duplicates("task").head(13)
+        ch_ok = sizes["cleanharm-f30"] == 947 and set(ch_) == set(top_per_task["episode_id"]) and len({task[e] for e in ch_}) == 13 and not (set(ch_) & lab_ids)
+        orc = made["oracle"][1].derivation["dropped"]
+        pt_or = task.loc[sorted(lab_ids)].value_counts().to_dict()
+        c91 = made["cleanrandom91-0"][1].derivation["dropped"]
+        or_ok = sizes["oracle"] == 869 and set(orc) == lab_ids and sizes["cleanrandom91-0"] == 869 and task.loc[c91].value_counts().to_dict() == pt_or and not (set(c91) & lab_ids)
+        C.check("10.2 each type arm's child has 947 episodes, exactly that type's 13 labelled episodes removed; cleanrandom: 947, 13 clean episodes from 13 distinct tasks; cleanharm: 947, the most harmful clean episode of each of the top 13 tasks; oracle: 869; oracle control: 869 with the oracle's per-task counts",
+                type_ok and cr_ok and ch_ok and or_ok, f"sizes {sizes}; oracle per-task counts {sorted(set(pt_or.values()))}")
+        # --- AC10.6: expectation stated before results, read back from the recorded select runs ---
+        def recorded(arm):
+            pr = client(lr).get_run(made[arm][0]).data.params
+            return pr, (json.loads(pr["expected_by_metric"]) if "expected_by_metric" in pr else None)
+
+        keys = ("f30", "auc_h", "rmst60", "hrt60", "censored60")
+        exp_of = {}
+        for arm in ("type-detour", "type-idle_padding", "type-gripper_release", "cleanharm-f30", "oracle"):
+            pr, ebm = recorded(arm)
+            exp_of[arm] = {m: step4.expected_direction("vs_base", pr["direction"], m, arm, "base", ebm) for m in keys}
+        ok6 = (all(v == "treated_better" for v in exp_of["type-detour"].values()) and all(v == "treated_better" for v in exp_of["cleanharm-f30"].values())
+               and all(v == "treated_better" for v in exp_of["oracle"].values())
+               and {m for m, v in exp_of["type-idle_padding"].items() if v} == {"rmst60", "hrt60"} and {m for m, v in exp_of["type-gripper_release"].items() if v} == {"f30", "censored60"})
+        C.check("10.6 expected_direction: type and cleanharm arms (and the oracle) treated_better on every metric, except where the label's hypothesis names metrics (idle_padding: rmst60, hrt60; gripper_release: f30, censored60: the others '-'); recorded in the select runs before any result",
+                ok6, f"detour {set(exp_of['type-detour'].values())}; idle_padding {exp_of['type-idle_padding']}; gripper_release {exp_of['type-gripper_release']}")
+        # --- AC10.3: blindness unchanged ---
+        gt_id = made["type-idle_padding"][1].subset_id
+        _reset_session()
+        tagged_train = None
+        with stage_run("train", "fake-train-gtarm", lr, allow_dirty=True, extra_tags={"vlapoc.groundtruth_arm": "true"}) as r:
+            r.input_subset(made["type-idle_padding"][1], "training", None)
+            tagged_train = r.run_id
+        with stage_run("attribute", "attribute-fake-gtarm", lr, allow_dirty=True, extra_tags={"vlapoc.groundtruth_arm": "true"}) as r:
+            tagged_score = r.run_id
+        ns = lambda **kw: ap_.Namespace(**kw)  # noqa: E731
+        refusals = []
+
+        def refuse(label, fn, exc, contains):
+            _reset_session()
+            before = n_runs_in(lr)
+            try:
+                fn()
+                refusals.append((label, False, "did not raise"))
+            except exc as e:
+                refusals.append((label, contains in str(e) and n_runs_in(lr) == before, f"{type(e).__name__}: {str(e)[:90]}"))
+            except Exception as e:  # noqa: BLE001
+                refusals.append((label, False, f"wrong error {type(e).__name__}: {str(e)[:90]}"))
+
+        refuse("train without --groundtruth-arm on a planted-arm subset", lambda: stage_mod.cmd_train(ns(subset=gt_id, groundtruth_arm=False, name="x", seed=0, steps=1, batch_size=1, device="cpu", pretrained_ref="x", smoke=True, chain=None)),
+               LineageError, "ground-truth-derived")
+        refuse("features on a ground-truth arm's train run", lambda: stage_mod.cmd_features(ns(train=tagged_train, which="train", eval=None, root=None, shard="0/1", stride=None, train_stride=2, rollout_stride=4,
+                                                                                             preset="cupid", output_fn=None, rank=8, k_draws=4, seed=0, batch_size=1, workers=1, device="cpu")), LineageError, "ground-truth arm")
+        refuse("attribute on a ground-truth arm's train run", lambda: at.attribute_run(tagged_train, "0" * 32, "0" * 32, Path("x"), Path("y"), "attr-bad", lineage_root=lr, allow_dirty=True), LineageError, "ground-truth arm")
+        refuse("select with a planted-arm subset as parent", lambda: stage_mod.cmd_select(ns(parent=gt_id, op="drop_random_k", scores=None, k=5, seed=0, name="s", metric=None, direction="highest", chain=None, headline=False,
+                                                                                        pipeline_curation=None, clusters=None, cluster_id=None, allow_whole_task=False)), LineageError, "ground-truth-derived")
+        refuse("select --scores from a ground-truth arm's run", lambda: stage_mod.cmd_select(ns(parent="v3/candidate", op="drop_top_k", scores=tagged_score, k=5, seed=None, name="s", metric="harm_f30", direction="highest", chain=None,
+                                                                                           headline=False, pipeline_curation=None, clusters=None, cluster_id=None, allow_whole_task=False)), LineageError, "ground-truth arm")
+        refuse("clusters on a ground-truth arm's run", lambda: cl.clusters_run(tagged_score, "clusters-bad", out_dir=base / "bad", lineage_root=lr, allow_dirty=True, heuristics=False, cache_dir=None), LineageError, "ground-truth arm")
+        refuse("analyze on a ground-truth arm's run (extra)", lambda: __import__("vlapoc.analysis", fromlist=["analyze_run"]).analyze_run(tagged_score, "an-bad", lineage_root=lr, allow_dirty=True), LineageError, "ground-truth arm")
+        _reset_session()
+        guard = (is_groundtruth_subset(gt_id, lr), is_groundtruth_subset("v3/candidate", lr))
+        C.check("10.3 stage.py train without --groundtruth-arm refuses a planted-arm subset; features, attribute, select --scores, clusters (and select parent, analyze) refuse planted arms and any vlapoc.groundtruth_arm=true run; "
+                "nothing written; the flag accepts only ground-truth-derived subsets",
+                all(r_[1] for r_ in refusals) and guard == (True, False), "; ".join(f"{a}: {'REFUSED' if b else 'WRONG'} ({c})" for a, b, c in refusals) + f"; is_groundtruth_subset(planted arm, v3/candidate) = {guard}")
+        # --- AC10.4: bounded wording on SYNTHETIC verdicts ---
+        def run_case(tag: str, calls_by_arm: dict, only_by_arm: dict | None = None):
+            chain = f"{tag}-cc111111"
+            for arm, kind, ty, nd in (("type-idle_padding", "type", "idle_padding", 13), ("type-detour", "type", "detour", 13), ("cleanharm-f30", "cleanharm", "", 13), ("oracle", "oracle", "", 91)):
+                with stage_run("select", f"select-{tag}-{arm}", lr, chain=chain, allow_dirty=True) as r:
+                    r.params({"op": "x", "arm_kind": kind, "groundtruth_arm": True, "corruption_type": ty, "n_dropped": nd, "child_n_episodes": 960 - nd, "direction": "highest"})
+                ctrl = "cleanrandom91-0" if arm == "oracle" else "cleanrandom0"
+                for sd in range(3):
+                    add_verify(lr, base, f"{tag}-{arm}-s{sd}", "curated_vs_random", arm, ctrl, sd, verdict_json(calls_by_arm.get(arm), only=(only_by_arm or {}).get(arm)), chain)
+            return pa.discrepancy_verdict_run(tag, f"dv-{tag}", out_dir=base / f"o_{tag}", lineage_root=lr, allow_dirty=True, synthetic=True), pd.read_parquet(base / f"o_{tag}" / "discrepancy_verdict.parquet")
+        _, ta = run_case("ta", {"type-idle_padding": None}, {"type-idle_padding": {"hrt60": "T", "rmst60": "T"}})
+        g = lambda t, arm, m: t[(t["arm"] == arm) & (t["metric"] == m)].iloc[0]  # noqa: E731
+        h, f = g(ta, "type-idle_padding", "hrt60"), g(ta, "type-idle_padding", "f30")
+        okA = (h["status"] == "harmful (confirmed)" and f["status"] == "no detectable harm, bounded" and re.search(r"spanned \[-?[\d.]+, -?[\d.]+\] \(union over runs\)", f["sentence"])
+               and "not proof of no harm" in f["sentence"] and g(ta, "type-detour", "f30")["status"] == "no detectable harm, bounded")
+        _, tb = run_case("tb", {})
+        okB = set(tb["status"]) == {"inconclusive"} and tb["sentence"].str.contains("no arm showed an effect").all() and not tb["positive_control_in_round"].any()
+        txt = " ".join(ta["sentence"]) + " " + " ".join(tb["sentence"]) + (base / "o_ta" / "discrepancy_verdict.json").read_text() + (base / "o_tb" / "discrepancy_verdict.json").read_text()
+        C.check("10.4 SYNTHETIC verdicts, positive control present: idle_padding harmful (confirmed) on hrt60 and 'no detectable harm, bounded' on f30 with the union CI in the sentence; no arm confirmed anywhere -> every status inconclusive ('no arm showed an effect ...'); the word 'harm'+'less' never appears",
+                bool(okA) and okB and ("harm" + "less") not in txt.lower(), f"A: hrt60 '{h['sentence'][:110]}...'; f30 '{f['sentence'][:200]}...'; B: {sorted(set(tb['status']))}")
+        ARTIFACTS.mkdir(parents=True, exist_ok=True)
+        ta.drop(columns=["verify_run_ids"]).to_csv(ARTIFACTS / "s10_discrepancy_verdict_positive_control_SYNTHETIC.csv", index=False)
+        tb.drop(columns=["verify_run_ids"]).to_csv(ARTIFACTS / "s10_discrepancy_verdict_all_null_SYNTHETIC.csv", index=False)
+        (ARTIFACTS / "s10_dry_run_counts.json").write_text(json.dumps(counts, indent=1))
+        (ARTIFACTS / "s10_round_b_planted_dry_run_default.txt").write_text("# server_pipeline.py --tag t --dry-run --subset v3/candidate --round-b-planted\n" + "\n".join(f"{j['id']} {j['name']} deps={','.join(j['dep_names'])} :: {j['cmd']}" for j in jd) + f"\n{sd_}\n")
+        del res
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+        shutil.rmtree(SCRATCH / "synthetic_runs", ignore_errors=True)
+        shutil.rmtree(SCRATCH / "fake_clusters", ignore_errors=True)
+    return C.finish({"SYNTHETIC": True, "dry_run_counts": counts})
+
+
+MODES = {"results": results, "clusters": clusters_mode, "planted": planted_mode, "discrepancy": discrepancy_mode, "round_b": round_b_mode, "planted_arms": planted_arms_mode}
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    for m, h in (("results", "S1"), ("clusters", "S2"), ("planted", "S3"), ("discrepancy", "S9")):
-        ap.add_argument(f"--{m}", action="store_true", help=h)
+    for m, h in (("results", "S1"), ("clusters", "S2"), ("planted", "S3"), ("discrepancy", "S9"), ("round_b", "S4"), ("planted_arms", "S10")):
+        ap.add_argument(f"--{m.replace('_', '-')}", dest=m, action="store_true", help=h)
     a = ap.parse_args()
     ran = [m for m in MODES if getattr(a, m, False)]
     if not ran:

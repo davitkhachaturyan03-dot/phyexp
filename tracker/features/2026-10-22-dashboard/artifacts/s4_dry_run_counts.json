@@ -1,0 +1,10 @@
+{
+ "round_b_2_clusters": {
+  "jobs": 21,
+  "trainings": 6
+ },
+ "round_b_2_clusters_matched_random": {
+  "jobs": 45,
+  "trainings": 12
+ }
+}
