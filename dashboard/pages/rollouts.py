@@ -36,6 +36,8 @@ def render(ctx: dict) -> None:
         st.info(f"{e}")
         return
     ro = ro.copy()
+    if "task_name" not in ro:  # an eval record without task names (e.g. a test fixture): label by suite and task id
+        ro["task_name"] = ro["suite"].astype(str) + "/" + ro["libero_task_id"].astype(str)
     ro["failed"] = ro["failure_type"] != "success"
     f1, f2, f3 = st.columns(3)
     only_failed = f1.checkbox("Failed rollouts only", value=True, key="only_failed")

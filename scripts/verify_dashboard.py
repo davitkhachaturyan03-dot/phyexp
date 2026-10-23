@@ -1636,7 +1636,7 @@ def dropin_mode() -> int:
         c = client(lr)
         from vlapoc.runs import experiment_id
 
-        for r in c.search_runs([experiment_id(lr)], "tags.stage = 'train' or tags.stage = 'eval'", max_results=1000):
+        for r in [*c.search_runs([experiment_id(lr)], "tags.stage = 'train'", max_results=1000), *c.search_runs([experiment_id(lr)], "tags.stage = 'eval'", max_results=1000)]:
             if r.data.tags.get("stage") == "train" and r.info.run_name.startswith(f"train-{T}"):
                 c.set_tag(r.info.run_id, "vlapoc.smoke", "false")
             if r.data.tags.get("stage") == "eval" and r.info.run_name.startswith(f"eval-{T}"):
