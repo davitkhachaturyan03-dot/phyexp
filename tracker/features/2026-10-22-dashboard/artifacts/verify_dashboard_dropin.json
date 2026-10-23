@@ -1,0 +1,30 @@
+{
+ "mode": "dropin",
+ "pass": true,
+ "n_pass": 4,
+ "n": 4,
+ "seconds": 24,
+ "checks": [
+  {
+   "name": "7.1 the real attribute -> ensemble -> clusters code path (SYNTHETIC features, scratch store, run through the stage CLI) loads in the dashboard by run name, every page, with no file under dashboard/, vlapoc/ or scripts/ modified (git status --porcelain empty before and after)",
+   "pass": true,
+   "detail": "porcelain before '' after ''; page errors []; banner on the untagged fixture: ['**SMOKE run.** Real code on a toy-scale chain (2-step checkp']"
+  },
+  {
+   "name": "7.2 the same chain with its train/eval runs re-tagged to what the server writes (vlapoc.smoke=false, eval.attribution_grade=true, nothing synthetic) renders with no SYNTHETIC or SMOKE banner (caption 'Provenance: REAL'); re-adding one synthetic tag brings the SYNTHETIC banner back",
+   "pass": true,
+   "detail": "re-tagged: banners [], caption ['Provenance: REAL (9 recorded runs checke']; one synthetic tag re-added: banner back True"
+  },
+  {
+   "name": "7.3 the real --with-smoke attribute run (real attribute_run output, no adapter) renders on the Rollouts page with its 2 real rollouts and the SMOKE banner",
+   "pass": true,
+   "detail": "2 rollouts ['libero_spatial/0/init000/seed0', 'libero_spatial/0/init001/seed1']; banner ['**SMOKE run.** Real code on a toy-scale chain (2-step checkpoint, 2 ro']; 3 videos (rollout + episodes)"
+  },
+  {
+   "name": "R real data/lineage/mlflow.db sha256 unchanged by this mode",
+   "pass": true,
+   "detail": "306af4123fda7e63..."
+  }
+ ],
+ "SYNTHETIC": "fixture features/rollouts/returns"
+}

@@ -1,0 +1,53 @@
+{
+ "SYNTHETIC": "scores, clusters, discrepancy readings and Round B verdicts in this store are synthetic; videos, catalog and rollouts are real",
+ "returns_files_unchanged": true,
+ "planted": {
+  "text": {
+   "hrt_harm": "length_vs_task > 1.113",
+   "f30_harm": "scene = KITCHEN_SCENE3",
+   "f30_boost": "smoothness > 0.1052 AND gripper_toggles (3, 4]"
+  },
+  "n": {
+   "hrt_harm": 192,
+   "f30_harm": 48,
+   "f30_boost": 25
+  },
+  "description": "SYNTHETIC: episodes in the top fifth of length_vs_task (long for their task) are harmful on HRT only; episodes of one scene are harmful on F(30) only; a small slice (rough actions, 3-4 gripper toggles) is helpful on F(30). Noise elsewhere. Planted through the rollouts' returns, from method-facing descriptors; no answer key is read. Planted: HRT-harm = length_vs_task > 1.113 (n 192); F30-harm = scene = KITCHEN_SCENE3 (n 48); F30-boost = smoothness > 0.1052 AND gripper_toggles (3, 4] (n 25)."
+ },
+ "synthetic_runs": 44,
+ "smoke": {
+  "chain": "demo-smoke0",
+  "attribute_run": "bad0a10ea38c4cf7968f48be01094456",
+  "attribute_name": "attribute-demo-smoke",
+  "n_rollouts": 2,
+  "train_run": "0a33bc75bb71433ca2def5220014dde0"
+ },
+ "warm": {
+  "training_episode_clips": 334,
+  "rollout_clips": 20,
+  "original_clips": 70,
+  "seconds": 0
+ },
+ "scores_run": "attribute-demo-ens",
+ "scores_run_id": "57729e66bf774de4bc08f8330c95321e",
+ "clusters_run": "clusters-demo",
+ "clusters_run_id": "6de750ad19a8430388e45a44bf9cf059",
+ "seed_runs": [
+  "1dbf287c2de34d03987278022205669f",
+  "0bb9bf95271d4cff8ebba1c95da83c1e",
+  "9f4778c5eb55440c813839abcb72b1d9"
+ ],
+ "picked_clusters": {
+  "cluster0": "slice:hrt60_lin:harm:1",
+  "cluster1": "slice:f30:boost:1",
+  "cluster2": "slice:auc_expected:harm:2"
+ },
+ "confirm_overall": {
+  "slice:auc_expected:harm:2": "refuted",
+  "slice:f30:boost:1": "not confirmed",
+  "slice:hrt60_lin:harm:1": "confirmed"
+ },
+ "mlflow_db_sha256_before": "306af4123fda7e635892d459a2e34008ba1cb62f6c4fce152c546e0da7bdde79",
+ "mlflow_db_sha256_after": "306af4123fda7e635892d459a2e34008ba1cb62f6c4fce152c546e0da7bdde79",
+ "seconds": 490
+}

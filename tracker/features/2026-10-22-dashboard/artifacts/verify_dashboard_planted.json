@@ -3,7 +3,7 @@
  "pass": true,
  "n_pass": 7,
  "n": 7,
- "seconds": 15,
+ "seconds": 16,
  "checks": [
   {
    "name": "3.2 hand-built SYNTHETIC cluster (13 idle_padding + 13 clean) over the real v3 key: precision 0.5, recall 1.0, lift = 0.5 / (13/960), Fisher p, recomputed independently",
@@ -18,7 +18,7 @@
   {
    "name": "3.3a the scoring run was created after the cluster run and consumes its members sha256 and clusters sha256; trace(scoring run) reaches the cluster run",
    "pass": true,
-   "detail": "cluster run start 1792738084723, scoring run start 1792738084892; trace reaches ['build-v0', 'clusters-hand-built', 'derive-v3', 'score-clusters-hand']"
+   "detail": "cluster run start 1792783070410, scoring run start 1792783070584; trace reaches ['build-v0', 'clusters-hand-built', 'derive-v3', 'score-clusters-hand']"
   },
   {
    "name": "3.3b clusters.py has no code path to the scorer (no import of recovery/groundtruth/discrepancy; no code identifier of the scorer or the answer key)",
@@ -28,7 +28,7 @@
   {
    "name": "3.1 cluster_recovery_run refuses (nothing written): a non-cluster run, a FAILED cluster run, a version without an answer key, a cluster run with a ground-truth read upstream",
    "pass": true,
-   "detail": "a run that is not a cluster run (an attribute run): REFUSED (ValueError: run babbdb329ed6 is not a FINISHED cluster run with recorded members (status FINISHED, stage 'attribute')); a FAILED cluster run: REFUSED (ValueError: run 3ec1ba557ce0 is not a FINISHED cluster run with recorded members (status FAILED, stage 'cluster')); a cluster run whose version has no answer key (v0): REFUSED (LineageError: version v0 has no labels (not a derived version)); a cluster run with a ground-truth read upstream (a score run in its trace): REFUSED (ValueError: cluster run 00d02b360684 has a ground-truth read upstream (['fake-score-gt (score)']); its clusters are not bl)"
+   "detail": "a run that is not a cluster run (an attribute run): REFUSED (ValueError: run babbdb329ed6 is not a FINISHED cluster run with recorded members (status FINISHED, stage 'attribute')); a FAILED cluster run: REFUSED (ValueError: run 4d14526a9574 is not a FINISHED cluster run with recorded members (status FAILED, stage 'cluster')); a cluster run whose version has no answer key (v0): REFUSED (LineageError: version v0 has no labels (not a derived version)); a cluster run with a ground-truth read upstream (a score run in its trace): REFUSED (ValueError: cluster run c37f108cdd92 has a ground-truth read upstream (['fake-score-gt (score)']); its clusters are not bl)"
   },
   {
    "name": "3.5 the real chain (SYNTHETIC scores -> clusters_run -> score-clusters) produces one row per (cluster, planted type) incl. any_planted, flagged synthetic",
