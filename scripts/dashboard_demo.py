@@ -189,7 +189,7 @@ def build(with_smoke: bool, force: bool) -> int:
     manifest["planted"] = {"text": cells["text"], "n": cells["n"], "description": note}
     seed_ids = []
     for s in range(3):
-        M, truth = syn.synthetic_matrix(ret, cells, seed=s, n_episodes=len(episodes))
+        M, truth = syn.synthetic_matrix(ret, cells["masks"], seed=s, n_episodes=len(episodes))
         table = at.score_table(M, episodes, ret, True, "pm1")
         index = {"rows": "rollout_id, row order of the SYNTHETIC matrix", "columns": "episode_id and content_hash, the score table's row order",
                  "rollout_id": ret["rollout_id"].tolist(), "episode_id": table["episode_id"].tolist(), "content_hash": table["content_hash"].tolist()}

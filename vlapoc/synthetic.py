@@ -85,14 +85,15 @@ def synthetic_matrix(ret: pd.DataFrame, cells: dict, seed: int, n_episodes: int,
     rng = np.random.default_rng(seed)
     w = weight_vectors(ret)
     wf, wh = w["ret_f30"], w["ret_hrt60_lin"]
-    u_f = wf - (wf @ wh) / (wh @ wh) * wh
-    u_h = wh - (wh @ wf) / (wf @ wf) * wf
+    dot = lambda a, b: float(np.einsum("t,t->", a, b))  # noqa: E731
+    u_f = wf - dot(wf, wh) / dot(wh, wh) * wh
+    u_h = wh - dot(wh, wf) / dot(wf, wf) * wf
     noise = rng.normal(size=(m, n_episodes))
-    sd = {"f30": float(((wf @ noise) / m).std()), "hrt": float(((wh @ noise) / m).std())}
-    gain = {"f30": float((wf @ u_f) / m), "hrt": float((wh @ u_h) / m)}
+    sd = {"f30": float((np.einsum("t,te->e", wf, noise) / m).std()), "hrt": float((np.einsum("t,te->e", wh, noise) / m).std())}  # einsum: no BLAS (spurious FP warnings seen with Accelerate)
+    gain = {"f30": dot(wf, u_f) / m, "hrt": dot(wh, u_h) / m}
     # harm = -good_sign * influence and both returns are higher-is-better, so a harmful episode needs negative influence
     s_f = np.where(cells["f30_harm"], -1.0, 0.0) + np.where(cells["f30_boost"], 1.0, 0.0)
     s_h = np.where(cells["hrt_harm"], -1.0, 0.0)
     mat = noise + np.outer(u_f, s_f * shift * sd["f30"] / gain["f30"]) + np.outer(u_h, s_h * shift * sd["hrt"] / gain["hrt"])
-    truth = {"shift_sd": shift, "noise_sd": sd, "cross_term_f30_uh": float((wf @ u_h) / m), "cross_term_hrt_uf": float((wh @ u_f) / m), "seed": seed, "n_rollouts": m}
+    truth = {"shift_sd": shift, "noise_sd": sd, "cross_term_f30_uh": dot(wf, u_h) / m, "cross_term_hrt_uf": dot(wh, u_f) / m, "seed": seed, "n_rollouts": m}
     return mat, truth
