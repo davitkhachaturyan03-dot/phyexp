@@ -177,7 +177,7 @@ def treated_advantage(row: dict) -> tuple[float, float, float]:
     return -float(row["diff_better"]), float(lo), float(hi)
 
 
-def statuses(records: list[dict], arms: dict[str, dict], n_total: int | None = None) -> pd.DataFrame:
+def statuses(records: list[dict], arms: dict[str, dict], n_total: int | None = None, synthetic: bool = False) -> pd.DataFrame:
     """One row per (arm, metric) over the family-W ``curated_vs_random`` verdicts of the planted effect arms (``type``, ``cleanharm``, ``oracle``):
     ``status`` (``STATUSES``), the wording ``sentence``, the by-record calls and the CI summary. ``records`` / ``arms`` are ``step4.collect``'s.
     The positive control and the all-null rule are in the module docstring."""
@@ -206,6 +206,11 @@ def statuses(records: list[dict], arms: dict[str, dict], n_total: int | None = N
     if t.empty:
         return t
     positive = bool((t["confirmed_harmful"] | t["confirmed_helpful"]).any())
+    pos_rows = t[t["confirmed_harmful"] | t["confirmed_helpful"]]
+    pos_row = (pos_rows[pos_rows["arm_kind"] == "oracle"] if (pos_rows["arm_kind"] == "oracle").any() else pos_rows).iloc[0] if positive else None
+    pos_text = (f"The positive control in this round ({pos_row['arm']}) removed {int(pos_row['n_dropped'])} episodes, far more than a single type's, so its effect does not show that a "
+                "13-episode arm has the power to show one. ") if positive else ""
+    shared = "The clean control is one fixed draw shared by every type and seed, so the runs are not independent replicates of it. "
     out_status, out_sentence = [], []
     for r in t.itertuples():
         k = f"{r.n_T} of {r.n_records}"
@@ -223,15 +228,18 @@ def statuses(records: list[dict], arms: dict[str, dict], n_total: int | None = N
             st = STATUSES[2]
             sent = (f"No detectable harm on {r.metric}: removing {what} did not improve it relative to removing the same number of clean episodes in any of "
                     f"{r.n_records} runs; the 95% CI on the difference spanned [{r.ci_lo_union:.3g}, {r.ci_hi_union:.3g}] (union over runs), so a benefit from removal "
-                    f"larger than {r.ci_hi_union:.3g} on this metric is not supported by this experiment. This is not proof of no harm.")
+                    f"larger than {r.ci_hi_union:.3g} on this metric is not supported by this experiment. {pos_text}{shared}This is not proof of no harm.")
         else:
             st = STATUSES[3]
             sent = (f"Inconclusive on {r.metric} for {what}: " + (f"{k} runs were significant in the harmful direction without meeting the rule. " if r.n_T else "")
                     + ("" if positive else f"no arm showed an effect; with {pct} per arm the test may lack power."))
         out_status.append(st)
         out_sentence.append(sent.strip())
-    t["status"], t["sentence"], t["positive_control_in_round"] = out_status, out_sentence, positive
-    t["claim_clean_but_harmful"] = (t["arm_kind"] == "cleanharm") & (t["status"] == STATUSES[0])
+    t["status_code"], t["positive_control_in_round"] = out_status, positive
+    pre = "SYNTHETIC: " if synthetic else ""  # recorded synthetic verdicts say so in the very text the app shows verbatim
+    t["status"] = [pre + x for x in out_status]
+    t["sentence"] = [pre + x for x in out_sentence]
+    t["claim_clean_but_harmful"] = (t["arm_kind"] == "cleanharm") & (t["status_code"] == STATUSES[0])
     return t
 
 
@@ -249,7 +257,7 @@ def discrepancy_verdict_run(tag: str, name: str, chain: str | None = None, out_d
     if n_total is None:
         a0 = next((d for d in arms.values() if d.get("groundtruth_arm") and d.get("child_n_episodes")), None)
         n_total = int(a0["child_n_episodes"]) + int(a0["n_dropped"]) if a0 else None
-    table = statuses(records, arms, n_total)
+    table = statuses(records, arms, n_total, synthetic)
     if table.empty:
         raise ValueError(f"chain {chain_id} has no family-W curated_vs_random verdicts of planted arms")
     table["synthetic"] = bool(synthetic)
@@ -266,7 +274,7 @@ def discrepancy_verdict_run(tag: str, name: str, chain: str | None = None, out_d
             r.input_entity("verdict", rec["verdict_sha256"], f"verify.{rec['name']}"[:200])
         r.params({"kind": "discrepancy-verdict (Round B planted, PoC §9.2)", "tag": tag, "source_chain": chain_id, "n_arms": int(table["arm"].nunique()),
                   "positive_control_in_round": bool(table["positive_control_in_round"].iloc[0]), "n_verify_runs": len(used), "synthetic": bool(synthetic),
-                  "statuses": {s: int((table["status"] == s).sum()) for s in STATUSES}})
+                  "statuses": {s: int((table["status_code"] == s).sum()) for s in STATUSES}})
         r.output_file("discrepancy_verdict", path, kind="table")
         r.output_file("discrepancy_verdict_json", jpath, kind="file")
         return {"run_id": r.run_id, "table": rel(path), "rows": len(table), "positive_control": bool(table["positive_control_in_round"].iloc[0])}

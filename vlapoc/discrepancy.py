@@ -30,10 +30,12 @@ Grounding
 How the wording is bounded (the owner's caution: non-significance is not proof)
 ------------------------------------------------------------------------------
 A type is compared with the clean episodes, per metric, on the subset-z-scored harm column (z = (x - mean) / s.d., ddof 0). The
-difference of the two means gets a percentile bootstrap 95% CI (1000 resamples of each group). If the interval excludes 0 the reading is
+difference of the two means gets a Welch 95% interval (``scipy.stats.ttest_ind(..., equal_var=False).confidence_interval``; the percentile
+bootstrap was measured to over-call at 13 vs 869 episodes, so it is kept only as ``*_boot`` comparison columns). If the interval excludes 0 the reading is
 "harmful on <metric>" (above) or "helpful on <metric>" (below). If it does not, the reading is always written
-"no detectable harm on <metric> (estimated; CI [lo, hi])": an interval that spans zero cannot show there is no harm, and with 13 episodes
-per type (1.4% of the data) it can be wide. The word that would claim the opposite never appears in any output (``verify_dashboard.py
+"no detectable harm on <metric> (estimated; Welch 95% CI [lo, hi])": an interval that spans zero cannot show there is no harm, and with 13 episodes
+per type (1.4% of the data) it can be wide. Every sentence says it is uncorrected across the types x metrics cells and whether it holds after Holm
+across the metrics of that type (``p_holm_metrics``, PoC §4.4 p. 10); the reading itself stays the calibrated per-cell Welch call. The word that would claim the opposite never appears in any output (``verify_dashboard.py
 --discrepancy`` scans every output file). Only a removal arm that passes the two-step verdict can support that claim (Round B).
 
 Declared parameters (inferred, recorded in the run params): "harmful" means harm z >= 1 (the ``analysis.metric_groups`` threshold);
@@ -95,20 +97,15 @@ def boot_diff_ci(a: np.ndarray, b: np.ndarray, rng: np.random.Generator, n_boot:
     return float(np.quantile(d, 0.025)), float(np.quantile(d, 0.975))
 
 
-def welch_diff_ci(a: np.ndarray, b: np.ndarray, level: float = 0.95) -> tuple[float, float]:
-    """Welch t interval for mean(a) - mean(b) (scipy ``t.ppf``, Welch-Satterthwaite degrees of freedom): a cross-check of ``boot_diff_ci``.
-    Measured on this repo's setting (13 vs 869 episodes, normal null, 1500 trials; ``artifacts/s9_null_calibration_SYNTHETIC.json``): the
-    percentile bootstrap interval excludes 0 in 8.5% of trials at nominal 5%, the Welch interval in 4.9%. The reported ``reading`` follows
-    the plan (percentile bootstrap); ``reading_welch`` is stored beside it so the difference is visible."""
+def welch(a: np.ndarray, b: np.ndarray) -> tuple[float, float, float]:
+    """``(lo, hi, p)`` of mean(a) - mean(b): the Welch interval and p of ``scipy.stats.ttest_ind(a, b, equal_var=False)`` (95%, no hand-rolled version).
+    Measured on this repo's setting (13 vs 869 episodes, normal null; ``artifacts/s9_null_calibration_SYNTHETIC.json``): the percentile bootstrap interval
+    excludes 0 in 8.5-9.9% of trials at nominal 5%, the Welch interval in about 5%, so the reading uses Welch (analysis-r1 planner item 1)."""
     from scipy import stats
 
-    a, b = np.asarray(a, float), np.asarray(b, float)
-    va, vb = a.var(ddof=1) / len(a), b.var(ddof=1) / len(b)
-    se = float(np.sqrt(va + vb))
-    df = (va + vb) ** 2 / (va**2 / (len(a) - 1) + vb**2 / (len(b) - 1))
-    tc = float(stats.t.ppf(0.5 + level / 2, df))
-    d = float(a.mean() - b.mean())
-    return d - tc * se, d + tc * se
+    r = stats.ttest_ind(np.asarray(a, float), np.asarray(b, float), equal_var=False)
+    ci = r.confidence_interval(0.95)
+    return float(ci.low), float(ci.high), float(r.pvalue)
 
 
 def reading_of(lo: float, hi: float) -> str:
@@ -116,14 +113,21 @@ def reading_of(lo: float, hi: float) -> str:
     return "harmful" if lo > 0 else ("helpful" if hi < 0 else "no_detectable_harm")
 
 
-def estimated_reading(metric: str, lo: float, hi: float) -> tuple[str, str]:
-    """``(reading, sentence)`` from the CI of the type-minus-clean difference (module docstring: the wording is bounded)."""
-    ci = f"CI [{lo:.2f}, {hi:.2f}]"
-    if lo > 0:
-        return "harmful", f"harmful on {metric} (estimated; {ci})"
-    if hi < 0:
-        return "helpful", f"helpful on {metric} (estimated; {ci})"
-    return "no_detectable_harm", f"no detectable harm on {metric} (estimated; {ci})"
+def estimated_reading(metric: str, lo: float, hi: float, p_holm: float | None = None, n_types: int | None = None, n_metrics: int | None = None) -> tuple[str, str]:
+    """``(reading, sentence)`` from the Welch interval of the type-minus-clean difference (module docstring: the wording is bounded). The sentence always says
+    the reading is uncorrected across the ``n_types`` x ``n_metrics`` cells, and whether it holds after Holm across the metrics of that type (PoC §4.4 p. 10,
+    "correct for it (e.g. Bonferroni or Holm across metrics)")."""
+    ci = f"Welch 95% CI [{lo:.2f}, {hi:.2f}]"
+    reading = reading_of(lo, hi)
+    head = {"harmful": f"harmful on {metric}", "helpful": f"helpful on {metric}", "no_detectable_harm": f"no detectable harm on {metric}"}[reading]
+    tail = ""
+    if n_types and n_metrics:
+        tail += f" Uncorrected across {n_types} types \u00d7 {n_metrics} metrics."
+    if p_holm is not None:
+        holds = (p_holm < 0.05) if reading != "no_detectable_harm" else None
+        tail += (f" Holm across the {n_metrics} metrics: {'holds' if holds else 'does not hold'} (adjusted p = {p_holm:.3f})." if holds is not None
+                 else f" Holm across the {n_metrics} metrics: adjusted p = {p_holm:.3f}.")
+    return reading, f"{head} (estimated; {ci}).{tail}"
 
 
 def filter_flags(desc: pd.DataFrame, q: float) -> pd.DataFrame:
@@ -200,31 +204,38 @@ def type_table(ep: pd.DataFrame, labels: pd.DataFrame, cols: list[str], decls: d
                seed: int = 0) -> pd.DataFrame:
     """Per (planted type, metric): the type's mean z with a bootstrap CI, the clean episodes' mean z, the difference with its CI, the reading,
     the share of members in each quadrant, the label's hypothesis and the best heuristic's AUROC (the visibly-bad evidence)."""
+    from vlapoc.verdict import holm
+
     rng = np.random.default_rng(seed)
     hyp = labels.groupby("corruption_type")["hypothesis"].first().to_dict() if "hypothesis" in labels else {}
     bh = best.set_index("planted_type") if len(best) else pd.DataFrame()
     clean = ep["planted_type"] == CLEAN
+    types_ = sorted(set(ep["planted_type"]) - {CLEAN})
     rows = []
-    for t in sorted(set(ep["planted_type"]) - {CLEAN}):
+    for t in types_:
         sel = ep["planted_type"] == t
+        part = []
         for c in cols:
             m = c.removeprefix("harm_")
             zt, zc = ep.loc[sel, f"z__{m}"].to_numpy(), ep.loc[clean, f"z__{m}"].to_numpy()
             lo, hi = boot_mean_ci(zt, rng, n_boot)
             clo, chi = boot_mean_ci(zc, rng, n_boot)
-            dlo, dhi = boot_diff_ci(zt, zc, rng, n_boot)
-            reading, sentence = estimated_reading(m, dlo, dhi)
-            wlo, whi = welch_diff_ci(zt, zc)
+            blo, bhi = boot_diff_ci(zt, zc, rng, n_boot)
+            wlo, whi, wp = welch(zt, zc)
             q = ep.loc[sel, f"quadrant__{m}"].value_counts(normalize=True)
-            rows.append({"planted_type": t, "metric": m, "n": int(sel.sum()), "mean_z": float(zt.mean()), "mean_z_lo": lo, "mean_z_hi": hi,
+            part.append({"planted_type": t, "metric": m, "n": int(sel.sum()), "mean_z": float(zt.mean()), "mean_z_lo": lo, "mean_z_hi": hi,
                          "clean_n": int(clean.sum()), "clean_mean_z": float(zc.mean()), "clean_mean_z_lo": clo, "clean_mean_z_hi": chi,
-                         "diff": float(zt.mean() - zc.mean()), "diff_lo": dlo, "diff_hi": dhi, "reading": reading, "estimated_reading": sentence,
-                         "diff_lo_welch": wlo, "diff_hi_welch": whi, "reading_welch": reading_of(wlo, whi),
+                         "diff": float(zt.mean() - zc.mean()), "diff_lo": wlo, "diff_hi": whi, "p_welch": wp,
+                         "diff_lo_boot": blo, "diff_hi_boot": bhi, "reading_boot": reading_of(blo, bhi),
                          "share_bad_and_harmful": float(q.get(QUADRANTS[0], 0.0)), "share_bad_but_not_harmful": float(q.get(QUADRANTS[1], 0.0)),
                          "hypothesis": hyp.get(t), "best_heuristic": bh.loc[t, "heuristic"] if t in getattr(bh, "index", []) else None,
                          "best_heuristic_direction": bh.loc[t, "direction"] if t in getattr(bh, "index", []) else None,
                          "best_heuristic_auroc": float(bh.loc[t, "auroc"]) if t in getattr(bh, "index", []) else None,
                          **_decl(decls, c), "synthetic": bool(synthetic)})
+        for r, ph in zip(part, holm([r["p_welch"] for r in part])):
+            r["p_holm_metrics"] = float(ph)
+            r["reading"], r["estimated_reading"] = estimated_reading(r["metric"], r["diff_lo"], r["diff_hi"], float(ph), len(types_), len(cols))
+        rows += part
     return pd.DataFrame(rows)
 
 
@@ -232,24 +243,30 @@ def filter_table(ep: pd.DataFrame, flags: pd.DataFrame, cols: list[str], decls: 
     """The secondary layer, "what a practical filter would have dropped, and whether it mattered": per filter (``any_H1_H8`` and each
     heuristic) and metric: how many episodes it flags and how many of those are planted, the mean z of flagged vs unflagged episodes with the
     difference's CI and the same bounded reading, and the filter-based quadrant counts."""
+    from vlapoc.verdict import holm
+
     rng = np.random.default_rng(seed)
     sets = {"any_H1_H8": ep["looks_bad_filter"].to_numpy()} | {h: flags[h].to_numpy() for h in flags.columns}
     planted = (ep["planted_type"] != CLEAN).to_numpy()
     rows = []
     for name, f in sets.items():
-        if f.sum() == 0:
+        if f.sum() == 0 or (~f).sum() < 2:
             continue
+        part = []
         for c in cols:
             m = c.removeprefix("harm_")
             z = ep[f"z__{m}"].to_numpy()
-            dlo, dhi = boot_diff_ci(z[f], z[~f], rng, n_boot) if (~f).sum() else (np.nan, np.nan)
-            reading, sentence = estimated_reading(m, dlo, dhi) if (~f).sum() else ("n/a", "n/a")
+            wlo, whi, wp = welch(z[f], z[~f])
             quad = quadrant_of(f, z)
-            rows.append({"filter": name, "metric": m, "n_flagged": int(f.sum()), "share_flagged": float(f.mean()), "n_flagged_planted": int((f & planted).sum()),
+            part.append({"filter": name, "metric": m, "n_flagged": int(f.sum()), "share_flagged": float(f.mean()), "n_flagged_planted": int((f & planted).sum()),
                          "precision_vs_planted": float((f & planted).sum() / f.sum()), "recall_of_planted": float((f & planted).sum() / max(planted.sum(), 1)),
-                         "mean_z_flagged": float(z[f].mean()), "mean_z_unflagged": float(z[~f].mean()) if (~f).sum() else np.nan, "diff": float(z[f].mean() - z[~f].mean()) if (~f).sum() else np.nan,
-                         "diff_lo": dlo, "diff_hi": dhi, "reading": reading, "estimated_reading": sentence,
+                         "mean_z_flagged": float(z[f].mean()), "mean_z_unflagged": float(z[~f].mean()), "diff": float(z[f].mean() - z[~f].mean()),
+                         "diff_lo": wlo, "diff_hi": whi, "p_welch": wp,
                          **{f"n_{qn}": int((quad == qn).sum()) for qn in QUADRANTS}, **_decl(decls, c), "synthetic": bool(synthetic)})
+        for r, ph in zip(part, holm([r["p_welch"] for r in part])):
+            r["p_holm_metrics"] = float(ph)
+            r["reading"], r["estimated_reading"] = estimated_reading(r["metric"], r["diff_lo"], r["diff_hi"], float(ph), None, len(cols))
+        rows += part
     return pd.DataFrame(rows)
 
 

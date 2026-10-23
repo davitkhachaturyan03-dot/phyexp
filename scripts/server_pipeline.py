@@ -391,7 +391,7 @@ def main(argv: list[str] | None = None) -> int:
         runs = " ".join(f"attribute-{t}-s{s}" for s in a.seeds)
         ens = ch.submit("cpu.sbatch", f"{PY} ensemble --runs {runs} --name attribute-{t}-ens", f"ensemble-{t}", attr_jobs)
         ch.submit("cpu.sbatch", f"{PY} analyze --scores attribute-{t}-ens --name analyze-{t}", f"analyze-{t}", [ens])  # PoC §4.2, §4.5 outputs
-        cl = ch.submit("cpu.sbatch", f"{PY} clusters --scores attribute-{t}-ens --name clusters-{t}", f"clusters-{t}", [ens])  # dashboard S2: clusters + patterns
+        cl = ch.submit("cpu.sbatch", f"{PY} clusters --scores attribute-{t}-ens --name clusters-{t} --min-sup-fraction 0.01", f"clusters-{t}", [ens])  # dashboard S2: clusters + patterns; min_sup 10 (1%), below the 13 episodes of a planted type (analysis-r1 F2)
         if has_answer_key(a.subset):  # injection run (e.g. --subset v3/candidate): score the ranking against the planted truth
             vname, _, sname = a.subset.partition("/")
             ch.submit("cpu.sbatch", f"{PY} score --scores attribute-{t}-ens --version {vname} --subset {sname} --name score-{t}",

@@ -47,6 +47,8 @@ minimum value holds more than 1/5 of the episodes, such as ``idle_steps``, gets 
 episodes, +1.5 sigma planted): a 40-member slice is found at rank <= 2 with alpha 0.95; a 17-19-member slice is not (alpha 0.99
 finds it, but then always returns k slices, mostly noise). So small slices can be missed at the defaults.
 
+Clusters with identical member sets are reported once (``dedupe``: the kept row lists the equivalent definitions).
+
 Caveat carried into every pattern (R1): a slice finder picks the most extreme slices, so the percentile-bootstrap interval of a
 discovered slice's mean is optimistic. These are estimates to confirm, not findings.
 """
@@ -404,6 +406,28 @@ def harm_columns(table: pd.DataFrame, metrics: list[str] | None) -> list[str]:
     return cols
 
 
+def dedupe(rows: list[dict], masks: list[np.ndarray]) -> tuple[list[dict], list[np.ndarray], int]:
+    """Report clusters with identical member sets once (dashboard round 2, AC2.9). The first row in lens order (label, slice, metric group) is kept; the others
+    become its ``equivalent_definitions`` (JSON list of ``{cluster_id, lens, definition, direction, target_metric}``), so e.g. ``scene = KITCHEN_SCENE3`` and
+    ``task_name = KITCHEN_SCENE3_turn_on_the_stove...`` (the same 48 episodes in the demo) are one cluster that names both. Returns ``(rows, masks, n_removed)``."""
+    seen: dict[bytes, int] = {}
+    keep_rows, keep_masks, n = [], [], 0
+    for r, m in zip(rows, masks):
+        key = np.asarray(m, bool).tobytes()
+        if key in seen:
+            keep_rows[seen[key]]["_eq"].append({k: r[k] for k in ("cluster_id", "lens", "definition", "direction", "target_metric")})
+            n += 1
+        else:
+            seen[key] = len(keep_rows)
+            r["_eq"] = []
+            keep_rows.append(r)
+            keep_masks.append(m)
+    for r in keep_rows:
+        r["equivalent_definitions"] = json.dumps(r.pop("_eq"))
+        r["n_equivalent"] = len(json.loads(r["equivalent_definitions"]))
+    return keep_rows, keep_masks, n
+
+
 def discover(table: pd.DataFrame, view, decls: dict[str, dict], cols: list[str], params: dict | None = None,
              cache_dir: Path | None = DEFAULT_CACHE, heuristics: bool = True) -> dict:
     """The untracked core of ``clusters_run``: ``{"clusters", "members", "patterns", "descriptors", "bins", "dropped"}`` from a
@@ -428,6 +452,7 @@ def discover(table: pd.DataFrame, view, decls: dict[str, dict], cols: list[str],
         r, m = fn(*args)
         rows += r
         masks += m
+    rows, masks, n_dup = dedupe(rows, masks)
     decl_json = json.dumps({c: declaration_of(decls, c) for c in cols}, sort_keys=True)
     for r in rows:
         r["declarations"] = decl_json
@@ -448,7 +473,7 @@ def discover(table: pd.DataFrame, view, decls: dict[str, dict], cols: list[str],
     for c in codes.columns:
         descriptors[f"{c}__bin"] = codes[c].to_numpy()
     return {"clusters": clusters, "members": pd.concat(members, ignore_index=True), "patterns": patterns, "descriptors": descriptors,
-            "bins": specs, "dropped": dropped, "params": p, "columns": cols}
+            "bins": specs, "dropped": dropped, "params": p, "columns": cols, "n_deduped": n_dup}
 
 
 def clusters_run(score_run_id: str, name: str, metrics: list[str] | None = None, out_dir: Path | None = None, lineage_root: Path | None = None,
@@ -501,7 +526,7 @@ def clusters_run(score_run_id: str, name: str, metrics: list[str] | None = None,
                   "group_z_threshold": p["z"], "group_rule": DIVERGENCE_NOTE, "n_boot": p["n_boot"], "seed": p["seed"],
                   "status": STATUS, "status_note": STATUS_NOTE, "selection_caveat": SELECTION_CAVEAT,
                   "metric_specific_split": "one cluster per (metric, sign), not one per group (PoC §4.2 p. 10 'explain specific behaviours')",
-                  "heuristic_descriptors": bool(heuristics), "n_episodes": len(out["descriptors"]), "n_clusters": len(out["clusters"]),
+                  "heuristic_descriptors": bool(heuristics), "n_episodes": len(out["descriptors"]), "n_clusters": len(out["clusters"]), "n_duplicate_member_sets_merged": out["n_deduped"],
                   "synthetic": synthetic})
         for k, path in files.items():
             r.output_file(k, path, kind="table")

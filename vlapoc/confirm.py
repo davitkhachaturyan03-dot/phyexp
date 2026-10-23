@@ -107,6 +107,7 @@ def confirm_run(cluster_run_id: str, tag: str, name: str, chain: str | None = No
     synthetic = crun.data.params.get("synthetic") == "True" or crun.data.tags.get("vlapoc.synthetic") == "true"
     table["synthetic"] = synthetic
     table["cluster_run_id"] = cluster_run_id
+    table["status_display"] = [("SYNTHETIC: " if synthetic else "") + x for x in table["status"]]  # the app shows this column; "status" stays the canonical word
     ov = overall(table)
     out_dir = Path(out_dir) if out_dir else Path("data") / "attribution" / name
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -121,7 +122,8 @@ def confirm_run(cluster_run_id: str, tag: str, name: str, chain: str | None = No
         for rec in used:
             r.input_entity("verdict", rec["verdict_sha256"], f"verify.{rec['name']}"[:200])
         r.params({"kind": "confirm (Round B cluster status)", "cluster_run_id": cluster_run_id, "tag": tag, "source_chain": chain_id, "rule": RULE,
-                  "n_verify_runs": len(used), "overall_vs_base": ov, "synthetic": synthetic})
+                  "n_verify_runs": len(used), "overall_vs_base": ov, "overall_display": {k: ("SYNTHETIC: " if synthetic else "") + v for k, v in ov.items()},
+                  "synthetic": synthetic})
         r.output_file("cluster_status", path, kind="table")
         r.output_file("cluster_status_json", jpath, kind="file")
         return {"run_id": r.run_id, "table": rel(path), "rows": len(table), "overall": ov}
