@@ -29,6 +29,7 @@ import streamlit as st  # noqa: E402
 
 from vlapoc import results as res  # noqa: E402
 from vlapoc import video  # noqa: E402
+from dashboard import words  # noqa: E402
 from vlapoc.analysis import axis_label  # noqa: E402
 
 
@@ -151,20 +152,34 @@ def rollout_video(lr: str, eval_run_id: str, traj_episode_index: int) -> bytes |
 
 
 def label(col: str, decls: dict) -> str:
-    """A score column under its declared functional and tau (``analysis.axis_label``): never a bare column name (PoC §3.4 p. 7, §4.4 p. 10)."""
-    return axis_label(col, decls)
+    """The short, plain name of a score column (``Speed vs human (HRT)``). The declared functional is reachable next to it: ``declared(col, decls)`` in a caption or
+    tooltip (PoC §3.4 p. 7, §4.4 p. 10); ``analysis.axis_label`` is the full text."""
+    return words.metric_name(col)
+
+
+def declared(col: str, decls: dict) -> str:
+    """``Speed vs human (HRT): HRT(60) = ... [τ 60 s, all, good_sign +1]``: the short name and the declaration from ``functionals.json``."""
+    return f"{words.metric_name(col)}: {axis_label(col, decls).split(': ', 1)[1]}"
+
+
+def declared_caption(cols: list[str], decls: dict) -> None:
+    """One caption listing what each shown metric explains (the declared functional and τ), so no number is bare."""
+    st.caption("What the scores explain: " + " | ".join(declared(c, decls) for c in cols))
 
 
 def banner(prov: dict) -> None:
-    """The provenance banner: SYNTHETIC in red, SMOKE in amber, a quiet caption for REAL (decided by ``results.provenance`` from the recorded runs)."""
-    why = "; ".join(prov["reasons"][:3]) + (f"; ... {len(prov['reasons'])} reasons in all" if len(prov["reasons"]) > 3 else "")
+    """The provenance banner, one line (SYNTHETIC in red, SMOKE in amber, a quiet caption for REAL), with the recorded reasons in an expander below it
+    (decided by ``results.provenance`` from the recorded runs; PoC §3.4 and the owner's "labelled everywhere")."""
     if prov["label"] == "SYNTHETIC":
-        st.error("**SYNTHETIC DATA.** The scores, clusters and findings below are synthetic (made-up influence, planted structure) and say nothing about any policy. "
-                 "Videos, catalog and rollouts may be real. Why: " + why)
+        st.error("**SYNTHETIC scores:** a demonstration, not a result about any policy (videos, catalog and rollouts may be real).")
     elif prov["label"] == "SMOKE":
-        st.warning("**SMOKE run.** Real code on a toy-scale chain (2-step checkpoint, 2 rollouts), not attribution-grade; do not read the numbers as results. Why: " + why)
+        st.warning("**SMOKE run:** real code on a toy-scale chain, not attribution-grade; do not read the numbers as results.")
     else:
         st.caption(f"Provenance: REAL ({prov['n_runs']} recorded runs checked: every train run is not smoke, every eval run is attribution-grade, nothing synthetic).")
+    if prov["reasons"]:
+        with st.expander("Why this label (recorded runs)"):
+            for r in prov["reasons"]:
+                st.caption(r)
 
 
 PAGES = ("Overview", "Rollouts", "Episodes", "Clusters", "Bad vs harmful")
@@ -197,11 +212,8 @@ def header(cfg: Config) -> dict:
 
 
 def functional_note(ctx: dict, cols: list[str]) -> None:
-    """The declared functionals of the columns in view (PoC §3.4 p. 7): one caption per column."""
-    with st.expander("Declared functionals of the columns on this page", expanded=False):
-        for c in cols:
-            d = ctx["decls"].get(c)
-            st.caption(f"`{c}`: {label(c, ctx['decls'])}" + (f" - {d['weighting']}" if d and d.get("weighting") else ""))
+    """Caption with the declared functional and τ of the columns in view (PoC §3.4 p. 7)."""
+    declared_caption(cols, ctx["decls"])
 
 
 def harm_cols(ctx: dict) -> list[str]:

@@ -129,9 +129,10 @@ def tradeoff_text(x: str, y: str, decls: dict[str, dict], synthetic: bool) -> di
 
 
 def plot_heatmap(table: pd.DataFrame, columns: list[str], groups: pd.Series, decls: dict[str, dict], path: Path,
-                 synthetic: bool = False) -> Path:
+                 synthetic: bool = False, tick_labels: dict[str, str] | None = None) -> Path:
     """Episode × metric heatmap of z-scored harm (red = harmful, blue = helpful), episodes sorted by group then by mean harm
-    (PoC §4.5). Each column's label names its functional and τ from ``functionals.json``."""
+    (PoC §4.5). Each column's label names its functional and τ from ``functionals.json``; ``tick_labels`` (column -> short text) replaces the long
+    tick labels where the full declaration is shown beside the figure (the dashboard)."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -143,7 +144,7 @@ def plot_heatmap(table: pd.DataFrame, columns: list[str], groups: pd.Series, dec
     im = ax.imshow(z.iloc[order].to_numpy(), aspect="auto", cmap="RdBu_r", vmin=-3, vmax=3, interpolation="nearest")
     ax.set_xticks(range(len(columns)))
     txt = heatmap_text(columns, decls, synthetic)
-    ax.set_xticklabels(txt["xticklabels"], rotation=35, ha="right", fontsize=6)
+    ax.set_xticklabels([tick_labels[c] for c in columns] if tick_labels else txt["xticklabels"], rotation=35 if not tick_labels else 20, ha="right", fontsize=6 if not tick_labels else 9)
     ax.set_ylabel("training episodes (sorted by group, then mean harm)")
     bounds = np.cumsum([sum(groups.iloc[i] == g for i in range(len(table))) for g in GROUPS])
     for b in bounds[:-1]:
