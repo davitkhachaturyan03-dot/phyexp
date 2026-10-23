@@ -115,6 +115,26 @@ def find_runs(stage: str, lineage_root: Path | None = None, chain: str | None = 
     return out
 
 
+def runs_with_param(stage: str, key: str, value: str, lineage_root: Path | None = None) -> list[dict]:
+    """FINISHED runs of ``stage`` whose MLflow param ``key`` equals ``value``, newest first (same fields as ``find_runs``): how the dashboard finds the runs
+    that were made from another run (a cluster run's ``score_run_id``, a confirm run's ``cluster_run_id``)."""
+    from vlapoc.runs import STAGES, experiment_id
+
+    if stage not in STAGES:
+        raise ValueError(f"stage must be one of {STAGES}")
+    q = f"tags.stage = '{stage}' and attributes.status = 'FINISHED' and params.{key} = '{value}'"
+    runs = _client(lineage_root).search_runs([experiment_id(lineage_root)], q, order_by=["attributes.start_time DESC"], max_results=5000)
+    return [{"run_id": r.info.run_id, "name": r.info.run_name, "stage": stage, "chain": r.data.tags.get("vlapoc.chain"), "start_time": r.info.start_time,
+             "synthetic_tag": r.data.tags.get("vlapoc.synthetic") == "true", "params": dict(r.data.params),
+             "outputs": sorted(k[len("output."):-len(".artifact")] for k in r.data.tags if k.startswith("output.") and k.endswith(".artifact"))} for r in runs]
+
+
+def run_summary(run_id: str, lineage_root: Path | None = None) -> dict:
+    """``{"name", "stage", "params", "tags"}`` of one run (for display: lineage panel, banner reasons)."""
+    r = _get_run(run_id, lineage_root)
+    return {"name": r.info.run_name, "stage": r.data.tags.get("stage"), "params": dict(r.data.params), "tags": dict(r.data.tags), "experiment_id": r.info.experiment_id}
+
+
 def resolve_run(ref: str, stage: str, lineage_root: Path | None = None, chain: str | None = None) -> str:
     """``ref`` itself if it is a run id, else the newest FINISHED ``stage`` run named ``ref`` (``ValueError`` if none)."""
     import re
