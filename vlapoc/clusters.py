@@ -41,7 +41,8 @@ Grounding
   ``max(z, 0)`` (harm slices) and ``max(-z, 0)`` (boost slices).
 
 Declared parameters (inferred defaults, recorded in the run params; the owner may override): 5 quantile bins (a descriptor whose
-minimum value holds more than 1/5 of the episodes, such as ``idle_steps``, gets that value as its own bin), ``max_l = 2``, ``k = 5``,
+minimum value holds more than 1/5 of the episodes, such as ``idle_steps``, gets that value as its own bin; a bin smaller than
+``min_sup`` is merged into its neighbour), ``max_l = 2``, ``k = 5``,
 ``alpha = 0.95``, ``min_sup = max(10, 2% of N)``, group threshold z = 1, 1000 bootstrap resamples. Measured sensitivity (960
 episodes, +1.5 sigma planted): a 40-member slice is found at rank <= 2 with alpha 0.95; a 17-19-member slice is not (alpha 0.99
 finds it, but then always returns k slices, mostly noise). So small slices can be missed at the defaults.
@@ -115,13 +116,16 @@ def _fmt(x: float) -> str:
     return f"{float(x):.4g}"
 
 
-def bin_spec(x: pd.Series, n_bins: int) -> dict | None:
+def bin_spec(x: pd.Series, n_bins: int, min_bin: int = 1) -> dict | None:
     """The binning of one numeric descriptor, or ``None`` if it is constant.
 
     ``kind="value"`` when it has at most ``n_bins`` distinct values (each its own bin). Otherwise ``kind="cuts"``: bin ``i`` is
     ``(cuts[i-1], cuts[i]]`` (first bin ``<= cuts[0]``, last ``> cuts[-1]``), cuts are data values from the quantiles
     (``method="lower"``); when the minimum value holds more than ``1/n_bins`` of the episodes (zero-inflated descriptors such as
-    ``idle_steps``) it is its own bin and the rest is cut into ``n_bins - 1`` quantile bins. ``labels`` read like ``"(1.08, 1.31]"``."""
+    ``idle_steps``) it is its own bin and the rest is cut into ``n_bins - 1`` quantile bins. A bin with fewer than ``min_bin`` episodes
+    is merged into its smaller neighbour (down to two bins), because the slice finder cannot return a slice below its minimum support
+    (measured on v3: ``duplicate_frame_pairs > 0`` has 26 episodes and split into bins of 7, 18 and 1, none usable; merged it is one bin
+    of 26). ``labels`` read like ``"(1.08, 1.31]"``."""
     v = x.to_numpy(float)
     if np.isnan(v).any():
         raise ValueError(f"descriptor {x.name!r} has NaN values")
@@ -135,6 +139,14 @@ def bin_spec(x: pd.Series, n_bins: int) -> dict | None:
     else:
         cuts = list(np.quantile(v, np.linspace(0, 1, n_bins + 1)[1:-1], method="lower"))
     cuts = sorted({float(c) for c in cuts if c < uniq[-1]})
+    while len(cuts) > 1:
+        sizes = np.bincount(np.searchsorted(np.array(cuts), v, side="left"), minlength=len(cuts) + 1)
+        i = int(np.argmin(sizes))
+        if sizes[i] >= min_bin:
+            break
+        left = sizes[i - 1] if i > 0 else np.inf
+        right = sizes[i + 1] if i < len(sizes) - 1 else np.inf
+        del cuts[i - 1 if left <= right else i]  # merge bin i into its smaller neighbour: drop the cut between them
     labels = [f"= {_fmt(cuts[0])}" if cuts[0] == uniq[0] else f"<= {_fmt(cuts[0])}"]
     labels += [f"({_fmt(a)}, {_fmt(b)}]" for a, b in zip(cuts[:-1], cuts[1:])]
     labels.append(f"> {_fmt(cuts[-1])}")
@@ -147,7 +159,7 @@ def encode_numeric(x, spec: dict) -> np.ndarray:
     return np.searchsorted(edges, np.asarray(x, float), side="left")  # bin i = (edges[i-1], edges[i]]; a "value" spec matches exactly
 
 
-def bin_descriptors(desc: pd.DataFrame, n_bins: int = DEFAULTS["n_bins"]) -> tuple[pd.DataFrame, dict, dict]:
+def bin_descriptors(desc: pd.DataFrame, n_bins: int = DEFAULTS["n_bins"], min_bin: int = 1) -> tuple[pd.DataFrame, dict, dict]:
     """``(codes, specs, dropped)``: an integer code per descriptor and episode (``codes`` columns are the kept descriptors), the
     ``bin_spec`` of each (categorical descriptors: ``kind="categorical"`` with the sorted ``categories``), and ``{descriptor: reason}``
     for the descriptors dropped (constant). The slice finder searches over these codes."""
@@ -155,7 +167,7 @@ def bin_descriptors(desc: pd.DataFrame, n_bins: int = DEFAULTS["n_bins"]) -> tup
     for c in (*CATALOG_DESCRIPTORS, *HEURISTIC_DESCRIPTORS):
         if c not in desc:
             continue
-        s = bin_spec(desc[c], n_bins)
+        s = bin_spec(desc[c], n_bins, min_bin)
         if s is None:
             dropped[c] = "constant"
             continue
@@ -407,7 +419,7 @@ def discover(table: pd.DataFrame, view, decls: dict[str, dict], cols: list[str],
     table = table.reset_index(drop=True)
     desc = descriptor_table(view, heuristics, cache_dir).set_index("episode_id").loc[table["episode_id"]].reset_index()
     desc.index = table.index
-    codes, specs, dropped = bin_descriptors(desc, p["n_bins"])
+    codes, specs, dropped = bin_descriptors(desc, p["n_bins"], max(int(p["min_sup_floor"]), int(round(p["min_sup_fraction"] * len(table)))))
     rng = np.random.default_rng(p["seed"])
     rows, masks = [], []
     for fn, args in ((label_clusters, (table, view.catalog, cols, p["n_boot"], p["seed"])),

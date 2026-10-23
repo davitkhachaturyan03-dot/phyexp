@@ -3,7 +3,7 @@
  "pass": true,
  "n_pass": 8,
  "n": 8,
- "seconds": 8,
+ "seconds": 7,
  "checks": [
   {
    "name": "9.1 SYNTHETIC over the real v3 key: idle_padding 'harmful on hrt60_lin' and 'no detectable harm on f30 (estimated)'; action_noise 'no detectable harm' on all five metrics; the 10 planted clean episodes are in clean_harmful top-20 for f30; all four quadrants non-empty for a metric",
@@ -23,7 +23,7 @@
   {
    "name": "9.4 refuses (nothing written): a FAILED attribute run, a non-attribute run, a version without an answer key, a table that does not key v3/candidate; the run consumes the score table's sha256 and was created after it; attribution/clusters/results/analysis import nothing from discrepancy, groundtruth or recovery",
    "pass": true,
-   "detail": "a FAILED attribute run: REFUSED (ValueError: run 9ec8b998e19f is not a FINISHED attribute run with a recorded score table (status FAILED, stage '); a non-attribute run (a cluster run): REFUSED (ValueError: run e43a6e7bb090 is not a FINISHED attribute run with a recorded score table (status FINISHED, stage); a version without an answer key (v0): REFUSED (LineageError: version v0 has no labels (not a derived version)); a score table that does not key exactly v3/candidate: REFUSED (LineageError: score table keys != parent subset's episode versions: 0 unknown/stale (e.g. []), 910 unscored (e.g. ); importers of the GT side among method files: {}"
+   "detail": "a FAILED attribute run: REFUSED (ValueError: run 239fd7d59f9c is not a FINISHED attribute run with a recorded score table (status FAILED, stage '); a non-attribute run (a cluster run): REFUSED (ValueError: run 6ad01abdfedd is not a FINISHED attribute run with a recorded score table (status FINISHED, stage); a version without an answer key (v0): REFUSED (LineageError: version v0 has no labels (not a derived version)); a score table that does not key exactly v3/candidate: REFUSED (LineageError: score table keys != parent subset's episode versions: 0 unknown/stale (e.g. []), 910 unscored (e.g. ); importers of the GT side among method files: {}"
   },
   {
    "name": "9.5 every row of discrepancy_types, discrepancy_filter and clean_harmful carries functional/tau/rollout_subset/good_sign of its harm column and synthetic; episodes rows carry the JSON declarations; examples.json entries carry the declaration",

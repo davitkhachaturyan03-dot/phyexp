@@ -1,0 +1,13 @@
+=== pipeline: .venv/bin/python scripts/verify_training_attribution.py --pipeline data/scratch/dash_exec/dry_pipeline.txt
+[PASS] 4.1 every harm and help arm has a verify job vs each random control of its family, per seed, depending on exactly both arms' eval jobs  96 jobs checked, 8 help arms, mismatches []
+[PASS] 4.1b both a harm-vs-random and a help-vs-random job exist for f30 (per-task) in every seed
+[PASS] 4.2 a harm-hrt60_lin arm and per seed a head-to-head verify (hrt60_lin arm B vs f30 arm A), depending on both evals
+[PASS] 4.3 --curation global emits drop_top_k on harm_<m> (no __same_task) and drop_random_k with the same k (N = 5 x 20 = 100)  8 drop_top_k arms (k ['100']), 2 random controls (k ['100'])
+[PASS] 4.3b --curation per_task emits only the per-task family (plus the k=20 AC7.5 gate)
+[PASS] 4.3c --curation both emits both families, and is the default (owner answer Q1); each select records --pipeline-curation both, per-task arms --headline  21 select runs: {'drop_random_k': 3, 'drop_random_k_per_task': 2, 'drop_top_k': 8, 'drop_top_k_per_task': 8}
+[PASS] 4.3d a step4-summary job runs last and depends on every verify job  165 verify jobs
+[PASS] 4.6 job count and arm list of the default dry run recorded  313 jobs ({'train': 66, 'eval': 66, 'returns': 3, 'feat': 6, 'attribute': 3, 'ensemble': 1, 'analyze': 1, 'select': 1, 'verify': 165, 'step4': 1}); arms (21): ['harm-f30-k5', 'help-f30-k5', 'harm-rmst60-k5', 'help-rmst60-k5', 'harm-auc_expected-k5', 'help-auc_expected-k5', 'harm-hrt60_lin-k5', 'help-hrt60_lin-k5', 'random0-k5', 'random1-k5', 'gharm-f30-n100', 'ghelp-f30-n100', 'gharm-rmst60-n100', 'ghelp-rmst60-n100', 'gharm-auc_expected-n100', 'ghelp-auc_expected-n100', 'gharm-hrt60_lin-n100', 'ghelp-hrt60_lin-n100', 'grandom0-n100', 'grandom1-n100', 'drop-random-20']
+[PASS] 4.7 first server run (--curation per_task --metrics f30 hrt60_lin): 112 jobs, 24 training runs, and it is documented in the module docstring  112 jobs, 24 trains; script default unchanged at 313 jobs
+S4 pipeline pass: True (9/9, 2s)
+  1.98s user 0.43s system 89% cpu 2.684 total
+rc=0

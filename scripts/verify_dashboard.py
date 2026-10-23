@@ -350,7 +350,7 @@ def clusters_mode() -> int:
         view = open_for_method("v3/candidate", lr)
         desc = cl.descriptor_table(view, True)
         print(f"descriptors for {len(desc)} v3/candidate episodes via open_for_method in {time.time() - t0:.0f}s (cached under data/dashboard_cache/descriptors/)")
-        codes, specs, dropped = cl.bin_descriptors(desc)
+        codes, specs, dropped = cl.bin_descriptors(desc, 5, 19)  # the stage's own binning: min_bin = min_sup = 19
         planted, truth = plant_structure(desc, codes, specs)
         print("planted (SYNTHETIC):", json.dumps(truth))
         metrics = ["f30", "rmst60", "auc_expected", "hrt60_lin", "censored60"]
@@ -669,7 +669,7 @@ def planted_mode() -> int:
         _reset_session()
         view = open_for_method("v3/candidate", lr)
         desc = cl.descriptor_table(view, True)
-        codes, specs, _ = cl.bin_descriptors(desc)
+        codes, specs, _ = cl.bin_descriptors(desc, 5, 19)
         planted, truth = plant_structure(desc, codes, specs)
         tab = synthetic_table(eps, ["f30", "rmst60", "auc_expected", "hrt60_lin", "censored60"], 0, planted)
         sidb = synthetic_score_run(lr, v3, tab, "attribute-dash-synth-s3", note=f"SYNTHETIC planted structure over descriptors: {truth['slice_a']['text']}; task {truth['task']['task_name']}; {truth['slice_b']['text']}")

@@ -1,0 +1,42 @@
+=== verify_attribution: .venv/bin/python scripts/verify_attribution.py
+/Users/davit_khachaturyan/Projects/personal/vlaExp/scripts/verify_attribution.py:80: RuntimeWarning: divide by zero encountered in matmul
+  h = phi.T @ phi / len(phi)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/scripts/verify_attribution.py:80: RuntimeWarning: overflow encountered in matmul
+  h = phi.T @ phi / len(phi)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/scripts/verify_attribution.py:80: RuntimeWarning: invalid value encountered in matmul
+  h = phi.T @ phi / len(phi)
+[PASS] 1 influence_matrix == brute-force double sum (2 shards each)  max rel err 7.42e-16
+[PASS] 1b the brute-force H, its inverse and both matrices are finite (the matmul warnings hide no overflow)  cond(H) = 2.0
+[PASS] 2a center=False is Prop. 1: (1/m) Σ R M
+[PASS] 2b centred = raw − R̄·mean_τ M
+[PASS] 2c constant return scores 0 when centred
+[PASS] 3a infl_f30__same_task equals the per-task computation
+[PASS] 3b harm = −sign·infl (f30 +1, censored60 −1, ft_* −1)
+[PASS] 3c failure-type columns: types with >= 5 rollouts only  ['infl_ft_timeout']
+[PASS] 3d agreement gives Kendall τ per pair
+[PASS] 4a zscore_ensemble: affine-rescaled seed averages to the same z
+[PASS] 4b zscore_ensemble refuses misaligned keys
+[PASS] 5a drop_top_k_per_task drops k from every task  [4, 4, 4, 4, 4, 4]
+[PASS] 5b ... and they are each task's 2 highest (ties by episode_id)
+[PASS] 5c random control: same seed same subset, other seed differs
+[PASS] 5d curated and random children hold identical per-task counts
+[PASS] 5e refuses a stale score table
+[PASS] 5e refuses a k that empties a task
+[PASS] 6a toy module: 'square' features == brute-force projected per-sample gradient (masked, K=2, B=5)  max per-sample rel err 8.58e-08, dim 18 = 2 layers x 3²
+[PASS] 6b square_objective == the definition (mean of v² over valid steps x action dims)  max abs diff 0.0e+00
+[PASS] 6a toy module: 'loss' features == brute-force projected per-sample gradient (masked, K=2, B=5)  max per-sample rel err 1.18e-07, dim 18 = 2 layers x 3²
+[PASS] 6c OutputCapture raises when the captured module ran twice (premise P1 guard)
+[PASS] 7a CUPID parity: performance_influence(M, ±1, center=False)·m == compute_demo_quality_scores(.., 'net') (vendored 2941eba9)  max abs err 2.84e-14
+[PASS] 7c ... but at p = 0.3 the two rankings differ (counterexample)  p=0.3, identity err 3.6e-15, Kendall tau 0.667
+[PASS] 7b centring algebra and p = 1/2: centred = p(1-p)·m·(ms-mf), net = m·[p·ms-(1-p)·mf], same ranking  p=0.5, identity err 2.7e-15, Kendall tau 1.000
+[PASS] 7d refuses pm1 with centring
+[PASS] 7d refuses pm1 on a non-binary return
+[PASS] 7e default score_table: the yes/no column ret_f30 equals CUPID's released 'net' score (±1, uncentred), parity with the vendored copy  max abs err 4.2e-17
+[PASS] 7f ... the timed-out column too (R = +1 timed out), and the continuous column ret_rmst60 is still centred
+[PASS] 7g return_encoding='raw' (--raw-returns) restores the centred yes/no columns, and the two weightings differ
+[PASS] 8a check_compatible accepts one output function per side (incl. ATHENA loss/square, legacy manifests = loss)
+[PASS] 8b check_compatible refuses shards that mix train-side output functions  manifest list 0: shards mix output functions ['loss', 'square']
+[PASS] 8c DIVERGENCES names every departure listed in the plan
+pass: True (32/32)
+  1.30s user 0.30s system 78% cpu 2.029 total
+rc=0

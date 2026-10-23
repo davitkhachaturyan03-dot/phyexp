@@ -1,0 +1,20 @@
+=== names: .venv/bin/python scripts/verify_training_attribution.py --names
+2026/10/22 22:29:20 INFO mlflow.store.db.utils: Creating initial MLflow database tables...
+2026/10/22 22:29:20 INFO mlflow.store.db.utils: Updating database tables
+[PASS] 6.1 no machine-specific cluster path (the two cluster roots) is left in slurm, scripts or vlapoc  no matches
+[PASS] 6.2 bash -n passes on every slurm/*.sh and *.sbatch  4 files
+[PASS] 6.2b env.sh without a site.env exits non-zero with a message naming site.env.example  rc=2: [env.sh] missing /Users/davit_khachaturyan/Projects/personal/vlaExp/data/scratch/training_attribution/does_not_exist.env: copy slurm/site.en
+[PASS] 6.3 run_id with a chain prefix returns the run of that chain only  u- scope -> 04e96cb2 (u-bbbb2222 is 04e96cb2)
+[PASS] 6.3b two runs of one name in scope (t-aaaa1111, t-cccc3333) raise without --latest  2 FINISHED train runs named 'train-t-s0' in chains ['t-aaaa1111', 't-cccc3333']; pass --latest to take the most recent, or use a r
+[PASS] 6.3c ... and --latest takes the most recent of them
+[PASS] 6.3d without a chain (hand use) the most recent run of the name wins, as before
+[PASS] 6.3e chain prefixes derive from chain ids
+[PASS] 6.4 stage.py has a global --lineage-root; no client() call without it; every tracked-stage call passes lineage_root=LR  bare client(): []; calls missing lineage_root: []. The whole chain on a scratch store is S8 (--integration)
+[PASS] 6.5 the dry run prints the full sbatch argv with --partition=<PARTITION> and --output=<LOG_DIR>/... from site.env.example  60 sbatch lines; e.g. sbatch --parsable --job-name=train-t-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[PASS] 6.6 verify_attribution.py with TMPDIR set to an empty dir under data/scratch leaves it empty, and uses explicit dir=  rc 0, entries left in TMPDIR: []; ['pass: True (32/32)']
+[PASS] R7 real mlflow.db sha256 unchanged  306af4123fda7e63... == 306af4123fda7e63...
+[4242] probe  deps=-  :: python scripts/stage.py --chain t-deadbeef returns
+[PASS] 6.7 a real (non-dry) submission creates LOG_DIR first (mkdir -p) so sbatch can open --output  dir existed at the sbatch call: True
+S6 pass: True (13/13, 3s)
+  3.10s user 0.69s system 91% cpu 4.158 total
+rc=0
