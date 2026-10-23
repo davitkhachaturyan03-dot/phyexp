@@ -247,7 +247,8 @@ def synthetic_ret(seed: int = 0) -> pd.DataFrame:
     return ret
 
 
-def synthetic_score_run(lr: Path, subset, table: pd.DataFrame, name: str, chain: str | None = None, note: str = "") -> str:
+def synthetic_score_run(lr: Path, subset, table: pd.DataFrame, name: str, chain: str | None = None, note: str = "",
+                        extra_inputs: dict | None = None) -> str:
     """Record ``table`` (SYNTHETIC) as a FINISHED ``attribute`` run in the scratch store ``lr`` on ``subset``: outputs
     ``attribution_scores`` and ``functionals`` (real declarations from ``attribution.column_declarations``), tag
     ``vlapoc.synthetic=true``, param ``synthetic``. Returns the run id."""
@@ -261,6 +262,8 @@ def synthetic_score_run(lr: Path, subset, table: pd.DataFrame, name: str, chain:
     (d / "functionals.json").write_text(json.dumps(decls, indent=1, ensure_ascii=False))
     with stage_run("attribute", name, lr, allow_dirty=True, chain=chain, extra_tags={"vlapoc.synthetic": "true"}) as r:
         r.input_subset(subset, "training", None)
+        for role, (kind, eid) in (extra_inputs or {}).items():
+            r.input_entity(kind, eid, role)
         r.params({"synthetic": True, "method": "SYNTHETIC noise plus planted structure (verify_dashboard.py); not an attribution result",
                   "planted_structure": note, "n_rows": len(table)})
         r.output_file("attribution_scores", d / "attribution_scores.parquet", kind="score_table")
@@ -524,7 +527,187 @@ def clusters_mode() -> int:
     return C.finish({"SYNTHETIC": True, "planted": truth, "stage_seconds": round(t_stage)})
 
 
-MODES = {"results": results, "clusters": clusters_mode}
+# ---------------------------------------------------------------------------------------------
+# S3: discovered clusters vs planted types
+# ---------------------------------------------------------------------------------------------
+
+
+def fake_cluster_run(lr: Path, subset, members: dict[str, list[str]], name: str, decls_json: str, synthetic: bool = True) -> str:
+    """A FINISHED ``cluster`` stage run with HAND-BUILT clusters (``members``: cluster id -> episode ids of ``subset``), SYNTHETIC: it did not come
+    from ``vlapoc.clusters``. Outputs the five files ``results.clusters`` reads."""
+    from vlapoc.runs import stage_run
+
+    keys = subset.keys(lr).set_index("episode_id")["content_hash"]
+    clusters = pd.DataFrame([{"cluster_id": cid, "lens": "label", "definition": f"hand-built {cid}", "direction": "none", "target_metric": "", "n": len(ids),
+                              "status": "estimated", "declarations": decls_json, "synthetic": synthetic} for cid, ids in members.items()])
+    mem = pd.DataFrame([{"cluster_id": cid, "episode_id": e, "content_hash": keys.loc[e], "rank": i + 1, "primary_metric": "harm_f30", "harm": 0.0}
+                        for cid, ids in members.items() for i, e in enumerate(ids)])
+    d = SCRATCH / "fake_clusters" / name
+    d.mkdir(parents=True, exist_ok=True)
+    clusters.to_parquet(d / "clusters.parquet", index=False)
+    mem.to_parquet(d / "members.parquet", index=False)
+    (d / "patterns.json").write_text("[]")
+    pd.DataFrame({"episode_id": list(keys.index)}).to_parquet(d / "descriptors.parquet", index=False)
+    (d / "bins.json").write_text(json.dumps({"bins": {}, "dropped": {}}))
+    with stage_run("cluster", name, lr, allow_dirty=True, extra_tags={"vlapoc.synthetic": "true"} if synthetic else None) as r:
+        r.input_subset(subset, "training", None)
+        r.params({"synthetic": synthetic, "kind": "hand-built clusters for a verifier fixture (SYNTHETIC)"})
+        for k in ("clusters", "members", "patterns", "descriptors", "bins"):
+            r.output_file(k, d / (f"{k}.json" if k in ("patterns", "bins") else f"{k}.parquet"), kind="table")
+        return r.run_id
+
+
+def planted_mode() -> int:
+    """S3, AC3.1-AC3.4."""
+    import subprocess
+
+    from scipy.stats import fisher_exact
+
+    from vlapoc import clusters as cl
+    from vlapoc import recovery as rc
+    from vlapoc import results as res
+    from vlapoc.groundtruth import load_answer_key
+    from vlapoc.lineage import Subset
+    from vlapoc.method_data import _reset_session, open_for_method
+    from vlapoc.runs import client, scratch_lineage_copy, stage_run, trace
+
+    C = Checker("planted")
+    shutil.rmtree(SCRATCH / "planted", ignore_errors=True)
+    base = SCRATCH / "planted"
+    base.mkdir(parents=True)
+    made = [REPO_ROOT / "data" / "attribution" / "score-clusters-dash"]
+    try:
+        lr = scratch_lineage_copy(base / "lineage")
+        v3 = Subset.load("v3/candidate", lr)
+        labels = load_answer_key("v3", lr)
+        typ = dict(zip(labels["episode_id"], labels["corruption_type"]))
+        eps = v3.episodes(lr)
+        N = len(eps)
+        n_total = len(client(lr).search_runs([client(lr).get_experiment_by_name("vlapoc-lineage").experiment_id], max_results=10000))
+        decl_tab = synthetic_table(eps, ["f30", "hrt60_lin"], 0, {})
+        from vlapoc import attribution as at
+
+        decls_json = json.dumps({d["column"]: {k: d[k] for k in ("functional", "tau", "rollout_subset", "good_sign")}
+                                 for d in at.column_declarations(decl_tab, synthetic_ret(), True, "pm1", ("square", "square"))})
+        # --- AC3.2: a hand-built cluster = all 13 idle_padding + 13 clean, over the real v3 answer key ---
+        idle = sorted(e for e, t in typ.items() if t == "idle_padding")
+        clean = sorted(e for e in eps["episode_id"] if e not in typ)[:13]
+        cid = fake_cluster_run(lr, v3, {"hand:idle13+clean13": idle + clean, "hand:clean13": clean}, "clusters-hand-built", decls_json)
+        out = rc.cluster_recovery_run(cid, "v3", "score-clusters-hand", lineage_root=lr, allow_dirty=True, out_dir=base / "out_hand")
+        t = pd.read_parquet(base / "out_hand" / "cluster_recovery.parquet")
+        r0 = t[(t["cluster_id"] == "hand:idle13+clean13") & (t["planted_type"] == "idle_padding")].iloc[0]
+        base_rate = 13 / N
+        want = {"precision": 13 / 26, "recall": 1.0, "base_rate": base_rate, "lift": (13 / 26) / base_rate}
+        p_want = fisher_exact([[13, 13], [0, N - 26]], alternative="greater")[1]
+        indep = [abs(r0[k] - v) < 1e-12 for k, v in want.items()] + [abs(r0["p_fisher"] - p_want) < 1e-12]
+        rp = t[(t["cluster_id"] == "hand:idle13+clean13") & (t["planted_type"] == "any_planted")].iloc[0]
+        r_clean = t[(t["cluster_id"] == "hand:clean13") & (t["planted_type"] == "idle_padding")].iloc[0]
+        best = t[(t["cluster_id"] == "hand:idle13+clean13") & t["is_best_type_for_cluster"]]
+        bestc = t[(t["planted_type"] == "idle_padding") & t["is_best_cluster_for_type"]]
+        C.check("3.2 hand-built SYNTHETIC cluster (13 idle_padding + 13 clean) over the real v3 key: precision 0.5, recall 1.0, lift = 0.5 / (13/960), Fisher p, recomputed independently",
+                all(indep) and best["planted_type"].tolist() == ["idle_padding"] and bestc["cluster_id"].tolist() == ["hand:idle13+clean13"] and r_clean["n_overlap"] == 0 and r_clean["p_fisher"] == 1.0
+                and abs(rp["precision"] - 0.5) < 1e-12 and abs(rp["recall"] - 13 / 91) < 1e-12,
+                f"precision {r0['precision']}, recall {r0['recall']}, lift {r0['lift']:.3f} (= {want['lift']:.3f}), p_fisher {r0['p_fisher']:.3e} (= {p_want:.3e}); any_planted recall {rp['recall']:.3f} (=13/91); clean-only cluster: overlap {r_clean['n_overlap']}, p {r_clean['p_fisher']}")
+        # --- AC3.4 ---
+        C.check("3.4 output rows carry synthetic and the clusters' declarations", t["synthetic"].all() and t["declarations"].map(lambda x: bool(json.loads(x))).all(),
+                f"{len(t)} rows, synthetic all {bool(t['synthetic'].all())}, declared columns {sorted(json.loads(t['declarations'].iloc[0]))}")
+        # --- AC3.3 ---
+        crun, srun = client(lr).get_run(cid), client(lr).get_run(out["run_id"])
+        trs = trace(out["run_id"], lr)
+        C.check("3.3a the scoring run was created after the cluster run and consumes its members sha256 and clusters sha256; trace(scoring run) reaches the cluster run",
+                srun.info.start_time > crun.info.start_time and srun.data.tags["input.members"] == f"members:{crun.data.tags['output.members.sha256']}"
+                and srun.data.tags["input.clusters"] == f"clusters:{crun.data.tags['output.clusters.sha256']}" and cid in trs["runs"],
+                f"cluster run start {crun.info.start_time}, scoring run start {srun.info.start_time}; trace reaches {sorted(r['name'] for r in trs['runs'].values())[:4]}")
+        tree_ = ast.parse((REPO_ROOT / "vlapoc" / "clusters.py").read_text())
+        idents = {n.id for n in ast.walk(tree_) if isinstance(n, ast.Name)} | {n.attr for n in ast.walk(tree_) if isinstance(n, ast.Attribute)}
+        scorer = {"cluster_recovery", "cluster_recovery_run", "recovery_matrix", "recovery_run", "load_answer_key", "score_recovery", "load_labels"}
+        C.check("3.3b clusters.py has no code path to the scorer (no import of recovery/groundtruth/discrepancy; no code identifier of the scorer or the answer key)",
+                not forbidden_imports(REPO_ROOT / "vlapoc" / "clusters.py") and not (idents & scorer),
+                f"forbidden imports {forbidden_imports(REPO_ROOT / 'vlapoc' / 'clusters.py')}; scorer identifiers in code: {sorted(idents & scorer)}")
+        # --- AC3.1: refusals, nothing written ---
+        def n_score() -> int:
+            return len(res.find_runs("score", lr))
+
+        refusals = []
+
+        def refuse(label, fn, contains):
+            before = n_score()
+            try:
+                fn()
+                refusals.append((label, False, "did not raise"))
+            except Exception as e:  # noqa: BLE001
+                refusals.append((label, contains in str(e) and n_score() == before, f"{type(e).__name__}: {str(e)[:110]}"))
+
+        att = client(lr).search_runs([client(lr).get_experiment_by_name("vlapoc-lineage").experiment_id], "tags.stage = 'attribute' and attributes.status = 'FINISHED'", max_results=1)[0]
+        refuse("a run that is not a cluster run (an attribute run)", lambda: rc.cluster_recovery_run(att.info.run_id, "v3", "score-bad", lineage_root=lr, allow_dirty=True, out_dir=base / "bad"), "not a FINISHED cluster run")
+        try:
+            with stage_run("cluster", "clusters-failed", lr, allow_dirty=True) as r:
+                failed_id = r.run_id
+                raise RuntimeError("fixture: this cluster run fails")
+        except RuntimeError:
+            pass
+        refuse("a FAILED cluster run", lambda: rc.cluster_recovery_run(failed_id, "v3", "score-bad", lineage_root=lr, allow_dirty=True, out_dir=base / "bad"), "FINISHED")
+        # a cluster run on v0 (no answer key)
+        v0c = Subset.load("v0/candidate", lr)
+        t0_ = synthetic_table(v0c.episodes(lr), ["f30"], 0, {})
+        sid0 = synthetic_score_run(lr, v0c, t0_, "attribute-synth-v0")
+        _reset_session()
+        o0 = cl.clusters_run(sid0, "clusters-synth-v0", metrics=["f30"], out_dir=base / "o0", lineage_root=lr, allow_dirty=True, synthetic=True, heuristics=False, cache_dir=None)
+        refuse("a cluster run whose version has no answer key (v0)", lambda: rc.cluster_recovery_run(o0["run_id"], "v0", "score-bad", lineage_root=lr, allow_dirty=True, out_dir=base / "bad"), "")
+        # clusters found on v0 scored against v3: members are not v3 episode versions (hashes differ for the edited ones only; ids equal) -> check hashes
+        # a ground-truth read upstream: the attribute run consumed a table produced by a score run
+        with stage_run("score", "fake-score-gt", lr, allow_dirty=True) as r:
+            r.produced("score_table", "ab" * 32, "gt_table")
+        t1_ = synthetic_table(eps, ["f30"], 0, {})
+        sid1 = synthetic_score_run(lr, v3, t1_, "attribute-synth-gtread", extra_inputs={"gt": ("score_table", "ab" * 32)})
+        _reset_session()
+        o1 = cl.clusters_run(sid1, "clusters-synth-gtread", metrics=["f30"], out_dir=base / "o1", lineage_root=lr, allow_dirty=True, synthetic=True, heuristics=False, cache_dir=None)
+        refuse("a cluster run with a ground-truth read upstream (a score run in its trace)", lambda: rc.cluster_recovery_run(o1["run_id"], "v3", "score-bad", lineage_root=lr, allow_dirty=True, out_dir=base / "bad"), "ground-truth read upstream")
+        C.check("3.1 cluster_recovery_run refuses (nothing written): a non-cluster run, a FAILED cluster run, a version without an answer key, a cluster run with a ground-truth read upstream",
+                all(r_[1] for r_ in refusals), "; ".join(f"{a}: {'REFUSED' if b else 'WRONG'} ({c})" for a, b, c in refusals))
+        # --- part B: the real chain, SYNTHETIC scores -> clusters_run -> score-clusters (python API and the stage CLI) ---
+        _reset_session()
+        view = open_for_method("v3/candidate", lr)
+        desc = cl.descriptor_table(view, True)
+        codes, specs, _ = cl.bin_descriptors(desc)
+        planted, truth = plant_structure(desc, codes, specs)
+        tab = synthetic_table(eps, ["f30", "rmst60", "auc_expected", "hrt60_lin", "censored60"], 0, planted)
+        sidb = synthetic_score_run(lr, v3, tab, "attribute-dash-synth-s3", note=f"SYNTHETIC planted structure over descriptors: {truth['slice_a']['text']}; task {truth['task']['task_name']}; {truth['slice_b']['text']}")
+        ob = cl.clusters_run(sidb, "clusters-dash-synth-s3", out_dir=base / "ob", lineage_root=lr, allow_dirty=True, synthetic=True)
+        dirty = subprocess.run(["git", "status", "--porcelain", "--", "vlapoc", "scripts"], cwd=REPO_ROOT, capture_output=True, text=True).stdout.strip()
+        if not dirty:
+            p_ = subprocess.run([sys.executable, "scripts/stage.py", "--lineage-root", str(lr), "score-clusters", "--clusters", "clusters-dash-synth-s3", "--version", "v3",
+                                 "--subset", "candidate", "--name", "score-clusters-dash"], cwd=REPO_ROOT, capture_output=True, text=True)
+            ok_cli = p_.returncode == 0
+            sout = json.loads(p_.stdout[p_.stdout.index("{"):]) if ok_cli else {}
+            detail = f"stage CLI rc={p_.returncode} {sout.get('n_clusters')} clusters" if ok_cli else p_.stderr[-300:]
+            out_b_dir = REPO_ROOT / "data" / "attribution" / "score-clusters-dash"
+        else:
+            ok_cli, detail = True, "stage CLI skipped: vlapoc/scripts tree is dirty (the CLI refuses a dirty tree); re-run after committing"
+            sout = rc.cluster_recovery_run(ob["run_id"], "v3", "score-clusters-dash", lineage_root=lr, allow_dirty=True, out_dir=base / "out_b")
+            out_b_dir = base / "out_b"
+        tb = pd.read_parquet(out_b_dir / "cluster_recovery.parquet")
+        sb = json.loads((out_b_dir / "cluster_recovery_summary.json").read_text())
+        C.check("3.5 the real chain (SYNTHETIC scores -> clusters_run -> score-clusters) produces one row per (cluster, planted type) incl. any_planted, flagged synthetic", ok_cli and
+                len(tb) == pd.read_parquet(base / "ob" / "clusters.parquet").shape[0] * 8 and tb["synthetic"].all() and set(tb["planted_type"]) >= {"idle_padding", "gripper_release", "any_planted"}, detail + f"; {len(tb)} rows")
+        top = tb[tb["planted_type"] != "any_planted"].sort_values("lift", ascending=False).head(8)
+        print("highest-lift (cluster, planted type) pairs on SYNTHETIC scores (descriptor-based clusters vs the real planted labels; NOT evidence about attribution):")
+        print(top[["cluster_id", "planted_type", "n_cluster", "n_overlap", "precision", "recall", "lift", "p_fisher"]].to_string(index=False))
+        ARTIFACTS.mkdir(parents=True, exist_ok=True)
+        tb.drop(columns=["declarations"]).sort_values(["planted_type", "p_fisher"]).to_csv(ARTIFACTS / "s3_cluster_recovery_SYNTHETIC.csv", index=False)
+        (ARTIFACTS / "s3_cluster_recovery_summary_SYNTHETIC.json").write_text(json.dumps(sb, indent=1))
+        n_after = len(client(lr).search_runs([client(lr).get_experiment_by_name("vlapoc-lineage").experiment_id], max_results=10000))
+        del n_total, n_after
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+        shutil.rmtree(SCRATCH / "synthetic_runs", ignore_errors=True)
+        shutil.rmtree(SCRATCH / "fake_clusters", ignore_errors=True)
+        for d in made:
+            shutil.rmtree(d, ignore_errors=True)
+    return C.finish({"SYNTHETIC": True})
+
+
+MODES = {"results": results, "clusters": clusters_mode, "planted": planted_mode}
 
 
 def main() -> int:

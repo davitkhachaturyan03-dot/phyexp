@@ -142,6 +142,27 @@ def functionals(run_id: str, lineage_root: Path | None = None) -> dict[str, dict
     return {r["column"]: r for r in rows}
 
 
+def output_table(run_id: str, name: str, lineage_root: Path | None = None) -> pd.DataFrame:
+    """Any recorded parquet output ``name`` of a run (e.g. ``clusters``, ``members``), sha-checked."""
+    return _fetch(_get_run(run_id, lineage_root), name, lineage_root, pd.read_parquet)
+
+
+def output_json(run_id: str, name: str, lineage_root: Path | None = None):
+    """Any recorded JSON output ``name`` of a run (e.g. ``patterns``), sha-checked."""
+    return _fetch(_get_run(run_id, lineage_root), name, lineage_root, lambda p: json.loads(p.read_text()))
+
+
+def clusters(run_id: str, lineage_root: Path | None = None) -> dict:
+    """The outputs of a ``cluster`` stage run (``vlapoc.clusters``): ``{"clusters": DataFrame, "members": DataFrame, "patterns": list,
+    "descriptors": DataFrame, "bins": dict}``, each sha-checked (dashboard S2)."""
+    run = _get_run(run_id, lineage_root)
+    if run.data.tags.get("stage") != "cluster":
+        raise NotRecordedError(f"run {run_id[:12]} is a {run.data.tags.get('stage')!r} run, not a cluster run")
+    return {"clusters": output_table(run_id, "clusters", lineage_root), "members": output_table(run_id, "members", lineage_root),
+            "patterns": output_json(run_id, "patterns", lineage_root), "descriptors": output_table(run_id, "descriptors", lineage_root),
+            "bins": output_json(run_id, "bins", lineage_root)["bins"]}
+
+
 def seed_runs(run_id: str, lineage_root: Path | None = None) -> list[str]:
     """The per-seed attribute run ids behind an ensemble run (param ``attribute_run_ids``), or ``[run_id]`` for a seed run."""
     p = _get_run(run_id, lineage_root).data.params

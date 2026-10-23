@@ -31,6 +31,8 @@ Stages (docs/dataflow.md; PoC §9.1 pp. 18-19):
                catalog column, episode x metric heatmap, throughput-vs-reliability scatter (``vlapoc.analysis``).
 - ``score``    ground-truth recovery (``vlapoc.recovery``): AUROC / recall@k per corruption type and harm column next to
                each type's best simple heuristic; only for a version with an answer key (v3), after attribution exists.
+- ``score-clusters`` dashboard S3, ground-truth side: precision / recall / lift / Fisher p of each discovered cluster against each planted
+               corruption type of an answer-key version, only after the cluster run exists (``vlapoc.recovery.cluster_recovery_run``).
 - ``clusters`` dashboard S2: clusters of training episodes from an attribute or ensemble run's scores, three lenses (label groups,
                rule-like slices via sliceline, the four metric groups), each with a pattern and an *estimated* effect
                (``vlapoc.clusters``; PoC §1 p.3, §4.2, §9.2); method side, opens the subset through ``method_view``.
@@ -289,6 +291,13 @@ def cmd_score(a) -> dict:
     return recovery_run(sid, a.version, a.name, subset=a.subset, chain=a.chain, lineage_root=LR, synthetic=a.synthetic)
 
 
+def cmd_score_clusters(a) -> dict:
+    """Ground-truth side (stage ``score``): discovered clusters vs the planted types of an answer-key version, after discovery (``vlapoc.recovery``)."""
+    from vlapoc.recovery import cluster_recovery_run
+
+    return cluster_recovery_run(rid(a.clusters, "cluster"), a.version, a.name, subset=a.subset, chain=a.chain, lineage_root=LR, synthetic=a.synthetic)
+
+
 def cmd_analyze(a) -> dict:
     """The §4.2 / §4.5 outputs of an attribute or ensemble run (``vlapoc.analysis``): groups, aggregation, heatmap, scatter."""
     from vlapoc.analysis import analyze_run
@@ -411,6 +420,13 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--version", required=True, help="a version with an answer key (e.g. v3)")
     s.add_argument("--subset", default="candidate", help="subset of that version the table must key exactly")
     s.add_argument("--synthetic", action="store_true", help="the scores are test data: recorded in the run's params")
+    s.add_argument("--name", required=True)
+
+    s = sub.add_parser("score-clusters")
+    s.add_argument("--clusters", required=True, help="the cluster run (name or id) whose clusters to score")
+    s.add_argument("--version", required=True, help="a version with an answer key (e.g. v3)")
+    s.add_argument("--subset", default="candidate", help="subset of that version the clusters must belong to")
+    s.add_argument("--synthetic", action="store_true", help="the clusters are test data (also inferred from a synthetic cluster run)")
     s.add_argument("--name", required=True)
 
     s = sub.add_parser("analyze")
