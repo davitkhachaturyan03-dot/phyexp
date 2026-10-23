@@ -38,7 +38,7 @@
   {
    "name": "2.4b results.provenance of the cluster run is SYNTHETIC (tag from the producing attribute run)",
    "pass": true,
-   "detail": "['synthetic: clusters-dash-synth (cluster, 3262c6c7): tag vlapoc.synthetic=true']"
+   "detail": "['synthetic: clusters-dash-synth (cluster, 8f783715): tag vlapoc.synthetic=true']"
   },
   {
    "name": "2.5a clusters.py imports nothing from groundtruth / recovery / discrepancy, and reads the subset only via open_for_method (no Subset.episodes, no labels)",

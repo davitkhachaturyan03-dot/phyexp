@@ -28,7 +28,7 @@
   {
    "name": "1.2a a tampered matrix artifact is refused (ValueError naming the sha256)",
    "pass": true,
-   "detail": "run 8bbb20a106a54cd5b68dbfc9dd23b945: artifact rollout_episode_influence.npy differs from its recorded sha256 (output.influence_matrix.sha25"
+   "detail": "run ed70a0ec289b4d01a32bd74f8586553f: artifact rollout_episode_influence.npy differs from its recorded sha256 (output.influence_matrix.sha25"
   },
   {
    "name": "1.2b the real store's stand-in attribute run: 'not recorded (run predates dashboard S1)'",
@@ -43,7 +43,7 @@
   {
    "name": "1.3b a fixture attribute run (train/eval without server tags) is not REAL",
    "pass": true,
-   "detail": "SMOKE: [\"smoke: train-dash-s0 (train, 6ba1bf88): tag vlapoc.smoke is None, not 'false'\", \"smoke: eval-dash-s0 (eval, 67ce7762): tag eval.attribution_grade is None, not 'true'\"]"
+   "detail": "SMOKE: [\"smoke: train-dash-s0 (train, 905ce7c5): tag vlapoc.smoke is None, not 'false'\", \"smoke: eval-dash-s0 (eval, 2149578f): tag eval.attribution_grade is None, not 'true'\"]"
   },
   {
    "name": "1.3c seed_runs of a seed run is itself",
