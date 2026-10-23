@@ -954,9 +954,13 @@ def recovery() -> int:
         v3 = subprocess.run([sys.executable, "scripts/server_pipeline.py", "--tag", "t", "--dry-run", "--subset", "v3/candidate"], cwd=REPO_ROOT, capture_output=True, text=True, check=True).stdout
         v0 = subprocess.run([sys.executable, "scripts/server_pipeline.py", "--tag", "t", "--dry-run"], cwd=REPO_ROOT, capture_output=True, text=True, check=True).stdout
         j3, j0 = parse_dry_run(v3), parse_dry_run(v0)
-        s3 = [j for j in j3 if j["name"].startswith("score-")]
-        check("5.4 dry run with --subset v3/candidate has one score job depending on the ensemble job; with v0/candidate none",
-              len(s3) == 1 and s3[0]["dep_names"] == ["ensemble-t"] and not [j for j in j0 if j["name"].startswith("score-")], f"{s3[0]['cmd'] if s3 else None}")
+        s3 = [j for j in j3 if j["name"] == "score-t"]
+        gt_side = ("score-", "discrepancy-")  # ground-truth-side jobs: only with an answer key (the dashboard feature adds score-clusters and discrepancy)
+        by3 = {j["name"]: j for j in j3}
+        check("5.4 dry run with --subset v3/candidate has one score job depending on the ensemble job (and, dashboard S3/S9, score-clusters after clusters and "
+              "discrepancy after the ensemble); with v0/candidate no ground-truth-side job, only the method-side clusters job",
+              len(s3) == 1 and s3[0]["dep_names"] == ["ensemble-t"] and by3["score-clusters-t"]["dep_names"] == ["clusters-t"] and by3["discrepancy-t"]["dep_names"] == ["ensemble-t"]
+              and not [j for j in j0 if j["name"].startswith(gt_side)] and any(j["name"] == "clusters-t" for j in j0), f"{s3[0]['cmd'] if s3 else None}")
     finally:
         shutil.rmtree(base, ignore_errors=True)
     # 5.6 boundary
