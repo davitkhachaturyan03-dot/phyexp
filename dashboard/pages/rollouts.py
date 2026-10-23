@@ -46,7 +46,7 @@ def render(ctx: dict) -> None:
     tasks = sorted(ro["task_name"].dropna().unique())
     ftasks = f3.multiselect("Task", tasks, default=tasks, key="ftasks")
     view = ro[(ro["failed"] | (not only_failed)) & ro["failure_type"].isin(ftypes) & ro["task_name"].isin(ftasks)]
-    cols = ["rollout_id", "task_name", "failure_type", "T_s", "event", "censored"]
+    cols = [c for c in ("rollout_id", "task_name", "failure_type", "T_s", "event", "censored") if c in view]  # an eval record may lack the timing columns
     st.caption(f"{len(view)} of {len(ro)} rollouts")
     ev = st.dataframe(view[cols], hide_index=True, width="stretch", on_select="rerun", selection_mode="single-row", key="roll_table")
     ids = list(view["rollout_id"])
@@ -59,10 +59,10 @@ def render(ctx: dict) -> None:
     st.markdown(f"**{rid}**")
     a, b, c, d = st.columns(4)
     a.metric("Failure type", r["failure_type"])
-    b.metric("T (s)", "none (did not succeed)" if pd.isna(r["T_s"]) else f"{r['T_s']:.1f}")
-    c.metric("Event", int(r["event"]))
-    d.metric("Censored", str(bool(r["censored"])))
-    if pd.notna(r["traj_episode_index"]):
+    b.metric("T (s)", "not recorded" if "T_s" not in r else ("none (did not succeed)" if pd.isna(r["T_s"]) else f"{r['T_s']:.1f}"))
+    c.metric("Event", "not recorded" if "event" not in r else int(r["event"]))
+    d.metric("Censored", "not recorded" if "censored" not in r else str(bool(r["censored"])))
+    if pd.notna(r.get("traj_episode_index")):
         vid = common.rollout_video(lr, r["eval_run_id"], int(r["traj_episode_index"]))
         if vid is None:
             st.info("Rollout video not on this machine (the eval's recorded trajectories were not copied back).")
