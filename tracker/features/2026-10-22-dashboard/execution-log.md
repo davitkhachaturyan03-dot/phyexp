@@ -219,3 +219,6 @@ Leftover (untracked, gitignored): orphaned `data/eval/returns-<id>` directories 
 - **F22 (S5):** Streamlit's AppTest cannot click dataframe rows or chart points; those two interactions (row selection on Rollouts, point click on the scatter) were exercised by looking at the page in headless Chrome only through the screenshots (rendered, not clicked). The selectbox route to the same state is tested.
 - **F23 (S6):** NumPy/Accelerate spurious floating-point warnings in `attribution.performance_influence` (pre-existing); harmless here, noisy in logs.
 - No plan premise was false; nothing blocked.
+
+## Round 2 (executor, 2026-10-23): analyzer r1 REWORK items
+Start: HEAD `f09d787`, mlflow.db sha256 `306af4123fda7e635892d459a2e34008ba1cb62f6c4fce152c546e0da7bdde79`. Items (analysis-r1 'Feedback: executor' 1-7 and plan 'Round 2 changes'): R2-1 Welch via scipy + Holm column + wording (AC9.1/9.2/9.7); R2-2 clusters min_sup 10 (AC2.8, AC8.2c); R2-3 dedupe (AC2.9); R2-4 plain language (AC5.9, AC5.4); R2-5 rendering checks in headless Chrome (AC5.10) and the chart, row-click, navigation fixes; R2-6 runbook (AC8.1 parser check, AC8.7 repoint step, Step 3 probe, Step 14 prose); R2-7 F16 / positive-control wording.
