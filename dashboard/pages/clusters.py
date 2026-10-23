@@ -43,7 +43,7 @@ def scatter(ctx: dict, cols: list[str]) -> alt.Chart:
     lo, hi = float(df[["throughput", "reliability"]].min().min()), float(df[["throughput", "reliability"]].max().max())
     q = pd.DataFrame({"throughput": [hi * 0.7, lo * 0.7, lo * 0.7, hi * 0.7], "reliability": [hi * 0.9, lo * 0.9, hi * 0.9, lo * 0.9],
                       "name": ["consistent harmers", "consistent helpers", "trade-off", "trade-off"]})
-    txt = alt.Chart(q).mark_text(fontSize=11, opacity=0.7).encode(x="throughput:Q", y="reliability:Q", text="name:N")
+    txt = alt.Chart(alt.Data(values=q.to_dict("records"))).mark_text(fontSize=11, opacity=0.7).encode(x="throughput:Q", y="reliability:Q", text="name:N")
     return (pts + txt).properties(title=f"{syn}Throughput vs reliability influence, positive = harmful (quadrants labelled; group labels are descriptive, unverified)", height=380)
 
 

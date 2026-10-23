@@ -12,6 +12,9 @@ Run from the repo root; each mode exits 0 when every check passes::
     .venv/bin/python scripts/verify_dashboard.py --discrepancy   # S9: planted/clean x harmful/not, estimated (PoC §9.2)
     .venv/bin/python scripts/verify_dashboard.py --round-b       # S4: drop_cluster arms, the Round B chain, the confirm stage
     .venv/bin/python scripts/verify_dashboard.py --planted-arms  # S10: planted-type arms, ground-truth path, bounded verdict wording
+    .venv/bin/python scripts/verify_dashboard.py --app           # S5: headless AppTest of every page on the demo store, video helper, server health
+    .venv/bin/python scripts/verify_dashboard.py --demo          # S6: the demo store (data/lineage_demo, built by scripts/dashboard_demo.py)
+    .venv/bin/python scripts/verify_dashboard.py --dropin        # S7: a real-code chain and the real smoke run render with no file changes
 
 Every MLflow-writing check runs on a scratch lineage store under ``data/scratch/dashboard/`` (``runs.scratch_lineage_copy``); the real
 ``data/lineage/mlflow.db`` sha256 is recorded before and after and must not change. Scratch runs use ``allow_dirty=True`` because
@@ -1288,12 +1291,395 @@ def planted_arms_mode() -> int:
     return C.finish({"SYNTHETIC": True, "dry_run_counts": counts})
 
 
-MODES = {"results": results, "clusters": clusters_mode, "planted": planted_mode, "discrepancy": discrepancy_mode, "round_b": round_b_mode, "planted_arms": planted_arms_mode}
+# ---------------------------------------------------------------------------------------------
+# S5 / S6 / S7: the dashboard, the demo store, the drop-in proof
+# ---------------------------------------------------------------------------------------------
+
+APP = REPO_ROOT / "dashboard" / "app.py"
+DEMO = REPO_ROOT / "data" / "lineage_demo"
+PAGES = ("Overview", "Rollouts", "Episodes", "Clusters", "Bad vs harmful")
+
+
+def app_test(lineage_root: str, scores: str, clusters: str = ""):
+    """A headless Streamlit ``AppTest`` of ``dashboard/app.py`` on a store (the app reads its options from these environment variables)."""
+    import streamlit as st
+    from streamlit.testing.v1 import AppTest
+
+    st.cache_data.clear()
+    os.environ.update({"DASH_LINEAGE_ROOT": lineage_root, "DASH_SCORES": scores, "DASH_CLUSTERS": clusters})
+    at = AppTest.from_file(str(APP), default_timeout=180)
+    at.run()
+    return at
+
+
+def go(at, page: str):
+    at.sidebar.radio(key="page").set_value(page).run()
+    return at
+
+
+def texts(at) -> list[str]:
+    """Every user-visible string of the rendered page: markdown, captions, titles, banners, metric labels/values, widget labels and options."""
+    out = []
+    for kind in ("markdown", "caption", "title", "subheader", "error", "warning", "info", "success"):
+        out += [str(e.value) for e in getattr(at, kind)]
+    out += [f"{m.label} {m.value}" for m in at.metric]
+    for kind in ("selectbox", "radio", "multiselect", "checkbox", "toggle", "slider"):
+        for w in getattr(at, kind):
+            out.append(str(w.label))
+            out += [str(o) for o in getattr(w, "options", [])]
+    return out
+
+
+def chart_strings(at) -> list[str]:
+    """Titles and axis titles of the page's vega-lite charts."""
+    import re
+
+    out = []
+    for ch in at.get("vega_lite_chart"):
+        out += [json.loads(f'"{x}"') for x in re.findall(r'"(?:title|text)": ?"((?:[^"\\]|\\.)*)"', ch.proto.spec)]
+    return out
+
+
+def bare_columns(at) -> list[str]:
+    """Strings that name a score column (``harm_*`` / ``infl_*``) without its tau: dataframe column names, chart titles, captions, markdown, widget labels (PoC §3.4 p. 7)."""
+    import re
+
+    pat = re.compile(r"\b(?:harm|infl)_[a-z0-9]+")
+    strings = [str(c) for df in at.dataframe for c in df.value.columns] + chart_strings(at) + texts(at)
+    return sorted({x[:90] for x in strings if pat.search(x) and "τ" not in x and "tau" not in x.lower()})
+
+
+def app_mode() -> int:
+    """S5, AC5.1-AC5.8."""
+    import re
+    import subprocess
+    import urllib.request
+
+    import streamlit
+    from dashboard.pages.episodes import groupable
+    from vlapoc import results as res
+    from vlapoc import video
+    from vlapoc.analysis import aggregate_by
+    from vlapoc.discrepancy import QUADRANTS
+    from vlapoc.runs import client
+
+    C = Checker("app")
+    if not DEMO.exists():
+        print("data/lineage_demo is missing: run scripts/dashboard_demo.py build --with-smoke first")
+        return 2
+    man = json.loads((DEMO / "demo_manifest.json").read_text())
+    lr = DEMO
+    t0 = time.time()
+    at = app_test("data/lineage_demo", "attribute-demo-ens")
+    bad_pages, no_banner, bare = [], [], {}
+    pages = {}
+    for pg in PAGES:
+        go(at, pg)
+        pages[pg] = at
+        if at.exception:
+            bad_pages.append((pg, [e.value[:100] for e in at.exception]))
+        if not any("SYNTHETIC" in str(e.value) for e in at.error):
+            no_banner.append(pg)
+        b = bare_columns(at)
+        if b:
+            bare[pg] = b
+        print(f"  page {pg}: {len(at.dataframe)} dataframes, {len(at.get('video'))} videos, {len(at.get('vega_lite_chart'))} charts, {len(at.get('imgs'))} images")
+    C.check("5.1 AppTest (headless) on the demo store: every page runs with no exception, and the SYNTHETIC banner is present on every page",
+            not bad_pages and not no_banner, f"{len(PAGES)} pages in {time.time() - t0:.0f}s; exceptions {bad_pages}; pages without the banner {no_banner}")
+    # --- AC5.2 rollouts ---
+    go(at, "Rollouts")
+    seed = at.selectbox(key="seed_run").value
+    ro = res.rollouts(seed, lr)
+    failed = ro[ro["failure_type"] != "success"]
+    pick = failed[failed["task_name"].str.startswith("KITCHEN")].iloc[0] if (failed["task_name"].str.startswith("KITCHEN")).any() else failed.iloc[0]
+    at.checkbox(key="only_failed").set_value(True)
+    at.selectbox(key="rollout_pick").set_value(pick["rollout_id"]).run()
+    ft = [m.value for m in at.metric if m.label == "Failure type"]
+    m_, idx = res.influence(seed, lr)
+    row = m_[int(pick["matrix_row"])]
+    want = [idx["episode_id"][j] for j in np.argsort(-row, kind="stable")[:10]]
+    tbl = next(df.value for df in at.dataframe if "influence on this rollout" in df.value.columns)
+    ret = res._fetch(client(lr).get_run(json.loads(client(lr).get_run(seed).data.params["returns_run_ids"])[0 if pick["eval_run_id"] == json.loads(client(lr).get_run(seed).data.params["eval_run_ids"])[0] else 1]), "returns", lr, pd.read_parquet)
+    ret_ft = ret.set_index("rollout_id").loc[pick["rollout_id"], "failure_type"]
+    C.check("5.2 Rollouts: a selected failed rollout shows the failure type of returns.parquet, a video, and 10 episode rows in the order of argsort of its influence-matrix row (recomputed here)",
+            ft and ft[0] == ret_ft and len(at.get("video")) >= 1 and list(tbl["episode_id"]) == want and len(tbl) == 10,
+            f"rollout {pick['rollout_id']}: failure type {ft} (returns.parquet: {ret_ft}); {len(at.get('video'))} videos; top-10 order equal: {list(tbl['episode_id']) == want}")
+    # --- AC5.3 episodes ---
+    go(at, "Episodes")
+    ens = man["scores_run_id"]
+    t, decls = res.score_table(ens, lr), res.functionals(ens, lr)
+    col = at.selectbox(key="ep_col").value
+    lab = res.__dict__ and __import__("vlapoc.analysis", fromlist=["axis_label"]).axis_label(col, decls)
+    ranked = next(df.value for df in at.dataframe if lab in df.value.columns)
+    exp = t.sort_values([col, "episode_id"], ascending=[False, True])["episode_id"].head(len(ranked)).tolist()
+    opts = at.selectbox(key="ep_group").options
+    cat = res.training_episodes(ens, lr)[1]
+    agg_shown = next(df.value for df in at.dataframe if any(str(c).startswith("mean ") for c in df.value.columns))
+    agg = aggregate_by(t, at.selectbox(key="ep_group").value, [col], cat)
+    from vlapoc.catalog import CATALOG_COLUMNS
+    from vlapoc.lineage import GROUP_COLUMNS_EXCLUDED
+
+    full = [c for c in CATALOG_COLUMNS if c not in GROUP_COLUMNS_EXCLUDED]
+    try:
+        aggregate_by(t, "objects", [col], cat, n_boot=5)
+        objects_ok = True
+    except Exception as e:  # noqa: BLE001
+        objects_ok, objects_err = False, type(e).__name__
+    C.check("5.3 Episodes: the ranked list equals the score table sorted by the chosen harm column; 'aggregate by' offers the groupable catalog columns (CATALOG_COLUMNS minus GROUP_COLUMNS_EXCLUDED, minus the list-valued 'objects', which aggregate_by cannot group: measured); the table equals aggregate_by",
+            list(ranked["episode_id"]) == exp and list(opts) == groupable() == [c for c in full if c != "objects"] and not objects_ok
+            and np.allclose(agg_shown.iloc[:, 2].to_numpy(float), agg[f"{col}__mean"].to_numpy(float)) and list(agg_shown["n"]) == list(agg["n"]),
+            f"{len(ranked)} ranked rows equal; offered {list(opts)}; objects fails with {objects_err if not objects_ok else 'nothing'}; aggregate rows {len(agg)}")
+    # --- AC5.4 labels ---
+    C.check("5.4 every displayed score column label names its declared functional and tau: no dataframe column name, caption, markdown, widget label or chart title names a harm_/infl_ column without it (all 5 pages scanned)",
+            not bare, f"bare strings: {bare}")
+    # --- AC5.5 clusters ---
+    go(at, "Clusters")
+    spec = " ".join(ch.proto.spec for ch in at.get("vega_lite_chart"))  # the quadrant labels are inline data values of a text layer
+    at.selectbox(key="cl_metric").set_value("harm_hrt60_lin").run()
+    tab = next(df.value for df in at.dataframe if "definition" in df.value.columns and "status" in df.value.columns)
+    st_of = dict(zip(tab["cluster"], tab["status"]))
+    md = " ".join(str(e.value) for e in at.markdown)
+    quad = all(q in spec for q in ("consistent harmers", "consistent helpers", "trade-off"))
+    conf = man["confirm_overall"]
+    C.check("5.5 Clusters: heatmap, a clickable scatter with the four quadrant labels, the cluster list with status from the confirm run when one exists (else estimated) and a lineage link per cluster",
+            len(at.get("image")) >= 1 and len(at.get("vega_lite_chart")) >= 1 and quad and st_of.get("slice:hrt60_lin:harm:1") == conf["slice:hrt60_lin:harm:1"]
+            and set(st_of.values()) <= {"estimated", "confirmed", "refuted", "not confirmed", "mixed"} and "#/experiments/" in md and "vlapoc.lineage trace" in " ".join(c.value for c in at.code),
+            f"quadrant labels in the chart spec: {quad}; statuses {sorted(set(st_of.values()))}; slice:hrt60_lin:harm:1 = {st_of.get('slice:hrt60_lin:harm:1')} (confirm run: {conf['slice:hrt60_lin:harm:1']})")
+    # --- AC5.5b bad vs harmful ---
+    go(at, "Bad vs harmful")
+    drun = res.runs_with_param("score", "score_run_id", ens, lr)
+    drun = [r for r in drun if "discrepancy_episodes" in r["outputs"]][0]
+    ep = res.output_table(drun["run_id"], "discrepancy_episodes", lr)
+    metric = at.selectbox(key="bvh_metric").value
+    shown = next(df.value for df in at.dataframe if "quadrant" in df.value.columns)
+    want_q = ep[f"quadrant__{metric}"].value_counts().reindex(QUADRANTS, fill_value=0)
+    vruns = [r for r in res.find_runs("summarize", lr) if "discrepancy_verdict" in r["outputs"]]
+    vt = res.output_table(vruns[0]["run_id"], "discrepancy_verdict", lr)
+    vshown = next(df.value for df in at.dataframe if "sentence" in df.value.columns)
+    alltxt = " ".join(texts(at)) + " ".join(str(c) for df in at.dataframe for c in df.value.to_numpy().ravel())
+    nvid = len(at.get("video"))
+    C.check("5.5b Bad-vs-harmful: quadrant counts equal discrepancy_episodes.parquet's; statuses and sentences equal the discrepancy-verdict run's verbatim; the word 'harm'+'less' appears nowhere on the page; the selected type shows two video elements (corrupted, original)",
+            dict(zip(shown["quadrant"], shown["episodes"])) == {q: int(want_q[q]) for q in QUADRANTS} and set(vshown["sentence"]) == set(vt["sentence"]) and set(vshown["status"]) == set(vt["status"])
+            and ("harm" + "less") not in alltxt.lower() and nvid == 2,
+            f"quadrant counts {dict(zip(shown['quadrant'], shown['episodes']))}; {len(vshown)} verdict rows, statuses {sorted(set(vshown['status']))}; {nvid} videos")
+    # --- AC5.6 video ---
+    sid, cat2 = res.training_episodes(ens, lr)
+    root = res.dataset_root(sid, lr)
+    row = cat2.iloc[7]
+    cache = SCRATCH / "video_cache"
+    shutil.rmtree(cache, ignore_errors=True)
+    b1 = video.episode_video(root, int(row["episode_index"]), row["content_hash"], cache_dir=cache)
+    b2 = video.episode_video(root, int(row["episode_index"]), row["content_hash"], cache_dir=cache)
+    n_ep = int(row["length_steps"])
+    ro0 = res.rollouts(res.seed_runs(ens, lr)[0], lr).iloc[0]
+    troot = res.trajectory_root(ro0["eval_run_id"], lr)
+    r1 = video.episode_video(troot, int(ro0["traj_episode_index"]), "scratch-rollout", cache_dir=cache)
+    r2 = video.episode_video(troot, int(ro0["traj_episode_index"]), "scratch-rollout", cache_dir=cache)
+    n_roll = int(video.frames_of(troot, int(ro0["traj_episode_index"])).shape[0])
+    C.check("5.6 vlapoc.video: a real training episode and a real rollout trajectory become H.264 mp4 whose decoded frame count equals the episode's frame count; the cache returns the same bytes on the second call",
+            video.decode_frame_count(b1) == n_ep and video.decode_frame_count(r1) == n_roll and b1 == b2 and r1 == r2 and b1[4:8] == b"ftyp",
+            f"training episode {row['episode_id'][-30:]}: {video.decode_frame_count(b1)} frames = {n_ep} ({len(b1)} bytes); rollout {ro0['rollout_id']}: {video.decode_frame_count(r1)} frames = {n_roll} ({len(r1)} bytes)")
+    shutil.rmtree(cache, ignore_errors=True)
+    # --- AC5.7 no ad-hoc paths; another store changes the content ---
+    hard = [f.name for f in (REPO_ROOT / "dashboard").rglob("*.py") if re.search(r"data/(attribution|eval)|\"attribution\"|\"eval\" */", f.read_text())]
+    at2 = app_test("", "")
+    opts_real = [str(o) for o in at2.sidebar.selectbox[0].options] if at2.sidebar.selectbox else []
+    opts_demo = [str(o) for o in app_test("data/lineage_demo", "attribute-demo-ens").sidebar.selectbox[0].options]
+    msg_real = [str(e.value)[:120] for e in at2.error] + [str(e.value)[:120] for e in at2.warning]
+    C.check("5.7 the app reads only through results.py/MLflow (no hard-coded data/attribution or data/eval path in dashboard/); pointing --lineage-root/--scores at another store (the real one) changes the content with no edit",
+            not hard and opts_real != opts_demo and not at2.exception, f"hard-coded paths in {hard}; demo run options {opts_demo[:2]}...; real store options {opts_real[:2]}; messages {msg_real[:1]}")
+    # --- AC5.8 streamlit installed and serving ---
+    port = 8766
+    srv = subprocess.Popen([sys.executable, "-m", "streamlit", "run", str(APP), "--server.headless", "true", "--server.port", str(port), "--browser.gatherUsageStats", "false", "--", "--lineage-root", "data/lineage_demo", "--scores", "attribute-demo-ens"],
+                           cwd=REPO_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    code, body, page = None, "", None
+    try:
+        for _ in range(60):
+            try:
+                r_ = urllib.request.urlopen(f"http://localhost:{port}/_stcore/health", timeout=2)
+                code, body = r_.status, r_.read().decode()
+                page = urllib.request.urlopen(f"http://localhost:{port}/", timeout=5).status
+                break
+            except Exception:  # noqa: BLE001
+                time.sleep(0.5)
+    finally:
+        srv.terminate()
+        srv.wait(timeout=15)
+    C.check("5.8 streamlit==1.66.1 is installed in .venv; `streamlit run dashboard/app.py` serves locally (HTTP 200 on /_stcore/health, and on /), then it is stopped",
+            streamlit.__version__ == "1.66.1" and code == 200 and body == "ok" and page == 200, f"streamlit {streamlit.__version__}; health {code} {body!r}; page {page}; stopped")
+    return C.finish({"SYNTHETIC": True})
+
+
+def demo_mode() -> int:
+    """S6, AC6.1-AC6.5."""
+    from vlapoc import clusters as cl
+    from vlapoc import results as res
+    from vlapoc import synthetic as syn
+    from vlapoc.lineage import LineageError
+    from vlapoc.method_data import _reset_session
+    from vlapoc.runs import client, experiment_id
+
+    C = Checker("demo")
+    if not DEMO.exists():
+        print("data/lineage_demo is missing: run scripts/dashboard_demo.py build --with-smoke first")
+        return 2
+    man = json.loads((DEMO / "demo_manifest.json").read_text())
+    C.check("6.1 the build with --with-smoke completed (manifest) and left data/lineage/mlflow.db unchanged (its sha256 before == after == now)",
+            "smoke" in man and man["mlflow_db_sha256_before"] == man["mlflow_db_sha256_after"] == db_sha(), f"build took {man['seconds']}s; smoke attribute run {man['smoke']['attribute_name']} ({man['smoke']['n_rollouts']} rollouts); sha {db_sha()[:16]}...")
+    lr = DEMO
+    c = client(lr)
+    real = {r.info.run_id for r in client(None).search_runs([experiment_id(None)], max_results=50000)}
+    mine = [r for r in c.search_runs([experiment_id(lr)], max_results=50000) if r.info.run_id not in real]
+    smoke_chain = [r for r in mine if r.data.tags.get("vlapoc.chain", "").startswith("demo-smoke")]
+    other = [r for r in mine if r not in smoke_chain]
+    untagged = [r.info.run_name for r in other if r.data.tags.get("vlapoc.synthetic") != "true"]
+    smoke_tagged = [r.info.run_name for r in smoke_chain if r.data.tags.get("vlapoc.synthetic") == "true"]
+    p_ens = res.provenance(man["scores_run_id"], lr)
+    p_smoke = res.provenance(man["smoke"]["attribute_run"], lr)
+    C.check("6.2 every run the builder created is tagged vlapoc.synthetic=true except the smoke chain's; provenance is SYNTHETIC for the demo ensemble and SMOKE for the smoke attribute run",
+            not untagged and smoke_chain and not smoke_tagged and p_ens["label"] == "SYNTHETIC" and p_smoke["label"] == "SMOKE",
+            f"{len(other)} synthetic-tagged runs, {len(smoke_chain)} smoke-chain runs (untagged by design); ensemble {p_ens['label']}; smoke {p_smoke['label']}: {p_smoke['reasons'][:1]}; untagged synthetic-side runs {untagged[:3]}")
+    src = REPO_ROOT / "vlapoc" / "synthetic.py"
+    _reset_session()
+    try:
+        syn.demo_inputs("v2/candidate", lr)
+        refused = "opened"
+    except LineageError as e:
+        refused = str(e)[:80]
+    _reset_session()
+    prm = c.get_run(man["seed_runs"][0]).data.params
+    C.check("6.3 the synthetic generator imports nothing from groundtruth / recovery / discrepancy and opens the subset only through open_for_method (a fenced v2 is refused); the planted structure is described in plain words in the run params",
+            not forbidden_imports(src) and "open_for_method(" in src.read_text() and "fenced" in refused and "SYNTHETIC" in prm["planted_structure"] and "length_vs_task" in prm["planted_structure"],
+            f"forbidden imports {forbidden_imports(src)}; v2 refused: {refused}; params: {prm['planted_structure'][:150]}...")
+    # --- AC6.4 the demo's cluster run recovers the planted structure; S3 table exists ---
+    view, desc, codes, specs = syn.demo_inputs("v3/candidate", lr)
+    cells = syn.plant_cells(desc, codes, specs)
+    top = int(codes["length_vs_task"].max())
+    clu = res.output_table(man["clusters_run_id"], "clusters", lr)
+    sl = clu[clu["lens"] == "slice"]
+
+    def preds(r):
+        return {(q["feature"], q["code"]) for q in json.loads(r["predicates"])}
+
+    def top3(metric, side):
+        d = sl[(sl["target_metric"] == f"harm_{metric}") & (sl["direction"] == side)].sort_values("rank").head(3)
+        return [(int(r["rank"]), r["definition"], int(r["n"])) for _, r in d.iterrows()], [preds(r) for _, r in d.iterrows()]
+
+    t_h, p_h = top3("hrt60_lin", "harm")
+    scene_code = specs["scene"]["categories"].index(cells["text"]["f30_harm"].removeprefix("scene = "))
+    t_f, p_f = top3("f30", "harm")
+    t_b, p_b = top3("f30", "boost")
+    stop, gcode = int(codes["smoothness"].max()), None
+    gcode = [code for code, lab_ in enumerate(specs["gripper_toggles"]["labels"]) if lab_ in cells["text"]["f30_boost"]][0]
+    ok_h = any(("length_vs_task", top) in p for p in p_h)
+    ok_f = any(("scene", scene_code) in p for p in p_f)
+    ok_b = any({("smoothness", stop), ("gripper_toggles", gcode)} <= p for p in p_b)
+    rec = [r for r in res.runs_with_param("score", "cluster_run_id", man["clusters_run_id"], lr) if "cluster_recovery" in r["outputs"]]
+    tb = res.output_table(rec[0]["run_id"], "cluster_recovery", lr)
+    best = tb[(tb["planted_type"] != "any_planted") & tb["is_best_cluster_for_type"]].sort_values("p_fisher").head(3)
+    C.check("6.4 the demo's cluster run recovers the planted structure (planted HRT slice, F30 scene slice, F30 boost slice each in the top 3 of its metric and side), and its S3 table is produced; any overlap with the real planted types is SYNTHETIC and not evidence about attribution",
+            ok_h and ok_f and ok_b and len(tb) == len(clu) * 8 and tb["synthetic"].all(),
+            f"planted: {cells['text']}; found hrt {t_h[:1]}, f30 harm {t_f[:1]}, f30 boost {t_b[:1]}; S3 table {len(tb)} rows; best (cluster, type) by Fisher p: " + "; ".join(f"{r.planted_type}: {r.cluster_id} p={r.p_fisher:.1e}" for r in best.itertuples()))
+    # --- AC6.5 disk ---
+    def du(p: Path) -> int:
+        return sum(f.stat().st_size for f in Path(p).rglob("*") if f.is_file())
+
+    store, cache = du(DEMO), du(REPO_ROOT / "data" / "dashboard_cache")
+    free = shutil.disk_usage(REPO_ROOT).free
+    C.check("6.5 disk: the demo store plus the dashboard cache stay under 2 GiB and free disk stays above 20 GiB", store + cache < 2 * 2**30 and free > 20 * 2**30,
+            f"demo store {store / 2**20:.0f} MiB (outputs of the smoke chain live under data/eval and data/attribution), cache {cache / 2**20:.0f} MiB, free {free / 2**30:.0f} GiB")
+    del cl
+    return C.finish({"SYNTHETIC": True, "manifest": {k: man[k] for k in ("planted", "warm", "confirm_overall", "picked_clusters", "seconds")}})
+
+
+def dropin_mode() -> int:
+    """S7, AC7.1-AC7.3."""
+    import subprocess
+
+    from vlapoc.runs import client
+
+    C = Checker("dropin")
+    v = vt()
+    porcelain = lambda: subprocess.run(["git", "status", "--porcelain", "--", "dashboard", "vlapoc", "scripts"], cwd=REPO_ROOT, capture_output=True, text=True).stdout.strip()  # noqa: E731
+    if porcelain():
+        print(f"commit first (the stage CLI refuses a dirty tree and AC7.1 needs a clean one):\n{porcelain()}")
+        return 2
+    shutil.rmtree(SCRATCH / "dropin", ignore_errors=True)
+    base = SCRATCH / "dropin"
+    base.mkdir(parents=True)
+    CH, T = "di-fixture0", "di"
+    made = [REPO_ROOT / "data" / "attribution" / n for n in (f"attribute-{T}-s0", f"attribute-{T}-s1", f"attribute-{T}-ens", f"clusters-{T}")]
+    try:
+        fx = v.make_fixture(base, parent="v3/candidate", cover_types=True, chain=CH, train_name=f"train-{T}-s0")
+        lr, feats = fx["lr"], base / "feats"
+        tr0 = fx["train"]
+        tr1 = v.make_train(fx, f"train-{T}-s1", fx["subset"], "cd" * 32, seed=1)
+        v.add_eval(fx, "s0", train=tr0, eval_name=f"eval-{T}-s0", returns_name=f"returns-{T}-s0", seed=1)
+        v.add_eval(fx, "s1", train=tr1, eval_name=f"eval-{T}-s1", returns_name=f"returns-{T}-s1", seed=2)
+        Cli = lambda *a: v.stage_cli(list(a), lr, feats, CH)  # noqa: E731
+        for s_ in (0, 1):
+            Cli("attribute", "--train", f"train-{T}-s{s_}", "--eval", f"eval-{T}-s{s_}", "--returns", f"returns-{T}-s{s_}", "--name", f"attribute-{T}-s{s_}", "--device", "cpu")
+        Cli("ensemble", "--runs", f"attribute-{T}-s0", f"attribute-{T}-s1", "--name", f"attribute-{T}-ens")
+        Cli("clusters", "--scores", f"attribute-{T}-ens", "--name", f"clusters-{T}")
+        before = porcelain()
+        at = app_test(str(lr), f"attribute-{T}-ens")
+        errs = []
+        for pg in PAGES:
+            go(at, pg)
+            if at.exception:
+                errs.append((pg, [e.value[:90] for e in at.exception]))
+        after = porcelain()
+        banner0 = [str(e.value)[:60] for e in at.warning] + [str(e.value)[:60] for e in at.error]
+        C.check("7.1 the real attribute -> ensemble -> clusters code path (SYNTHETIC features, scratch store, run through the stage CLI) loads in the dashboard by run name, every page, with no file under dashboard/, vlapoc/ or scripts/ modified (git status --porcelain empty before and after)",
+                not before and not after and not errs, f"porcelain before {before!r} after {after!r}; page errors {errs}; banner on the untagged fixture: {banner0[:1]}")
+        # --- AC7.2 re-tag train/eval to the values the server writes ---
+        c = client(lr)
+        from vlapoc.runs import experiment_id
+
+        for r in c.search_runs([experiment_id(lr)], "tags.stage = 'train' or tags.stage = 'eval'", max_results=1000):
+            if r.data.tags.get("stage") == "train" and r.info.run_name.startswith(f"train-{T}"):
+                c.set_tag(r.info.run_id, "vlapoc.smoke", "false")
+            if r.data.tags.get("stage") == "eval" and r.info.run_name.startswith(f"eval-{T}"):
+                c.set_tag(r.info.run_id, "eval.attribution_grade", "true")
+        at = app_test(str(lr), f"attribute-{T}-ens")
+        go(at, "Overview")
+        flagged = [str(e.value)[:80] for e in at.error] + [str(e.value)[:80] for e in at.warning]
+        caps = [str(e.value) for e in at.caption]
+        real_ok = not any(("SYNTHETIC" in x or "SMOKE" in x) for x in flagged) and any(x.startswith("Provenance: REAL") for x in caps)
+        seed_run = c.search_runs([experiment_id(lr)], f"tags.mlflow.runName = 'attribute-{T}-s0'")[0].info.run_id
+        c.set_tag(seed_run, "vlapoc.synthetic", "true")
+        at = app_test(str(lr), f"attribute-{T}-ens")
+        go(at, "Overview")
+        back = any("SYNTHETIC" in str(e.value) for e in at.error)
+        C.check("7.2 the same chain with its train/eval runs re-tagged to what the server writes (vlapoc.smoke=false, eval.attribution_grade=true, nothing synthetic) renders with no SYNTHETIC or SMOKE banner (caption 'Provenance: REAL'); re-adding one synthetic tag brings the SYNTHETIC banner back",
+                real_ok and back, f"re-tagged: banners {flagged}, caption {[x[:40] for x in caps if x.startswith('Provenance')]}; one synthetic tag re-added: banner back {back}")
+        # --- AC7.3 the real smoke run in the demo store ---
+        if DEMO.exists():
+            man = json.loads((DEMO / "demo_manifest.json").read_text())
+            at = app_test("data/lineage_demo", man["smoke"]["attribute_name"])
+            go(at, "Rollouts")
+            rows = next(df.value for df in at.dataframe if "rollout_id" in df.value.columns)
+            at.checkbox(key="only_failed").set_value(False).run()
+            rows = next(df.value for df in at.dataframe if "rollout_id" in df.value.columns)
+            warn = [str(e.value)[:70] for e in at.warning]
+            C.check("7.3 the real --with-smoke attribute run (real attribute_run output, no adapter) renders on the Rollouts page with its 2 real rollouts and the SMOKE banner",
+                    len(rows) == 2 and any("SMOKE" in w for w in warn) and not at.exception and len(at.get("video")) >= 1,
+                    f"{len(rows)} rollouts {list(rows['rollout_id'])}; banner {warn[:1]}; {len(at.get('video'))} videos (rollout + episodes)")
+        else:
+            C.check("7.3 demo store present", False, "run scripts/dashboard_demo.py build --with-smoke")
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+        for d in made:
+            shutil.rmtree(d, ignore_errors=True)
+    return C.finish({"SYNTHETIC": "fixture features/rollouts/returns"})
+
+
+MODES = {"results": results, "clusters": clusters_mode, "planted": planted_mode, "discrepancy": discrepancy_mode, "round_b": round_b_mode, "planted_arms": planted_arms_mode, "app": app_mode, "demo": demo_mode, "dropin": dropin_mode}
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    for m, h in (("results", "S1"), ("clusters", "S2"), ("planted", "S3"), ("discrepancy", "S9"), ("round_b", "S4"), ("planted_arms", "S10")):
+    for m, h in (("results", "S1"), ("clusters", "S2"), ("planted", "S3"), ("discrepancy", "S9"), ("round_b", "S4"), ("planted_arms", "S10"), ("app", "S5"), ("demo", "S6"), ("dropin", "S7")):
         ap.add_argument(f"--{m.replace('_', '-')}", dest=m, action="store_true", help=h)
     a = ap.parse_args()
     ran = [m for m in MODES if getattr(a, m, False)]
