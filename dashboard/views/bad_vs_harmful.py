@@ -61,7 +61,12 @@ def render(ctx: dict) -> None:
         common.declared_caption([f"harm_{k}" for k in metrics], ctx["decls"])
         vt = common.table_of(lr, vr[0]["run_id"], "discrepancy_verdict")
         vv = vt[["arm", "metric", "status", "sentence", "calls", "claim_clean_but_harmful"]].copy()
-        vv["arm"] = [words.plain(a.replace("type-", "").replace("-", " ")) + (" (removed)" if a.startswith("type-") else "") for a in vv["arm"]]
+        def arm_name(a: str) -> str:
+            if a.startswith("type-"):
+                return words.PLANTED.get(a.removeprefix("type-"), a) + " removed"
+            return {"oracle": "all planted episodes removed (positive control)"}.get(a, "the most harmful clean episodes removed" if a.startswith("cleanharm") else words.plain(a))
+
+        vv["arm"] = [arm_name(a) for a in vv["arm"]]
         vv["metric"] = [words.metric_name(x) for x in vv["metric"]]
         st.dataframe(vv.rename(columns={"calls": "calls by run", "claim_clean_but_harmful": "clean but harmful (claimed)"}), hide_index=True, width="stretch", key="bvh_verdict")
     else:
