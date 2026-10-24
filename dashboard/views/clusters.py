@@ -44,7 +44,7 @@ def scatter(ctx: dict, cols: list[str]) -> alt.Chart:
     q = [{"throughput": hi * 0.7, "reliability": hi * 0.9, "name": "consistent harmers"}, {"throughput": lo * 0.7, "reliability": lo * 0.9, "name": "consistent helpers"},
          {"throughput": lo * 0.7, "reliability": hi * 0.9, "name": "trade-off"}, {"throughput": hi * 0.7, "reliability": lo * 0.9, "name": "trade-off"}]
     txt = alt.Chart(alt.Data(values=q)).mark_text(fontSize=11, opacity=0.7).encode(x="throughput:Q", y="reliability:Q", text="name:N")
-    return (pts + txt).properties(title=f"{syn}Each dot is a training episode (higher = more harmful)", height=PLOT_HEIGHT)
+    return (pts + txt).properties(title=f"{syn}one dot per training episode", height=PLOT_HEIGHT)
 
 
 def status_of(ctx: dict, cluster_run: str) -> tuple[dict, pd.DataFrame | None, str | None]:

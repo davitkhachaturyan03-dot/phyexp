@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import re
 
-METRICS = {"f30": "Success within 30 s", "rmst60": "Mean time to success (RMST)", "auc_expected": "Beats human (AUC)", "hrt60_lin": "Speed vs human (HRT)",
+METRICS = {"f30": "Success within 30 s", "rmst60": "Mean time to success (RMST)", "auc_expected": "Beats human (AUC)", "auc_sampled": "Beats a sampled human (AUC, sampled)", "hrt60_lin": "Speed vs human (HRT)",
            "censored60": "Timed out (censored)"}
 QUADRANTS = {"bad_and_harmful": "looks bad, hurts", "bad_but_not_harmful": "looks bad, no detectable harm", "clean_but_harmful": "looks clean, hurts",
              "clean_and_not_harmful": "looks clean, no detectable harm"}
