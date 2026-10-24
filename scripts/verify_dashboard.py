@@ -1627,28 +1627,30 @@ def demo_mode() -> int:
     clu = res.output_table(man["clusters_run_id"], "clusters", lr)
     sl = clu[clu["lens"] == "slice"]
 
-    def preds(r):
-        return {(q["feature"], q["code"]) for q in json.loads(r["predicates"])}
+    # Clusters with identical member sets are reported once (AC2.9): the kept row lists the others as equivalent definitions, so the slices found for one metric and side are the kept rows' own
+    # entries plus the equivalents that name that metric. A planted structure counts as recovered if the definition of a top-3 entry states it.
+    entries = []
+    for _, r in clu.iterrows():
+        for e in [{"cluster_id": r["cluster_id"], "lens": r["lens"], "definition": r["definition"], "direction": r["direction"], "target_metric": r["target_metric"]}, *json.loads(r["equivalent_definitions"])]:
+            if e["lens"] == "slice":
+                entries.append({**e, "rank": int(e["cluster_id"].rsplit(":", 1)[1]), "n": int(r["n"])})
+    ent = pd.DataFrame(entries)
 
     def top3(metric, side):
-        d = sl[(sl["target_metric"] == f"harm_{metric}") & (sl["direction"] == side)].sort_values("rank").head(3)
-        return [(int(r["rank"]), r["definition"], int(r["n"])) for _, r in d.iterrows()], [preds(r) for _, r in d.iterrows()]
+        d = ent[(ent["target_metric"] == f"harm_{metric}") & (ent["direction"] == side)].sort_values("rank").head(3)
+        return [(int(r["rank"]), r["definition"], int(r["n"])) for _, r in d.iterrows()]
 
-    t_h, p_h = top3("hrt60_lin", "harm")
-    scene_code = specs["scene"]["categories"].index(cells["text"]["f30_harm"].removeprefix("scene = "))
-    t_f, p_f = top3("f30", "harm")
-    t_b, p_b = top3("f30", "boost")
-    stop, gcode = int(codes["smoothness"].max()), None
-    gcode = [code for code, lab_ in enumerate(specs["gripper_toggles"]["labels"]) if lab_ in cells["text"]["f30_boost"]][0]
-    ok_h = any(("length_vs_task", top) in p for p in p_h)
-    ok_f = any(("scene", scene_code) in p for p in p_f)
-    ok_b = any({("smoothness", stop), ("gripper_toggles", gcode)} <= p for p in p_b)
+    def states(top, text):
+        return any(all(part in d for part in text.split(" AND ")) for _, d, _ in top)
+
+    t_h, t_f, t_b = top3("hrt60_lin", "harm"), top3("f30", "harm"), top3("f30", "boost")
+    ok_h, ok_f, ok_b = states(t_h, cells["text"]["hrt_harm"]), states(t_f, cells["text"]["f30_harm"]), states(t_b, cells["text"]["f30_boost"])
     rec = [r for r in res.runs_with_param("score", "cluster_run_id", man["clusters_run_id"], lr) if "cluster_recovery" in r["outputs"]]
     tb = res.output_table(rec[0]["run_id"], "cluster_recovery", lr)
     best = tb[(tb["planted_type"] != "any_planted") & tb["is_best_cluster_for_type"]].sort_values("p_fisher").head(3)
     C.check("6.4 the demo's cluster run recovers the planted structure (planted HRT slice, F30 scene slice, F30 boost slice each in the top 3 of its metric and side), and its S3 table is produced; any overlap with the real planted types is SYNTHETIC and not evidence about attribution",
             ok_h and ok_f and ok_b and len(tb) == len(clu) * 8 and tb["synthetic"].all(),
-            f"planted: {cells['text']}; found hrt {t_h[:1]}, f30 harm {t_f[:1]}, f30 boost {t_b[:1]}; S3 table {len(tb)} rows; best (cluster, type) by Fisher p: " + "; ".join(f"{r.planted_type}: {r.cluster_id} p={r.p_fisher:.1e}" for r in best.itertuples()))
+            f"planted: {cells['text']}; found hrt {t_h[:2]}, f30 harm {t_f[:1]}, f30 boost {t_b[:1]} (identical member sets are listed once with their equivalents); S3 table {len(tb)} rows; best (cluster, type) by Fisher p: " + "; ".join(f"{r.planted_type}: {r.cluster_id} p={r.p_fisher:.1e}" for r in best.itertuples()))
     # --- AC6.5 disk ---
     def du(p: Path) -> int:
         return sum(f.stat().st_size for f in Path(p).rglob("*") if f.is_file())
@@ -1727,13 +1729,13 @@ def dropin_mode() -> int:
             man = json.loads((DEMO / "demo_manifest.json").read_text())
             at = app_test("data/lineage_demo", man["smoke"]["attribute_name"])
             go(at, "Rollouts")
-            rows = next(df.value for df in at.dataframe if "rollout_id" in df.value.columns)
+            rows = next(df.value for df in at.dataframe if "rollout" in df.value.columns)
             at.checkbox(key="only_failed").set_value(False).run()
-            rows = next(df.value for df in at.dataframe if "rollout_id" in df.value.columns)
+            rows = next(df.value for df in at.dataframe if "rollout" in df.value.columns)
             warn = [str(e.value)[:70] for e in at.warning]
             C.check("7.3 the real --with-smoke attribute run (real attribute_run output, no adapter) renders on the Rollouts page with its 2 real rollouts and the SMOKE banner",
                     len(rows) == 2 and any("SMOKE" in w for w in warn) and not at.exception and len(at.get("video")) >= 1,
-                    f"{len(rows)} rollouts {list(rows['rollout_id'])}; banner {warn[:1]}; {len(at.get('video'))} videos (rollout + episodes)")
+                    f"{len(rows)} rollouts {list(rows['rollout'])}; banner {warn[:1]}; {len(at.get('video'))} videos (rollout + episodes)")
         else:
             C.check("7.3 demo store present", False, "run scripts/dashboard_demo.py build --with-smoke")
     finally:
