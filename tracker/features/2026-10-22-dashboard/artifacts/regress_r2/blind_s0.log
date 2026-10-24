@@ -1,0 +1,60 @@
+=== blind_s0: .venv/bin/python scripts/verify_blind_s0.py
+objc[30335]: Class AVFFrameReceiver is implemented in both /Users/davit_khachaturyan/Projects/personal/vlaExp/.venv/lib/python3.14/site-packages/av/.dylibs/libavdevice.61.3.100.dylib (0x124b103a8) and /opt/homebrew/Cellar/ffmpeg/8.1.1/lib/libavdevice.62.3.101.dylib (0x1397f8328). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+objc[30335]: Class AVFAudioReceiver is implemented in both /Users/davit_khachaturyan/Projects/personal/vlaExp/.venv/lib/python3.14/site-packages/av/.dylibs/libavdevice.61.3.100.dylib (0x124b103f8) and /opt/homebrew/Cellar/ffmpeg/8.1.1/lib/libavdevice.62.3.101.dylib (0x1397f8378). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+Map:   0%|          | 0/98 [00:00<?, ? examples/s]Map: 100%|██████████| 98/98 [00:00<00:00, 2679.58 examples/s]
+Map:   0%|          | 0/152 [00:00<?, ? examples/s]Map: 100%|██████████| 152/152 [00:00<00:00, 3223.89 examples/s]
+Map:   0%|          | 0/103 [00:00<?, ? examples/s]Map: 100%|██████████| 103/103 [00:00<00:00, 2985.06 examples/s]
+Map:   0%|          | 0/99 [00:00<?, ? examples/s]Map: 100%|██████████| 99/99 [00:00<00:00, 3137.05 examples/s]
+Map:   0%|          | 0/153 [00:00<?, ? examples/s]Map: 100%|██████████| 153/153 [00:00<00:00, 3190.43 examples/s]
+Map:   0%|          | 0/137 [00:00<?, ? examples/s]Map: 100%|██████████| 137/137 [00:00<00:00, 3322.83 examples/s]
+Map:   0%|          | 0/123 [00:00<?, ? examples/s]Map: 100%|██████████| 123/123 [00:00<00:00, 3225.98 examples/s]
+Map:   0%|          | 0/155 [00:00<?, ? examples/s]Map: 100%|██████████| 155/155 [00:00<00:00, 3067.72 examples/s]
+Map:   0%|          | 0/115 [00:00<?, ? examples/s]Map: 100%|██████████| 115/115 [00:00<00:00, 3120.92 examples/s]
+Map:   0%|          | 0/136 [00:00<?, ? examples/s]Map: 100%|██████████| 136/136 [00:00<00:00, 3270.00 examples/s]
+Map:   0%|          | 0/388 [00:00<?, ? examples/s]Map:  85%|████████▌ | 330/388 [00:00<00:00, 3277.83 examples/s]Map: 100%|██████████| 388/388 [00:00<00:00, 3115.86 examples/s]
+Map:   0%|          | 0/258 [00:00<?, ? examples/s]Map: 100%|██████████| 258/258 [00:00<00:00, 3213.15 examples/s]
+Map:   0%|          | 0/272 [00:00<?, ? examples/s]Map: 100%|██████████| 272/272 [00:00<00:00, 3223.06 examples/s]
+Map:   0%|          | 0/261 [00:00<?, ? examples/s]Map:  93%|█████████▎| 244/261 [00:00<00:00, 2414.43 examples/s]Map: 100%|██████████| 261/261 [00:00<00:00, 2227.82 examples/s]
+Map:   0%|          | 0/275 [00:00<?, ? examples/s]Map:  88%|████████▊ | 242/275 [00:00<00:00, 2406.43 examples/s]Map: 100%|██████████| 275/275 [00:00<00:00, 2279.32 examples/s]
+Map:   0%|          | 0/234 [00:00<?, ? examples/s]Map: 100%|██████████| 234/234 [00:00<00:00, 2231.78 examples/s]Map: 100%|██████████| 234/234 [00:00<00:00, 2218.39 examples/s]
+Map:   0%|          | 0/203 [00:00<?, ? examples/s]Map: 100%|██████████| 203/203 [00:00<00:00, 3026.87 examples/s]
+Map:   0%|          | 0/242 [00:00<?, ? examples/s]Map: 100%|██████████| 242/242 [00:00<00:00, 2938.14 examples/s]
+Map:   0%|          | 0/457 [00:00<?, ? examples/s]Map:  74%|███████▎  | 336/457 [00:00<00:00, 3342.32 examples/s]Map: 100%|██████████| 457/457 [00:00<00:00, 3197.01 examples/s]
+Map:   0%|          | 0/329 [00:00<?, ? examples/s]Map: 100%|██████████| 329/329 [00:00<00:00, 3297.48 examples/s]
+[convert] 20/20 episodes, 4190 frames, 10s elapsed, 405 frames/s
+AC0.3 scratch parent small20 bafb211603dd: 20 episodes, 4190 frames
+Map:   0%|          | 0/98 [00:00<?, ? examples/s]Map: 100%|██████████| 98/98 [00:00<00:00, 3188.35 examples/s]
+Map:   0%|          | 0/152 [00:00<?, ? examples/s]Map: 100%|██████████| 152/152 [00:00<00:00, 3122.69 examples/s]
+Map:   0%|          | 0/103 [00:00<?, ? examples/s]Map: 100%|██████████| 103/103 [00:00<00:00, 2545.13 examples/s]
+Map:   0%|          | 0/119 [00:00<?, ? examples/s]Map: 100%|██████████| 119/119 [00:00<00:00, 3193.05 examples/s]
+Map:   0%|          | 0/153 [00:00<?, ? examples/s]Map: 100%|██████████| 153/153 [00:00<00:00, 3355.41 examples/s]
+Map:   0%|          | 0/137 [00:00<?, ? examples/s]Map: 100%|██████████| 137/137 [00:00<00:00, 3166.23 examples/s]
+Map:   0%|          | 0/123 [00:00<?, ? examples/s]Map: 100%|██████████| 123/123 [00:00<00:00, 3004.71 examples/s]
+Map:   0%|          | 0/155 [00:00<?, ? examples/s]Map: 100%|██████████| 155/155 [00:00<00:00, 3050.45 examples/s]
+Map:   0%|          | 0/115 [00:00<?, ? examples/s]Map: 100%|██████████| 115/115 [00:00<00:00, 3164.99 examples/s]
+Map:   0%|          | 0/136 [00:00<?, ? examples/s]Map: 100%|██████████| 136/136 [00:00<00:00, 3185.75 examples/s]
+Map:   0%|          | 0/388 [00:00<?, ? examples/s]Map:  89%|████████▉ | 347/388 [00:00<00:00, 3451.33 examples/s]Map: 100%|██████████| 388/388 [00:00<00:00, 3269.62 examples/s]
+Map:   0%|          | 0/258 [00:00<?, ? examples/s]Map: 100%|██████████| 258/258 [00:00<00:00, 3166.15 examples/s]
+Map:   0%|          | 0/272 [00:00<?, ? examples/s]Map: 100%|██████████| 272/272 [00:00<00:00, 3088.59 examples/s]
+Map:   0%|          | 0/261 [00:00<?, ? examples/s]Map: 100%|██████████| 261/261 [00:00<00:00, 3159.69 examples/s]
+Map:   0%|          | 0/275 [00:00<?, ? examples/s]Map: 100%|██████████| 275/275 [00:00<00:00, 2960.67 examples/s]
+Map:   0%|          | 0/234 [00:00<?, ? examples/s]Map: 100%|██████████| 234/234 [00:00<00:00, 3246.85 examples/s]
+Map:   0%|          | 0/203 [00:00<?, ? examples/s]Map: 100%|██████████| 203/203 [00:00<00:00, 3262.51 examples/s]
+Map:   0%|          | 0/242 [00:00<?, ? examples/s]Map: 100%|██████████| 242/242 [00:00<00:00, 3091.78 examples/s]
+Map:   0%|          | 0/457 [00:00<?, ? examples/s]Map:  56%|█████▋    | 258/457 [00:00<00:00, 2565.76 examples/s]Map: 100%|██████████| 457/457 [00:00<00:00, 2511.57 examples/s]
+Map:   0%|          | 0/329 [00:00<?, ? examples/s]Map:  84%|████████▍ | 278/329 [00:00<00:00, 2747.44 examples/s]Map: 100%|██████████| 329/329 [00:00<00:00, 2616.05 examples/s]
+AC0.3 derive_version: 3 edits at parent episode_index [3, 11, 16] (['idle_padding x20', 'robodrop action noise', 'robodrop action noise']); 14.5s, timing {'guards': 0.5, 'write': 11.5, 'hash_and_blind_check': 2.0, 'total': 14.5}, mechanism 'one LeRobotDataset writer pass in parent episode order (episode_index preserved)'
+AC0.3 episode_index equal to parent's: 20/20; edited episodes now at [3, 11, 16]; length change on the padded episode: 99 -> 119
+AC0.3 meta/episodes tasks per index equal to parent's: True; data-file episode ranges child {0: [0, 14], 1: [15, 19]} vs parent {0: [0, 14], 1: [15, 19]}
+AC0.3 parents.parquet == parent content_hash: True (20 rows); child columns == parent columns: True
+AC0.3 check_blind(child) = []
+AC0.5 extra bookkeeping column parent_content_hash: check_blind -> ['parent_content_hash']; rejected: True
+AC0.5 episode_index of parent rows 0 and 5 swapped: check_blind -> ['(meta/episodes does not match the episode table)', 'episode_index']; rejected: True
+AC0.5 source_demo changed on one edited row: check_blind -> ['source_demo']; rejected: True
+AC0.5 rows shuffled, values unchanged: check_blind -> ['(row order)']; rejected: True
+AC0.5 check_blind after restore: []
+AC0.5 assert_blind(v1) refused: version v1 (16076b9c5cb2) is not blind to its edits: fenced=True, offending=['episode_index'] (PoC §2.1 item 4 p.3)
+AC0.5 assert_blind(scratch child) passed (no exception)
+scratch removed: True
+  44.26s user 7.77s system 155% cpu 33.566 total
+rc=0

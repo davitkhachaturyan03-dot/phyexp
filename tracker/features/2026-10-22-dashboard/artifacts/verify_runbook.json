@@ -2,14 +2,19 @@
  "pass": true,
  "checks": [
   {
+   "name": "8.1b every flag used in a fenced command is accepted by that command's real argparse parser (parse_known_args on the substituted argv, unknown list empty)",
+   "pass": true,
+   "detail": "23/23 commands; 11 labelled executed locally, 12 parsed only; rejected: []"
+  },
+  {
    "name": "8.1 every fenced shell command naming a scripts/*.py, python -m vlapoc.* or the dashboard exists and its subcommand's --help exits 0 here",
    "pass": true,
-   "detail": "12/12 entries ok; external commands not checked (they are server tools): ['--version', '.venv/bin/', 'cat', 'df', 'export', 'git', 'ls', 'nvidia-smi', 'python -m pip', 'rsync', 'sacct', 'shasum', 'source', 'squeue']"
+   "detail": "15/15 entries ok; external commands not checked (they are server tools): ['--version', '.venv/bin/', 'cat', 'df', 'export', 'git', 'ls', 'nvidia-smi', 'python -m pip', 'rsync', 'sacct', 'shasum', 'source', 'sqlite3', 'squeue']"
   },
   {
    "name": "8.2 every dry-run count in the skill equals a fresh local dry run: Round A on v3/candidate (116 jobs, 24 trainings; v0/candidate only as a labelled variant), Round B per cluster (2 picks, and with --matched-random), Round B planted (default and --no-oracle); the first server run is the v3 command in the skill and in server_pipeline.py's docstring",
    "pass": true,
-   "detail": "fresh counts {'round_a_v3': (116, 24), 'round_a_v0_variant': (113, 24), 'round_b_clusters_2': (21, 6), 'round_b_clusters_2_matched': (45, 12), 'round_b_planted': (129, 33), 'round_b_planted_no_oracle': (108, 27)}; mismatches []"
+   "detail": "fresh counts {'round_a_v3': (116, 24), 'round_a_v0_variant': (113, 24), 'round_b_clusters_2': (21, 6), 'round_b_clusters_2_matched': (45, 12), 'round_b_planted': (129, 33), 'round_b_planted_no_oracle': (108, 27), 'round_b_planted_draws2': (162, 36)}; mismatches []"
   },
   {
    "name": "8.3 every step is tagged [verified locally] or [unverified until a server session]; the verifier counts both and lists the unverified; no expected output in an unverified step lacks a measured/quoted/inferred label (and verified steps cite measured outputs)",
@@ -19,7 +24,17 @@
   {
    "name": "8.4 at least 7 STOP AND ASK markers, covering preflight failure, revision mismatch, any FAILED job, disk below threshold, any needed code change, the Round B cluster pick and a SYNTHETIC/SMOKE banner on real results",
    "pass": true,
-   "detail": "11 markers: ['preflight failure', 'revision mismatch', 'failed check', 'odd numbers', 'failed job', 'disk below threshold', 'any needed code change', 'SYNTHETIC or SMOKE banner on real results', 'the Round B cluster pick', 'cost approval', 'database is locked']; missing []"
+   "detail": "12 markers: ['preflight failure', 'store relocation read check', 'revision mismatch', 'failed check', 'odd numbers', 'failed job', 'disk below threshold', 'any needed code change', 'SYNTHETIC or SMOKE banner on real results', 'the Round B cluster pick', 'cost approval', 'database is locked']; missing []"
+  },
+  {
+   "name": "8.7 store relocation: in a scratch copy of the demo store moved to a root that does not exist the read fails before the repoint and works after it; Step 2 runs the repoint tool (dry run, then real) with a read check (results.score_table of an attribute run, results.output_json of a ground-truth score run, lineage trace) that is a STOP AND ASK point; Step 14 repoints once more from the server prefix",
+   "pass": true,
+   "detail": "moved copy before: MlflowException: Failed to download artifacts from path 'attribution_scores.parquet', p; after: read ok (960, 34); rewritten counts {'rows': 2, 'rewritten': 1} {'rows': 118, 'rewritten': 43}"
+  },
+  {
+   "name": "8.1c the Step 3 probe commands run (executed locally on MPS with --n 2 --batch-size 2 and a scratch --lineage-root; the skill's server form differs only in --device cuda, --n 10 --batch-size 10 and no --lineage-root) and the comparison snippet prints the differing columns",
+   "pass": true,
+   "detail": "eval_smoke rc [0, 0]; compare: {'rows': 2, 'columns_compared': 31, 'differing': {}}"
   },
   {
    "name": "8.5 CLAUDE.md is untouched by the dashboard batches: `git diff --stat CLAUDE.md` equals the recorded value from before B1",
@@ -75,6 +90,10 @@
   "round_b_planted_no_oracle": [
    108,
    27
+  ],
+  "round_b_planted_draws2": [
+   162,
+   36
   ]
  }
 }

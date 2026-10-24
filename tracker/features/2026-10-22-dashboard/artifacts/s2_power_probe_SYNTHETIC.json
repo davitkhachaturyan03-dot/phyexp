@@ -2,7 +2,7 @@
  "seeds": [
   {
    "seed": 100,
-   "slice_a_rank_hrt": 1,
+   "slice_a_rank_hrt": NaN,
    "slice_a_rank_f30": NaN,
    "slice_b_boost_rank_f30": 1,
    "small_slice_n": 37,
@@ -22,7 +22,7 @@
   },
   {
    "seed": 102,
-   "slice_a_rank_hrt": 1,
+   "slice_a_rank_hrt": NaN,
    "slice_a_rank_f30": NaN,
    "slice_b_boost_rank_f30": 1,
    "small_slice_n": 37,
@@ -62,7 +62,7 @@
   },
   {
    "seed": 106,
-   "slice_a_rank_hrt": 1,
+   "slice_a_rank_hrt": NaN,
    "slice_a_rank_f30": NaN,
    "slice_b_boost_rank_f30": 1,
    "small_slice_n": 37,
@@ -72,7 +72,7 @@
   },
   {
    "seed": 107,
-   "slice_a_rank_hrt": 1,
+   "slice_a_rank_hrt": NaN,
    "slice_a_rank_f30": NaN,
    "slice_b_boost_rank_f30": 1,
    "small_slice_n": 37,
@@ -103,7 +103,7 @@
  ],
  "note": "SYNTHETIC. n_boot=50 to keep this fast; the slice finder does not use the bootstrap.",
  "summary": {
-  "slice_a_in_top3_hrt": 10,
+  "slice_a_in_top3_hrt": 6,
   "slice_a_in_top3_f30 (false alarm)": 0,
   "slice_b_boost_in_top3_f30": 9,
   "task_top3_hrt": 10,

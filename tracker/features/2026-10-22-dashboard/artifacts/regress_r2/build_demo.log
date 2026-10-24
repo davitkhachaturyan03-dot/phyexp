@@ -1,0 +1,179 @@
+=== build_demo: .venv/bin/python scripts/dashboard_demo.py build --with-smoke --force
+real rollouts: 20; failure types {'timeout_no_progress': 9, 'success': 9, 'timeout_partial_1_of_2': 2}; returns files unchanged: True
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: divide by zero encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: overflow encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: invalid value encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: divide by zero encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: overflow encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: invalid value encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: divide by zero encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: overflow encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: invalid value encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: divide by zero encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: overflow encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: invalid value encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: divide by zero encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: overflow encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: invalid value encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: divide by zero encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: overflow encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: invalid value encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: divide by zero encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: overflow encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: invalid value encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: divide by zero encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: overflow encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: invalid value encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: divide by zero encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: overflow encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: invalid value encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: divide by zero encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: overflow encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: invalid value encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: divide by zero encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: overflow encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: invalid value encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: divide by zero encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: overflow encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: invalid value encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: divide by zero encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: overflow encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: invalid value encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: divide by zero encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: overflow encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: invalid value encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: divide by zero encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: overflow encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: invalid value encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: divide by zero encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: overflow encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: invalid value encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: divide by zero encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: overflow encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: invalid value encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: divide by zero encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: overflow encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: invalid value encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: divide by zero encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: overflow encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: invalid value encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: divide by zero encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: overflow encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: invalid value encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: divide by zero encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: overflow encountered in matmul
+  return adv @ m / len(r)
+/Users/davit_khachaturyan/Projects/personal/vlaExp/vlapoc/attribution.py:286: RuntimeWarning: invalid value encountered in matmul
+  return adv @ m / len(r)
+synthetic seed 0: matrix (20, 960), table (960, 34)
+synthetic seed 1: matrix (20, 960), table (960, 34)
+synthetic seed 2: matrix (20, 960), table (960, 34)
+stages: analyze bf528c54, clusters 50 ({'label': 23, 'slice': 18, 'metric_group': 9}), score-clusters 50, discrepancy b22882b6
+confirm: {'slice:auc_expected:harm:2': 'not confirmed', 'slice:f30:boost:1': 'confirmed'}
+discrepancy-verdict: 25 rows, positive control True
+[ok] smoke eval 86s
+[ok] smoke returns 2s
+[ok] smoke features-train 342s
+[ok] smoke features-rollouts 32s
+[ok] smoke attribute 6s
+{
+ "SYNTHETIC": "scores, clusters, discrepancy readings and Round B verdicts in this store are synthetic; videos, catalog and rollouts are real",
+ "returns_files_unchanged": true,
+ "synthetic_runs": 40,
+ "smoke": {
+  "chain": "demo-smoke0",
+  "attribute_run": "620a29c044dd4b72a961607a4e47dda2",
+  "attribute_name": "attribute-demo-smoke",
+  "n_rollouts": 2,
+  "train_run": "0a33bc75bb71433ca2def5220014dde0"
+ },
+ "warm": {
+  "training_episode_clips": 334,
+  "rollout_clips": 20,
+  "original_clips": 70,
+  "seconds": 0
+ },
+ "scores_run": "attribute-demo-ens",
+ "scores_run_id": "ad09f2e6063341b5bd79c9b0a7fa8be1",
+ "clusters_run": "clusters-demo",
+ "clusters_run_id": "aae526631159489eb1a6ba86529903b2",
+ "seed_runs": [
+  "552887a5bae148e9ad07a2133c72c7b6",
+  "20ef661815624d4b9ca03e272b1e0cb4",
+  "44491745d3a14ea09535767747e0ec6b"
+ ],
+ "picked_clusters": {
+  "cluster0": "slice:f30:boost:1",
+  "cluster1": "slice:auc_expected:harm:2"
+ },
+ "confirm_overall": {
+  "slice:auc_expected:harm:2": "not confirmed",
+  "slice:f30:boost:1": "confirmed"
+ },
+ "mlflow_db_sha256_before": "306af4123fda7e635892d459a2e34008ba1cb62f6c4fce152c546e0da7bdde79",
+ "mlflow_db_sha256_after": "306af4123fda7e635892d459a2e34008ba1cb62f6c4fce152c546e0da7bdde79",
+ "seconds": 483
+}
+  384.76s user 147.59s system 109% cpu 8:04.19 total
+rc=0

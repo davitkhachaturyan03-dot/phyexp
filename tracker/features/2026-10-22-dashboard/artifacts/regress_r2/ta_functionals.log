@@ -1,0 +1,23 @@
+=== ta_functionals: .venv/bin/python scripts/verify_training_attribution.py --functionals
+2026/10/23 17:10:01 INFO mlflow.agent.hint: Load the `instrumenting-with-mlflow-tracing` skill at /Users/davit_khachaturyan/Projects/personal/vlaExp/.venv/lib/python3.14/site-packages/mlflow/assistant/skills/instrumenting-with-mlflow-tracing/SKILL.md before writing any tracing code; it ships with this MLflow install. Set MLFLOW_DISABLE_AGENT_HINT=1 to silence this.
+[PASS] 3.1 every infl_/harm_ column has exactly one functionals row, and its tau is the metrics_registry tau  32 columns, 32 rows; tau_s by return: {'ret_f30': 30.0, 'ret_rmst60': 60.0, 'ret_auc_expected': None, 'ret_auc_sampled': None, 'ret_hrt60_lin': 60.0, 'ret_censored60': 60.0, 'ft_drop': 60.0, 'ft_timeout': 60.0}
+[PASS] 3.1b the declared encoding/centring is what column_plan applied (pm1 on binary columns, centred on the rest)  {'ret_f30': ('pm1', False), 'ret_rmst60': ('raw', True), 'ret_auc_expected': ('raw', True), 'ret_auc_sampled': ('raw', True), 'ret_hrt60_lin': ('raw', True), 'ret_censored60': ('pm1', False), 'ft_drop': ('pm1', False), 'ft_timeout': ('pm1', False)}
+[PASS] 3.1c harm columns state their sign (good_sign) and subset
+[PASS] 2.5 attribute run params carry output functions, encoding, centring and DIVERGENCES  {'train_output_fn': 'square', 'rollout_output_fn': 'square', 'return_encoding': 'pm1', 'center_returns': 'True', 'min_failure_type_rollouts_inferred': '5'}, divergences keys ['centred_returns', 'continuous_returns', 'damping', 'draws', 'failure_type_returns', 'model_family', 'numerics', 'projection', 'strides']
+[PASS] 2.5b owner ruling 2026-10-22: a default attribute run weights yes/no columns by CUPID's ±1 (params and every functionals row say so)  {'binary_columns': 'CUPID ±1, uncentred', 'continuous_columns': 'centred (R − mean R)'}; f30: CUPID ±1, uncentred (success +1, otherwise −1); rmst60: centred (R − mean R)
+[PASS] 3.3 the attribute run lists one `features` input per .npy / .meta.npz file with its sha256  6 features inputs for 6 files: ['features.rollouts.meta.npz', 'features.rollouts.npy', 'features.train.shard0.meta.npz', 'features.train.shard0.npy', 'features.train.shard1.meta.npz', 'features.train.shard1.npy']
+[PASS] 3.3b flipping one byte of one feature file changes exactly that file's recorded digest  ['input.features.train.shard1.npy']
+[PASS] 3.4 attribute raises when one rollout lacks a trajectory  1 of 30 rollouts of eval run 60326d434be1 have no recorded trajectory, so they would be dropped from the attribution silently; pass allow_partial=True to accept
+[PASS] 3.4b --allow-partial passes and records n_rollouts_without_trajectory  n_rollouts 29 of 30, recorded 1
+[PASS] 3.1d functionals.json of the attribute run has one row per score column  28 rows
+[PASS] 3.5 ensemble_run raises on [id, id] duplicates  ensemble inputs contain duplicate runs: ['2e88124bcfe740cca9be2827e4c69cdc', '2e88124bcfe740cca9be2827e4c69cdc']
+[PASS] 3.5b ensemble_run raises on mixed center_returns  ensemble inputs differ in 'center_returns': ['False', 'True']; their columns explain different functionals
+[PASS] 3.5c ensemble records n_models per column (a failure-type column exists in only one seed)  columns with n_models=1: ['harm_ft_drop', 'harm_ft_drop__same_task', 'infl_ft_drop', 'infl_ft_drop__same_task']; others 2
+[PASS] 3.6 the select run's params carry the ranked column's declaration  harm_f30__same_task: F(30) = P(T <= 30 s) | tau 30 s | subset same_task | good_sign 1.0
+[PASS] 3.6b select refuses (require_declaration) a score run that recorded no functionals.json  score run 2acb6dcc3aed recorded no functionals.json, so the functional that 'harm_f30__same_task' explains is undeclared (PoC §3.4 p. 7); re-run the attribute s
+[PASS] 3.6c select refuses a column the score run neither contains nor declares (before any run is created)  score table lacks column 'harm_nonexistent'
+[SKIP] 3.2 featurize manifests are repo-relative (no --manifest given; see artifacts/s3_manifest_example.json)
+[PASS] R7 real mlflow.db sha256 unchanged  306af4123fda7e63... == 306af4123fda7e63...
+S3 pass: True (18/18, 20s)
+  40.02s user 11.43s system 239% cpu 21.497 total
+rc=0

@@ -1,9 +1,9 @@
 {
  "mode": "clusters",
  "pass": true,
- "n_pass": 12,
- "n": 12,
- "seconds": 14,
+ "n_pass": 14,
+ "n": 14,
+ "seconds": 13,
  "checks": [
   {
    "name": "2.1a planted slice (SYNTHETIC) is among the top-3 harm slices for harm_hrt60_lin",
@@ -26,9 +26,19 @@
    "detail": "top-3 boost slices for f30: [(1, 'smoothness > 0.1052 AND gripper_toggles (3, 4]', 25), (2, 'smoothness > 0.1052 AND length_vs_task > 1.113', 46), (3, 'smoothness > 0.1052 AND instruction_mismatch = 0', 190)]; in the f30 harm list: False"
   },
   {
+   "name": "2.9 clusters with identical member sets are reported once: no two rows of clusters.parquet share a member set; the kept row lists the equivalent definitions",
+   "pass": true,
+   "detail": "58 clusters, duplicate member sets 0; 18 rows list equivalents, e.g. ('task_name = KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it', 'scene = KITCHEN_SCENE3'); 26 merged"
+  },
+  {
+   "name": "2.8 Round A on v3 passes --min-sup-fraction 0.01 to the clusters job (dry-run argv), and the cluster run's params record min_sup = 10, below the 13 members of a planted type",
+   "pass": true,
+   "detail": "clusters job argv: python scripts/stage.py --chain t-0a871a0a clusters --scores attribute-t-ens --name clusters-t --min-sup-fraction 0.01...; recorded min_sup 10"
+  },
+  {
    "name": "2.3 every clusters row and patterns entry carries functional/tau/rollout_subset/good_sign of each reported column; status == estimated everywhere",
    "pass": true,
-   "detail": "84 rows, 84 patterns, e.g. 'HRT(60) = (1/J) \u03a3_o RMST_h,o(60) / RMST_m,o(60)' tau '60 s'"
+   "detail": "58 rows, 58 patterns, e.g. 'HRT(60) = (1/J) \u03a3_o RMST_h,o(60) / RMST_m,o(60)' tau '60 s'"
   },
   {
    "name": "2.4 cluster-stage run: input entity = the score table's sha256, params hold lens settings, descriptors, bin edges and synthetic; trace reaches the attribute run",
@@ -38,7 +48,7 @@
   {
    "name": "2.4b results.provenance of the cluster run is SYNTHETIC (tag from the producing attribute run)",
    "pass": true,
-   "detail": "['synthetic: clusters-dash-synth (cluster, 3e7ce4f2): tag vlapoc.synthetic=true']"
+   "detail": "['synthetic: clusters-dash-synth (cluster, b02c99a8): tag vlapoc.synthetic=true']"
   },
   {
    "name": "2.5a clusters.py imports nothing from groundtruth / recovery / discrepancy, and reads the subset only via open_for_method (no Subset.episodes, no labels)",
@@ -51,9 +61,9 @@
    "detail": "fenced v1: REFUSED (version v1 (16076b9c5cb2) is not blind to its edits: fenced=True, offending=['episode_inde); fenced v2: REFUSED (version v2 (eaeed043455a) is fenced: superseded by v3 (002a68e4caf2); use the superseding ); ground-truth-derived: REFUSED (subset 'a05b2fc9e7d447aedfcae85bffce23501d236ca91699eb16b591107705c9874f' is ground-truth-)"
   },
   {
-   "name": "2.6 label-group n sum to N for task_name, scene and suite; every slice's members equal its definition re-evaluated from the raw descriptors and recorded edges; group members belong to their group",
+   "name": "2.6 label-group n sum to N for task_name, scene and suite (counting groups merged into an equivalent cluster, AC2.9); every slice's members equal its definition re-evaluated from the raw descriptors and recorded edges; group members belong to their group",
    "pass": true,
-   "detail": "label n sums {'task_name': 960, 'scene': 960, 'suite': 960} (N=960); 39 slices re-evaluated, mismatches []; 13 group clusters, mismatches []"
+   "detail": "label n sums {'task_name': 960, 'scene': 960, 'suite': 960} (N=960); 22 slices re-evaluated, mismatches []; 13 group clusters, mismatches []"
   },
   {
    "name": "2.7 sliceline==0.3.0 installed in .venv; imports and finds the planted slice on Python 3.14 with numba and with numba blocked, same slices",
@@ -103,5 +113,5 @@
   },
   "shift_sd": 1.5
  },
- "stage_seconds": 5
+ "stage_seconds": 3
 }

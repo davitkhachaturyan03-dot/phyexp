@@ -1,0 +1,15 @@
+=== ta_recovery: .venv/bin/python scripts/verify_training_attribution.py --recovery
+[PASS] 5.1 planted columns: idle_padding AUROC 1.0 in harm_rmst60 and gripper_release 1.0 in harm_f30  1.0, 1.0
+[PASS] 5.1b a random column's pooled AUROC is in [0.4, 0.6] (inferred band: 91 positives of 960)  0.527
+[PASS] 5.2 recovery_matrix.csv has one row per (type or pooled, harm column)  48 rows = 8 x 6 columns
+[PASS] 5.2b best_heuristic_auroc equals the ground-truth bands CSV for every type  7/7
+[PASS] 5.3 matches_hypothesis is True for the two planted types and None where the PoC states no mapping  idle_padding best harm_rmst60; gripper_release best harm_f30 (SYNTHETIC, planted)
+[PASS] 5.3b the hypothesis map was committed before any scoring code existed  first commit of vlapoc/recovery.py: b4790ee
+[PASS] 5.3c the run records synthetic=True and a tracked score run exists
+[PASS] 5.5 score refuses a score table keyed to another version  score table keys != parent subset's episode versions: 91 unknown/stale (e.g. [('libero_10/KITCHEN_SCENE3_turn_on_the_sto
+[PASS] 5.4 dry run with --subset v3/candidate has one score job depending on the ensemble job (and, dashboard S3/S9, score-clusters after clusters and discrepancy after the ensemble); with v0/candidate no ground-truth-side job, only the method-side clusters job  python scripts/stage.py --chain t-0a871a0a score --scores attribute-t-ens --version v3 --subset candidate --name score-t
+[PASS] 5.6 the scoring code is imported only inside stage.py's score command, never by influence.py / attribution.py (boundary scan clean)  mentions [], top-level imports 0
+[PASS] R7 real mlflow.db sha256 unchanged  306af4123fda7e63... == 306af4123fda7e63...
+S5 pass: True (11/11, 3s)
+  2.86s user 0.70s system 93% cpu 3.826 total
+rc=0

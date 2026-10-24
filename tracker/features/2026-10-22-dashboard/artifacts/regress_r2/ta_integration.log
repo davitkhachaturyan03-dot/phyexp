@@ -1,0 +1,18 @@
+=== ta_integration: .venv/bin/python scripts/verify_training_attribution.py --integration
+fixture (SYNTHETIC features/rollouts/returns): 14 v3 episodes in 2 tasks, 10 injected, 2 seeds; scratch store data/scratch/training_attribution/integration/lineage
+stage runs through the CLI: attribute-s0=0f9937f8, attribute-s1=81fbf992, ensemble=07b7457c, select-harm=aff87795, select-help=6c22f63c, select-random=0ed02c6f, select-gharm=27d4bf2f, select-grandom=1a5aadc5, score=89dfe922, analyze=c728d03e
+[PASS] 8.1 attribute x2, ensemble, five selects, score and analyze all ran through the stage CLI on a scratch store (--lineage-root; AC6.4)  10 stage runs; attribute table 14 episodes x 12 rollouts
+[PASS] 8.1b selects: per-task arms keep n - (tasks x 1), global arms n - 2, per-task counts of curated and random children are identical  kept {'harm': 12, 'help': 12, 'random': 12, 'gharm': 12, 'grandom': 12} of 14; harm select declares F(30) = P(T <= 30 s)
+[PASS] 8.2 trace from a select run reaches both attribute runs and the ensemble, both seeds' returns, eval and train runs, every feature digest and the training subset  stages ['attribute', 'eval', 'returns', 'select', 'train']; 10 runs; 12 features inputs (2 seeds x 6 files); training subset 308ff4d8d805 in entities: True; dead ends (no producer): ['features', 'score_table', 'subset']
+[PASS] 8.3 the score stage ran on the v3 subset (recovery matrix has 7 types + pooled per harm column, flagged synthetic)  112 rows, 14 harm columns
+[PASS] 8.4 refused with nothing written: features from another checkpoint  features /Users/davit_khachaturyan/Projects/personal/vlaExp/data/scratch/training_attribution/integration/feat
+[PASS] 8.4 refused with nothing written: train features on a different episode list  train features were not computed on exactly the training subset's episodes
+[PASS] 8.4 refused with nothing written: train features from another version's root (v0 root for a v3 subset)  train features were computed on ['data/lerobot/libero_spatial_10'], not on the training subset's version copy 
+[PASS] 8.4 refused with nothing written: rollout features computed on another eval's trajectories  rollout features were computed on ['data/scratch/training_attribution/integration/evals/s1/trajectories'], whi
+[PASS] 8.4 refused with nothing written: a score table from another subset at select  score table keys != parent subset's episode versions: 0 unknown/stale (e.g. []), 1 unscored (e.g. [('libero_10
+[PASS] 8.4 refused with nothing written: an ensemble of two runs on different subsets  ensemble inputs were trained on different subsets: ['subset:2cd29b6df0d840ace4ed9972e391b5394eda0452516cddda3f
+[PASS] 8.4b the integration run left the real mlflow.db sha256 unchanged  306af4123fda7e63...
+[PASS] R7 real mlflow.db sha256 unchanged  306af4123fda7e63...
+S8(a) pass: True (12/12, 56s)
+  92.51s user 24.69s system 202% cpu 57.984 total
+rc=0

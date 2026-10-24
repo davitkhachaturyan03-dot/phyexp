@@ -1,0 +1,30 @@
+=== dv_dropin: .venv/bin/python scripts/verify_dashboard.py --dropin
+2026-10-23 17:08:21.438 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+2026-10-23 17:08:21.438 WARNING streamlit.runtime.scriptrunner_utils.script_run_context: Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+[PASS] 7.1 the real attribute -> ensemble -> clusters code path (SYNTHETIC features, scratch store, run through the stage CLI) loads in the dashboard by run name, every page, with no file under dashboard/, vlapoc/ or scripts/ modified (git status --porcelain empty before and after)  porcelain before '' after ''; page errors []; banner on the untagged fixture: ['**SMOKE run:** real code on a toy-scale chain, not attributi']
+2026-10-23 17:08:22.474 No runtime found, using MemoryCacheStorageManager
+2026-10-23 17:08:22.475 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-10-23 17:08:22.687 No runtime found, using MemoryCacheStorageManager
+2026-10-23 17:08:22.687 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+[PASS] 7.2 the same chain with its train/eval runs re-tagged to what the server writes (vlapoc.smoke=false, eval.attribution_grade=true, nothing synthetic) renders with no SYNTHETIC or SMOKE banner (caption 'Provenance: REAL'); re-adding one synthetic tag brings the SYNTHETIC banner back  re-tagged: banners [], caption ['Provenance: REAL (9 recorded runs checke']; one synthetic tag re-added: banner back True
+2026-10-23 17:08:22.890 No runtime found, using MemoryCacheStorageManager
+2026-10-23 17:08:22.890 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+Traceback (most recent call last):
+  File "/Users/davit_khachaturyan/Projects/personal/vlaExp/scripts/verify_dashboard.py", line 1808, in <genexpr>
+    return max(MODES[m]() for m in ran)
+               ~~~~~~~~^^
+  File "/Users/davit_khachaturyan/Projects/personal/vlaExp/scripts/verify_dashboard.py", line 1730, in dropin_mode
+    rows = next(df.value for df in at.dataframe if "rollout_id" in df.value.columns)
+StopIteration
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/davit_khachaturyan/Projects/personal/vlaExp/scripts/verify_dashboard.py", line 1812, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/Users/davit_khachaturyan/Projects/personal/vlaExp/scripts/verify_dashboard.py", line 1808, in main
+    return max(MODES[m]() for m in ran)
+RuntimeError: generator raised StopIteration
+  30.33s user 7.70s system 153% cpu 24.702 total
+rc=1

@@ -1,0 +1,77 @@
+=== derive_gt_s2: .venv/bin/python scripts/verify_derive_gt_s2.py
+objc[31102]: Class AVFFrameReceiver is implemented in both /Users/davit_khachaturyan/Projects/personal/vlaExp/.venv/lib/python3.14/site-packages/av/.dylibs/libavdevice.61.3.100.dylib (0x126c1c3a8) and /opt/homebrew/Cellar/ffmpeg/8.1.1/lib/libavdevice.62.3.101.dylib (0x13ace4328). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+objc[31102]: Class AVFAudioReceiver is implemented in both /Users/davit_khachaturyan/Projects/personal/vlaExp/.venv/lib/python3.14/site-packages/av/.dylibs/libavdevice.61.3.100.dylib (0x126c1c3f8) and /opt/homebrew/Cellar/ffmpeg/8.1.1/lib/libavdevice.62.3.101.dylib (0x13ace4378). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+Map:   0%|          | 0/98 [00:00<?, ? examples/s]Map: 100%|██████████| 98/98 [00:00<00:00, 2706.96 examples/s]
+Map:   0%|          | 0/152 [00:00<?, ? examples/s]Map: 100%|██████████| 152/152 [00:00<00:00, 3431.07 examples/s]
+Map:   0%|          | 0/103 [00:00<?, ? examples/s]Map: 100%|██████████| 103/103 [00:00<00:00, 3405.51 examples/s]
+Map:   0%|          | 0/99 [00:00<?, ? examples/s]Map: 100%|██████████| 99/99 [00:00<00:00, 3160.74 examples/s]
+Map:   0%|          | 0/153 [00:00<?, ? examples/s]Map: 100%|██████████| 153/153 [00:00<00:00, 3435.03 examples/s]
+Map:   0%|          | 0/137 [00:00<?, ? examples/s]Map: 100%|██████████| 137/137 [00:00<00:00, 3435.98 examples/s]
+Map:   0%|          | 0/123 [00:00<?, ? examples/s]Map: 100%|██████████| 123/123 [00:00<00:00, 3340.93 examples/s]
+Map:   0%|          | 0/155 [00:00<?, ? examples/s]Map: 100%|██████████| 155/155 [00:00<00:00, 3440.85 examples/s]
+Map:   0%|          | 0/115 [00:00<?, ? examples/s]Map: 100%|██████████| 115/115 [00:00<00:00, 3099.64 examples/s]
+Map:   0%|          | 0/136 [00:00<?, ? examples/s]Map: 100%|██████████| 136/136 [00:00<00:00, 3232.93 examples/s]
+Map:   0%|          | 0/388 [00:00<?, ? examples/s]Map:  95%|█████████▍| 368/388 [00:00<00:00, 3665.16 examples/s]Map: 100%|██████████| 388/388 [00:00<00:00, 3480.50 examples/s]
+Map:   0%|          | 0/258 [00:00<?, ? examples/s]Map: 100%|██████████| 258/258 [00:00<00:00, 3419.57 examples/s]
+Map:   0%|          | 0/272 [00:00<?, ? examples/s]Map: 100%|██████████| 272/272 [00:00<00:00, 3266.21 examples/s]
+Map:   0%|          | 0/261 [00:00<?, ? examples/s]Map: 100%|██████████| 261/261 [00:00<00:00, 3406.15 examples/s]
+Map:   0%|          | 0/275 [00:00<?, ? examples/s]Map: 100%|██████████| 275/275 [00:00<00:00, 3488.26 examples/s]
+Map:   0%|          | 0/234 [00:00<?, ? examples/s]Map: 100%|██████████| 234/234 [00:00<00:00, 3392.34 examples/s]
+Map:   0%|          | 0/203 [00:00<?, ? examples/s]Map: 100%|██████████| 203/203 [00:00<00:00, 3547.58 examples/s]
+Map:   0%|          | 0/242 [00:00<?, ? examples/s]Map: 100%|██████████| 242/242 [00:00<00:00, 3452.10 examples/s]
+Map:   0%|          | 0/457 [00:00<?, ? examples/s]Map:  81%|████████  | 371/457 [00:00<00:00, 3690.95 examples/s]Map: 100%|██████████| 457/457 [00:00<00:00, 3506.08 examples/s]
+Map:   0%|          | 0/329 [00:00<?, ? examples/s]Map: 100%|██████████| 329/329 [00:00<00:00, 3230.12 examples/s]Map: 100%|██████████| 329/329 [00:00<00:00, 3210.70 examples/s]
+[convert] 20/20 episodes, 4190 frames, 10s elapsed, 435 frames/s
+scratch parent small20: 20 episodes; stored content hash == v0's for the same episode_id: 20/20
+Map:   0%|          | 0/98 [00:00<?, ? examples/s]Map: 100%|██████████| 98/98 [00:00<00:00, 1433.07 examples/s]
+Map:   0%|          | 0/152 [00:00<?, ? examples/s]Map: 100%|██████████| 152/152 [00:00<00:00, 3392.93 examples/s]
+Map:   0%|          | 0/103 [00:00<?, ? examples/s]Map: 100%|██████████| 103/103 [00:00<00:00, 3407.66 examples/s]
+Map:   0%|          | 0/59 [00:00<?, ? examples/s]Map: 100%|██████████| 59/59 [00:00<00:00, 3279.80 examples/s]
+Map:   0%|          | 0/153 [00:00<?, ? examples/s]Map: 100%|██████████| 153/153 [00:00<00:00, 3472.29 examples/s]
+Map:   0%|          | 0/137 [00:00<?, ? examples/s]Map: 100%|██████████| 137/137 [00:00<00:00, 3463.09 examples/s]
+Map:   0%|          | 0/123 [00:00<?, ? examples/s]Map: 100%|██████████| 123/123 [00:00<00:00, 3468.88 examples/s]
+Map:   0%|          | 0/155 [00:00<?, ? examples/s]Map: 100%|██████████| 155/155 [00:00<00:00, 3436.12 examples/s]
+Map:   0%|          | 0/115 [00:00<?, ? examples/s]Map: 100%|██████████| 115/115 [00:00<00:00, 3444.98 examples/s]
+Map:   0%|          | 0/176 [00:00<?, ? examples/s]Map: 100%|██████████| 176/176 [00:00<00:00, 3485.85 examples/s]
+Map:   0%|          | 0/388 [00:00<?, ? examples/s]Map:  95%|█████████▍| 368/388 [00:00<00:00, 3660.06 examples/s]Map: 100%|██████████| 388/388 [00:00<00:00, 3480.07 examples/s]
+Map:   0%|          | 0/298 [00:00<?, ? examples/s]Map: 100%|██████████| 298/298 [00:00<00:00, 3471.54 examples/s]
+Map:   0%|          | 0/272 [00:00<?, ? examples/s]Map: 100%|██████████| 272/272 [00:00<00:00, 3495.66 examples/s]
+Map:   0%|          | 0/261 [00:00<?, ? examples/s]Map: 100%|██████████| 261/261 [00:00<00:00, 3362.80 examples/s]
+Map:   0%|          | 0/275 [00:00<?, ? examples/s]Map: 100%|██████████| 275/275 [00:00<00:00, 3439.18 examples/s]
+Map:   0%|          | 0/234 [00:00<?, ? examples/s]Map: 100%|██████████| 234/234 [00:00<00:00, 3488.52 examples/s]
+Map:   0%|          | 0/203 [00:00<?, ? examples/s]Map: 100%|██████████| 203/203 [00:00<00:00, 3409.88 examples/s]
+Map:   0%|          | 0/242 [00:00<?, ? examples/s]Map: 100%|██████████| 242/242 [00:00<00:00, 3503.55 examples/s]
+Map:   0%|          | 0/457 [00:00<?, ? examples/s]Map:  81%|████████  | 370/457 [00:00<00:00, 3678.05 examples/s]Map: 100%|██████████| 457/457 [00:00<00:00, 3503.15 examples/s]
+Map:   0%|          | 0/329 [00:00<?, ? examples/s]Map: 100%|██████████| 329/329 [00:00<00:00, 3406.50 examples/s]
+AC2.1 7 edits (['action_noise', 'time_shift', 'instruction_swap', 'dropped_frames', 'detour', 'idle_padding', 'gripper_release']) registered as dbb9f38a473f in 13.6s; check_blind = []; assert_blind passes: yes
+AC2.1 labels.parquet: 7 rows, columns ['episode_id', 'parent_content_hash', 'content_hash', 'corruption_type', 'params', 'seed', 'hypothesis']; columns == required: True; hypothesis per type: {'action_noise': 'none stated', 'time_shift': 'none stated', 'instruction_swap': 'none stated', 'dropped_frames': 'none stated', 'detour': 'none stated', 'idle_padding': 'speed (time-based metrics), not reliability (PoC §8.10 p.17; §4.5 p.11)', 'gripper_release': 'reliability (drops), not speed (PoC §8.10 p.17; §4.5 p.11)'}
+AC2.3 child data files: ['data/chunk-000/file-000.parquet', 'data/chunk-000/file-001.parquet']; rows of the swapped episode: 137
+AC2.3 tasks.parquet equal to parent's (task -> task_index, from the raw files): True; 20 tasks, same order: True
+AC2.3 swapped episode pick_up_the_black_bowl_on_the_ramekin_an../demo_0: parent task_index 5 -> data rows carry [7] (target task's parent index 7); meta tasks ['pick up the black bowl on the stove and place it on the plate']
+AC2.3 episodes whose task_index differs from the parent's: [5] (expected only 5)
+
+AC2.6 blind-check table (scratch child; tampering is applied to the stored table and undone)
+                                                                                         case                                          check_blind  rejected
+                                              derived child as written (swap + 6 other edits)                                                   []     False
+                                   task_name changed on the swapped episode (provenance leak)                                        ['task_name']      True
+                                                libero_task_id changed on the swapped episode                                   ['libero_task_id']      True
+                                             source_demo changed on an edited (noise) episode                                      ['source_demo']      True
+                       language_instruction of an UNEDITED episode changed, meta/episodes not ['(meta/episodes does not match the episode table)']      True
+swapped episode's language_instruction put back to the parent's, meta/episodes keeps the swap ['(meta/episodes does not match the episode table)']      True
+AC2.6 provenance leak names task_name: True
+
+AC2.2 swap to a string not in the parent's tasks: LineageError: True; message: instruction edit(s) to task string(s) not in small20's tasks.parquet: ['pick up the black bowl on the ramekin and place it on the plate (not a benchmark task)'] (a swap must use one of the parent's tasks; nothing written)
+AC2.2 nothing written: out_root exists False, leftover temp dirs [], versions in store 2 -> 2
+AC2.2 swap on reference episode demo_14: LineageError: True; message: refusing to edit 1 reference-split episode(s) (PoC §8.7 p.15: corrupt only the training copy): ['libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it/demo_14']; nothing written: True
+
+AC2.5 check_blind(v1) = ['episode_index']; check_blind(v0) = []; assert_blind(v1) refused: True (version v1 (16076b9c5cb2) is not blind to its edits: fenced=True, offending=['episode_index'] (PoC §2.1 item 4 p.3))
+scratch removed: True
+
+AC2.4 PYTHONHASHSEED 0 vs 1: {'tasks_map': True, 'tasks_parquet_sha256': True, 'labels_rows_digest': True, 'content_hashes': True, 'dataset_version_id': True}; labels.parquet bytes equal: True; 6 child files, differing files: ['meta/stats.json']
+AC2.4 dataset_version_id (seed 0) dbb9f38a473f2bb8, (seed 1) dbb9f38a473f2bb8
+AC2.4 meta/stats.json differs in 0 entries; largest relative differences: []
+AC2.4 stats.json parsed equal: True; lengths 13940 / 13940; first differing char 7: seed0 '{\n    "observation.images.image2": {\n        "m' | seed1 '{\n    "task_index": {\n        "min": [\n        '; key order equal: False
+
+all S2 checks pass: True (92s); summary -> /Users/davit_khachaturyan/Projects/personal/vlaExp/tracker/features/2026-10-15-ground-truth/artifacts/s2_verify.json
+  131.66s user 20.10s system 163% cpu 1:32.96 total
+rc=0

@@ -1,0 +1,21 @@
+=== dv_planted: .venv/bin/python scripts/verify_dashboard.py --planted
+[PASS] 3.2 hand-built SYNTHETIC cluster (13 idle_padding + 13 clean) over the real v3 key: precision 0.5, recall 1.0, lift = 0.5 / (13/960), Fisher p, recomputed independently  precision 0.5, recall 1.0, lift 36.923 (= 36.923), p_fisher 1.195e-22 (= 1.195e-22); any_planted recall 0.143 (=13/91); clean-only cluster: overlap 0, p 1.0
+[PASS] 3.4 output rows carry synthetic and the clusters' declarations  16 rows, synthetic all True, declared columns ['harm_f30', 'harm_hrt60_lin']
+[PASS] 3.3a the scoring run was created after the cluster run and consumes its members sha256 and clusters sha256; trace(scoring run) reaches the cluster run  cluster run start 1792800335802, scoring run start 1792800335980; trace reaches ['build-v0', 'clusters-hand-built', 'derive-v3', 'score-clusters-hand']
+[PASS] 3.3b clusters.py has no code path to the scorer (no import of recovery/groundtruth/discrepancy; no code identifier of the scorer or the answer key)  forbidden imports []; scorer identifiers in code: []
+[PASS] 3.1 cluster_recovery_run refuses (nothing written): a non-cluster run, a FAILED cluster run, a version without an answer key, a cluster run with a ground-truth read upstream  a run that is not a cluster run (an attribute run): REFUSED (ValueError: run babbdb329ed6 is not a FINISHED cluster run with recorded members (status FINISHED, stage 'attribute')); a FAILED cluster run: REFUSED (ValueError: run 33aa88bbafaf is not a FINISHED cluster run with recorded members (status FAILED, stage 'cluster')); a cluster run whose version has no answer key (v0): REFUSED (LineageError: version v0 has no labels (not a derived version)); a cluster run with a ground-truth read upstream (a score run in its trace): REFUSED (ValueError: cluster run 802554e9393a has a ground-truth read upstream (['fake-score-gt (score)']); its clusters are not bl)
+[PASS] 3.5 the real chain (SYNTHETIC scores -> clusters_run -> score-clusters) produces one row per (cluster, planted type) incl. any_planted, flagged synthetic  stage CLI rc=0 58 clusters; 464 rows
+highest-lift (cluster, planted type) pairs on SYNTHETIC scores (descriptor-based clusters vs the real planted labels; NOT evidence about attribution):
+                              cluster_id planted_type  n_cluster  n_overlap  precision   recall      lift     p_fisher
+                       slice:f30:boost:1 action_noise         25          4   0.160000 0.307692 11.815385 2.192355e-04
+                  slice:hrt60_lin:harm:3       detour         62          6   0.096774 0.461538  7.146402 6.868797e-05
+                  slice:hrt60_lin:harm:3 idle_padding         62          6   0.096774 0.461538  7.146402 6.868797e-05
+group:metric_specific:auc_expected:boost   time_shift         34          3   0.088235 0.230769  6.515837 9.113043e-03
+       group:metric_specific:rmst60:harm       detour         24          2   0.083333 0.153846  6.153846 3.950814e-02
+                       slice:f30:boost:1 idle_padding         25          2   0.080000 0.153846  5.907692 4.261653e-02
+                       slice:f30:boost:5 action_noise        182         13   0.071429 1.000000  5.274725 2.859584e-10
+                  slice:hrt60_lin:harm:1 idle_padding         98          7   0.071429 0.538462  5.274725 9.649695e-05
+[PASS] R real data/lineage/mlflow.db sha256 unchanged by this mode  306af4123fda7e63...
+planted: pass=True (7/7, 15s)
+  29.22s user 8.20s system 217% cpu 17.169 total
+rc=0

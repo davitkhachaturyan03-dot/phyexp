@@ -142,68 +142,12 @@
    "lift": 1.5384615384615383,
    "p_fisher": 0.48886811285922227
   },
-  "label:scene=KITCHEN_SCENE3": {
-   "planted_type": "action_noise",
-   "precision": 0.020833333333333332,
-   "recall": 0.07692307692307693,
-   "lift": 1.5384615384615383,
-   "p_fisher": 0.48886811285922227
-  },
-  "label:scene=KITCHEN_SCENE4": {
-   "planted_type": "action_noise",
-   "precision": 0.020833333333333332,
-   "recall": 0.07692307692307693,
-   "lift": 1.5384615384615383,
-   "p_fisher": 0.48886811285922227
-  },
-  "label:scene=KITCHEN_SCENE6": {
-   "planted_type": "action_noise",
-   "precision": 0.020833333333333332,
-   "recall": 0.07692307692307693,
-   "lift": 1.5384615384615383,
-   "p_fisher": 0.48886811285922227
-  },
-  "label:scene=KITCHEN_SCENE8": {
-   "planted_type": "detour",
-   "precision": 0.020833333333333332,
-   "recall": 0.07692307692307693,
-   "lift": 1.5384615384615383,
-   "p_fisher": 0.48886811285922227
-  },
-  "label:scene=LIVING_ROOM_SCENE1": {
-   "planted_type": "action_noise",
-   "precision": 0.020833333333333332,
-   "recall": 0.07692307692307693,
-   "lift": 1.5384615384615383,
-   "p_fisher": 0.48886811285922227
-  },
   "label:scene=LIVING_ROOM_SCENE2": {
    "planted_type": "detour",
    "precision": 0.020833333333333332,
    "recall": 0.15384615384615385,
    "lift": 1.5384615384615383,
    "p_fisher": 0.37916626215437577
-  },
-  "label:scene=LIVING_ROOM_SCENE5": {
-   "planted_type": "action_noise",
-   "precision": 0.020833333333333332,
-   "recall": 0.07692307692307693,
-   "lift": 1.5384615384615383,
-   "p_fisher": 0.48886811285922227
-  },
-  "label:scene=LIVING_ROOM_SCENE6": {
-   "planted_type": "action_noise",
-   "precision": 0.020833333333333332,
-   "recall": 0.07692307692307693,
-   "lift": 1.5384615384615383,
-   "p_fisher": 0.48886811285922227
-  },
-  "label:scene=STUDY_SCENE1": {
-   "planted_type": "action_noise",
-   "precision": 0.020833333333333332,
-   "recall": 0.07692307692307693,
-   "lift": 1.5384615384615383,
-   "p_fisher": 0.48886811285922227
   },
   "label:scene=libero_tabletop_manipulation": {
    "planted_type": "dropped_frames",
@@ -214,13 +158,6 @@
   },
   "label:suite=libero_10": {
    "planted_type": "action_noise",
-   "precision": 0.014583333333333334,
-   "recall": 0.5384615384615384,
-   "lift": 1.0769230769230769,
-   "p_fisher": 0.49999999999999994
-  },
-  "label:suite=libero_spatial": {
-   "planted_type": "dropped_frames",
    "precision": 0.014583333333333334,
    "recall": 0.5384615384615384,
    "lift": 1.0769230769230769,
@@ -255,13 +192,6 @@
    "p_fisher": 0.5707686236093875
   },
   "slice:f30:harm:5": {
-   "planted_type": "action_noise",
-   "precision": 0.017045454545454544,
-   "recall": 0.6923076923076923,
-   "lift": 1.2587412587412585,
-   "p_fisher": 0.22632469514494466
-  },
-  "slice:f30:harm:6": {
    "planted_type": "action_noise",
    "precision": 0.017045454545454544,
    "recall": 0.6923076923076923,
@@ -303,33 +233,12 @@
    "lift": 5.274725274725275,
    "p_fisher": 2.8595840600898425e-10
   },
-  "slice:f30:boost:6": {
-   "planted_type": "action_noise",
-   "precision": 0.07142857142857142,
-   "recall": 1.0,
-   "lift": 5.274725274725275,
-   "p_fisher": 2.8595840600898425e-10
-  },
   "slice:rmst60:harm:1": {
    "planted_type": "time_shift",
    "precision": 0.015021459227467811,
    "recall": 0.5384615384615384,
    "lift": 1.1092769891053151,
    "p_fisher": 0.4570366560953363
-  },
-  "slice:rmst60:harm:2": {
-   "planted_type": "action_noise",
-   "precision": 0.013921113689095127,
-   "recall": 0.46153846153846156,
-   "lift": 1.028020703194717,
-   "p_fisher": 0.5707686236093875
-  },
-  "slice:rmst60:harm:3": {
-   "planted_type": "dropped_frames",
-   "precision": 0.014583333333333334,
-   "recall": 0.5384615384615384,
-   "lift": 1.0769230769230769,
-   "p_fisher": 0.49999999999999994
   },
   "slice:rmst60:harm:4": {
    "planted_type": "action_noise",
@@ -359,20 +268,6 @@
    "lift": 1.1483253588516746,
    "p_fisher": 0.16363356235863685
   },
-  "slice:auc_expected:boost:3": {
-   "planted_type": "action_noise",
-   "precision": 0.01555023923444976,
-   "recall": 1.0,
-   "lift": 1.1483253588516746,
-   "p_fisher": 0.16363356235863685
-  },
-  "slice:auc_expected:boost:4": {
-   "planted_type": "action_noise",
-   "precision": 0.014115092290988056,
-   "recall": 1.0,
-   "lift": 1.0423452768729642,
-   "p_fisher": 0.5812213662569836
-  },
   "slice:hrt60_lin:harm:1": {
    "planted_type": "idle_padding",
    "precision": 0.07142857142857142,
@@ -394,89 +289,12 @@
    "lift": 7.1464019851116625,
    "p_fisher": 6.868796645549192e-05
   },
-  "slice:hrt60_lin:harm:4": {
-   "planted_type": "detour",
-   "precision": 0.0967741935483871,
-   "recall": 0.46153846153846156,
-   "lift": 7.1464019851116625,
-   "p_fisher": 6.868796645549192e-05
-  },
   "slice:hrt60_lin:harm:5": {
    "planted_type": "detour",
    "precision": 0.06878306878306878,
    "recall": 1.0,
    "lift": 5.079365079365079,
    "p_fisher": 4.748956224390083e-10
-  },
-  "slice:hrt60_lin:boost:1": {
-   "planted_type": "action_noise",
-   "precision": 0.015817223198594025,
-   "recall": 0.6923076923076923,
-   "lift": 1.168041097742328,
-   "p_fisher": 0.331860272272367
-  },
-  "slice:hrt60_lin:boost:2": {
-   "planted_type": "action_noise",
-   "precision": 0.016042780748663103,
-   "recall": 0.6923076923076923,
-   "lift": 1.1846976552858908,
-   "p_fisher": 0.30963993400087336
-  },
-  "slice:hrt60_lin:boost:3": {
-   "planted_type": "action_noise",
-   "precision": 0.017045454545454544,
-   "recall": 0.6923076923076923,
-   "lift": 1.2587412587412585,
-   "p_fisher": 0.22632469514494466
-  },
-  "slice:hrt60_lin:boost:4": {
-   "planted_type": "action_noise",
-   "precision": 0.017045454545454544,
-   "recall": 0.6923076923076923,
-   "lift": 1.2587412587412585,
-   "p_fisher": 0.22632469514494466
-  },
-  "slice:hrt60_lin:boost:5": {
-   "planted_type": "action_noise",
-   "precision": 0.01618705035971223,
-   "recall": 0.6923076923076923,
-   "lift": 1.1953514111787493,
-   "p_fisher": 0.29612971271998484
-  },
-  "slice:censored60:harm:1": {
-   "planted_type": "action_noise",
-   "precision": 0.016042780748663103,
-   "recall": 0.6923076923076923,
-   "lift": 1.1846976552858908,
-   "p_fisher": 0.30963993400087336
-  },
-  "slice:censored60:harm:2": {
-   "planted_type": "action_noise",
-   "precision": 0.015817223198594025,
-   "recall": 0.6923076923076923,
-   "lift": 1.168041097742328,
-   "p_fisher": 0.331860272272367
-  },
-  "slice:censored60:harm:3": {
-   "planted_type": "action_noise",
-   "precision": 0.01618705035971223,
-   "recall": 0.6923076923076923,
-   "lift": 1.1953514111787493,
-   "p_fisher": 0.29612971271998484
-  },
-  "slice:censored60:harm:4": {
-   "planted_type": "action_noise",
-   "precision": 0.017045454545454544,
-   "recall": 0.6923076923076923,
-   "lift": 1.2587412587412585,
-   "p_fisher": 0.22632469514494466
-  },
-  "slice:censored60:harm:5": {
-   "planted_type": "action_noise",
-   "precision": 0.017045454545454544,
-   "recall": 0.6923076923076923,
-   "lift": 1.2587412587412585,
-   "p_fisher": 0.22632469514494466
   },
   "slice:censored60:boost:1": {
    "planted_type": "time_shift",

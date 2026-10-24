@@ -1,19 +1,19 @@
 {
  "mode": "discrepancy",
  "pass": true,
- "n_pass": 9,
- "n": 9,
+ "n_pass": 10,
+ "n": 10,
  "seconds": 13,
  "checks": [
   {
    "name": "9.1 SYNTHETIC over the real v3 key: idle_padding 'harmful on hrt60_lin' and 'no detectable harm on f30 (estimated)'; action_noise 'no detectable harm' on all five metrics; the 10 planted clean episodes are in clean_harmful top-20 for f30; all four quadrants non-empty for a metric",
    "pass": true,
-   "detail": "idle_padding/hrt: harmful on hrt60_lin (estimated; CI [1.39, 2.69]); idle_padding/f30: no detectable harm on f30 (estimated; CI [-0.45, 0.52]); action_noise: ['no_detectable_harm', 'no_detectable_harm', 'no_detectable_harm', 'no_detectable_harm', 'no_detectable_harm']; planted clean in f30 top-20: 10/10; quadrant counts hrt60_lin {'bad_and_harmful': 13, 'bad_but_not_harmful': 78, 'clean_but_harmful': 122, 'clean_and_not_harmful': 747}, f30 {'bad_and_harmful': 13, 'bad_but_not_harmful': 78, 'clean_but_harmful': 134, 'clean_and_not_harmful': 735}"
+   "detail": "idle_padding/hrt: harmful on hrt60_lin (estimated; Welch 95% CI [1.26, 2.78]). Uncorrected across 7 types \u00d7 5 metrics. Holm across the 5 metrics: holds (adjusted p = 0.000).; idle_padding/f30: no detectable harm on f30 (estimated; Welch 95% CI [-0.56, 0.62]). Uncorrected across 7 types \u00d7 5 metrics. Holm across the 5 metrics: adjusted p = 1.000.; action_noise: ['no_detectable_harm', 'no_detectable_harm', 'no_detectable_harm', 'no_detectable_harm', 'no_detectable_harm']; planted clean in f30 top-20: 10/10; quadrant counts hrt60_lin {'bad_and_harmful': 13, 'bad_but_not_harmful': 78, 'clean_but_harmful': 122, 'clean_and_not_harmful': 747}, f30 {'bad_and_harmful': 13, 'bad_but_not_harmful': 78, 'clean_but_harmful': 134, 'clean_and_not_harmful': 735}"
   },
   {
-   "name": "9.2 the word 'harm'+'less' appears in no output file; every non-excluding CI reads 'no detectable harm on <metric> (estimated; CI [lo, hi])'",
+   "name": "9.2 the word 'harm'+'less' appears in no output file; every non-excluding CI reads 'no detectable harm on <metric> (estimated; Welch 95% CI [lo, hi]). Uncorrected across 7 types \u00d7 5 metrics. Holm across the 5 metrics: ...'",
    "pass": true,
-   "detail": "6 output files scanned, 79 'no detectable' sentences all well-formed, e.g. 'no detectable harm on f30 (estimated; CI [-0.79, 0.50])'"
+   "detail": "6 output files scanned, 79 'no detectable' sentences all well-formed, e.g. 'no detectable harm on f30 (estimated; Welch 95% CI [-0.82, 0.64]). Uncorrected across 7 types \u00d7 5 metrics. Holm across the 5 metrics: adjusted p = 1.000.'"
   },
   {
    "name": "9.3 per type: best-heuristic AUROC read from the recorded ground-truth `score` runs (not re-typed) equals the published bands (s5_v3_r3_bands.csv, tol 1e-3); examples.json pairs every example with its clean original (parent_content_hash, differs from the corrupted hash)",
@@ -23,7 +23,7 @@
   {
    "name": "9.4 refuses (nothing written): a FAILED attribute run, a non-attribute run, a version without an answer key, a table that does not key v3/candidate; the run consumes the score table's sha256 and was created after it; attribution/clusters/results/analysis import nothing from discrepancy, groundtruth or recovery",
    "pass": true,
-   "detail": "a FAILED attribute run: REFUSED (ValueError: run 286d26c35778 is not a FINISHED attribute run with a recorded score table (status FAILED, stage '); a non-attribute run (a cluster run): REFUSED (ValueError: run d3814fe74a13 is not a FINISHED attribute run with a recorded score table (status FINISHED, stage); a version without an answer key (v0): REFUSED (LineageError: version v0 has no labels (not a derived version)); a score table that does not key exactly v3/candidate: REFUSED (LineageError: score table keys != parent subset's episode versions: 0 unknown/stale (e.g. []), 910 unscored (e.g. ); importers of the GT side among method files: {}"
+   "detail": "a FAILED attribute run: REFUSED (ValueError: run 5b2e144d58e8 is not a FINISHED attribute run with a recorded score table (status FAILED, stage '); a non-attribute run (a cluster run): REFUSED (ValueError: run cf7afd58c69f is not a FINISHED attribute run with a recorded score table (status FINISHED, stage); a version without an answer key (v0): REFUSED (LineageError: version v0 has no labels (not a derived version)); a score table that does not key exactly v3/candidate: REFUSED (LineageError: score table keys != parent subset's episode versions: 0 unknown/stale (e.g. []), 910 unscored (e.g. ); importers of the GT side among method files: {}"
   },
   {
    "name": "9.5 every row of discrepancy_types, discrepancy_filter and clean_harmful carries functional/tau/rollout_subset/good_sign of its harm column and synthetic; episodes rows carry the JSON declarations; examples.json entries carry the declaration",
@@ -36,7 +36,7 @@
    "detail": ""
   },
   {
-   "name": "9.7 the filter layer exists: 10 filters (any + 9 heuristics) x 5 metrics, quadrant counts per filter sum to N",
+   "name": "9.7b the filter layer exists: 10 filters (any + 9 heuristics) x 5 metrics, quadrant counts per filter sum to N",
    "pass": true,
    "detail": "50 rows; any-filter flagged 438 (q = 0.0948)"
   },
@@ -44,6 +44,11 @@
    "name": "9.8 the stage CLI (scripts/stage.py discrepancy) runs on the scratch store",
    "pass": true,
    "detail": "rc=0"
+  },
+  {
+   "name": "9.7 the reading's difference CI equals scipy.stats.ttest_ind(..., equal_var=False).confidence_interval(0.95) to 1e-12 (no hand-rolled Welch); the stored null calibration (20 seeds x 7 types x 5 metrics, no planted effect) gives a reading false-call rate <= 0.06; written back with the Holm rate beside it",
+   "pass": true,
+   "detail": "max |difference| to scipy 0.0e+00; Welch false-call rate 0.0586, bootstrap 0.0929, Holm 0.0071"
   },
   {
    "name": "R real data/lineage/mlflow.db sha256 unchanged by this mode",

@@ -8,12 +8,12 @@
   {
    "name": "6.1 the build with --with-smoke completed (manifest) and left data/lineage/mlflow.db unchanged (its sha256 before == after == now)",
    "pass": true,
-   "detail": "build took 490s; smoke attribute run attribute-demo-smoke (2 rollouts); sha 306af4123fda7e63..."
+   "detail": "build took 483s; smoke attribute run attribute-demo-smoke (2 rollouts); sha 306af4123fda7e63..."
   },
   {
    "name": "6.2 every run the builder created is tagged vlapoc.synthetic=true except the smoke chain's; provenance is SYNTHETIC for the demo ensemble and SMOKE for the smoke attribute run",
    "pass": true,
-   "detail": "44 synthetic-tagged runs, 3 smoke-chain runs (untagged by design); ensemble SYNTHETIC; smoke SMOKE: [\"smoke: train-smolvla-2step-persubset-v0ref (train, 0a33bc75): tag vlapoc.smoke is None, not 'false'\"]; untagged synthetic-side runs []"
+   "detail": "40 synthetic-tagged runs, 3 smoke-chain runs (untagged by design); ensemble SYNTHETIC; smoke SMOKE: [\"smoke: train-smolvla-2step-persubset-v0ref (train, 0a33bc75): tag vlapoc.smoke is None, not 'false'\"]; untagged synthetic-side runs []"
   },
   {
    "name": "6.3 the synthetic generator imports nothing from groundtruth / recovery / discrepancy and opens the subset only through open_for_method (a fenced v2 is refused); the planted structure is described in plain words in the run params",
@@ -23,12 +23,12 @@
   {
    "name": "6.4 the demo's cluster run recovers the planted structure (planted HRT slice, F30 scene slice, F30 boost slice each in the top 3 of its metric and side), and its S3 table is produced; any overlap with the real planted types is SYNTHETIC and not evidence about attribution",
    "pass": true,
-   "detail": "planted: {'hrt_harm': 'length_vs_task > 1.113', 'f30_harm': 'scene = KITCHEN_SCENE3', 'f30_boost': 'smoothness > 0.1052 AND gripper_toggles (3, 4]'}; found hrt [(1, 'length_vs_task > 1.113 AND duplicate_frame_pairs = 0', 177)], f30 harm [(1, 'scene = KITCHEN_SCENE3', 48)], f30 boost [(1, 'smoothness > 0.1052 AND gripper_toggles (3, 4]', 25)]; S3 table 760 rows; best (cluster, type) by Fisher p: detour: slice:auc_expected:harm:4 p=3.6e-11; idle_padding: slice:auc_expected:harm:3 p=2.7e-08; time_shift: slice:auc_expected:boost:1 p=6.5e-07"
+   "detail": "planted: {'hrt_harm': 'length_vs_task > 1.113', 'f30_harm': 'scene = KITCHEN_SCENE3', 'f30_boost': 'smoothness > 0.1052 AND gripper_toggles (3, 4]'}; found hrt [(1, 'length_vs_task > 1.113 AND duplicate_frame_pairs = 0', 177), (2, 'length_vs_task > 1.113', 192)], f30 harm [(1, 'scene = KITCHEN_SCENE3', 48)], f30 boost [(1, 'smoothness > 0.1052 AND gripper_toggles (3, 4]', 25)] (identical member sets are listed once with their equivalents); S3 table 400 rows; best (cluster, type) by Fisher p: detour: slice:auc_expected:harm:4 p=3.6e-11; idle_padding: slice:auc_expected:harm:3 p=2.7e-08; time_shift: slice:auc_expected:boost:1 p=6.5e-07"
   },
   {
    "name": "6.5 disk: the demo store plus the dashboard cache stay under 2 GiB and free disk stays above 20 GiB",
    "pass": true,
-   "detail": "demo store 14 MiB (outputs of the smoke chain live under data/eval and data/attribution), cache 17 MiB, free 62 GiB"
+   "detail": "demo store 13 MiB (outputs of the smoke chain live under data/eval and data/attribution), cache 17 MiB, free 62 GiB"
   },
   {
    "name": "R real data/lineage/mlflow.db sha256 unchanged by this mode",
@@ -58,15 +58,13 @@
    "seconds": 0
   },
   "confirm_overall": {
-   "slice:auc_expected:harm:2": "refuted",
-   "slice:f30:boost:1": "not confirmed",
-   "slice:hrt60_lin:harm:1": "confirmed"
+   "slice:auc_expected:harm:2": "not confirmed",
+   "slice:f30:boost:1": "confirmed"
   },
   "picked_clusters": {
-   "cluster0": "slice:hrt60_lin:harm:1",
-   "cluster1": "slice:f30:boost:1",
-   "cluster2": "slice:auc_expected:harm:2"
+   "cluster0": "slice:f30:boost:1",
+   "cluster1": "slice:auc_expected:harm:2"
   },
-  "seconds": 490
+  "seconds": 483
  }
 }
