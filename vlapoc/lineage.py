@@ -69,7 +69,7 @@ Usage (from the repo root; every command prints JSON)::
     .venv/bin/python -m vlapoc.lineage build verify v0
     .venv/bin/python -m vlapoc.lineage derive --parent v0 --name v1 --demo-action-noise --per-task 5 --seed 0
     # lineage queries over the recorded runs (vlapoc.runs)
-    .venv/bin/python -m vlapoc.lineage trace <run_id>
+    .venv/bin/python -m vlapoc.lineage trace <run_id> [--lineage-root <store>]
     .venv/bin/python -m vlapoc.lineage consumers <episode_id>@<content_hash>
     .venv/bin/python -m vlapoc.lineage diff <run_a> <run_b> [--ids]
     .venv/bin/python -m vlapoc.lineage check-scores <scores.parquet> <train_run_id>
@@ -1091,7 +1091,7 @@ def _cmd_derive(a) -> None:
 def _cmd_trace(a) -> None:
     from vlapoc.runs import trace
 
-    _print(trace(a.run_id))
+    _print(trace(a.run_id, a.lineage_root))
 
 
 def _cmd_consumers(a) -> None:
@@ -1178,6 +1178,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     c = sub.add_parser("trace")
     c.add_argument("run_id")
+    c.add_argument("--lineage-root", type=Path, default=None, help="a lineage store other than data/lineage (a scratch copy, the dashboard demo store, a store copied back from the server)")
     c.set_defaults(func=_cmd_trace)
     c = sub.add_parser("consumers")
     c.add_argument("episode_version", help="<episode_id>@<content_hash>")

@@ -44,7 +44,7 @@ def render(ctx: dict) -> None:
     syn = "SYNTHETIC - " if ctx["prov"]["label"] == "SYNTHETIC" else ""
     chart = alt.Chart(d).mark_circle(size=35, opacity=0.6).encode(
         y=alt.Y("group:N", title=None), x=alt.X("z:Q", title="Harm score (z; positive = harmful)"),
-        color=alt.Color("quadrant:N", scale=alt.Scale(domain=[words.QUADRANTS[q] for q in QUADRANTS]), legend=alt.Legend(orient="bottom", title=None, columns=2)),
+        color=alt.Color("quadrant:N", scale=alt.Scale(domain=[words.QUADRANTS[q] for q in QUADRANTS], range=["#c1121f", "#f4a261", "#7b2cbf", "#8d99ae"]), legend=alt.Legend(orient="bottom", title=None, columns=2)),
         tooltip=["episode_id", "group", "z"]).properties(title=f"{syn}Harm score of each episode on {lab}, by whether it looks bad", height=alt.Step(30))
     st.altair_chart(chart, width="stretch")
     st.markdown("**Per planted type (estimated):** mean harm score against the clean episodes, with the bounded reading (Welch interval; Holm across the metrics in the sentence).")

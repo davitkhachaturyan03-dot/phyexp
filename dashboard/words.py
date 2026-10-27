@@ -5,8 +5,7 @@ from __future__ import annotations
 
 import re
 
-METRICS = {"f30": "Success within 30 s", "rmst60": "Mean time to success (RMST)", "auc_expected": "Beats human (AUC)", "auc_sampled": "Beats a sampled human (AUC, sampled)", "hrt60_lin": "Speed vs human (HRT)",
-           "censored60": "Timed out (censored)"}
+from vlapoc.metrics_registry import SHORT_NAMES as METRICS  # one mapping for the dashboard and the recorded pattern text
 QUADRANTS = {"bad_and_harmful": "looks bad, hurts", "bad_but_not_harmful": "looks bad, no detectable harm", "clean_but_harmful": "looks clean, hurts",
              "clean_and_not_harmful": "looks clean, no detectable harm"}
 GROUPS = {"consistent_harmer": "harms several metrics", "consistent_helper": "helps several metrics", "trade_off": "trade-off (helps some, harms others)",

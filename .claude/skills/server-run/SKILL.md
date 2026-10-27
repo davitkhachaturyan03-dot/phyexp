@@ -56,7 +56,8 @@ Install what the dashboard and the cluster stage add to the evaluation-layer env
 
 Copy from the owner's machine (sizes measured on the Mac): the v0 dataset `data/lerobot/libero_spatial_10/` (6.9 GiB) **and the v3 dataset
 `data/lerobot/libero_spatial_10__v3/`** (the injected version Round A trains on; about the same size), `data/lineage/` (the store; copy it, append on the server, copy it back),
-`data/eval/human_reference/`, `data/libero_assets/`, `data/libero_config/`, `data/hf_models/smolvla_base/`, `data/hf_home/`. Then the environment of the evaluation-layer runbook:
+`data/eval/human_reference/`, `data/libero_assets/`, `data/libero_config/`, `data/hf_models/smolvla_base/`, `data/hf_home/`, **and the checkpoint of the tracked 2-step train run that Step 3 evaluates,
+`data/runs/train-smolvla-2step-persubset-v0ref-20261005T012854Z/` (1.5 GiB, measured with `du`; `runs.eval_run` loads `checkpoint.path` from it, so Step 3 fails on a server without it)**. Then the environment of the evaluation-layer runbook:
 
 ```bash
 source slurm/env.sh
@@ -84,6 +85,16 @@ sqlite3 data/lineage/mlflow.db "select artifact_location from experiments"
 Expected (measured on the Mac with the demo store moved to another root: the read fails with `MlflowException: Failed to download artifacts` before the repoint and works after it, `scripts/verify_runbook.py` AC8.7; inferred for the server): the dry run lists the rewritten counts (the experiment and about all runs), the real run prints the same counts and `run_artifact_dirs_existing`, the read check prints a ground-truth score run's `recovery` keys and the attribute run's table shape, and `trace` ends at the raw files.
 
 **STOP AND ASK (store relocation read check):** if the read check or the trace fails, stop; do not edit `mlflow.db` by hand and do not run any stage.
+
+Check that the smoke checkpoint arrived:
+
+```bash
+ls data/runs/train-smolvla-2step-persubset-v0ref-20261005T012854Z/lerobot/checkpoints/last/pretrained_model
+```
+
+Expected (measured on the Mac): `config.json`, `model.safetensors`, `policy_postprocessor.json` and the other files of a LeRobot `pretrained_model` directory.
+
+**STOP AND ASK (missing smoke checkpoint):** if that directory is missing or empty, stop: Step 3's two commands cannot run. Ask the owner to copy it; do not train a replacement.
 
 Check the `smolvla_base` revision. The code pins `lerobot/smolvla_base@d9f33c94a60fb382c90dea2164c96845bd955e28` (`scripts/stage.py` `PRETRAINED_REF`); the cluster's Hugging Face cache may
 hold a different one (`5e8d12a6`, quoted from the owner's brief):

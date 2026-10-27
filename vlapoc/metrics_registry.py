@@ -199,6 +199,10 @@ def verdict_metrics(family: str) -> list[dict]:
     return [entry(k) for k in VERDICT_FAMILIES[family]]
 
 
+SHORT_NAMES = {"f30": "Success within 30 s", "rmst60": "Mean time to success (RMST)", "auc_expected": "Beats human (AUC)", "auc_sampled": "Beats a sampled human (AUC, sampled)",
+               "hrt60_lin": "Speed vs human (HRT)", "censored60": "Timed out (censored)"}  # plain names of the family-W score columns (dashboard and recorded pattern text)
+
+
 def verdict_key_of(harm_column: str) -> str | None:
     """The verdict metric key (``f30``, ``rmst60``, ``auc_h``, ``hrt60``, ``censored60``) of a score column such as ``harm_hrt60_lin`` or
     ``harm_f30__same_task`` (dashboard S4: Round B expectations are stated per verdict metric); ``None`` for per-failure-type columns."""
@@ -214,4 +218,4 @@ def to_json() -> list[dict]:
     return [dict(e) for e in ENTRIES]
 
 
-__all__ = ["ENTRIES", "VERDICT_FAMILIES", "FAMILY_TAU_S", "entry", "return_columns", "verdict_metrics", "verdict_key_of", "to_json"]
+__all__ = ["ENTRIES", "VERDICT_FAMILIES", "FAMILY_TAU_S", "entry", "return_columns", "verdict_metrics", "verdict_key_of", "SHORT_NAMES", "to_json"]

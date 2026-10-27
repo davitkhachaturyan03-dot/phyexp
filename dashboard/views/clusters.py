@@ -21,7 +21,7 @@ def heatmap_png(lr: str, run_id: str, cols: tuple[str, ...], synthetic: bool) ->
     t, decls = common.scores_of(lr, run_id)
     DEFAULT_FIG.mkdir(parents=True, exist_ok=True)
     path = DEFAULT_FIG / f"{run_id}-heatmap-v2.png"
-    plot_heatmap(t, list(cols), metric_groups(t, list(cols)), decls, path, synthetic, tick_labels={c: words.metric_name(c) for c in cols})
+    plot_heatmap(t, list(cols), metric_groups(t, list(cols)), decls, path, synthetic, tick_labels={c: words.metric_name(c) for c in cols}, axes_json=True)
     return path.read_bytes()
 
 
@@ -130,7 +130,14 @@ def render(ctx: dict) -> None:
     st.write(words.plain(p["text"]))
     eq = json.loads(sub.set_index("cluster_id").loc[cid, "equivalent_definitions"] or "[]")
     if eq:
-        st.caption("The same episodes are also described as: " + "; ".join(words.plain(e["definition"]) for e in eq))
+        own = words.plain(p["definition"])
+        same = [e for e in eq if words.plain(e["definition"]) == own]
+        other = [e for e in eq if words.plain(e["definition"]) != own]
+        if same:
+            ms = sorted({words.metric_name(e["target_metric"]) for e in same if e["target_metric"]})
+            st.caption("This slice was also found for: " + ", ".join(ms))
+        if other:
+            st.caption("The same episodes are also described as: " + "; ".join(words.plain(e["definition"]) for e in other))
     if confirm_id and cid in overall:
         cs = cstatus[cstatus["cluster_id"] == cid][["comparison", "metric", "expected", "status_display", "calls_by_seed", "met", "contradicted"]].copy()
         cs["expected"] = cs["expected"].map({"treated_better": "removal should help", "treated_worse": "removal should hurt", "-": "none stated"})

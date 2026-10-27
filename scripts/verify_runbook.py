@@ -37,7 +37,7 @@ COUNT_ARGS = {  # key -> server_pipeline.py arguments (after --tag v3cand --dry-
     "round_b_planted_draws2": ["--subset", "v3/candidate", "--round-b-planted", "--random-draws", "2"],
 }
 REQUIRED_STOPS = {"preflight failure": "preflight", "revision mismatch": "revision", "failed job": "failed job", "disk below threshold": "disk", "any needed code change": "code change",
-                  "the Round B cluster pick": "cluster pick", "SYNTHETIC or SMOKE banner on real results": "banner", "store relocation read check": "relocation"}
+                  "the Round B cluster pick": "cluster pick", "SYNTHETIC or SMOKE banner on real results": "banner", "store relocation read check": "relocation", "missing smoke checkpoint": "checkpoint"}
 
 
 def fenced_blocks(text: str) -> list[tuple[str, str]]:
@@ -295,6 +295,19 @@ def main() -> int:
     shutil.rmtree(work, ignore_errors=True)
     check("8.1c the Step 3 probe commands run (executed locally on MPS with --n 2 --batch-size 2 and a scratch --lineage-root; the skill's server form differs only in --device cuda, --n 10 --batch-size 10 and no --lineage-root) and the comparison snippet prints the differing columns",
           outs == [0, 0] and cmp_.returncode == 0 and "differing" in cmp_.stdout, f"eval_smoke rc {outs}; compare: {cmp_.stdout.strip()[:120]}")
+    # --- N1: the inputs of the commands run locally appear in Step 2's copy list ---
+    from vlapoc.runs import client as _client
+
+    train_ids = sorted(set(re.findall(r"train:([0-9a-f]{32})", text)))
+    c_ = _client(None)
+    missing_in = []
+    for tid in train_ids:
+        ck = c_.get_run(tid).data.tags["checkpoint.path"]  # e.g. data/runs/<dir>/lerobot/checkpoints/last/pretrained_model
+        top = "/".join(ck.split("/")[:3])
+        if top not in step2 or not (REPO / ck).is_dir() or f"ls {top}/" not in text:
+            missing_in.append((tid[:8], top))
+    check("8.8 every train run the Step 3 commands evaluate has its checkpoint directory in Step 2's copy list (name and size), an existence check, and a STOP AND ASK; the checkpoint exists on this machine",
+          train_ids and not missing_in and "STOP AND ASK (missing smoke checkpoint)" in step2 and "1.5 GiB" in step2, f"train runs {[t[:8] for t in train_ids]}; checkpoint dirs not covered: {missing_in}")
     # --- AC8.5 ---
     now = subprocess.run(["git", "diff", "--stat", "CLAUDE.md"], cwd=REPO, capture_output=True, text=True).stdout
     before = (ART / "b1_claude_md_diffstat_before.txt").read_text()

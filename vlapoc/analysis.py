@@ -129,7 +129,7 @@ def tradeoff_text(x: str, y: str, decls: dict[str, dict], synthetic: bool) -> di
 
 
 def plot_heatmap(table: pd.DataFrame, columns: list[str], groups: pd.Series, decls: dict[str, dict], path: Path,
-                 synthetic: bool = False, tick_labels: dict[str, str] | None = None) -> Path:
+                 synthetic: bool = False, tick_labels: dict[str, str] | None = None, axes_json: bool = False) -> Path:
     """Episode × metric heatmap of z-scored harm (red = harmful, blue = helpful), episodes sorted by group then by mean harm
     (PoC §4.5). Each column's label names its functional and τ from ``functionals.json``; ``tick_labels`` (column -> short text) replaces the long
     tick labels where the full declaration is shown beside the figure (the dashboard)."""
@@ -156,8 +156,9 @@ def plot_heatmap(table: pd.DataFrame, columns: list[str], groups: pd.Series, dec
     ax.set_title(txt["title"], fontsize=8)
     fig.tight_layout()
     fig.canvas.draw()
-    bb = ax.get_window_extent()  # pixels of the main axes at the saved dpi: written beside the PNG so a test can check the plot area is not squeezed
-    Path(path).with_suffix(".axes.json").write_text(json.dumps({"axes_width_px": float(bb.width), "axes_height_px": float(bb.height), "figure_px": [float(x) for x in fig.get_size_inches() * 130]}))
+    if axes_json:  # only when asked (the dashboard's render check): pixels of the main axes at the saved dpi, written beside the PNG
+        bb = ax.get_window_extent()
+        Path(path).with_suffix(".axes.json").write_text(json.dumps({"axes_width_px": float(bb.width), "axes_height_px": float(bb.height), "figure_px": [float(x) for x in fig.get_size_inches() * 130]}))
     fig.savefig(path, dpi=130)
     plt.close(fig)
     return Path(path)

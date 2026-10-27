@@ -371,9 +371,12 @@ def pattern_of(row: dict, mask: np.ndarray, table: pd.DataFrame, desc: pd.DataFr
     top = ids[np.argsort(-order if row["direction"] != "boost" else order)][:n_top]
     top_members = [{"episode_id": table["episode_id"].iloc[i], "content_hash": table["content_hash"].iloc[i], "harm": float(table[primary].iloc[i]),
                     "harm_z": float((table[primary].iloc[i] - table[primary].mean()) / table[primary].std(ddof=0))} for i in top]
-    harmful = [m["metric"] for m in moves if m["reading"] == "harmful"]
-    helpful = [m["metric"] for m in moves if m["reading"] == "helpful"]
-    flat = [m["metric"] for m in moves if m["reading"] == "no detectable shift"]
+    from vlapoc.metrics_registry import SHORT_NAMES
+
+    nm = lambda m: SHORT_NAMES.get(m["metric"], m["metric"])  # noqa: E731  plain names in the recorded text
+    harmful = [nm(m) for m in moves if m["reading"] == "harmful"]
+    helpful = [nm(m) for m in moves if m["reading"] == "helpful"]
+    flat = [nm(m) for m in moves if m["reading"] == "no detectable shift"]
     parts = [f"{row['definition']}: n = {row['n']} ({100 * row['share_of_subset']:.1f}% of the subset)."]
     if harmful:
         parts.append("Estimated harmful on " + ", ".join(harmful) + ".")

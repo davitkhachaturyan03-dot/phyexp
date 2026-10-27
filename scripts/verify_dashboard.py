@@ -1441,6 +1441,16 @@ def app_mode() -> int:
         print(f"  page {pg}: {len(at.dataframe)} dataframes, {len(at.get('video'))} videos, {len(at.get('vega_lite_chart'))} charts, {len(at.get('imgs'))} images")
     C.check("5.1 AppTest (headless) on the demo store: every page runs with no exception, and the SYNTHETIC banner is present on every page",
             not bad_pages and not no_banner, f"{len(PAGES)} pages in {time.time() - t0:.0f}s; exceptions {bad_pages}; pages without the banner {no_banner}")
+    # --- N2: the lineage command the pages display runs (rc 0) against the store they show ---
+    import subprocess as _sp
+
+    go(at, "Overview")
+    cmds = [c.value for c in at.code if "vlapoc.lineage trace" in c.value]
+    rcs = [(c[:60], _sp.run(c.split(), cwd=REPO_ROOT, capture_output=True, text=True).returncode) for c in cmds]
+    go(at, "Clusters")
+    cmds2 = [c.value for c in at.code if "vlapoc.lineage trace" in c.value]
+    rcs += [(c[:60], _sp.run(c.split(), cwd=REPO_ROOT, capture_output=True, text=True).returncode) for c in cmds2]
+    C.check("5.11 the lineage command shown on the Overview and Clusters pages (python -m vlapoc.lineage trace <run id> --lineage-root <store>) runs with exit code 0", len(rcs) >= 2 and all(rc == 0 for _, rc in rcs), f"{rcs}")
     # --- AC5.2 rollouts ---
     go(at, "Rollouts")
     seed = at.selectbox(key="seed_run").value
