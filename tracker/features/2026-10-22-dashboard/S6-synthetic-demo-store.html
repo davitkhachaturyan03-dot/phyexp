@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S6 The synthetic demo store — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.bad{border-left-color:var(--bad)}.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}code{overflow-wrap:anywhere}pre code{overflow-wrap:normal}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}.f-box.acc{stroke:var(--accent);stroke-width:1.8}.f-box.warn{stroke:var(--warn)}.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
+.f-t{fill:var(--text);font:600 13px var(--sans)}.f-m{fill:var(--muted);font:11.5px var(--mono)}.f-mt{fill:var(--text);font:12px var(--mono)}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}.f-ah{fill:var(--muted)}.f-bar{fill:var(--accent)}.f-bar2{fill:var(--muted)}.f-barw{fill:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Dashboard, clusters and server runbook</a></p>
+  <h1>S6 · The synthetic demo store</h1>
+  <p class="dek">A demo store the dashboard can show today: real videos, catalog and test attempts with invented scores, plus one real tiny training chain labelled SMOKE.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">5/5</span></span>
+    <span><b>Depends on</b> S1</span>
+    <span><b>Data</b> <span class="pill warn">scores SYNTHETIC, no real results yet</span></span>
+  </div>
+</header>
+
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>There are no real attribution scores yet, but the dashboard still has to be shown and tested. So this story builds a store where everything except the scores is real: the training videos and catalog, 20 real test attempts of a real model, and the planted-damage labels. The scores are invented, with known structure planted so that the screens have something to find, and every one is tagged SYNTHETIC. A real two-step training on this Mac is included as well and shows up as SMOKE.</p>
+  <p class="small">Terms are defined in the <a href="report.html#glossary">glossary</a> of the main report.</p>
+</div>
+
+<h2>Why</h2>
+<p>Owner answer: real LIBERO videos and catalog, the real (not attribution-grade) smoke run, plus synthetic influence scores clearly marked SYNTHETIC everywhere. PoC §2.7 is what the demo shows.</p>
+<blockquote>"Synthetic scores, labelled" — owner answer, 2026-10-22 (brief.md)</blockquote>
+
+<h2>What was built</h2>
+<div class="scroll"><table class=""><thead><tr><th>File / function</th><th>What it does</th></tr></thead><tbody><tr><td><code>scripts/dashboard_demo.py build [--with-smoke] [--force]</code></td><td>Builds <code>data/lineage_demo</code> (a scratch copy of the real store) with all the runs below; 490 s in the first build, 474 s in the last</td></tr><tr><td><code>vlapoc/synthetic.py::demo_inputs, plant_cells, weight_vectors, synthetic_matrix</code></td><td>Generates the scores through the method-facing view; refuses the fenced v2; reads no answer key</td></tr><tr><td><code>scripts/verify_dashboard.py --demo</code></td><td>6 checks</td></tr></tbody></table></div>
+
+<h2>Acceptance criteria</h2>
+<p class="small">Results as the analyzer reproduced them in round 3 (commands from the repo root). Details of each check are in <code>artifacts/verify_dashboard_*.json</code>.</p>
+<div class="scroll"><table class=""><thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead><tbody><tr><td>6.1 the build completes with the smoke chain; the real mlflow.db is unchanged</td><td>owner answer</td><td>✅</td><td><code>build took 474s; smoke run attribute-demo-smoke (2 rollouts); sha256 306af412…</code></td></tr><tr><td>6.2 every builder run is tagged synthetic except the smoke chain; labels are SYNTHETIC and SMOKE</td><td>§3.4; brief</td><td>✅</td><td><code>40 synthetic-tagged runs, 3 smoke-chain runs; ensemble SYNTHETIC; smoke SMOKE (the manifest counts 44 synthetic runs including late-tagged stages)</code></td></tr><tr><td>6.3 the generator imports nothing from groundtruth/recovery/discrepancy and opens v3 only through the blind view</td><td>§2.1 item 4</td><td>✅</td><td><code>forbidden imports []; v2 refused: version v2 is fenced: superseded by v3</code></td></tr><tr><td>6.4 the demo's cluster stage recovers the planted structure</td><td>S2</td><td>✅</td><td><code>planted HRT slice rank 1; F30 scene rank 1; boost slice rank 1 (n 25)</code></td></tr><tr><td>6.5 disk: store plus cache under 2 GiB; free disk over 20 GiB</td><td>brief</td><td>✅</td><td><code>demo store 13 MiB, cache 18 MiB, free 62 GiB</code></td></tr></tbody></table></div>
+
+<h2>Example</h2>
+<p>The planted structure, stated in the run's own parameters in plain words, and what the cluster stage found without being told:</p>
+<pre><code>planted (SYNTHETIC):
+  hrt_harm   length_vs_task &gt; 1.113                        n = 192   harmful on HRT only
+  f30_harm   scene = KITCHEN_SCENE3                        n = 48    harmful on F(30) only
+  f30_boost  smoothness &gt; 0.1052 AND gripper_toggles (3,4] n = 25    helpful on F(30)
+found by clusters_run (all rank 1): the HRT slice (as a slice that includes the planted rule),
+  the scene group, and the boost slice
+(artifacts/demo_manifest.json; verify_dashboard.py --demo, check 6.4)</code></pre>
+
+<h2>Visual</h2>
+<figure><svg viewBox="0 0 700 190" role="img" aria-label="What is real and what is synthetic in the demo store"><rect class="f-box acc" x="10" y="20" width="320" height="150" rx="8"/><text class="f-t" x="24" y="44">REAL</text><text class="f-m" x="24" y="68">training videos and catalog (v3/candidate)</text><text class="f-m" x="24" y="88">20 test attempts of SmolVLA + their returns</text><text class="f-m" x="24" y="108">91 planted labels (answer key)</text><text class="f-m" x="24" y="128">2-step MPS smoke chain (SMOKE)</text><text class="f-m" x="24" y="148">all stage code</text><rect class="f-box warn" x="370" y="20" width="320" height="150" rx="8"/><text class="f-t" x="384" y="44">SYNTHETIC (tagged)</text><text class="f-m" x="384" y="68">influence scores (3 seeds, 20 × 960 matrix)</text><text class="f-m" x="384" y="88">clusters found from them (95)</text><text class="f-m" x="384" y="108">bad-vs-harmful readings</text><text class="f-m" x="384" y="128">Round B verdicts (3 + 5 arms)</text><text class="f-m" x="384" y="148">44 runs tagged vlapoc.synthetic=true</text></svg><figcaption><b>What is real in the demo.</b> Left: real data and real code. Right: everything that would be a finding on a real run, invented with a known shape. The app reads the tags, so the right-hand side always shows SYNTHETIC.</figcaption></figure>
+
+<h2>Divergences and limitations</h2>
+<ul><li>The planted synthetic structure is built from descriptors that also describe the real corruptions, so overlaps with the real planted types appear. They say nothing about attribution (S3).</li><li>The demo store is not self-contained: runs copied from the real store still read their files from <code>data/lineage/mlartifacts</code>; only new runs write into <code>data/lineage_demo</code>.</li><li>Only 2 of 20 tasks have rollouts, so the same-task score columns exist for 96 of 960 episodes; the demo pages use the all-rollout columns.</li><li>NumPy/Accelerate prints spurious floating-point warnings from pre-existing code; the columns are finite.</li><li>The two partial earlier builds left orphaned untracked <code>data/eval/returns-*</code> folders (gitignored, not deleted).</li></ul>
+
+</div>
+</body>
+</html>

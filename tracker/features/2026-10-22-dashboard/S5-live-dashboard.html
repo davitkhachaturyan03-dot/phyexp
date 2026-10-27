@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S5 The live local dashboard — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.bad{border-left-color:var(--bad)}.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}code{overflow-wrap:anywhere}pre code{overflow-wrap:normal}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}.f-box.acc{stroke:var(--accent);stroke-width:1.8}.f-box.warn{stroke:var(--warn)}.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
+.f-t{fill:var(--text);font:600 13px var(--sans)}.f-m{fill:var(--muted);font:11.5px var(--mono)}.f-mt{fill:var(--text);font:12px var(--mono)}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}.f-ah{fill:var(--muted)}.f-bar{fill:var(--accent)}.f-bar2{fill:var(--muted)}.f-barw{fill:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Dashboard, clusters and server runbook</a></p>
+  <h1>S5 · The live local dashboard</h1>
+  <p class="dek">A five-page Streamlit app over the lineage store: pick a failed rollout, browse ranked episodes, see clusters and the bad-vs-harmful view, all with video and a provenance banner.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">11/11</span></span>
+    <span><b>Depends on</b> S1, S6</span>
+    <span><b>Data</b> <span class="pill warn">scores SYNTHETIC, no real results yet</span></span>
+  </div>
+</header>
+
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>This is the thing a stakeholder opens. It runs on this laptop in a web browser. The first page says what the numbers are. The second lets you pick a failed attempt and see which training recordings pushed it, with video. The third ranks recordings and groups them by task or scene. The fourth shows the groups found in the data. The fifth is the "looks bad but doesn't hurt" view. A red banner on every page says whether the scores are synthetic, smoke or real, and it cannot be switched off in the app.</p>
+  <p class="small">Terms are defined in the <a href="report.html#glossary">glossary</a> of the main report.</p>
+</div>
+
+<h2>Why</h2>
+<p>PoC §2.7 specifies the dashboard (both views) and names PhAIL's run explorer as the design reference for the rollout side; §4.5 asks for the heatmap and the throughput-vs-reliability scatter; §3.4 requires each shown number to declare what it explains; §10 lists "dashboard linking failed rollouts to influential episodes".</p>
+<blockquote>"or browse a ranked list of harmful episodes, aggregated by any catalog column" — §2.7, p. 5</blockquote>
+
+<h2>What was built</h2>
+<div class="scroll"><table class=""><thead><tr><th>File / function</th><th>What it does</th></tr></thead><tbody><tr><td><code>dashboard/app.py</code></td><td>Page setup, builds the context, renders the page chosen in the sidebar</td></tr><tr><td><code>dashboard/common.py</code></td><td>Settings, cached readers (each wraps one results.py function), provenance banner, run picker, the lineage command shown per run</td></tr><tr><td><code>dashboard/words.py</code></td><td>Plain names: metrics ("Success within 30 s"), descriptors, planted types, quadrants</td></tr><tr><td><code>dashboard/views/overview.py, rollouts.py, episodes.py, clusters.py, bad_vs_harmful.py</code></td><td>The five pages; each exposes <code>render(ctx)</code></td></tr><tr><td><code>vlapoc/video.py</code></td><td>H.264 clips from LeRobot frames, cached on disk (a real episode: 92 frames, 17,112 bytes)</td></tr><tr><td><code>scripts/dashboard_screenshots.py</code></td><td>Drives headless Chrome for the screenshots and the layout measurements</td></tr></tbody></table></div>
+
+<h2>Acceptance criteria</h2>
+<p class="small">Results as the analyzer reproduced them in round 3 (commands from the repo root). Details of each check are in <code>artifacts/verify_dashboard_*.json</code>.</p>
+<div class="scroll"><table class=""><thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead><tbody><tr><td>5.1 every page runs with no exception and carries the SYNTHETIC banner</td><td>§2.7</td><td>✅</td><td><code>5 pages in 1s; exceptions []; pages without the banner []</code></td></tr><tr><td>5.2 Rollouts: failure type equals returns.parquet; a video; top-10 order equals the matrix row</td><td>§2.7 p.5</td><td>✅</td><td><code>failure type timeout no progress (= timeout_no_progress); 3 videos; top-10 order equal: True</code></td></tr><tr><td>5.3 Episodes: ranked list equals the sorted score table; aggregate by every groupable column</td><td>§2.7; §1 p.3</td><td>✅</td><td><code>20 ranked rows equal; offered suite, task, scene, … 14 columns</code></td></tr><tr><td>5.4 + 5.9 plain language with the declared functional reachable on the element</td><td>§3.4 p.7</td><td>✅</td><td><code>offending labels: {}</code></td></tr><tr><td>5.5 Clusters: heatmap, clickable scatter with four quadrant labels, cluster list with status from the confirm run</td><td>§4.5 p.11</td><td>✅</td><td><code>statuses shown SYNTHETIC: confirmed, estimated; slice:f30:boost:1 = confirmed (confirm run: confirmed)</code></td></tr><tr><td>5.5b Bad vs harmful: counts equal discrepancy_episodes.parquet; statuses and sentences verbatim</td><td>§9.2</td><td>✅</td><td><code>quadrant counts looks bad, hurts 10; looks bad, no detectable harm 81; looks clean, hurts 127; looks clean, no detectable harm 742</code></td></tr><tr><td>5.6 real episode and rollout become H.264 with the right frame count</td><td>§2.7</td><td>✅</td><td><code>92 frames = 92 (17112 bytes); 1200 frames = 1200 (396518 bytes)</code></td></tr><tr><td>5.7 the app reads only through results.py (no hard-coded data paths)</td><td>brief</td><td>✅</td><td><code>hard-coded paths in []</code></td></tr><tr><td>5.8 streamlit==1.66.1 serves locally</td><td>plan</td><td>✅</td><td><code>health 200 'ok'; page 200</code></td></tr><tr><td>5.10a every chart's plot area at least 200 px tall at 1400 px (real Chrome)</td><td>analyzer r1</td><td>✅</td><td><code>Clusters 394×355, Bad vs harmful 839×240, heatmap axes 566×611</code></td></tr><tr><td>5.10b/c a real row click selects that rollout; no truncated values; no stray sidebar links</td><td>analyzer r1</td><td>✅</td><td><code>selected before 'libero spatial/0/init000/seed0', after 'libero 10/8/init000/seed0'; truncated []; sidebar links 0</code></td></tr></tbody></table></div>
+
+<h2>Example</h2>
+<p>Start the app on the demo store and open the Rollouts page. The failed attempt below is real; its influence numbers are synthetic.</p>
+<pre><code>.venv/bin/streamlit run dashboard/app.py -- --lineage-root data/lineage_demo --scores attribute-demo-ens
+# open http://localhost:8501  -&gt;  Rollouts  -&gt;  tick a row
+
+selected rollout        libero_10/8/init000/seed0   (real attempt, real video)
+failure type            timeout no progress         (returns.parquet: timeout_no_progress)
+pushed toward (top 10)  ranked by that rollout&#x27;s row of the influence matrix (synthetic values)</code></pre>
+
+<h2>Visual</h2>
+<figure><img class="shot" src="artifacts/screens/rollouts.png" alt="Rollouts page"><figcaption><b>Rollouts page.</b> Pick a failed rollout (table or list); see its real video and failure type, then the ten training episodes that pushed toward it and the ten that pushed away, each playable. The banner on top is the provenance label.</figcaption></figure><figure><img class="shot" src="artifacts/screens/episodes.png" alt="Episodes page"><figcaption><b>Episodes page.</b> Ranked harmful and helpful lists for the chosen metric, aggregation by a catalog column with a 95% interval, and a player for the selected episode.</figcaption></figure><figure><img class="shot" src="artifacts/screens/overview.png" alt="Overview page"><figcaption><b>Overview page.</b> What the dashboard is, how the label is decided, and the declared meaning of every metric.</figcaption></figure>
+
+<h2>Divergences and limitations</h2>
+<ul><li>The pages are switched by a sidebar radio, not by a <code>pages/</code> folder: the analyzer found that a <code>pages/</code> folder created blank auto-generated pages, so it was renamed <code>views/</code>.</li><li>"Aggregate by" cannot use the list-valued <code>objects</code> column, so 14 columns are offered. <code>operator</code> and <code>collection_date</code> are empty in this catalog and give one group.</li><li>AppTest cannot click a table row or chart point; those interactions were verified in a real headless Chrome (<code>--render</code>), and the same state is reachable through a selectbox that AppTest drives. Row-click geometry depends on Streamlit 1.66.1 and should be re-checked after an upgrade.</li><li>The provenance reader is cached for 15 s, so a re-tagged run can show the old banner for up to 15 s.</li><li>The real store's only attribute run is a stand-in without declared functionals; the app says it cannot show it instead of showing unlabelled numbers.</li></ul>
+
+</div>
+</body>
+</html>

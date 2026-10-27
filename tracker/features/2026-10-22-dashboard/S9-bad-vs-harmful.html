@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S9 Bad-looking vs harmful (estimated) — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.bad{border-left-color:var(--bad)}.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}code{overflow-wrap:anywhere}pre code{overflow-wrap:normal}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}.f-box.acc{stroke:var(--accent);stroke-width:1.8}.f-box.warn{stroke:var(--warn)}.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
+.f-t{fill:var(--text);font:600 13px var(--sans)}.f-m{fill:var(--muted);font:11.5px var(--mono)}.f-mt{fill:var(--text);font:12px var(--mono)}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}.f-ah{fill:var(--muted)}.f-bar{fill:var(--accent)}.f-bar2{fill:var(--muted)}.f-barw{fill:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Dashboard, clusters and server runbook</a></p>
+  <h1>S9 · Bad-looking vs harmful (estimated)</h1>
+  <p class="dek">The spec's "most compelling output": which recordings look bad but do not hurt the policy, and which look clean but do, as a table, a chart and example videos.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">7/7</span></span>
+    <span><b>Depends on</b> S1, S2</span>
+    <span><b>Data</b> <span class="pill warn">scores SYNTHETIC, no real results yet</span></span>
+  </div>
+</header>
+
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>Intuition says bad data hurts. The spec says the interesting finding is where intuition fails: damaged-looking recordings that do not hurt, and clean-looking ones that do. We know exactly which 91 recordings were damaged, so "looks bad" is a fact, not a guess. This story compares that with the influence scores: for each of the seven damage types and each metric, does the type's average harm differ from the clean data's, with an honest interval? It also lists the clean recordings with the highest harm, and shows a damaged episode beside its clean original. Everything here is an <i>estimate</i> from scores; S10 plans the retraining that would test it.</p>
+  <p class="small">Terms are defined in the <a href="report.html#glossary">glossary</a> of the main report.</p>
+</div>
+
+<h2>Why</h2>
+<p>PoC §9.2 (p. 19) calls this the most compelling output; §9.1 Step 1 says screening verdicts are stored so they can be compared with what actually happened. The owner chose the planted labels over building a new screening method. CUPID's Fig. 4 caption (p. 8) is published precedent that quality and effect can come apart.</p>
+<blockquote>"The most compelling output is where screening and outcome attribution disagree: episodes that look bad but do not hurt the policy, and episodes that look clean but do." — §9.2, p. 19</blockquote>
+
+<h2>What was built</h2>
+<div class="scroll"><table class=""><thead><tr><th>File / function</th><th>What it does</th></tr></thead><tbody><tr><td><code>vlapoc/discrepancy.py::quadrant_of, type_table</code></td><td>Four quadrants per metric; per planted type a Welch interval of the difference from clean, Holm across the 5 metrics, and a bounded sentence</td></tr><tr><td><code>discrepancy.py::filter_flags, heuristic_evidence</code></td><td>The optional second definition of "looks bad": the label-free H1–H8 flags (10 filters × 5 metrics) and each type's best-heuristic AUROC read from recorded runs</td></tr><tr><td><code>discrepancy.py::discrepancy_run, scripts/stage.py discrepancy</code></td><td>The stage; refuses anything but a finished attribute run on a version with an answer key</td></tr><tr><td><code>dashboard/views/bad_vs_harmful.py</code></td><td>The page, including the corrupted-vs-original video pair</td></tr></tbody></table></div>
+
+<h2>Acceptance criteria</h2>
+<p class="small">Results as the analyzer reproduced them in round 3 (commands from the repo root). Details of each check are in <code>artifacts/verify_dashboard_*.json</code>.</p>
+<div class="scroll"><table class=""><thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead><tbody><tr><td>9.1 over the real key with planted effects: idle_padding harmful on HRT, no detectable harm on F(30); 10 clean episodes found; all four quadrants non-empty</td><td>§9.2 p.19</td><td>✅</td><td><code>idle_padding/hrt: harmful on hrt60_lin (Welch 95% CI [1.26, 2.78]); f30 no detectable harm</code></td></tr><tr><td>9.2 the word 'harmless' appears in no output; every non-excluding interval reads 'no detectable harm on …'</td><td>analyzer; §4.4</td><td>✅</td><td><code>6 output files scanned, 79 'no detectable' sentences well-formed</code></td></tr><tr><td>9.3 per-type best-heuristic AUROC is read from recorded score runs and equals the published bands</td><td>plan caveat 1</td><td>✅</td><td><code>9 score runs; action_noise=smoothness 1.000 … time_shift=length_vs_task 0.848</code></td></tr><tr><td>9.4 refuses a FAILED run, a non-attribute run, a version without a key, a table that does not key v3</td><td>§2.1 item 4</td><td>✅</td><td><code>REFUSED for each, nothing written</code></td></tr><tr><td>9.5 every row carries functional, τ, rollout subset, sign, synthetic</td><td>§3.4 p.7</td><td>✅</td><td><code>types 35 rows, filter 50, clean_harmful 100, episodes 960</code></td></tr><tr><td>9.6 docstring cites §9.2 p.19, §9.1 Step 1 p.18, §4.5 p.11, CUPID Fig. 4 p.8</td><td>vla-build</td><td>✅</td><td><code>check pass</code></td></tr><tr><td>9.7 Welch equals scipy; calibration: Welch false-call rate within 6%; filter layer present</td><td>analyzer r1</td><td>✅</td><td><code>max |difference| to scipy 0.0; Welch 0.0586, bootstrap 0.0929, Holm 0.0071; 50 filter rows, any-filter flagged 438 (q = 0.0948)</code></td></tr></tbody></table></div>
+
+<h2>Example</h2>
+<p>One synthetic reading, as the stage writes it (planted effect: idle_padding episodes +2 spread on HRT only). The sentence carries its own limits.</p>
+<pre><code>idle_padding / hrt60_lin:
+  harmful on hrt60_lin (estimated; Welch 95% CI [1.26, 2.78]).
+  Uncorrected across 7 types x 5 metrics. Holm across the 5 metrics: holds (adjusted p = 0.0003).
+idle_padding / f30:
+  no detectable harm on f30 (estimated; Welch 95% CI [-0.56, 0.62]).
+  Uncorrected across 7 types x 5 metrics. Holm across the 5 metrics: adjusted p = 1.000.
+(artifacts/s9_discrepancy_types_SYNTHETIC.csv, s9_discrepancy_summary_SYNTHETIC.json)</code></pre>
+
+<h2>Visual</h2>
+<figure><img class="shot" src="artifacts/screens/bad_vs_harmful.png" alt="Bad vs harmful page"><figcaption><b>Bad vs harmful page (demo store, SYNTHETIC).</b> Quadrant table and a strip chart with one row per planted type; per-type readings below with interval and Holm value; Round B rows; and the corrupted episode beside its clean original. Notice the quadrant counts for F(30): 10 look bad and hurt, 81 look bad and show no detectable harm, 127 look clean and hurt.</figcaption></figure><p class="small">Secondary layer (SYNTHETIC scores, real descriptors and labels, so these counts do not depend on the invented scores): the any-of-H1–H8 filter flags 438 of 960 episodes and 89 of the 91 planted (precision 0.20, recall 0.98). Per heuristic, flagged/planted: H5 26/26 and H6 13/13 are precise; H1 86/12, H2 81/15, H4 91/22.</p>
+
+<h2>Divergences and limitations</h2>
+<ul><li><b>Never "harmless".</b> A non-excluding interval is stated as "no detectable harm" with its bounds, and "not proof of no harm".</li><li><b>Uncorrected.</b> 7 types × 5 metrics = 35 readings; about 1.75 false readings are expected by chance at 5%. Holm across the 5 metrics is shown as a tighter, partial correction. The first method (percentile bootstrap) called 9.3% of null cells, so it was replaced with Welch (5.9%).</li><li>13 episodes per type is a small group (1.4%); an all-null result is inconclusive, not reassuring.</li><li>The demo scores are invented, so the quadrant counts show the view, not a fact about any policy.</li><li>The union "any of H1–H8" filter flags 46% of the data, because nine rankers each flag about 9.5%; the per-heuristic rows are the informative layer.</li></ul>
+
+</div>
+</body>
+</html>

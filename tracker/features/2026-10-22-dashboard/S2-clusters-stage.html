@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S2 Clusters stage, three lenses — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.bad{border-left-color:var(--bad)}.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}code{overflow-wrap:anywhere}pre code{overflow-wrap:normal}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}.f-box.acc{stroke:var(--accent);stroke-width:1.8}.f-box.warn{stroke:var(--warn)}.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
+.f-t{fill:var(--text);font:600 13px var(--sans)}.f-m{fill:var(--muted);font:11.5px var(--mono)}.f-mt{fill:var(--text);font:12px var(--mono)}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}.f-ah{fill:var(--muted)}.f-bar{fill:var(--accent)}.f-bar2{fill:var(--muted)}.f-barw{fill:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Dashboard, clusters and server runbook</a></p>
+  <h1>S2 · Clusters stage, three lenses</h1>
+  <p class="dek">A tracked stage that finds groups of training recordings that move a metric, in three ways, and writes a plain-language pattern for each, all labelled as estimates.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">9/9</span></span>
+    <span><b>Depends on</b> S1</span>
+    <span><b>Data</b> <span class="pill warn">scores SYNTHETIC, no real results yet</span></span>
+  </div>
+</header>
+
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>The owner wanted to pinpoint exact groups of data and see the pattern inside them. The stage looks for groups three ways: by recorded labels (task, scene), by <i>rules</i> over how the recordings behave ("longer than usual for its task AND from scene X"), and by the spec's four groups of how recordings move the five metrics. Each group gets a sentence that says how big it is, which metric it moves and in which direction, and what is different about it. Every group is marked <b>estimated</b>, because adding up individual influence only approximates a group's real effect.</p>
+  <p class="small">Terms are defined in the <a href="report.html#glossary">glossary</a> of the main report.</p>
+</div>
+
+<h2>Why</h2>
+<p>PoC §1 names the two kinds of finding stakeholders act on: a metadata group ("demos from operator 3") and a rule over a number ("episodes over 400 steps"). §4.2 gives the four groups.</p>
+<blockquote>"Findings such as 'demos from operator 3 hurt drawer tasks' or 'episodes over 400 steps are net harmful' are usually what stakeholders act on." — §1, p. 3</blockquote>
+
+<h2>What was built</h2>
+<div class="scroll"><table class=""><thead><tr><th>File / function</th><th>What it does</th></tr></thead><tbody><tr><td><code>vlapoc/clusters.py::descriptor_table, bin_descriptors</code></td><td>12 behaviour measures per recording, cut into ranges (a zero-only range where most values are 0)</td></tr><tr><td><code>clusters.py::label_clusters, slice_clusters, group_clusters</code></td><td>The three lenses; slices come from sliceline on binned data, run once for harm and once for boost on each metric</td></tr><tr><td><code>clusters.py::dedupe</code></td><td>Groups with identical members are reported once, listing the other descriptions</td></tr><tr><td><code>clusters.py::pattern_of, clusters_run</code></td><td>Writes the sentence per cluster and records the stage run (<code>stage = cluster</code>)</td></tr><tr><td><code>scripts/stage.py clusters</code></td><td>The command, with the settings as options (<code>--min-sup-fraction</code>)</td></tr><tr><td><code>vlapoc/runs.py</code></td><td>Adds <code>cluster</code> to the stage list</td></tr></tbody></table></div>
+
+<h2>Acceptance criteria</h2>
+<p class="small">Results as the analyzer reproduced them in round 3 (commands from the repo root). Details of each check are in <code>artifacts/verify_dashboard_*.json</code>.</p>
+<div class="scroll"><table class=""><thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead><tbody><tr><td>2.1 on synthetic scores the planted slice and task group are top-3 on HRT and not on F(30)</td><td>§1 p.3</td><td>✅</td><td><code>top-3 for hrt60_lin: (1, 'length_vs_task > 1.113 AND scene = libero_tabletop_manipulation', 98); task rank on hrt = 1, on f30 = 17</code></td></tr><tr><td>2.2 a planted boost slice is found on the boost side only</td><td>user ask</td><td>✅</td><td><code>top boost for f30: 'smoothness > 0.1052 AND gripper_toggles (3, 4]' (25)</code></td></tr><tr><td>2.3 every row and pattern carries functional, τ, rollout subset, sign</td><td>§3.4 p.7</td><td>✅</td><td><code>58 rows, 58 patterns, e.g. 'HRT(60) = (1/J) Σ …' tau '60 s'</code></td></tr><tr><td>2.4 recorded as a cluster-stage run whose input is the score table's sha256</td><td>§2.1 item 1</td><td>✅</td><td><code>trace reaches attribute-dash-synth-s2, build-v0, derive-v3 …; lenses label, slice, metric_group; 12 descriptors</code></td></tr><tr><td>2.5 blind: imports nothing from groundtruth/recovery/discrepancy; refuses fenced v1, v2, oracle subsets</td><td>§2.1 item 4 p.3</td><td>✅</td><td><code>forbidden imports: []; fenced v1: REFUSED; fenced v2: REFUSED</code></td></tr><tr><td>2.6 label-group sizes sum to N; slices re-derived independently</td><td>vla-build</td><td>✅</td><td><code>n sums {task_name: 960, scene: 960, suite: 960}; 22 slices, 0 mismatches</code></td></tr><tr><td>2.7 sliceline==0.3.0 works on Python 3.14, with and without numba</td><td>plan prior art</td><td>✅</td><td><code>sliceline 0.3.0; python 3.14.0; numba used True / False; same top slice</code></td></tr><tr><td>2.8 Round A on v3 passes --min-sup-fraction 0.01 (min size 10)</td><td>analyzer r1</td><td>✅</td><td><code>clusters job argv … --min-sup-fraction 0.01; recorded min_sup 10</code></td></tr><tr><td>2.9 identical member sets reported once</td><td>analyzer r2</td><td>✅</td><td><code>58 clusters, duplicate member sets 0; 18 rows list equivalents</code></td></tr></tbody></table></div>
+
+<h2>Example</h2>
+<p>On the demo store the planted harmful slice is rank 1 for HRT. The stage's own pattern sentence for the synthetic check (planted structure: long-for-its-task episodes in one scene):</p>
+<pre><code>length_vs_task &gt; 1.113 AND scene = libero_tabletop_manipulation: n = 98 (10.2% of the subset).
+Estimated harmful on hrt60_lin. ... Most different descriptor: length_vs_task (1.26 inside vs 0.998 outside, +1.93 s.d.).
+Status: estimated: first-order sum of individual influence (CUPID p. 11) ...
+(artifacts/s2_patterns_SYNTHETIC.json; SYNTHETIC scores)</code></pre>
+
+<h2>Visual</h2>
+<figure><img class="shot" src="artifacts/screens/clusters.png" alt="Clusters page"><figcaption><b>Clusters page (demo store, SYNTHETIC).</b> Notice the cluster table with its effect, size and mean harm, the descriptors that differ most, and the "estimated" status. Heatmap and scatter at the top are the §4.5 views.</figcaption></figure><p class="small">Power probe (SYNTHETIC, 10 seeds, <code>artifacts/s2_power_probe_SYNTHETIC.json</code>): the planted 98-member slice is in the HRT top 3 in 6 of 10 seeds as a slice (the planted task group in 10 of 10), never a false alarm on F(30) (0 of 10); the 25-member boost slice in 9 of 10; a 37-member slice in 10 of 10. Small slices (about 17–19 members at +1.5 spread) are below the finder's power at the defaults.</p>
+
+<h2>Divergences and limitations</h2>
+<ul><li>Slice finding needs ranges, so the bins are our choice (about 192 episodes per quintile on v3); a slice isolates a 13-episode type only through a conjunction. The page says so.</li><li>The finder also returns large near-population "slices" for noise; the page filters on the estimated reading matching the direction by default.</li><li>The reading compares a cluster with the subset mean, uncorrected for the number of metrics and clusters. On the server's z-scored ensemble the mean is 0, which removes part of this.</li><li>On v3 the scene column is partly the suite (480 episodes share one scene value). Operator and date are empty in the LIBERO catalog, so lens 1 is task, scene and suite only.</li><li>Metric-specific groups are split by (metric, direction) instead of one cluster for the whole group (recorded in the run's parameters).</li></ul>
+
+</div>
+</body>
+</html>

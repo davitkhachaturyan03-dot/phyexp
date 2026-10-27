@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S10 The §9.2 claim as retraining arms — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.bad{border-left-color:var(--bad)}.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}code{overflow-wrap:anywhere}pre code{overflow-wrap:normal}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}.f-box.acc{stroke:var(--accent);stroke-width:1.8}.f-box.warn{stroke:var(--warn)}.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
+.f-t{fill:var(--text);font:600 13px var(--sans)}.f-m{fill:var(--muted);font:11.5px var(--mono)}.f-mt{fill:var(--text);font:12px var(--mono)}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}.f-ah{fill:var(--muted)}.f-bar{fill:var(--accent)}.f-bar2{fill:var(--muted)}.f-barw{fill:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Dashboard, clusters and server runbook</a></p>
+  <h1>S10 · The §9.2 claim as retraining arms</h1>
+  <p class="dek">The plan and code to test "bad but not harmful" causally: retrain without each planted type, without the most harmful clean episodes, and without all 91, against random clean controls.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">6/6</span></span>
+    <span><b>Depends on</b> S4, S9</span>
+    <span><b>Data</b> <span class="pill warn">scores SYNTHETIC, no real results yet</span></span>
+  </div>
+</header>
+
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>S9 only reads influence scores, which are estimates. To say a damage type genuinely does not hurt the policy, the data must be removed and the policy retrained. This story builds that test: seven arms (one per damage type, 13 episodes each), one arm removing the most harmful clean-looking episodes, a random clean control, and an arm that removes all 91 damaged episodes as a positive control. Each retraining uses the same recipe and three seeds. The verdict wording is careful: a null is reported as "no detectable harm, bounded" with the interval, never "harmless", and if nothing shows an effect anywhere the verdict is "inconclusive".</p>
+  <p class="small">Terms are defined in the <a href="report.html#glossary">glossary</a> of the main report.</p>
+</div>
+
+<h2>Why</h2>
+<p>PoC §9.2 asks for exactly this comparison; §9.1 Step 4 says estimates must be turned into verified results. The oracle-arm pattern (removing the 91 labelled episodes) already existed in the ground-truth feature runbook (GT-R5).</p>
+<blockquote>"Influence estimates can be wrong. This step turns them from claims into verified results." — §9.1 Step 4, p. 19</blockquote>
+
+<h2>What was built</h2>
+<div class="scroll"><table class=""><thead><tr><th>File / function</th><th>What it does</th></tr></thead><tbody><tr><td><code>vlapoc/planted_arms.py::build_arm, planted_select_run, statuses, discrepancy_verdict_run</code></td><td>Builds each removal arm from the answer key (ground-truth side), states the expectation per metric before any result, and words the final verdicts</td></tr><tr><td><code>vlapoc/method_data.py::is_groundtruth_subset, refuse_groundtruth_arm</code></td><td>Keeps the method side blind: five method entry points refuse these arms</td></tr><tr><td><code>scripts/stage.py select-planted / train --groundtruth-arm / discrepancy-verdict</code></td><td>The commands; <code>--groundtruth-arm</code> changes nothing but a tag and only accepts ground-truth subsets</td></tr><tr><td><code>scripts/server_pipeline.py --round-b-planted [--types --clean-harm-metrics --random-draws --no-oracle]</code></td><td>Generates the SLURM chain</td></tr></tbody></table></div>
+
+<h2>Acceptance criteria</h2>
+<p class="small">Results as the analyzer reproduced them in round 3 (commands from the repo root). Details of each check are in <code>artifacts/verify_dashboard_*.json</code>.</p>
+<div class="scroll"><table class=""><thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead><tbody><tr><td>10.1 dry run: default 129 jobs / 33 trainings; --no-oracle 108 / 27; --random-draws 2 162 / 36</td><td>owner Q2</td><td>✅</td><td><code>MEASURED default 129 / 33; no-oracle 108 / 27; random-draws 2 162 (+33) / 36 (+3); 11 select-planted, 27 curated_vs_random verifies, 60 verify jobs</code></td></tr><tr><td>10.2 each type arm's child has 947 episodes with exactly that type's 13 labelled episodes removed</td><td>§2.1 item 5</td><td>✅</td><td><code>sizes all 947; cleanrandom 947 with 13 clean episodes from 13 distinct tasks; oracle 869; cleanrandom91 matched per task</code></td></tr><tr><td>10.3 blindness unchanged: train without --groundtruth-arm refuses these subsets; method entry points refuse</td><td>§2.1 item 4 p.3</td><td>✅</td><td><code>7 refusals with run count unchanged; existing blindness verifiers pass</code></td></tr><tr><td>10.4 synthetic verdicts: harmful confirmed on one metric, 'no detectable harm, bounded' on another; all-null → inconclusive</td><td>§9.2; analyzer</td><td>✅</td><td><code>A: hrt60 'SYNTHETIC: Removing the 13 idle_padding episodes improved hrt60 by 0.1 [0.05, 0.15] …'; f30 'SYNTHETIC: No detectable harm …'</code></td></tr><tr><td>10.5 every train argv equals the base recipe except --subset, --name, --groundtruth-arm</td><td>§2.6 p.5</td><td>✅</td><td><code>33 train jobs compared, mismatches []</code></td></tr><tr><td>10.6 expectation per type from the label's own hypothesis, recorded before results</td><td>§4.5</td><td>✅</td><td><code>idle_padding: rmst60 and hrt60 only; gripper_release: f30 and censored60; others none</code></td></tr></tbody></table></div>
+
+<h2>Example</h2>
+<p>How the 33 trainings arise, and what the verdict wording promises. The numbers come from the code's dry run; GPU-hours are inferred from about 4 hours per training.</p>
+<pre><code>round_b_planted (default):  129 jobs, 33 trainings   ~132 GPU-h (inferred)
+  11 arms = 7 type arms + 1 clean-but-harmful arm + 1 clean random-13 control
+            + the all-91 oracle arm + its matched random-91 control
+  x 3 seeds = 33 trainings
+no-oracle:      108 jobs / 27 trainings
+random-draws 2: 162 jobs / 36 trainings
+sentence for a null (SYNTHETIC check): &quot;No detectable harm on f30: ... This is not proof of no harm.&quot;
+(verify_dashboard.py --planted-arms; artifacts/s10_dry_run_counts.json)</code></pre>
+
+<h2>Visual</h2>
+<figure><svg viewBox="0 0 700 220" role="img" aria-label="The eleven arms of Round B planted"><text class="f-n" x="10" y="16">ROUND B · PLANTED · 11 ARMS × 3 SEEDS = 33 TRAININGS</text><rect class="f-box acc" x="10" y="30" width="330" height="60" rx="6"/><text class="f-t" x="20" y="52">7 type arms</text><text class="f-m" x="20" y="72">remove the 13 episodes of one damage type</text><rect class="f-box" x="350" y="30" width="170" height="60" rx="6"/><text class="f-t" x="360" y="52">clean-but-harmful</text><text class="f-m" x="360" y="72">13 most harmful clean</text><rect class="f-box" x="530" y="30" width="160" height="60" rx="6"/><text class="f-t" x="540" y="52">clean random-13</text><text class="f-m" x="540" y="72">the control (1 draw)</text><rect class="f-box warn" x="10" y="110" width="330" height="60" rx="6"/><text class="f-t" x="20" y="132">oracle: remove all 91 planted</text><text class="f-m" x="20" y="152">positive control; 91 ≠ 13, so no power claim at 13</text><rect class="f-box" x="350" y="110" width="340" height="60" rx="6"/><text class="f-t" x="360" y="132">clean random-91</text><text class="f-m" x="360" y="152">matched control for the oracle</text><text class="f-m" x="10" y="196">All arms: same recipe as the base, same 3 seeds. The 3 seeds share one control draw per arm (F16).</text></svg><figcaption><b>The eleven arms.</b> A type arm that does not beat the random control reads as "no detectable harm, bounded"; the oracle arm shows whether removal can matter at all, but because it removes 91 episodes it does not show the test is sensitive to 13.</figcaption></figure>
+
+<h2>Divergences and limitations</h2>
+<ul><li><b>Not run.</b> No Round B has been executed; all verdicts shown anywhere are SYNTHETIC. This story delivers the plan, the code and the proof that the plan is wired correctly.</li><li>The three seeds share one random control draw per arm, so "k of 3 seeds" is not three independent replicates of the control; <code>--random-draws 2</code> adds a second draw (+33 jobs, +3 trainings).</li><li>The oracle positive control removes 91 episodes (owner-approved), so a confirmation there does not show power at 13; the sentence says so.</li><li>The clean-but-harmful arm needs the ensemble's same-task score column (one episode per task); on real data only tasks with rollouts have it (all 20 in the first server run).</li><li>The word "harmless" is never used; an all-null result is reported as inconclusive ("with 13 episodes (1.4% of the data) per arm the test may lack power").</li><li>The hypothesis-to-metric mapping uses the earlier declared <code>recovery.EXPECTED_METRICS</code>, not a parse of the free-text hypothesis.</li></ul>
+
+</div>
+</body>
+</html>

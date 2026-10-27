@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S4 Round B for discovered clusters — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.bad{border-left-color:var(--bad)}.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}code{overflow-wrap:anywhere}pre code{overflow-wrap:normal}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}.f-box.acc{stroke:var(--accent);stroke-width:1.8}.f-box.warn{stroke:var(--warn)}.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
+.f-t{fill:var(--text);font:600 13px var(--sans)}.f-m{fill:var(--muted);font:11.5px var(--mono)}.f-mt{fill:var(--text);font:12px var(--mono)}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}.f-ah{fill:var(--muted)}.f-bar{fill:var(--accent)}.f-bar2{fill:var(--muted)}.f-barw{fill:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Dashboard, clusters and server runbook</a></p>
+  <h1>S4 · Round B for discovered clusters</h1>
+  <p class="dek">A discovered cluster becomes a retraining test: remove it, retrain, and a stated rule turns the results into confirmed, not confirmed or refuted.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">5/5</span></span>
+    <span><b>Depends on</b> S2</span>
+    <span><b>Data</b> <span class="pill warn">scores SYNTHETIC, no real results yet</span></span>
+  </div>
+</header>
+
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>A cluster found from scores is only a guess about what hurts. To test it, we retrain the policy without those recordings and compare with the original policy, in three training seeds. The expectation (for example "removing these should improve speed") is written down <i>before</i> training, from the estimate. Afterwards a fixed rule says confirmed (the expectation held in at least 2 of 3 seeds and no seed contradicted it), not confirmed, or refuted (the opposite happened). The test can also remove an equal-sized random set instead, as a control.</p>
+  <p class="small">Terms are defined in the <a href="report.html#glossary">glossary</a> of the main report.</p>
+</div>
+
+<h2>Why</h2>
+<p>PoC §2.1 item 5 describes leave-one-group-out ablations as the coarse, unambiguous reference; §4.4 gives the two-step verdict used to decide whether a change is real; §9.1 Step 4: "Influence estimates can be wrong. This step turns them from claims into verified results."</p>
+<blockquote>"Leave-one-group-out ablations. Drop one data source or task group, retrain, and measure the change." — §2.1 item 5, p. 3</blockquote>
+
+<h2>What was built</h2>
+<div class="scroll"><table class=""><thead><tr><th>File / function</th><th>What it does</th></tr></thead><tbody><tr><td><code>vlapoc/runs.py::select_run (ops drop_cluster, drop_random_matched)</code></td><td>Builds the child dataset without the cluster, or without a random set with the same per-task counts; records the expectation per metric before any training</td></tr><tr><td><code>vlapoc/confirm.py::status_of, cluster_status, confirm_run</code></td><td>The rule: <code>ceil(2n/3)</code> of n seeds met and none contradicting; judged per metric; the confirm run records the table</td></tr><tr><td><code>vlapoc/step4.py::expected_direction</code></td><td>Takes an expectation per metric</td></tr><tr><td><code>scripts/server_pipeline.py --round-b --clusters --pick [--matched-random]</code></td><td>Generates the SLURM chain</td></tr><tr><td><code>scripts/stage.py select / confirm</code></td><td>The commands</td></tr></tbody></table></div>
+
+<h2>Acceptance criteria</h2>
+<p class="small">Results as the analyzer reproduced them in round 3 (commands from the repo root). Details of each check are in <code>artifacts/verify_dashboard_*.json</code>.</p>
+<div class="scroll"><table class=""><thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead><tbody><tr><td>4.1 two picks: 21 jobs / 6 trainings; with --matched-random 45 / 12; structure as described</td><td>§2.1 item 5 p.3</td><td>✅</td><td><code>21 jobs, 6 trainings; MEASURED 45 jobs (plan arithmetic 33), 12 trainings; one select job with 2 drop_cluster and 2 drop_random_matched</code></td></tr><tr><td>4.2 child has exactly N − n episodes; matched random has the same per-task counts; expectation recorded first</td><td>§4.4</td><td>✅</td><td><code>n = 98, child 862 of 960; 10 tasks counts [5, 6, 8, 9, 10, 11, 11, 12, 12, 14]; expected_by_metric {f30: treated_worse, hrt60: treated_better}</code></td></tr><tr><td>4.3 synthetic verdicts give confirmed / not confirmed / refuted; trade-offs judged per metric; matched-random judged separately</td><td>§4.4 pp.10-11</td><td>✅</td><td><code>statuses {cA confirmed, cB not confirmed, cC not confirmed, cD refuted, cE confirmed}; calls T,T,T / T,0,0 / g,g,T / C,C,0</code></td></tr><tr><td>4.4 refusals: unknown cluster id, another subset's cluster, a whole task, a non-cluster run</td><td>safety</td><td>✅</td><td><code>REFUSED for each; whole task allowed only with <code>allow_whole_task</code></code></td></tr><tr><td>4.5 every arm's train argv equals the base recipe except --subset and --name</td><td>§2.6 p.5</td><td>✅</td><td><code>12 train + 12 eval jobs compared, mismatches []</code></td></tr></tbody></table></div>
+
+<h2>Example</h2>
+<p>Two picked clusters on a synthetic cluster run over the real v3 catalog. The select run writes the expectation before any retraining.</p>
+<pre><code>cluster slice:hrt60_lin:harm:1   n = 98   child subset 862 of 960 episodes
+expected_by_metric (stated before any retraining):
+    f30   -&gt; treated_worse      (uncorrected reading, see limitations)
+    hrt60 -&gt; treated_better
+dry run, 2 picks:                 21 jobs, 6 trainings
+dry run, with --matched-random:   45 jobs, 12 trainings
+(verify_dashboard.py --round-b, checks 4.1a, 4.1b, 4.2c)</code></pre>
+
+<h2>Visual</h2>
+<figure><svg viewBox="0 0 700 200" role="img" aria-label="Job structure of Round B for two clusters"><text class="f-n" x="10" y="16">ROUND B · 2 PICKED CLUSTERS · 21 JOBS</text><rect class="f-box" x="10" y="30" width="100" height="44" rx="6"/><text class="f-t" x="20" y="50">1 select</text><text class="f-m" x="20" y="66">2 drop_cluster</text><rect class="f-box" x="150" y="24" width="270" height="58" rx="6"/><text class="f-t" x="160" y="46">cluster 0 and cluster 1, each</text><text class="f-m" x="160" y="64">3 train + 3 eval + 3 verify = 9</text><rect class="f-box" x="460" y="30" width="110" height="44" rx="6"/><text class="f-t" x="470" y="50">1 step4</text><text class="f-m" x="470" y="66">summary</text><rect class="f-box acc" x="600" y="30" width="90" height="44" rx="6"/><text class="f-t" x="610" y="50">1 confirm</text><path class="f-arrow" d="M110,52 H148" marker-end="url(#a)"/><path class="f-arrow" d="M420,52 H458" marker-end="url(#a)"/><path class="f-arrow" d="M570,52 H598" marker-end="url(#a)"/><text class="f-m" x="10" y="120">1 + 2 × 9 + 1 + 1 = 21 jobs; 2 × 3 = 6 trainings</text><text class="f-m" x="10" y="142">With matched random arms: +24 jobs (4 more train/eval sets and the extra verifies) = 45 jobs, 12 trainings</text><text class="f-m" x="10" y="164">The planner expected 33; the chain also gives each matched arm and each cluster a comparison verify (+12).</text><text class="f-m" x="10" y="186">Counts: scripts/server_pipeline.py --dry-run (artifacts/s4_dry_run_counts.json)</text></svg><figcaption><b>Round B for clusters.</b> One select job writes the child datasets; each picked cluster is trained three times; one summary and one confirm job close the chain. The arithmetic is shown so a reader can check the count.</figcaption></figure>
+
+<h2>Divergences and limitations</h2>
+<ul><li>The matched-random option costs 45 jobs, not the 33 the plan first counted; a flag-sized change would give the cheaper shape if the owner wants it.</li><li>The expectation comes from the cluster's estimated reading, which is uncorrected for metrics and selection. A noise-driven reading can become an expectation that then fails to confirm. It can give "not confirmed" or "refuted", not a false "confirmed" (inferred).</li><li>The rule generalises "2 of 3" to <code>ceil(2n/3)</code> of n seeds.</li><li>Real verdicts need the server; the verdicts in the demo are SYNTHETIC and say so in the status text.</li></ul>
+
+</div>
+</body>
+</html>

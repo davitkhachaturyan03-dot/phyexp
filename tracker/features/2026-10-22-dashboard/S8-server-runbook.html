@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S8 Server runbook skill — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.bad{border-left-color:var(--bad)}.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}code{overflow-wrap:anywhere}pre code{overflow-wrap:normal}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}.f-box.acc{stroke:var(--accent);stroke-width:1.8}.f-box.warn{stroke:var(--warn)}.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
+.f-t{fill:var(--text);font:600 13px var(--sans)}.f-m{fill:var(--muted);font:11.5px var(--mono)}.f-mt{fill:var(--text);font:12px var(--mono)}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}.f-ah{fill:var(--muted)}.f-bar{fill:var(--accent)}.f-bar2{fill:var(--muted)}.f-barw{fill:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Dashboard, clusters and server runbook</a></p>
+  <h1>S8 · Server runbook skill</h1>
+  <p class="dek">A 15-step guide, loaded automatically by a Claude Code session on the GPU server, from preflight to bringing results back, stopping to ask the owner at 13 marked points.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">9/9</span></span>
+    <span><b>Depends on</b> S4, S5, S10</span>
+    <span><b>Data</b> <span class="pill warn">scores SYNTHETIC, no real results yet</span></span>
+  </div>
+</header>
+
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>The owner wants to run the whole pipeline on the real GPUs from a fresh Claude Code session that knows nothing about this repo. The runbook is a skill file that session loads on its own. Every step says what to run, what output to expect, and when to stop and ask. Because we cannot run the server steps here, every step is honestly tagged: <i>checked here</i> (the commands and counts were run locally) or <i>unchecked until a server session</i>.</p>
+  <p class="small">Terms are defined in the <a href="report.html#glossary">glossary</a> of the main report.</p>
+</div>
+
+<h2>Why</h2>
+<p>Owner request: "an exact step-by-step runbook for a new claude session inside the actual gpu server ... all the way to attribution and real dashboard creation". It makes Round A (v3), the clusters stage, the dashboard and both Round B variants runnable by someone else.</p>
+<blockquote>"In case I want to run the pipeline end-to-end on real gpus the claude-code session must know exactly what to do with this code." — owner, 2026-10-22 (brief.md)</blockquote>
+
+<h2>What was built</h2>
+<div class="scroll"><table class=""><thead><tr><th>File / function</th><th>What it does</th></tr></thead><tbody><tr><td><code>.claude/skills/server-run/SKILL.md</code></td><td>15 steps, each tagged; expected outputs labelled measured, inferred or quoted; STOP AND ASK markers; recovery with <code>--from</code>; rules (no code edits, no push, no deletes)</td></tr><tr><td><code>scripts/repoint_lineage_store.py</code></td><td>Rewrites a copied MLflow store's absolute paths (dry run first, writes a <code>.bak</code>); used in Steps 2 and 14</td></tr><tr><td><code>scripts/verify_runbook.py</code></td><td>The proof: commands exist, flags parse, counts equal fresh dry runs, tags present, markers present, checkpoint covered</td></tr><tr><td><code>scripts/server_pipeline.py</code></td><td>Documented first run is now Round A on v3/candidate (116 jobs)</td></tr><tr><td><code>CLAUDE.md</code></td><td>One-line pointer to the skill, committed by the orchestrator (<code>5e39224</code>, owner-approved). No pipeline agent touched it</td></tr></tbody></table></div>
+
+<h2>Acceptance criteria</h2>
+<p class="small">Results as the analyzer reproduced them in round 3 (commands from the repo root). Details of each check are in <code>artifacts/verify_dashboard_*.json</code>.</p>
+<div class="scroll"><table class=""><thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead><tbody><tr><td>8.1 every command named in the skill exists; every flag is accepted by its real parser</td><td>executor + analyzer r1</td><td>✅</td><td><code>15/15 entries ok; 23/23 commands parsed, 11 executed locally, 12 parsed only; rejected []</code></td></tr><tr><td>8.2 every dry-run count in the skill equals a fresh run</td><td>owner Q1, Q2</td><td>✅</td><td><code>round_a_v3 (116, 24); v0 variant (113, 24); round_b_clusters_2 (21, 6); matched (45, 12); planted (129, 33); no-oracle (108, 27); 2 draws (162, 36); mismatches none</code></td></tr><tr><td>8.2b the documented first server run is v3 everywhere</td><td>owner Q1</td><td>✅</td><td><code>verify_training_attribution.py --pipeline 9/9: v3 116 jobs, 24 trains</code></td></tr><tr><td>8.2c Step 8 states the slice minimum size (10) and what it means</td><td>analyzer r1</td><td>✅</td><td><code>check passes</code></td></tr><tr><td>8.3 every step is tagged; counted</td><td>owner brief</td><td>✅</td><td><code>5 [verified locally], 10 [unverified until a server session]</code></td></tr><tr><td>8.4 at least 7 STOP AND ASK markers covering the required cases</td><td>owner brief</td><td>✅</td><td><code>13 markers (preflight failure, store relocation read check, missing smoke checkpoint, revision mismatch, failed check, odd numbers, failed job, disk, code change, banner, cluster pick, cost, database locked)</code></td></tr><tr><td>8.5 CLAUDE.md untouched by the pipeline batches</td><td>owner rule</td><td>✅</td><td><code>diffstat equal to the recorded value until the owner-approved pointer commit</code></td></tr><tr><td>8.6 frontmatter parses and the skill sits in .claude/skills/</td><td>SKILL spec</td><td>✅</td><td><code>name 'server-run', description 486 characters</code></td></tr><tr><td>8.7 store relocation: a moved copy fails before the repoint and reads after</td><td>analyzer r1</td><td>✅</td><td><code>before: MlflowException: Failed to download artifacts …; after: read ok (960, 34); 43 runs rewritten</code></td></tr></tbody></table></div>
+
+<h2>Example</h2>
+<p>The store-relocation check on a scratch copy of the demo store moved to a root that does not exist (the problem the analyzer found in round 1):</p>
+<pre><code>before repoint:  MlflowException: Failed to download artifacts from path &#x27;attribution_scores.parquet&#x27;
+repoint_lineage_store.py (dry run, then real):  runs rewritten 43, experiments 1
+after repoint:   results.score_table -&gt; read ok (960, 34)
+(verify_runbook.py, check 8.7)</code></pre>
+
+<h2>Visual</h2>
+<figure><svg viewBox="0 0 700 250" role="img" aria-label="The 15 runbook steps grouped by tag"><text class="f-n" x="10" y="16">15 STEPS · each tagged</text><g><rect class="f-box warn" x="10" y="30" width="200" height="44" rx="6"/><text class="f-t" x="18" y="50">1–3 preflight, inputs,</text><text class="f-m" x="18" y="66">repoint, smoke</text><rect class="f-box acc" x="220" y="30" width="110" height="44" rx="6"/><text class="f-t" x="228" y="50">4 Round A</text><text class="f-m" x="228" y="66">dry run 116/24</text><rect class="f-box warn" x="340" y="30" width="170" height="44" rx="6"/><text class="f-t" x="348" y="50">5–7 submit, monitor,</text><text class="f-m" x="348" y="66">recover</text><rect class="f-box acc" x="520" y="30" width="170" height="44" rx="6"/><text class="f-t" x="528" y="50">8–9 clusters, dashboard</text><text class="f-m" x="528" y="66">checked here</text><rect class="f-box acc" x="10" y="100" width="150" height="44" rx="6"/><text class="f-t" x="18" y="120">10 clusters dry run</text><text class="f-m" x="18" y="136">21/6, 45/12</text><rect class="f-box warn" x="170" y="100" width="130" height="44" rx="6"/><text class="f-t" x="178" y="120">11 submit, confirm</text><rect class="f-box acc" x="310" y="100" width="150" height="44" rx="6"/><text class="f-t" x="318" y="120">12 planted dry run</text><text class="f-m" x="318" y="136">129/33</text><rect class="f-box warn" x="470" y="100" width="220" height="44" rx="6"/><text class="f-t" x="478" y="120">13 submit and verdict</text><text class="f-m" x="478" y="136">14 results back · 15 risks</text></g><rect class="f-box acc" x="10" y="180" width="18" height="14"/><text class="f-m" x="36" y="192">checked here (5 steps: 4, 8, 9, 10, 12)</text><rect class="f-box warn" x="330" y="180" width="18" height="14"/><text class="f-m" x="356" y="192">unchecked until a server session (10 steps)</text><text class="f-m" x="10" y="226">A STOP AND ASK marks 13 points; the session never edits code, pushes or deletes.</text></svg><figcaption><b>The steps and their status.</b> Blue-outlined steps (accent) were executed or dry-run locally and their numbers match code output; amber steps need the server and carry inferred or quoted expectations.</figcaption></figure>
+
+<h2>Divergences and limitations</h2>
+<ul><li>Ten of 15 steps are unchecked until a real server session. Their expected outputs are labelled inferred or quoted, never measured.</li><li>Known server-only risks recorded in Step 15: SQLite locking under concurrent jobs, and the <code>smolvla_base</code> revision <code>5e8d12a6</code> versus the pinned <code>d9f33c94</code>.</li><li>Step 2 copies the smoke checkpoint (<code>data/runs/train-smolvla-2step-persubset-v0ref-20261005T012854Z/</code>, 1.5 GiB) because Step 3 loads it; the analyzer found it missing in round 2.</li><li>The GPU-hour figures (about 4 h per training) are inferred.</li><li>The repoint script is kept rather than replaced by <code>mlflow-export-import</code>, which does not preserve run ids (see the reinvention audit in the main report).</li></ul>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S1 Read side and the fail-closed label — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.bad{border-left-color:var(--bad)}.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}code{overflow-wrap:anywhere}pre code{overflow-wrap:normal}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}.f-box.acc{stroke:var(--accent);stroke-width:1.8}.f-box.warn{stroke:var(--warn)}.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
+.f-t{fill:var(--text);font:600 13px var(--sans)}.f-m{fill:var(--muted);font:11.5px var(--mono)}.f-mt{fill:var(--text);font:12px var(--mono)}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}.f-ah{fill:var(--muted)}.f-bar{fill:var(--accent)}.f-bar2{fill:var(--muted)}.f-barw{fill:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Dashboard, clusters and server runbook</a></p>
+  <h1>S1 · Read side and the fail-closed label</h1>
+  <p class="dek">One loader reads results back from the lineage store, the missing influence matrix is now recorded, and every number is labelled SYNTHETIC, SMOKE or REAL from the runs behind it.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">6/6</span></span>
+    <span><b>Depends on</b> —</span>
+    <span><b>Data</b> <span class="pill warn">scores SYNTHETIC, no real results yet</span></span>
+  </div>
+</header>
+
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>The dashboard needs two things the pipeline did not provide. First, for one failed test attempt it must know how strongly each training recording pushed it. That table (the influence matrix) was computed and then thrown away. Second, a stakeholder must never mistake invented scores for real ones. So this story saves the matrix, adds one reader for everything the app needs, and decides the label by looking at every run behind a number. If any tag is missing, the label is <i>not</i> REAL.</p>
+  <p class="small">Terms are defined in the <a href="report.html#glossary">glossary</a> of the main report.</p>
+</div>
+
+<h2>Why</h2>
+<p>PoC §2.7 asks for "the most influential training episodes" for a selected rollout; that needs the per-rollout row. The owner's rule is that real server results must replace synthetic ones with the SYNTHETIC label disappearing only because the data is real.</p>
+<blockquote>"A dashboard: select a failed rollout, see its failure type, the most influential training episodes (with video) and their source datasets" — §2.7, p. 5</blockquote>
+
+<h2>What was built</h2>
+<div class="scroll"><table class=""><thead><tr><th>File / function</th><th>What it does</th></tr></thead><tbody><tr><td><code>vlapoc/attribution.py::attribute_run, influence_index</code></td><td>Now also records <code>influence_matrix</code> and <code>influence_index</code> (rollout ids per row, episode id and content hash per column) as outputs</td></tr><tr><td><code>vlapoc/results.py::find_runs, score_table, functionals, influence, rollouts, clusters, verdicts</code></td><td>The only read-side loader. Every artifact is checked against the sha256 its run recorded; refuses on mismatch</td></tr><tr><td><code>vlapoc/results.py::provenance</code></td><td>Walks the run's trace and returns SYNTHETIC / SMOKE / REAL with the reasons; a missing tag counts against REAL</td></tr><tr><td><code>scripts/verify_dashboard.py --results</code></td><td>The proof, 12 checks</td></tr></tbody></table></div>
+
+<h2>Acceptance criteria</h2>
+<p class="small">Results as the analyzer reproduced them in round 3 (commands from the repo root). Details of each check are in <code>artifacts/verify_dashboard_*.json</code>.</p>
+<div class="scroll"><table class=""><thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead><tbody><tr><td>1.1 attribute_run records the matrix and index; shape = (rollouts, episodes); index order = score table order</td><td>§2.7 p.5; §2.1 item 1 p.3</td><td>✅</td><td><code>verify_dashboard.py --results → matrix (12, 14), index 12 rollouts × 14 episodes; outputs include influence_index, influence_matrix</code></td></tr><tr><td>1.2 a tampered matrix is refused; the old stand-in run says 'not recorded'</td><td>brief: lineage store only</td><td>✅</td><td><code>ValueError: … differs from its recorded sha256 …; NotRecordedError: … predates dashboard S1 …</code></td></tr><tr><td>1.3 provenance: all-real → REAL; flipping one condition → not REAL with reason (7 cases)</td><td>brief: SYNTHETIC only if recorded</td><td>✅</td><td><code>7/7 cases; e.g. smoke: tag vlapoc.smoke is None, not 'false'</code></td></tr><tr><td>1.4 results.py imports nothing from groundtruth, recovery, discrepancy</td><td>§2.1 item 4 p.3</td><td>✅</td><td><code>forbidden imports: []</code></td></tr><tr><td>1.5 all earlier verifiers still pass; real mlflow.db unchanged</td><td>vla-build</td><td>✅</td><td><code>verify_attribution 32/32; mlflow.db sha256 306af412…bde79 before and after</code></td></tr><tr><td>1.6 grounding docstrings cite §2.7 p.5, §3.4 p.7, §2.1 items 1, 4 p.3</td><td>vla-build</td><td>✅</td><td><code>check 1.6 pass</code></td></tr></tbody></table></div>
+
+<h2>Example</h2>
+<p>The seven label cases, run on fake chains in a scratch store (no model, no data). Each row flips one thing in an otherwise real chain.</p>
+<pre><code>case                                           expected    label      reason
+all real (server-written tags)                 REAL        REAL       -
+one vlapoc.synthetic=true                      SYNTHETIC   SYNTHETIC  tag vlapoc.synthetic=true
+one vlapoc.smoke=true (train run)              SMOKE       SMOKE      tag vlapoc.smoke is &#x27;true&#x27;, not &#x27;false&#x27;
+one eval.attribution_grade=false               SMOKE       SMOKE      tag eval.attribution_grade is &#x27;false&#x27;
+one missing tag (train run has no smoke tag)   SMOKE       SMOKE      tag vlapoc.smoke is None, not &#x27;false&#x27;
+one stand-in (attribute run)                   SMOKE       SMOKE      tag vlapoc.stand_in=true
+extra: synthetic param True                    SYNTHETIC   SYNTHETIC  param synthetic=True
+(from artifacts/s1_provenance_cases.json)</code></pre>
+
+<h2>Visual</h2>
+<figure><svg viewBox="0 0 700 200" role="img" aria-label="Decision rule for the provenance label"><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="f-ah"/></marker></defs><rect class="f-box" x="10" y="20" width="170" height="60" rx="6"/><text class="f-t" x="20" y="44">Trace of a run</text><text class="f-m" x="20" y="62">runs.trace(run_id)</text><rect class="f-box warn" x="230" y="10" width="230" height="40" rx="6"/><text class="f-t" x="240" y="35">any run tagged synthetic → SYNTHETIC</text><rect class="f-box warn" x="230" y="60" width="230" height="40" rx="6"/><text class="f-t" x="240" y="85">any stand-in / smoke / not grade → SMOKE</text><rect class="f-box" x="230" y="110" width="230" height="40" rx="6"/><text class="f-t" x="240" y="135">missing tag, or no train+eval run → SMOKE</text><rect class="f-box acc" x="510" y="55" width="180" height="50" rx="6"/><text class="f-t" x="520" y="78">otherwise → REAL</text><text class="f-m" x="520" y="94">checked in that order</text><path class="f-arrow" d="M180,50 H228" marker-end="url(#a)"/><path class="f-arrow" d="M460,80 H508" marker-end="url(#a)"/><text class="f-m" x="10" y="190">Fail-closed: nothing is REAL unless every upstream run says so.</text></svg><figcaption><b>How the label is decided.</b> Rules are checked top to bottom; only a chain with every tag present and correct reaches REAL. This is why a freshly built chain without server tags shows SMOKE, not REAL.</figcaption></figure>
+
+<h2>Divergences and limitations</h2>
+<ul><li>REAL additionally requires at least one training run and one evaluation run in the trace (otherwise the chain is not fully recorded). This is a stricter reading of the plan and is disclosed in the execution log.</li><li>The rule uses <code>eval.attribution_grade=true</code> as the plan says; the stricter <code>…asserted</code> tag some verdict code uses is not required (one condition to add later).</li><li>Ensemble runs have no matrix of their own (they average per-seed scores); the Rollouts page therefore picks one seed run.</li></ul>
+
+</div>
+</body>
+</html>

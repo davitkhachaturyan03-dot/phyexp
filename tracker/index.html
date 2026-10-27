@@ -32,6 +32,13 @@
   <span class="pill good">verified</span></div>
 </a>
 -->
+<a class="entry" href="features/2026-10-22-dashboard/report.html">
+  <div class="top"><span class="title">Dashboard, clusters and server runbook</span><span class="date">2026-10-22 → 2026-10-27</span></div>
+  <p class="sum">A live local web app (Streamlit) over the lineage store: pick a failed rollout and see the training episodes that pushed it, with video; browse clusters (label groups, sliceline rules, the four metric groups); and the §9.2 "looks bad but not harmful" view over the planted labels. Plus a 15-step server runbook skill (Round A on v3: 116 jobs / 24 trainings; Round B planted: 129 / 33). <b>No real attribution results yet:</b> every score shown is SYNTHETIC; clusters are estimates until a removal arm passes the two-step verdict.</p>
+  <div class="tags"><span class="pill accent">§2.7 p.5</span><span class="pill accent">§9.2 p.19</span><span class="pill accent">§4.2 / §4.5 pp.9–11</span><span class="pill accent">§3.4 p.7</span><span class="pill accent">§2.1 item 5 p.3</span><span class="pill accent">§10 Verification &amp; demo p.20</span>
+  <span class="pill">Streamlit</span><span class="pill">sliceline</span><span class="pill warn">real results pending server</span>
+  <span class="pill good">verified · 65/65 ACs · 3 analyzer rounds</span></div>
+</a>
 <a class="entry" href="features/2026-10-20-training-attribution/report.html">
   <div class="top"><span class="title">Training and attribution: checking the ported influence code</span><span class="date">2026-10-20 → 2026-10-22</span></div>
   <p class="sum">The cluster-ported CUPID attribution code, reviewed against the PoC and fixed in 8 stories. The default output function is now CUPID's <code>square</code>
@@ -100,6 +107,20 @@ One row per PoC section a feature touches.</p>
     <tr><td>§2.1</td><td>3</td><td>Episode lineage via …</td>
         <td><a href="features/2026-09-28-<slug>/report.html">slug</a></td><td>none</td></tr>
 -->
+    <tr><td>§2.7</td><td>5</td><td>Live local dashboard, both views: Rollouts (failure type, most influential training episodes with video and source file) and Episodes (ranked, aggregated by any catalog column); provenance banner SYNTHETIC / SMOKE / REAL computed from the recorded runs</td>
+        <td><a href="features/2026-10-22-dashboard/report.html">dashboard</a></td><td>Owner-approved: live Streamlit app; shown on synthetic scores until server results exist (drop-in proven, no code change). Not shown: telemetry traces of PhAIL's run explorer</td></tr>
+    <tr><td>§1 / §2.2</td><td>3–4</td><td>Clusters stage with three lenses: label groups (task, scene, suite), rule-like slices (sliceline over 12 binned descriptors), four metric groups; each with a plain pattern sentence</td>
+        <td><a href="features/2026-10-22-dashboard/report.html">dashboard</a></td><td>Owner-approved: no visual-similarity clusters. Operator and date are empty in the LIBERO catalog, so "operator 3"-style findings are not possible. All clusters are estimates</td></tr>
+    <tr><td>§4.2 / §4.5</td><td>9–11</td><td>Heatmap and throughput-vs-reliability scatter with the four groups on the Clusters page; planted-type scoring of discovered clusters after discovery</td>
+        <td><a href="features/2026-10-22-dashboard/report.html">dashboard</a></td><td>Owner-approved 2-of-5 group rule carried. Metric-specific groups split by (metric, direction)</td></tr>
+    <tr><td>§3.4</td><td>7</td><td>Every number shown names its functional and time cap, reachable on the element (caption or tooltip)</td>
+        <td><a href="features/2026-10-22-dashboard/report.html">dashboard</a></td><td>none</td></tr>
+    <tr><td>§2.1 item 5 / §4.4 / §9.1 Step 4</td><td>3, 10–11, 19</td><td>Round B: removal arms for discovered clusters (21 jobs / 6 trainings; 45 / 12 with matched random) and for the planted data (129 / 33); confirmed / not confirmed / refuted rule ceil(2n/3)</td>
+        <td><a href="features/2026-10-22-dashboard/report.html">dashboard</a></td><td>Owner-approved Round B option (a), 33 trainings. Rule generalises "2 of 3". Never run yet: all verdicts shown are SYNTHETIC. Oracle positive control removes 91, no power claim at 13</td></tr>
+    <tr><td>§9.2</td><td>19</td><td>Bad-looking vs harmful view over the planted labels (four quadrants per metric, per-type Welch readings uncorrected across 7 × 5 with Holm across metrics, clean-but-harmful list, corrupted vs original video)</td>
+        <td><a href="features/2026-10-22-dashboard/report.html">dashboard</a></td><td>Owner-approved: planted labels define "bad", no new screening (DemInf/RoboDrop not built). Estimated until Round B; null reads "no detectable harm, CI", never "harmless"</td></tr>
+    <tr><td>§10 Verification &amp; demo</td><td>20</td><td>Dashboard linking failed rollouts to influential episodes; counterfactual removal tests planned and wired; 15-step server runbook skill (<code>server-run</code>) with 13 stop-and-ask points</td>
+        <td><a href="features/2026-10-22-dashboard/report.html">dashboard</a></td><td>Runbook: 5 steps checked locally, 10 unchecked until a server session. GPU-hours (~4 h per training) inferred</td></tr>
     <tr><td>§4.3</td><td>10</td><td>The CUPID estimator made faithful: <code>square</code> output function on both sides (default), Gauss-Newton Hessian, sum over steps; our <code>net</code> score equals CUPID's vendored <code>compute_demo_quality_scores</code> to 2.84e-14; nine remaining differences recorded with sources in <code>DIVERGENCES</code></td>
         <td><a href="features/2026-10-20-training-attribution/report.html">training-attribution</a></td><td>Centred returns by default vs CUPID's ±1 (planner default, <b>not owner-approved</b>; open decision). Damping 1e-3, Kronecker 7,488 dims vs dense 4,000, K = 4 draws vs 64, strides, fp32 numerics, flow matching vs diffusion. Default changed from <code>loss</code> to <code>square</code>: alters the next server run. No real scores yet</td></tr>
     <tr><td>§3.4</td><td>7</td><td>Every score column declares the functional it explains (metric, τ, rollout subset, sign, centring, output functions) in <code>functionals.json</code>; select runs record the ranked column's declaration</td>

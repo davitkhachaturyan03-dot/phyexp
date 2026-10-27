@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S3 Score clusters against the planted types — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.bad{border-left-color:var(--bad)}.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}code{overflow-wrap:anywhere}pre code{overflow-wrap:normal}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}.f-box.acc{stroke:var(--accent);stroke-width:1.8}.f-box.warn{stroke:var(--warn)}.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
+.f-t{fill:var(--text);font:600 13px var(--sans)}.f-m{fill:var(--muted);font:11.5px var(--mono)}.f-mt{fill:var(--text);font:12px var(--mono)}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}.f-ah{fill:var(--muted)}.f-bar{fill:var(--accent)}.f-bar2{fill:var(--muted)}.f-barw{fill:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Dashboard, clusters and server runbook</a></p>
+  <h1>S3 · Score clusters against the planted types</h1>
+  <p class="dek">After clusters are found, a separate step checks how well each one matches the planted corruption types, and cannot influence the discovery.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">4/4</span></span>
+    <span><b>Depends on</b> S2</span>
+    <span><b>Data</b> <span class="pill warn">scores SYNTHETIC, no real results yet</span></span>
+  </div>
+</header>
+
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>We planted damage in 91 recordings, so we can ask: does a discovered group contain the damaged recordings? This story does that comparison. It is kept separate on purpose. The cluster stage never opens the answer key, and the scoring step runs afterwards and only reads the finished cluster run. That way a good match means the method found something, not that it peeked.</p>
+  <p class="small">Terms are defined in the <a href="report.html#glossary">glossary</a> of the main report.</p>
+</div>
+
+<h2>Why</h2>
+<p>PoC §2.1 item 4 asks to inject corrupted episodes and "check whether your attribution method flags exactly those". §4.5 asks whether each corrupted group is assigned to the expected metric.</p>
+<blockquote>"Inject 5–10% corrupted episodes and measure how many the method ranks near the top." — §2.1 item 4, p. 3</blockquote>
+
+<h2>What was built</h2>
+<div class="scroll"><table class=""><thead><tr><th>File / function</th><th>What it does</th></tr></thead><tbody><tr><td><code>vlapoc/recovery.py::cluster_recovery, cluster_recovery_run</code></td><td>For each cluster and planted type: overlap, precision, recall, lift, one-sided Fisher p; plus a pooled "any planted" row</td></tr><tr><td><code>vlapoc/recovery.py::ground_truth_reads</code></td><td>Defines what counts as a ground-truth read upstream (a <code>score</code> run, a scored-version input or a groundtruth tag)</td></tr><tr><td><code>scripts/stage.py score-clusters</code></td><td>The command</td></tr><tr><td><code>scripts/verify_dashboard.py --planted</code></td><td>7 checks</td></tr></tbody></table></div>
+
+<h2>Acceptance criteria</h2>
+<p class="small">Results as the analyzer reproduced them in round 3 (commands from the repo root). Details of each check are in <code>artifacts/verify_dashboard_*.json</code>.</p>
+<div class="scroll"><table class=""><thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead><tbody><tr><td>3.1 refuses a non-cluster run, a FAILED run, a version without a key, a ground-truth read upstream</td><td>§2.1 item 4</td><td>✅</td><td><code>REFUSED for each, nothing written</code></td></tr><tr><td>3.2 hand-built cluster of 13 idle_padding + 13 clean over the real key: numbers match scipy</td><td>§4.5 p.11</td><td>✅</td><td><code>precision 0.5, recall 1.0, lift 36.923 (= 36.923), p_fisher 1.195e-22 (= 1.195e-22); any_planted recall 0.143 (=13/91)</code></td></tr><tr><td>3.3 the scoring run starts after the cluster run and consumes its hashes; clusters.py has no path to the scorer</td><td>blindness</td><td>✅</td><td><code>cluster run start 1793100871642, scoring run 1793100871809; forbidden imports []</code></td></tr><tr><td>3.4 rows carry synthetic and the cluster's declarations</td><td>§3.4 p.7</td><td>✅</td><td><code>16 rows, synthetic all True; plus the real chain: rc=0, 58 clusters, 464 rows</code></td></tr></tbody></table></div>
+
+<h2>Example</h2>
+<p>A hand-built synthetic cluster (13 idle_padding episodes plus 13 clean ones) scored against the real answer key. Fisher's exact test asks how unlikely such an overlap is by chance.</p>
+<pre><code>cluster: 13 idle_padding + 13 clean episodes (26 members), type idle_padding has 13 of 960
+precision = 13/26 = 0.5     recall = 13/13 = 1.0
+lift = 0.5 / (13/960) = 36.923     one-sided Fisher p = 1.195e-22
+against the pooled &#x27;any planted&#x27; (91): recall 13/91 = 0.143
+a clean-only cluster: overlap 0, p = 1.0
+(verify_dashboard.py --planted, check 3.2)</code></pre>
+
+<h2>Visual</h2>
+<figure><svg viewBox="0 0 640 150" role="img" aria-label="Overlap bar of a 26-episode cluster"><text class="f-n" x="10" y="16">HAND-BUILT SYNTHETIC CLUSTER · 26 members</text><rect class="f-bar" x="10" y="30" width="300" height="34"/><text class="f-t" x="20" y="52" style="fill:var(--bg)">13 idle_padding (planted)</text><rect class="f-bar2" x="310" y="30" width="300" height="34"/><text class="f-t" x="320" y="52" style="fill:var(--bg)">13 clean</text><text class="f-m" x="10" y="92">precision 0.5 = planted share of the cluster</text><text class="f-m" x="10" y="112">recall 1.0 = all 13 idle_padding episodes are inside</text><text class="f-m" x="10" y="132">lift 36.9 = precision / base rate (13 of 960)</text></svg><figcaption><b>What the scores mean.</b> Half the cluster is the planted type and it contains every planted idle-padding episode, 37 times the chance rate. The same measures are computed for every cluster against all seven types.</figcaption></figure>
+
+<h2>Divergences and limitations</h2>
+<ul><li>The output also has a pooled "any_planted" pseudo-type (all 91 together) beside the seven types.</li><li>On the demo store some synthetic clusters overlap real planted types strongly (smallest p about 1e-11). That arises because the invented structure is built from descriptors (task-relative length, smoothness) that also describe the real corruptions. <b>It is not evidence about attribution.</b> The page shows it under the SYNTHETIC banner and the heading "ground-truth check (answer key read after discovery)".</li></ul>
+
+</div>
+</body>
+</html>
