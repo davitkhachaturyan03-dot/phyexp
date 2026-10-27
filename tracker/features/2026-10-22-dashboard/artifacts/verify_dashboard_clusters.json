@@ -33,7 +33,7 @@
   {
    "name": "2.8 Round A on v3 passes --min-sup-fraction 0.01 to the clusters job (dry-run argv), and the cluster run's params record min_sup = 10, below the 13 members of a planted type",
    "pass": true,
-   "detail": "clusters job argv: python scripts/stage.py --chain t-0a871a0a clusters --scores attribute-t-ens --name clusters-t --min-sup-fraction 0.01...; recorded min_sup 10"
+   "detail": "clusters job argv: python scripts/stage.py --chain t-e9ebb411 clusters --scores attribute-t-ens --name clusters-t --min-sup-fraction 0.01...; recorded min_sup 10"
   },
   {
    "name": "2.3 every clusters row and patterns entry carries functional/tau/rollout_subset/good_sign of each reported column; status == estimated everywhere",
@@ -48,7 +48,7 @@
   {
    "name": "2.4b results.provenance of the cluster run is SYNTHETIC (tag from the producing attribute run)",
    "pass": true,
-   "detail": "['synthetic: clusters-dash-synth (cluster, b02c99a8): tag vlapoc.synthetic=true']"
+   "detail": "['synthetic: clusters-dash-synth (cluster, d6197de2): tag vlapoc.synthetic=true']"
   },
   {
    "name": "2.5a clusters.py imports nothing from groundtruth / recovery / discrepancy, and reads the subset only via open_for_method (no Subset.episodes, no labels)",

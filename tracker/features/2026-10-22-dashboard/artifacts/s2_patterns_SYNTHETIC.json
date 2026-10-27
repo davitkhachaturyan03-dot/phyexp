@@ -267,7 +267,7 @@
      "weighting": "CUPID \u00b11, uncentred (success +1, otherwise \u22121)"
     }
    },
-   "text": "task_name = KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it: n = 48 (5.0% of the subset). Estimated harmful on hrt60_lin. No detectable shift on f30, rmst60, auc_expected, censored60. Most different descriptor: gripper_toggles (4.19 inside vs 2.76 outside, +1.12 s.d.). Status: estimated: first-order sum of individual influence (CUPID p. 11); a cluster is confirmed only after removing it, retraining and passing the two-step verdict (PoC \u00a74.4, \u00a79.1 Step 4)."
+   "text": "task_name = KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it: n = 48 (5.0% of the subset). Estimated harmful on Speed vs human (HRT). No detectable shift on Success within 30 s, Mean time to success (RMST), Beats human (AUC), Timed out (censored). Most different descriptor: gripper_toggles (4.19 inside vs 2.76 outside, +1.12 s.d.). Status: estimated: first-order sum of individual influence (CUPID p. 11); a cluster is confirmed only after removing it, retraining and passing the two-step verdict (PoC \u00a74.4, \u00a79.1 Step 4)."
   },
   {
    "cluster_id": "slice:f30:boost:1",
@@ -523,7 +523,7 @@
      "weighting": "CUPID \u00b11, uncentred (success +1, otherwise \u22121)"
     }
    },
-   "text": "smoothness > 0.1052 AND gripper_toggles (3, 4]: n = 25 (2.6% of the subset). Estimated harmful on hrt60_lin. Estimated helpful on f30. No detectable shift on rmst60, auc_expected, censored60. Most different descriptor: length_vs_task (1.29 inside vs 1.02 outside, +2.01 s.d.). Status: estimated: first-order sum of individual influence (CUPID p. 11); a cluster is confirmed only after removing it, retraining and passing the two-step verdict (PoC \u00a74.4, \u00a79.1 Step 4); slices are selected for extreme harm, so their intervals are optimistic; treat them as estimates to confirm. Readings compare a cluster's mean with the subset mean, per metric, uncorrected for the number of metrics and clusters."
+   "text": "smoothness > 0.1052 AND gripper_toggles (3, 4]: n = 25 (2.6% of the subset). Estimated harmful on Speed vs human (HRT). Estimated helpful on Success within 30 s. No detectable shift on Mean time to success (RMST), Beats human (AUC), Timed out (censored). Most different descriptor: length_vs_task (1.29 inside vs 1.02 outside, +2.01 s.d.). Status: estimated: first-order sum of individual influence (CUPID p. 11); a cluster is confirmed only after removing it, retraining and passing the two-step verdict (PoC \u00a74.4, \u00a79.1 Step 4); slices are selected for extreme harm, so their intervals are optimistic; treat them as estimates to confirm. Readings compare a cluster's mean with the subset mean, per metric, uncorrected for the number of metrics and clusters."
   },
   {
    "cluster_id": "slice:hrt60_lin:harm:1",
@@ -767,7 +767,7 @@
      "weighting": "CUPID \u00b11, uncentred (success +1, otherwise \u22121)"
     }
    },
-   "text": "length_vs_task > 1.113 AND scene = libero_tabletop_manipulation: n = 98 (10.2% of the subset). Estimated harmful on hrt60_lin. Estimated helpful on f30. No detectable shift on rmst60, auc_expected, censored60. Most different descriptor: length_vs_task (1.26 inside vs 0.998 outside, +1.93 s.d.). Status: estimated: first-order sum of individual influence (CUPID p. 11); a cluster is confirmed only after removing it, retraining and passing the two-step verdict (PoC \u00a74.4, \u00a79.1 Step 4); slices are selected for extreme harm, so their intervals are optimistic; treat them as estimates to confirm. Readings compare a cluster's mean with the subset mean, per metric, uncorrected for the number of metrics and clusters."
+   "text": "length_vs_task > 1.113 AND scene = libero_tabletop_manipulation: n = 98 (10.2% of the subset). Estimated harmful on Speed vs human (HRT). Estimated helpful on Success within 30 s. No detectable shift on Mean time to success (RMST), Beats human (AUC), Timed out (censored). Most different descriptor: length_vs_task (1.26 inside vs 0.998 outside, +1.93 s.d.). Status: estimated: first-order sum of individual influence (CUPID p. 11); a cluster is confirmed only after removing it, retraining and passing the two-step verdict (PoC \u00a74.4, \u00a79.1 Step 4); slices are selected for extreme harm, so their intervals are optimistic; treat them as estimates to confirm. Readings compare a cluster's mean with the subset mean, per metric, uncorrected for the number of metrics and clusters."
   }
  ]
 }

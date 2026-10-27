@@ -3,7 +3,7 @@
  "pass": true,
  "n_pass": 4,
  "n": 4,
- "seconds": 78,
+ "seconds": 79,
  "checks": [
   {
    "name": "5.10a every Altair chart's plot area is at least 200 px tall at 1400 px (SVG path.background; Clusters and Bad vs harmful each have one) and the matplotlib heatmap's axes area and displayed image are at least 200 px tall",

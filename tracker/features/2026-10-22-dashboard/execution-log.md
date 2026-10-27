@@ -268,3 +268,27 @@ A first look at the earlier screens had shown nothing wrong with the Rollouts an
 - R2-F1: merging identical member sets means one cluster can stand for slices found under several metrics; the page filters through the equivalents. The planted HRT structure is therefore visible under the AUC cluster's equivalents in the demo, which is honest (the synthetic generator moves AUC with HRT) but easy to misread without the "also described as" line.
 - R2-F2: the plain-language scan checks labels, not cell values: task names, recorded sentences and episode ids in cells are data and stay verbatim (the page applies `plain()` to the ones it formats itself).
 - R2-F3: the DevTools row click depends on the data grid's geometry (header 35 px, rows 35 px, row marker at the left edge); it passes at Streamlit 1.66.1 and would need re-checking after a Streamlit upgrade.
+
+## Round 3 (executor, 2026-10-27): analyzer r2 REWORK, three items
+Start: HEAD `ddd4ef5`, `data/lineage/mlflow.db` sha256 `306af4123fda7e635892d459a2e34008ba1cb62f6c4fce152c546e0da7bdde79` (unchanged at the end).
+
+### N1: the smoke checkpoint in the runbook's copy list
+**Files:** `.claude/skills/server-run/SKILL.md` Step 2 · `scripts/verify_runbook.py` (new check 8.8).
+Step 2's copy list now names `data/runs/train-smolvla-2step-persubset-v0ref-20261005T012854Z/` with its size (1.5 GiB, `du` on this Mac) and why (`runs.eval_run` loads `checkpoint.path` from it); an `ls .../lerobot/checkpoints/last/pretrained_model` existence check follows, with a **STOP AND ASK (missing smoke checkpoint)** marker (expected: `config.json`, `model.safetensors`, `policy_postprocessor.json`, measured here).
+**Evidence:** `verify_runbook.py` → `runbook: pass=True (10/10)`; 8.8: "train runs ['0a33bc75']; checkpoint dirs not covered: []". The check reads each `train:<id>` of the skill's commands, looks up the run's `checkpoint.path` in the lineage store, and requires the `data/runs/<dir>` name in Step 2, the `ls` check in the text, the STOP AND ASK marker and the size; it also requires the directory to exist here. 8.4 now lists 13 STOP AND ASK markers.
+
+### N2: the lineage command the dashboard displays
+**Files:** `vlapoc/lineage.py` (the `trace` subparser takes `--lineage-root`; `runs.trace` already accepted it) · `scripts/verify_dashboard.py` (new `--app` check 5.11).
+**Evidence:** before: `python -m vlapoc.lineage: error: unrecognized arguments: --lineage-root data/lineage_demo` (the analyzer's measurement). After: `--app` → `app: pass=True (11/11)`; 5.11 runs every `python -m vlapoc.lineage trace <id> --lineage-root data/lineage_demo` shown on the Overview and Clusters pages (at least two) from the repo root, all with exit code 0. The docstring usage line and Step 14's use of the same flag now hold.
+
+### N3: no untracked sidecar on every run
+**Files:** `vlapoc/analysis.py` (`plot_heatmap(..., axes_json=False)`: the `<png>.axes.json` is written only when asked) · `dashboard/views/clusters.py` (the dashboard's heatmap, under `data/dashboard_cache/figs`, passes `axes_json=True`, which the `--render` check reads).
+**Evidence:** after the full regression (which includes `verify_training_attribution.py --groups`), `git status` shows no untracked file under `tracker/features/2026-10-20-training-attribution/artifacts/` (it showed `s7_heatmap_planted_SYNTHETIC.axes.json` after Round 2); `--render` 4/4 still reads the heatmap axes (566 x 636 px).
+
+### Non-blocking items done
+- "also found for": when an equivalent cluster has the same definition text, the page says "This slice was also found for: Timed out (censored)" instead of repeating it (seen on the clusters screenshot for `smoothness > 0.1052 AND gripper toggles (3, 4]`).
+- Distinct colours for the four quadrants in the bad-vs-harmful strip chart: red (looks bad, hurts), orange (looks bad, no detectable harm), purple (looks clean, hurts), grey-blue (looks clean, no detectable harm). Seen on the re-captured `bad_vs_harmful.png`: the two "looks bad" series are now clearly different.
+- Plain metric names in the recorded pattern text: `pattern_of` uses `metrics_registry.SHORT_NAMES` (one mapping shared with `dashboard/words.py`); the demo was rebuilt, and the clusters screenshot reads "Estimated harmful on Beats human (AUC), Speed vs human (HRT). Estimated helpful on Success within 30 s, Mean time to success (RMST), Timed out (censored)."
+
+### Regression and screenshots (R3)
+`artifacts/regress_r3/` (one script after the last code commit; includes the demo rebuild `build --with-smoke --force`, rc=0): `verify_dashboard.py` `--results` 12/12, `--clusters` 14/14, `--planted` 7/7, `--discrepancy` 10/10, `--round-b` 13/13, `--planted-arms` 8/8, `--app` 11/11, `--render` 4/4, `--demo` 6/6, `--dropin` 4/4; `verify_runbook.py` 10/10; `verify_attribution.py` 32/32; `verify_training_attribution.py` `--blind`, `--functionals` 18/18, `--step4` 13/13, `--recovery` 11/11, `--names` 13/13, `--groups` 9/9, `--integration` 12/12, `--pipeline` 9/9; the nine older verifiers rc=0. Other features' rewritten artifacts restored with `git checkout` (the two training-attribution dry-run files are kept regenerated, as in earlier rounds). Screenshots re-captured (`artifacts/screens/*.png`) and the two changed regions looked at: the strip-chart legend and points on `bad_vs_harmful.png` (four distinct colours, plot area unchanged), and the cluster table, pattern text and "also found for" caption on `clusters.png`. `git diff --stat CLAUDE.md` unchanged; the owner's files untouched.

@@ -1,0 +1,8 @@
+=== dv_render: .venv/bin/python scripts/verify_dashboard.py --render
+[PASS] 5.10a every Altair chart's plot area is at least 200 px tall at 1400 px (SVG path.background; Clusters and Bad vs harmful each have one) and the matplotlib heatmap's axes area and displayed image are at least 200 px tall  plot areas (w, h) {'Overview': [], 'Rollouts': [], 'Episodes': [], 'Clusters': [[394, 355]], 'Bad vs harmful': [[839, 240]]}; heatmap axes 566x611px, displayed image heights [411]
+[PASS] 5.10b clicking row 5 of the Rollouts table makes the page show that row's rollout_id as the selected rollout  expected 'libero_10/8/init000/seed0'; selected before 'libero spatial/0/init000/seed0', after 'libero 10/8/init000/seed0'
+[PASS] 5.10c no st.metric value is truncated, the sidebar holds no auto-generated page links (only the page radio), and no page shows an exception  truncated []; sidebar page links 0; exceptions {}
+[PASS] R real data/lineage/mlflow.db sha256 unchanged by this mode  306af4123fda7e63...
+render: pass=True (4/4, 79s)
+  7.51s user 3.60s system 13% cpu 1:20.10 total
+rc=0

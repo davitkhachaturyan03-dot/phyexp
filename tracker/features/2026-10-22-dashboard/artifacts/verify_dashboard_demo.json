@@ -8,7 +8,7 @@
   {
    "name": "6.1 the build with --with-smoke completed (manifest) and left data/lineage/mlflow.db unchanged (its sha256 before == after == now)",
    "pass": true,
-   "detail": "build took 483s; smoke attribute run attribute-demo-smoke (2 rollouts); sha 306af4123fda7e63..."
+   "detail": "build took 474s; smoke attribute run attribute-demo-smoke (2 rollouts); sha 306af4123fda7e63..."
   },
   {
    "name": "6.2 every run the builder created is tagged vlapoc.synthetic=true except the smoke chain's; provenance is SYNTHETIC for the demo ensemble and SMOKE for the smoke attribute run",
@@ -28,7 +28,7 @@
   {
    "name": "6.5 disk: the demo store plus the dashboard cache stay under 2 GiB and free disk stays above 20 GiB",
    "pass": true,
-   "detail": "demo store 13 MiB (outputs of the smoke chain live under data/eval and data/attribution), cache 17 MiB, free 62 GiB"
+   "detail": "demo store 13 MiB (outputs of the smoke chain live under data/eval and data/attribution), cache 18 MiB, free 62 GiB"
   },
   {
    "name": "R real data/lineage/mlflow.db sha256 unchanged by this mode",
@@ -65,6 +65,6 @@
    "cluster0": "slice:f30:boost:1",
    "cluster1": "slice:auc_expected:harm:2"
   },
-  "seconds": 483
+  "seconds": 474
  }
 }

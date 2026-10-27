@@ -3,7 +3,7 @@
  "pass": true,
  "n_pass": 4,
  "n": 4,
- "seconds": 24,
+ "seconds": 30,
  "checks": [
   {
    "name": "7.1 the real attribute -> ensemble -> clusters code path (SYNTHETIC features, scratch store, run through the stage CLI) loads in the dashboard by run name, every page, with no file under dashboard/, vlapoc/ or scripts/ modified (git status --porcelain empty before and after)",

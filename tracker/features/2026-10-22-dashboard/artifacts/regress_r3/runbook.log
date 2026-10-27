@@ -1,0 +1,52 @@
+=== runbook: .venv/bin/python scripts/verify_runbook.py
+      ok  [parsed only] vlapoc.lineage version verify v3  all flags accepted
+      ok  [parsed only] vlapoc.lineage version verify v0  all flags accepted
+      ok  [executed locally] scripts/repoint_lineage_store.py --root data/lineage --old /Users/davit_khachaturyan/Projects  all flags accepted
+      ok  [parsed only] scripts/repoint_lineage_store.py --root data/lineage --old /Users/davit_khachaturyan/Projects  all flags accepted
+      ok  [parsed only] vlapoc.lineage trace PLACEHOLDER  all flags accepted
+      ok  [parsed only] scripts/lineage_dry_run.py --eval-smoke  all flags accepted
+      ok  [parsed only] scripts/verify_training_attribution.py --local-smoke --device cuda  all flags accepted
+      ok  [parsed only] scripts/eval_smoke.py --policy train:0a33bc75bb71433ca2def5220014dde0 --tasks libe  all flags accepted
+      ok  [parsed only] scripts/eval_smoke.py --policy train:0a33bc75bb71433ca2def5220014dde0 --tasks libe  all flags accepted
+      ok  [executed locally] scripts/server_pipeline.py --tag v3cand --subset v3/candidate --curation per_task --met  all flags accepted
+      ok  [parsed only] scripts/server_pipeline.py --tag v3cand --subset v3/candidate --curation per_task --met  all flags accepted
+      ok  [executed locally] scripts/server_pipeline.py --tag v3cand --subset v3/candidate --curation per_task --met  all flags accepted
+      ok  [executed locally] scripts/stage.py --chain v3cand-PLACEHOLDER clusters --scores attribute-v3can  all flags accepted
+      ok  [executed locally] scripts/stage.py --chain v3cand-PLACEHOLDER score-clusters --clusters cluster  all flags accepted
+      ok  [executed locally] scripts/stage.py --chain v3cand-PLACEHOLDER discrepancy --scores attribute-v3  all flags accepted
+      ok  [executed locally] scripts/server_pipeline.py --tag v3cand --subset v3/candidate --round-b --clusters clus  all flags accepted
+      ok  [executed locally] scripts/server_pipeline.py --tag v3cand --subset v3/candidate --round-b --clusters clus  all flags accepted
+      ok  [parsed only] scripts/server_pipeline.py --tag v3cand --subset v3/candidate --round-b --clusters clus  all flags accepted
+      ok  [executed locally] scripts/server_pipeline.py --tag v3cand --subset v3/candidate --round-b-planted --dry-r  all flags accepted
+      ok  [executed locally] scripts/server_pipeline.py --tag v3cand --subset v3/candidate --round-b-planted --no-or  all flags accepted
+      ok  [parsed only] scripts/server_pipeline.py --tag v3cand --subset v3/candidate --round-b-planted  all flags accepted
+      ok  [executed locally] scripts/repoint_lineage_store.py --root data/lineage_from_server --old PLACEHOLDER/data/linea  all flags accepted
+      ok  [parsed only] scripts/repoint_lineage_store.py --root data/lineage_from_server --old PLACEHOLDER/data/linea  all flags accepted
+[PASS] 8.1b every flag used in a fenced command is accepted by that command's real argparse parser (parse_known_args on the substituted argv, unknown list empty)  23/23 commands; 11 labelled executed locally, 12 parsed only; rejected: []
+      ok  module vlapoc.lineage version  --help rc=0
+      ok  inline python in Step 2: Inputs and environment  inline python: syntax ok
+      ok  scripts/repoint_lineage_store.py  --help rc=0
+      ok  module vlapoc.lineage trace  --help rc=0
+      ok  scripts/lineage_dry_run.py  --help rc=0
+      ok  scripts/verify_training_attribution.py  --help rc=0
+      ok  inline python in Step 3: Smoke on the server [u  inline python: syntax ok
+      ok  scripts/eval_smoke.py  --help rc=0
+      ok  scripts/server_pipeline.py  --help rc=0
+      ok  inline python in Step 6: Monitor [unverified un  inline python: syntax ok
+      ok  scripts/stage.py clusters  --help rc=0
+      ok  scripts/stage.py score-clusters  --help rc=0
+      ok  scripts/stage.py discrepancy  --help rc=0
+      ok  streamlit run dashboard/app.py  dashboard/app.py exists and streamlit imports
+      ok  streamlit run dashboard/app.py  dashboard/app.py exists and streamlit imports
+[PASS] 8.1 every fenced shell command naming a scripts/*.py, python -m vlapoc.* or the dashboard exists and its subcommand's --help exits 0 here  15/15 entries ok; external commands not checked (they are server tools): ['--version', '.venv/bin/', 'cat', 'df', 'export', 'git', 'ls', 'nvidia-smi', 'python -m pip', 'rsync', 'sacct', 'shasum', 'source', 'sqlite3', 'squeue']
+[PASS] 8.2 every dry-run count in the skill equals a fresh local dry run: Round A on v3/candidate (116 jobs, 24 trainings; v0/candidate only as a labelled variant), Round B per cluster (2 picks, and with --matched-random), Round B planted (default and --no-oracle); the first server run is the v3 command in the skill and in server_pipeline.py's docstring  fresh counts {'round_a_v3': (116, 24), 'round_a_v0_variant': (113, 24), 'round_b_clusters_2': (21, 6), 'round_b_clusters_2_matched': (45, 12), 'round_b_planted': (129, 33), 'round_b_planted_no_oracle': (108, 27), 'round_b_planted_draws2': (162, 36)}; mismatches []
+[PASS] 8.3 every step is tagged [verified locally] or [unverified until a server session]; the verifier counts both and lists the unverified; no expected output in an unverified step lacks a measured/quoted/inferred label (and verified steps cite measured outputs)  5 verified: ['Step 4: Round A dry run and the count', 'Step 8: Clusters, planted-type scoring and the discrepancy table, by hand', 'Step 9: The real dashboard', 'Step 10: Round B for discovered clusters, dry run', 'Step 12: Round B for the planted data, dry run']; 10 unverified: ['Step 1: Preflight', 'Step 2: Inputs and environment', 'Step 3: Smoke on the server', 'Step 5: Round A submit', 'Step 6: Monitor', 'Step 7: Recovery', 'Step 11: Round B for clusters, submit and confirm', 'Step 13: Round B planted, submit and verdict', 'Step 14: Results back', 'Step 15: Known server-only risks']; unlabelled expectations: []
+[PASS] 8.4 at least 7 STOP AND ASK markers, covering preflight failure, revision mismatch, any FAILED job, disk below threshold, any needed code change, the Round B cluster pick and a SYNTHETIC/SMOKE banner on real results  13 markers: ['preflight failure', 'store relocation read check', 'missing smoke checkpoint', 'revision mismatch', 'failed check', 'odd numbers', 'failed job', 'disk below threshold', 'any needed code change', 'SYNTHETIC or SMOKE banner on real results', 'the Round B cluster pick', 'cost approval', 'database is locked']; missing []
+[PASS] 8.7 store relocation: in a scratch copy of the demo store moved to a root that does not exist the read fails before the repoint and works after it; Step 2 runs the repoint tool (dry run, then real) with a read check (results.score_table of an attribute run, results.output_json of a ground-truth score run, lineage trace) that is a STOP AND ASK point; Step 14 repoints once more from the server prefix  moved copy before: MlflowException: Failed to download artifacts from path 'attribution_scores.parquet', p; after: read ok (960, 34); rewritten counts {'rows': 2, 'rewritten': 1} {'rows': 118, 'rewritten': 43}
+[PASS] 8.1c the Step 3 probe commands run (executed locally on MPS with --n 2 --batch-size 2 and a scratch --lineage-root; the skill's server form differs only in --device cuda, --n 10 --batch-size 10 and no --lineage-root) and the comparison snippet prints the differing columns  eval_smoke rc [0, 0]; compare: {'rows': 2, 'columns_compared': 31, 'differing': {}}
+[PASS] 8.8 every train run the Step 3 commands evaluate has its checkpoint directory in Step 2's copy list (name and size), an existence check, and a STOP AND ASK; the checkpoint exists on this machine  train runs ['0a33bc75']; checkpoint dirs not covered: []
+[PASS] 8.5 CLAUDE.md is untouched by the dashboard batches: `git diff --stat CLAUDE.md` equals the recorded value from before B1  'CLAUDE.md | 5 +++--\n 1 file changed, 3 insertions(+), 2 deletions(-)'
+[PASS] 8.6 the frontmatter parses (name, description) and the skill is in .claude/skills/  name 'server-run', description 486 characters
+runbook: pass=True (10/10)
+  45.14s user 10.87s system 93% cpu 59.824 total
+rc=0

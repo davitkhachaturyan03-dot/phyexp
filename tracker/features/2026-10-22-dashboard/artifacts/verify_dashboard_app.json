@@ -1,14 +1,19 @@
 {
  "mode": "app",
  "pass": true,
- "n_pass": 10,
- "n": 10,
- "seconds": 5,
+ "n_pass": 11,
+ "n": 11,
+ "seconds": 8,
  "checks": [
   {
    "name": "5.1 AppTest (headless) on the demo store: every page runs with no exception, and the SYNTHETIC banner is present on every page",
    "pass": true,
    "detail": "5 pages in 1s; exceptions []; pages without the banner []"
+  },
+  {
+   "name": "5.11 the lineage command shown on the Overview and Clusters pages (python -m vlapoc.lineage trace <run id> --lineage-root <store>) runs with exit code 0",
+   "pass": true,
+   "detail": "[('.venv/bin/python -m vlapoc.lineage trace 0fe56fdf9c4447b19eb', 0), ('.venv/bin/python -m vlapoc.lineage trace 5e72dec73f4e4b96922', 0)]"
   },
   {
    "name": "5.2 Rollouts: a selected failed rollout shows the failure type of returns.parquet, a video, and 10 episode rows in the order of argsort of its influence-matrix row (recomputed here)",
@@ -43,7 +48,7 @@
   {
    "name": "5.7 the app reads only through results.py/MLflow (no hard-coded data/attribution or data/eval path in dashboard/); pointing --lineage-root/--scores at another store (the real one) changes the content with no edit",
    "pass": true,
-   "detail": "hard-coded paths in []; demo run options ['attribute-demo-smoke  (620a29c0)', 'attribute-demo-ens  (ad09f2e6)']...; real store options ['attribute-train-full-s0 [stand-in]  (babbdb32)']; messages [\"This run cannot be shown: run babbdb329ed6 (attribute-train-full-s0 [stand-in]) has no recorded output 'functionals'. Ev\"]"
+   "detail": "hard-coded paths in []; demo run options ['attribute-demo-smoke  (cf7fa59f)', 'attribute-demo-ens  (0fe56fdf)']...; real store options ['attribute-train-full-s0 [stand-in]  (babbdb32)']; messages [\"This run cannot be shown: run babbdb329ed6 (attribute-train-full-s0 [stand-in]) has no recorded output 'functionals'. Ev\"]"
   },
   {
    "name": "5.8 streamlit==1.66.1 is installed in .venv; `streamlit run dashboard/app.py` serves locally (HTTP 200 on /_stcore/health, and on /), then it is stopped",

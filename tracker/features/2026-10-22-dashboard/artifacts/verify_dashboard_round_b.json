@@ -43,7 +43,7 @@
   {
    "name": "4.4 refused with nothing written: unknown cluster_id, a cluster run of another subset, a cluster that would empty a task, a non-cluster run; with allow_whole_task the whole-task cluster is allowed and the flag is recorded as a param",
    "pass": true,
-   "detail": "unknown cluster_id: REFUSED (ValueError: unknown cluster_id 'slice:nope:harm:9' in cluster run 1e454887dfa9); a cluster run found on another subset: REFUSED (ValueError: cluster run 1e454887dfa9 was found on another subset than the parent df307828495c); a cluster that would empty a task (leave-one-task-out): REFUSED (ValueError: cluster 'label:task_name=KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it' holds every ep); a run that is not a FINISHED cluster run: REFUSED (ValueError: run 374cc778eb78 is not a FINISHED cluster run (status FINISHED, stage 'attribute'))"
+   "detail": "unknown cluster_id: REFUSED (ValueError: unknown cluster_id 'slice:nope:harm:9' in cluster run 9cbde803c1be); a cluster run found on another subset: REFUSED (ValueError: cluster run 9cbde803c1be was found on another subset than the parent df307828495c); a cluster that would empty a task (leave-one-task-out): REFUSED (ValueError: cluster 'label:task_name=KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it' holds every ep); a run that is not a FINISHED cluster run: REFUSED (ValueError: run 25a31deb260e is not a FINISHED cluster run (status FINISHED, stage 'attribute'))"
   },
   {
    "name": "4.3a SYNTHETIC verdicts: met in 3/3 seeds -> confirmed; 1/3 -> not confirmed; gate fired in 1/3 -> not confirmed; opposite in 2/3 -> refuted",

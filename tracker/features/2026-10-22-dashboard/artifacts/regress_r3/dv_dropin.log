@@ -1,0 +1,16 @@
+=== dv_dropin: .venv/bin/python scripts/verify_dashboard.py --dropin
+2026-10-27 15:37:23.666 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+2026-10-27 15:37:23.667 WARNING streamlit.runtime.scriptrunner_utils.script_run_context: Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+[PASS] 7.1 the real attribute -> ensemble -> clusters code path (SYNTHETIC features, scratch store, run through the stage CLI) loads in the dashboard by run name, every page, with no file under dashboard/, vlapoc/ or scripts/ modified (git status --porcelain empty before and after)  porcelain before '' after ''; page errors []; banner on the untagged fixture: ['**SMOKE run:** real code on a toy-scale chain, not attributi']
+2026-10-27 15:37:24.852 No runtime found, using MemoryCacheStorageManager
+2026-10-27 15:37:24.852 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-10-27 15:37:25.084 No runtime found, using MemoryCacheStorageManager
+2026-10-27 15:37:25.084 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+[PASS] 7.2 the same chain with its train/eval runs re-tagged to what the server writes (vlapoc.smoke=false, eval.attribution_grade=true, nothing synthetic) renders with no SYNTHETIC or SMOKE banner (caption 'Provenance: REAL'); re-adding one synthetic tag brings the SYNTHETIC banner back  re-tagged: banners [], caption ['Provenance: REAL (9 recorded runs checke']; one synthetic tag re-added: banner back True
+2026-10-27 15:37:25.303 No runtime found, using MemoryCacheStorageManager
+2026-10-27 15:37:25.303 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+[PASS] 7.3 the real --with-smoke attribute run (real attribute_run output, no adapter) renders on the Rollouts page with its 2 real rollouts and the SMOKE banner  2 rollouts ['libero_spatial/0/init000/seed0', 'libero_spatial/0/init001/seed1']; banner ['**SMOKE run:** real code on a toy-scale chain, not attribution-grade; ']; 3 videos (rollout + episodes)
+[PASS] R real data/lineage/mlflow.db sha256 unchanged by this mode  306af4123fda7e63...
+dropin: pass=True (4/4, 30s)
+  34.31s user 9.73s system 138% cpu 31.689 total
+rc=0

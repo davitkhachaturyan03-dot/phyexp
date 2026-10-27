@@ -1,0 +1,39 @@
+=== dv_app: .venv/bin/python scripts/verify_dashboard.py --app
+2026-10-27 15:35:21.280 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+2026-10-27 15:35:21.280 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+2026-10-27 15:35:21.281 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+2026-10-27 15:35:21.281 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+2026-10-27 15:35:21.281 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+2026-10-27 15:35:21.281 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+2026-10-27 15:35:21.281 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+2026-10-27 15:35:21.281 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+2026-10-27 15:35:21.281 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+2026-10-27 15:35:21.281 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+2026-10-27 15:35:21.281 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+2026-10-27 15:35:21.281 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+2026-10-27 15:35:21.281 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+2026-10-27 15:35:21.835 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+2026-10-27 15:35:21.835 WARNING streamlit.runtime.scriptrunner_utils.script_run_context: Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+  page Overview: 1 dataframes, 0 videos, 0 charts, 0 images
+  page Rollouts: 3 dataframes, 3 videos, 0 charts, 0 images
+  page Episodes: 3 dataframes, 1 videos, 0 charts, 0 images
+  page Clusters: 4 dataframes, 3 videos, 1 charts, 0 images
+  page Bad vs harmful: 3 dataframes, 2 videos, 1 charts, 0 images
+[PASS] 5.1 AppTest (headless) on the demo store: every page runs with no exception, and the SYNTHETIC banner is present on every page  5 pages in 1s; exceptions []; pages without the banner []
+[PASS] 5.11 the lineage command shown on the Overview and Clusters pages (python -m vlapoc.lineage trace <run id> --lineage-root <store>) runs with exit code 0  [('.venv/bin/python -m vlapoc.lineage trace 0fe56fdf9c4447b19eb', 0), ('.venv/bin/python -m vlapoc.lineage trace 5e72dec73f4e4b96922', 0)]
+[PASS] 5.2 Rollouts: a selected failed rollout shows the failure type of returns.parquet, a video, and 10 episode rows in the order of argsort of its influence-matrix row (recomputed here)  rollout libero_10/8/init000/seed0: failure type ['timeout no progress'] (returns.parquet: timeout_no_progress); 3 videos; top-10 order equal: True
+[PASS] 5.3 Episodes: the ranked list equals the score table sorted by the chosen harm column; 'aggregate by' offers the groupable catalog columns (CATALOG_COLUMNS minus GROUP_COLUMNS_EXCLUDED, minus the list-valued 'objects', which aggregate_by cannot group: measured); the table equals aggregate_by  20 ranked rows equal; offered ['suite', 'task', 'task id', 'instruction', 'scene', 'source', 'operator', 'collection date', 'length (steps)', 'duration (s)', 'smoothness', 'idle share', 'idle steps', 'gripper toggles']; objects fails with TypeError; aggregate rows 20
+[PASS] 5.4/5.9 plain language with the declared functional reachable: no rendered label (dataframe column, widget label or option, heading, caption, markdown, chart title) matches [a-z]+_[a-z_]+ outside run names and ids, and every metric name shown has its '<name>: <functional> [τ ...]' declaration in a caption or tooltip on the same page (all 5 pages scanned)  offending labels: {}
+[PASS] 5.5 Clusters: heatmap, a clickable scatter with the four quadrant labels, the cluster list with status from the confirm run when one exists (else estimated) and a lineage link per cluster  quadrant labels in the chart spec: True; statuses shown ['SYNTHETIC: confirmed', 'estimated']; slice:f30:boost:1 = SYNTHETIC: confirmed (confirm run: confirmed)
+[PASS] 5.5b Bad-vs-harmful: quadrant counts equal discrepancy_episodes.parquet's; statuses and sentences equal the discrepancy-verdict run's verbatim; the word 'harm'+'less' appears nowhere on the page; the selected type shows two video elements (corrupted, original)  quadrant counts {'looks bad, hurts': 10, 'looks bad, no detectable harm': 81, 'looks clean, hurts': 127, 'looks clean, no detectable harm': 742}; 25 verdict rows, statuses ['SYNTHETIC: harmful (confirmed)', 'SYNTHETIC: helpful (confirmed)', 'SYNTHETIC: no detectable harm, bounded']; 2 videos
+[PASS] 5.6 vlapoc.video: a real training episode and a real rollout trajectory become H.264 mp4 whose decoded frame count equals the episode's frame count; the cache returns the same bytes on the second call  training episode d_place_it_on_the_plate/demo_7: 92 frames = 92 (17112 bytes); rollout libero_spatial/0/init000/seed0: 1200 frames = 1200 (396518 bytes)
+2026-10-27 15:35:28.716 No runtime found, using MemoryCacheStorageManager
+2026-10-27 15:35:28.716 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-10-27 15:35:28.896 No runtime found, using MemoryCacheStorageManager
+2026-10-27 15:35:28.896 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+[PASS] 5.7 the app reads only through results.py/MLflow (no hard-coded data/attribution or data/eval path in dashboard/); pointing --lineage-root/--scores at another store (the real one) changes the content with no edit  hard-coded paths in []; demo run options ['attribute-demo-smoke  (cf7fa59f)', 'attribute-demo-ens  (0fe56fdf)']...; real store options ['attribute-train-full-s0 [stand-in]  (babbdb32)']; messages ["This run cannot be shown: run babbdb329ed6 (attribute-train-full-s0 [stand-in]) has no recorded output 'functionals'. Ev"]
+[PASS] 5.8 streamlit==1.66.1 is installed in .venv; `streamlit run dashboard/app.py` serves locally (HTTP 200 on /_stcore/health, and on /), then it is stopped  streamlit 1.66.1; health 200 'ok'; page 200; stopped
+[PASS] R real data/lineage/mlflow.db sha256 unchanged by this mode  306af4123fda7e63...
+app: pass=True (11/11, 8s)
+  7.92s user 1.25s system 92% cpu 9.935 total
+rc=0
