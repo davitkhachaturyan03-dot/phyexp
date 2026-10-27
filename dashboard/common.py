@@ -35,6 +35,8 @@ from vlapoc.analysis import axis_label  # noqa: E402
 
 @dataclass(frozen=True)
 class Config:
+    """Where the dashboard reads from: ``lineage_root`` (empty = the real store ``data/lineage``), the score run to open first, an optional cluster run, and the MLflow UI base URL for links."""
+
     lineage_root: str  # "" = the real store data/lineage
     scores: str
     clusters: str
@@ -74,46 +76,55 @@ def score_runs(lr: str) -> list[dict]:
 
 @st.cache_data(show_spinner=False, ttl=30)
 def scores_of(lr: str, run_id: str):
+    """``(score table, functionals declarations)`` of a score run."""
     return res.score_table(run_id, _r(lr)), res.functionals(run_id, _r(lr))
 
 
 @st.cache_data(show_spinner=False)
 def catalog_of(lr: str, run_id: str):
+    """``(subset_id, catalog rows)`` of the training subset the run consumed (``results.training_episodes``)."""
     return res.training_episodes(run_id, _r(lr))
 
 
 @st.cache_data(show_spinner=False, ttl=15)
 def provenance_of(lr: str, run_id: str) -> dict:
+    """``results.provenance`` of a run: label REAL / SMOKE / SYNTHETIC and the recorded reasons."""
     return res.provenance(run_id, _r(lr))
 
 
 @st.cache_data(show_spinner=False, ttl=30)
 def run_info(lr: str, run_id: str) -> dict:
+    """``results.run_summary``: name, stage, params, tags and experiment id of one run."""
     return res.run_summary(run_id, _r(lr))
 
 
 @st.cache_data(show_spinner=False, ttl=30)
 def runs_from(lr: str, stage: str, key: str, value: str) -> list[dict]:
+    """FINISHED ``stage`` runs made from another run (param ``key`` == ``value``, e.g. a cluster run's ``score_run_id``)."""
     return res.runs_with_param(stage, key, value, _r(lr))
 
 
 @st.cache_data(show_spinner=False)
 def table_of(lr: str, run_id: str, name: str) -> pd.DataFrame:
+    """A recorded parquet output of a run, sha-checked (``results.output_table``)."""
     return res.output_table(run_id, name, _r(lr))
 
 
 @st.cache_data(show_spinner=False)
 def json_of(lr: str, run_id: str, name: str):
+    """A recorded JSON output of a run, sha-checked (``results.output_json``)."""
     return res.output_json(run_id, name, _r(lr))
 
 
 @st.cache_data(show_spinner=False)
 def influence_of(lr: str, run_id: str):
+    """``(matrix, index)``: the rollout x episode influence matrix of a seed run and its labels (``results.influence``)."""
     return res.influence(run_id, _r(lr))
 
 
 @st.cache_data(show_spinner=False)
 def rollouts_of(lr: str, run_id: str) -> pd.DataFrame:
+    """One row per rollout behind a run, with ``matrix_row`` (``results.rollouts``)."""
     return res.rollouts(run_id, _r(lr))
 
 
@@ -222,9 +233,11 @@ def harm_cols(ctx: dict) -> list[str]:
 
 
 def mlflow_run_url(ctx: dict, run_id: str) -> str:
+    """Link to a run in the MLflow UI (``cfg.mlflow_ui``)."""
     exp = run_info(ctx["lr"], run_id)["experiment_id"]
     return f"{ctx['cfg'].mlflow_ui.rstrip('/')}/#/experiments/{exp}/runs/{run_id}"
 
 
 def trace_command(ctx: dict, run_id: str) -> str:
+    """The shell command that prints a run's full lineage (``vlapoc.lineage trace``), with ``--lineage-root`` when the store is not the real one."""
     return f".venv/bin/python -m vlapoc.lineage trace {run_id}" + (f" --lineage-root {ctx['cfg'].lineage_root}" if ctx["cfg"].lineage_root else "")

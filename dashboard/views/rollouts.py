@@ -30,6 +30,7 @@ def show(label: str, value) -> None:
 
 
 def render(ctx: dict) -> None:
+    """Draw the Rollouts page: pick a rollout, see its outcome and video, then the training episodes with the largest influence on it."""
     st.subheader("Rollouts: which training episodes pushed this rollout?")
     lr = ctx["lr"]
     seeds = res.seed_runs(ctx["run_id"], common._r(lr))

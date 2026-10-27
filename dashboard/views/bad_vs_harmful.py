@@ -14,7 +14,15 @@ from dashboard import common, words
 from vlapoc.discrepancy import QUADRANTS
 
 
+def arm_name(a: str) -> str:
+    """Plain-language name of a Round B planted arm (``type-<corruption>``, ``cleanharm-...``, ``oracle``) for the verdict table."""
+    if a.startswith("type-"):
+        return words.PLANTED.get(a.removeprefix("type-"), a) + " removed"
+    return {"oracle": "all planted episodes removed (positive control)"}.get(a, "the most harmful clean episodes removed" if a.startswith("cleanharm") else words.plain(a))
+
+
 def render(ctx: dict) -> None:
+    """Draw the Bad vs harmful page: estimated quadrants and per-type table from the ``discrepancy`` run, then the Round B verdict table."""
     st.subheader("Bad vs harmful: do the episodes that look bad hurt the policy?")
     lr = ctx["lr"]
     runs = [r for r in common.runs_from(lr, "score", "score_run_id", ctx["run_id"]) if "discrepancy_episodes" in r["outputs"]]
@@ -61,11 +69,6 @@ def render(ctx: dict) -> None:
         common.declared_caption([f"harm_{k}" for k in metrics], ctx["decls"])
         vt = common.table_of(lr, vr[0]["run_id"], "discrepancy_verdict")
         vv = vt[["arm", "metric", "status", "sentence", "calls", "claim_clean_but_harmful"]].copy()
-        def arm_name(a: str) -> str:
-            if a.startswith("type-"):
-                return words.PLANTED.get(a.removeprefix("type-"), a) + " removed"
-            return {"oracle": "all planted episodes removed (positive control)"}.get(a, "the most harmful clean episodes removed" if a.startswith("cleanharm") else words.plain(a))
-
         vv["arm"] = [arm_name(a) for a in vv["arm"]]
         vv["metric"] = [words.metric_name(x) for x in vv["metric"]]
         st.dataframe(vv.rename(columns={"calls": "calls by run", "claim_clean_but_harmful": "clean but harmful (claimed)"}), hide_index=True, width="stretch", key="bvh_verdict")

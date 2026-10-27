@@ -26,6 +26,7 @@ def renamed_aggregate(agg: pd.DataFrame, col: str, group: str) -> pd.DataFrame:
 
 
 def render(ctx: dict) -> None:
+    """Draw the Episodes page: the ranked harmful episodes and the "aggregate by catalog column" table for the chosen run."""
     st.subheader("Episodes: ranked lists and aggregation by catalog column")
     t, decls, cat, lr = ctx["table"], ctx["decls"], ctx["cat"], ctx["lr"]
     cols = common.harm_cols(ctx)

@@ -148,6 +148,7 @@ async def screenshots(url: str, out: Path, port: int, width: int, wait: float, p
 
 
 def main() -> int:
+    """Command line: ``--url``, ``--out``, optional ``--check`` (module docstring)."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--url", default="http://localhost:8765")
     ap.add_argument("--out", type=Path, required=True)

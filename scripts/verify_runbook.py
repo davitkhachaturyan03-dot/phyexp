@@ -94,6 +94,7 @@ def parser_check(kind: str, target: str, argv: list[str]) -> tuple[bool, str]:
 
 
 def main() -> int:
+    """Run every runbook check (module docstring) on the skill and print one line per check (module docstring)."""
     text = SKILL.read_text()
     results: list[tuple[str, bool, str]] = []
 

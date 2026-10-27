@@ -285,6 +285,7 @@ def build(with_smoke: bool, force: bool) -> int:
 
 
 def main() -> int:
+    """Command line: ``build [--with-smoke] [--force]`` (module docstring)."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
     b = sub.add_parser("build")

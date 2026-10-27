@@ -18,6 +18,7 @@ PLOT_HEIGHT = 560  # the plot area is measured in a real browser by verify_dashb
 
 @st.cache_data(show_spinner=False)
 def heatmap_png(lr: str, run_id: str, cols: tuple[str, ...], synthetic: bool) -> bytes:
+    """PNG bytes of the episode x metric heatmap of a score run (written under ``data/dashboard_cache/figs``; the ``.axes.json`` beside it is what ``verify_dashboard.py --render`` reads)."""
     t, decls = common.scores_of(lr, run_id)
     DEFAULT_FIG.mkdir(parents=True, exist_ok=True)
     path = DEFAULT_FIG / f"{run_id}-heatmap-v2.png"
@@ -71,6 +72,7 @@ def side_for(row: pd.Series, metric: str) -> str | None:
 
 
 def render(ctx: dict) -> None:
+    """Draw the Clusters page: heatmap and scatter, then the cluster table with pattern, estimated effect and Round B status."""
     st.subheader("Clusters: where in the data, and what is the pattern?")
     lr, t, decls = ctx["lr"], ctx["table"], ctx["decls"]
     cols = common.harm_cols(ctx)

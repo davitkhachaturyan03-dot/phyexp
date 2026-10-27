@@ -1809,6 +1809,7 @@ MODES = {"results": results, "clusters": clusters_mode, "planted": planted_mode,
 
 
 def main() -> int:
+    """Run the selected modes (module docstring); the exit code is the worst mode's."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     for m, h in (("results", "S1"), ("clusters", "S2"), ("planted", "S3"), ("discrepancy", "S9"), ("round_b", "S4"), ("planted_arms", "S10"), ("app", "S5"), ("render", "S5 rendering"), ("demo", "S6"), ("dropin", "S7")):
         ap.add_argument(f"--{m.replace('_', '-')}", dest=m, action="store_true", help=h)

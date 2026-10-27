@@ -378,6 +378,7 @@ def cmd_step4_summary(a) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Parse one subcommand (see the module docstring for the list), run it, print its result as JSON; returns the exit code."""
     p = argparse.ArgumentParser(prog="scripts/stage.py", description=__doc__.split("\n\n")[0])
     p.add_argument("--chain", default=None, help="tag vlapoc.chain on the run (groups one experiment); run names are "
                    "resolved only among runs of chains starting with its <tag>-")

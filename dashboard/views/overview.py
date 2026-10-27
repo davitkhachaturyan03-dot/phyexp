@@ -9,6 +9,7 @@ from dashboard import common, words
 
 
 def render(ctx: dict) -> None:
+    """Draw the Overview page for the run chosen in ``common.header`` (``ctx``)."""
     st.subheader("Overview")
     prov, t = ctx["prov"], ctx["table"]
     st.markdown(

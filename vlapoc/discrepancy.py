@@ -4,7 +4,7 @@ label-free heuristic filter) against per-metric influence. Ground-truth side: re
 Where this sits (docs/dataflow.md, after the injection test): after an attribute or ensemble run on a version that carries an answer key
 (v3) exists, ``scripts/stage.py discrepancy`` calls ``discrepancy_run``. It is the estimated half of the claim "bad episodes are not
 always harmful for a policy"; the causal half (remove all of type X and compare with removing the same number of clean episodes) is
-Round B (dashboard S10). Reading order: ``quadrants`` -> ``type_table`` -> ``filter_flags`` -> ``heuristic_evidence`` -> ``discrepancy_run``.
+Round B (dashboard S10). Reading order: ``quadrant_of`` -> ``type_table`` -> ``filter_flags`` -> ``heuristic_evidence`` -> ``discrepancy_run``.
 
 Grounding
 ---------
@@ -52,8 +52,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from vlapoc.analysis import DEFAULT_METRICS
-from vlapoc.libero_convert import REPO_ROOT
 
 QUADRANTS = ("bad_and_harmful", "bad_but_not_harmful", "clean_but_harmful", "clean_and_not_harmful")
 HARMFUL_Z = 1.0  # the analysis.metric_groups threshold (declared)

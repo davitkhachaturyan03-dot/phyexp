@@ -50,6 +50,7 @@ def repoint(db: Path, old: str, new: str, dry_run: bool = False) -> dict:
 
 
 def main() -> int:
+    """Command line: ``--root``, ``--old``, ``--new`` (module docstring)."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--root", type=Path, required=True, help="the copied store (contains mlflow.db)")
     ap.add_argument("--old", required=True, help="the store root on the machine it was copied from")
