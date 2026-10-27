@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard, clusters and server runbook — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+/* page-specific styling: every colour comes from tracker.css variables */
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}
+.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.good{border-left-color:var(--good)}
+.note.bad{border-left-color:var(--bad)}
+.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}
+code{overflow-wrap:anywhere}
+pre code{overflow-wrap:normal}
+table.gloss th.grp{background:var(--surface-2);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+table.gloss td:first-child{min-width:11em}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.tag-syn{display:inline-block;font:600 11px/1.6 var(--mono);padding:1px 8px;border-radius:999px;border:1px solid var(--warn);color:var(--warn);margin-left:6px}
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+.f-box.dash{stroke-dasharray:6 4}
+.f-box.acc{stroke:var(--accent);stroke-width:1.8}
+.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}
+.f-box.warn{stroke:var(--warn)}
+.f-t{fill:var(--text);font:600 13px var(--sans)}
+.f-m{fill:var(--muted);font:11.5px var(--mono)}
+.f-mt{fill:var(--text);font:12px var(--mono)}
+.f-n{fill:var(--muted);font:600 11px var(--mono);letter-spacing:.04em}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}
+.f-ah{fill:var(--muted)}
+.f-axis{stroke:var(--border);stroke-width:1.2}
+.f-bar{fill:var(--accent)}
+.f-bar2{fill:var(--muted)}
+.f-barw{fill:var(--warn)}
+.f-bad{fill:var(--bad)}
+.f-good{fill:var(--good)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="../../index.html">← All features</a></p>
+  <h1>Dashboard, clusters and server runbook</h1>
+  <p class="dek">A live local web app that shows which groups of training recordings help or hurt a robot policy, a "bad-looking but not harmful" view, and a step-by-step guide a Claude session on the GPU server can follow. It runs today on real videos with <b>synthetic</b> scores; no real attribution result exists yet.</p>
+  <div class="meta">
+    <span><b>Date</b> 2026-10-22 → 2026-10-27</span>
+    <span><b>Milestone</b> Verification &amp; demo (PoC §10, p. 20)</span>
+    <span><b>Stories</b> 10 · <b>ACs</b> 65/65</span>
+    <span><b>Analyzer rounds</b> 3</span>
+    <span><b>Status</b> <span class="pill good">verified locally</span> <span class="pill warn">real results pending server</span></span>
+  </div>
+</header>
+
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>A robot policy is a model that learned to do tasks by imitating recorded demonstrations. Some recordings help it and some hurt it, and the project is about finding out which. Until now the answer was spreadsheets of numbers, one row per recording. This feature turns that into something a stakeholder can look at: a small web app on this laptop where you pick a failed attempt and see which training recordings pushed it, with video, and where you see <i>groups</i> of recordings (all the long ones, everything from one kitchen scene) that help or hurt.</p>
+  <p>The app also shows the most interesting finding the spec asks for: recordings that <i>look</i> bad (we deliberately damaged 91 of them, so we know which) but turn out not to hurt, and clean-looking ones that do. And there is a runbook, a written step-by-step guide that a fresh Claude session on the GPU server can follow without us, stopping to ask the owner at 13 marked points.</p>
+  <p>The result that matters: everything works end to end on this machine, and a check shows that real server results will appear in the same app with no code change. <b>What is still unknown is whether any of it is true of a real policy.</b> Every score, group and verdict in the demo is invented (synthetic) and labelled as such; the real scores need the GPU server. A group found from scores is only an <i>estimate</i> until we remove it, retrain, and the test passes.</p>
+</div>
+
+<div class="note bad">
+  <p><b>Read this before the demo section.</b> There are <b>no real attribution results</b> in this report. The videos, the recording catalog and the 20 test attempts shown are real. The influence scores, the groups found from them, the "bad but not harmful" tables and the retraining verdicts are <b>SYNTHETIC</b> (generated by us with known structure so the screens can be tested). One small real run on this Mac (a 2-step training, 2 test attempts, shown as <b>SMOKE</b>) proves the real code path but is not attribution-grade. Everything synthetic carries a SYNTHETIC tag on screen and in the filename (<code>_SYNTHETIC</code>).</p>
+</div>
+
+<h2 id="honest">What the numbers do and do not mean</h2>
+<ul>
+  <li><b>Estimated vs confirmed.</b> A cluster found from scores is an <i>estimate</i> (added-up individual influence, which CUPID's paper p. 11 says only approximates a group's effect). It becomes <i>confirmed</i> only after a "removal arm" (retrain without it) passes the two-step verdict. Until the server runs that, nothing in the app can read "confirmed" for real data.</li>
+  <li><b>A null result is a bound, not "harmless".</b> If removing a corruption type does not measurably help, the app says "no detectable harm, CI [lo, hi]". The word "harmless" appears in no output (a check scans six output files for it).</li>
+  <li><b>Uncorrected readings.</b> The per-type readings are tested 7 types × 5 metrics = 35 times. Without correction about 1.75 false readings are expected by chance at the 5% level. Every sentence says "uncorrected across 7 types × 5 metrics" and also gives a Holm-adjusted value across the 5 metrics (<i>Holm</i>: a standard way of tightening p-values when several are tested together).</li>
+  <li><b>Power.</b> Each planted type has only 13 episodes (1.4% of the data). The positive-control arm removes all 91 planted episodes, so confirming harm there does <i>not</i> show the test can detect an effect of 13. If no arm shows any effect, the verdict is "inconclusive", not "no harm".</li>
+  <li><b>The three seeds share one control draw.</b> By default each type is compared with one random set of 13 clean episodes (the "random control"), the same one for all three training seeds, so "k of 3 seeds" is not three independent replicates of the control. <code>--random-draws 2</code> adds a second draw (+33 jobs, +3 trainings).</li>
+  <li><b>GPU cost is inferred.</b> The job and training counts below come from code (<code>server_pipeline.py --dry-run</code>). The GPU-hours assume about 4 hours per training, which is an inference from earlier runs, not a measurement for this pipeline.</li>
+</ul>
+
+<h2 id="glossary">Glossary</h2>
+<p>Every term and label used on this page and the story pages, in the order you meet them. Each is also defined where it first appears.</p>
+<div class="scroll">
+<table class="gloss">
+  <thead><tr><th>Term</th><th>Plain meaning</th></tr></thead>
+  <tbody>
+    <tr><th colspan="2" class="grp">The robot-learning setting</th></tr>
+    <tr><td><b>Episode, demonstration, recording</b></td><td>One recording of a person guiding a simulated robot arm through a task once. The three words mean the same thing here.</td></tr>
+    <tr><td><b>LIBERO</b></td><td>A benchmark of simulated robot-arm tasks (household-style, e.g. "put the moka pot on the stove") with recorded demonstrations. Our corpus: 960 candidate recordings over 20 tasks.</td></tr>
+    <tr><td><b>LeRobot</b></td><td>An open-source Hugging Face library and file format for robot-learning data. Our datasets and the training code use it.</td></tr>
+    <tr><td><b>Policy; SmolVLA</b></td><td>A policy is a trained model that decides what the robot does next from camera images and an instruction. SmolVLA is the compact open-source one we train.</td></tr>
+    <tr><td><b>Rollout</b></td><td>One attempt by a trained policy at a task in the simulator, recorded with video and judged success or failure. "Failure type" says how it failed (e.g. <code>timeout_no_progress</code>: ran out of time without progress).</td></tr>
+    <tr><td><b>Seed</b></td><td>One random starting point for training. Several seeds show how much of a result is luck.</td></tr>
+    <tr><th colspan="2" class="grp">Influence and the metrics</th></tr>
+    <tr><td><b>Training-data attribution; influence</b></td><td>Working out which training recordings are responsible for how a policy behaves. Influence is a number per recording: how much it pushed a given outcome up or down.</td></tr>
+    <tr><td><b>CUPID</b></td><td>The published method (with MIT-licensed code) we use to compute influence of each training recording on rollout outcomes.</td></tr>
+    <tr><td><b>Metric / functional; time cap τ</b></td><td>The exact quantity a score is about. <b>F(30)</b> = chance of finishing within 30 s ("Success within 30 s" on screen). <b>RMST</b> = average time to success counted up to a cap ("Mean time to success"). <b>AUC</b> = chance the robot beats a human time ("Beats human"). <b>HRT</b> = robot time relative to human time ("Speed vs human"). <b>Censored</b> = share that never finished by the cap ("Timed out"). τ (tau) is the cap in seconds: 60 s for most. The spec (§3.4) requires every result to say which one it explains.</td></tr>
+    <tr><td><b>Harm score; z-score</b></td><td>Positive = the recording pushed the metric the wrong way (harmful). A z-score is a score rescaled to mean 0, spread 1, so "z ≥ 1" means "one spread above average".</td></tr>
+    <tr><td><b>Family W</b></td><td>The five whole-task metrics above (F(30), RMST, AUC, HRT, censored) that we attribute.</td></tr>
+    <tr><th colspan="2" class="grp">Finding groups</th></tr>
+    <tr><td><b>Cluster</b></td><td>A group of training recordings that share something and move a metric together. We build them three ways ("lenses").</td></tr>
+    <tr><td><b>Lens 1: label groups</b></td><td>Groups by recorded metadata: task, scene, suite. (The catalog has no operator or date for LIBERO, so only these vary.)</td></tr>
+    <tr><td><b>Lens 2: rule-like slices; sliceline</b></td><td>Rules such as "task-relative length above 1.113 AND scene = X". sliceline is an open-source tool (SliceLine, SIGMOD 2021) that finds the rules where a score is unusually high. We cut each behaviour measure into ranges first because it needs categories.</td></tr>
+    <tr><td><b>Lens 3: the four metric groups</b></td><td>The spec's §4.2 grouping of recordings by how they move the five metrics: consistent helpers, consistent harmers, trade-off (helps some, hurts others) and metric-specific (moves one). We use the owner-approved "at least 2 of 5 metrics" rule.</td></tr>
+    <tr><td><b>Descriptors</b></td><td>Behaviour measures per recording: length, smoothness, idle share, gripper toggles, repeated frames, task-relative length, and so on (including the label-free checks H1–H8 built earlier).</td></tr>
+    <tr><td><b>H1–H8</b></td><td>Eight label-free checks from the ground-truth feature that guess whether a recording is damaged, from its shape alone (e.g. unusual length, repeated frames).</td></tr>
+    <tr><th colspan="2" class="grp">Real, smoke, synthetic</th></tr>
+    <tr><td><b>SYNTHETIC</b></td><td>Scores we generated with known structure. They say nothing about any real policy. The label is computed from the recorded runs, never switched by hand.</td></tr>
+    <tr><td><b>SMOKE</b></td><td>Real code on a tiny real run (2 training steps) to prove the path works. Not attribution-grade.</td></tr>
+    <tr><td><b>REAL</b></td><td>Every upstream run is a full server run, none synthetic, none a stand-in. A missing tag counts against REAL (fail-closed).</td></tr>
+    <tr><td><b>Lineage store; MLflow; provenance</b></td><td>The database of every run and its inputs and outputs (MLflow is the open-source tool). Provenance is the chain behind a number. The dashboard reads only from here, with each file checked against its recorded hash (sha256).</td></tr>
+    <tr><td><b>Drop-in</b></td><td>Pointing the same app at a real run and seeing it display, with no code change.</td></tr>
+    <tr><th colspan="2" class="grp">Testing a group causally</th></tr>
+    <tr><td><b>Round A / Round B</b></td><td>Round A: train the baselines and compute influence (the "attribution chain"). Round B: retrain with a chosen group removed (a <b>removal arm</b>) and check whether results change.</td></tr>
+    <tr><td><b>Two-step verdict</b></td><td>PoC §4.4. Step 1, the <b>macro-KS gate</b>: is the overall pattern of outcomes different at all (a Kolmogorov-Smirnov test)? Step 2: per-metric confidence intervals with Holm correction say in which direction.</td></tr>
+    <tr><td><b>Estimated / confirmed / not confirmed / refuted</b></td><td>Our status words. Estimated: from scores only. Confirmed: removal met the expectation in at least ⌈2n/3⌉ of n seeds (2 of 3) and none contradicted it. Not confirmed: too few seeds, or the gate did not fire. Refuted: the opposite direction.</td></tr>
+    <tr><td><b>Matched random control</b></td><td>A random set of clean recordings with the same per-task counts as the removed group, removed instead, to check that "removing something" is not the cause.</td></tr>
+    <tr><td><b>Oracle arm (positive control)</b></td><td>Retrain without all 91 planted episodes. If anything shows an effect, this does. It removes 91, so it does not show power at 13.</td></tr>
+    <tr><th colspan="2" class="grp">The bad-looking-but-not-harmful view</th></tr>
+    <tr><td><b>Planted corruption; answer key; v3/candidate</b></td><td>An earlier feature damaged 91 of 960 recordings (13 each of seven types: action noise, detour, dropped frames, gripper release, idle padding, instruction swap, time shift). The answer key records which. v3/candidate is that damaged dataset. Methods are <b>blind</b>: they cannot open the key. Only scoring code reads it, after the method has finished.</td></tr>
+    <tr><td><b>"Looks bad" / "hurts"; four quadrants</b></td><td>Looks bad = planted as corrupt (or flagged by H1–H8). Hurts = harm z-score of at least 1. Quadrants: looks bad &amp; hurts, looks bad &amp; no detectable harm, looks clean &amp; hurts, looks clean &amp; no detectable harm.</td></tr>
+    <tr><td><b>Welch interval</b></td><td>A confidence interval for the difference between two group averages that does not assume equal spread. We use it (scipy) because the first method, a bootstrap, over-called at 13 vs 869 episodes (9.3% false readings vs 5% target).</td></tr>
+    <tr><th colspan="2" class="grp">The app and the runbook</th></tr>
+    <tr><td><b>Streamlit; AppTest</b></td><td>Streamlit is an open-source Python library for local web apps. AppTest is its headless test runner.</td></tr>
+    <tr><td><b>Runbook; skill; SLURM; STOP AND ASK</b></td><td>The runbook is a Claude Code "skill" file (<code>.claude/skills/server-run/SKILL.md</code>) that a session on the GPU server follows. SLURM is the cluster's job scheduler. STOP AND ASK marks a point where the session must stop and ask the owner.</td></tr>
+    <tr><td><b>Repoint</b></td><td>A copied MLflow store still points at the old machine's folders; repointing rewrites those paths so the copy can be read.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="grounding">
+  <h2>Grounding</h2>
+  <dl>
+    <dt>Spec section</dt>
+    <dd>PoC §2.7 "Demonstration surface" (p. 5): "A dashboard: select a failed rollout, see its failure type, the most influential training episodes (with video) and their source datasets; or browse a ranked list of harmful episodes, aggregated by any catalog column." Also §1 (p. 3, "aggregated by metadata"), §3.4 (p. 7, declared functional), §4.2 (pp. 9–10, four groups), §4.4 (pp. 10–11, two-step verdict, Holm), §4.5 (p. 11, heatmap and scatter), §2.1 item 5 (p. 3, leave-group-out), §9.1 Step 4 (p. 19), <b>§9.2 (p. 19): "where screening and outcome attribution disagree: episodes that look bad but do not hurt the policy, and episodes that look clean but do."</b> and §10 "Verification &amp; demo" (p. 20).</dd>
+    <dt>Papers</dt>
+    <dd><code>CUPID…2506.19121.pdf</code> p. 11 (summed influence only approximates group effects, which is why clusters are "estimated") and Fig. 4 caption p. 8 (quality measures can "degrade performance", precedent for §9.2). <code>DataMIL…2505.09603.pdf</code> p. 6 (cluster-level influence is established practice). <code>PhAIL…2605.29710.pdf</code> p. 2 and p. 6 (run explorer with synchronized video is the design reference for the rollout page).</dd>
+    <dt>Prior art</dt>
+    <dd>Adopted: <b>Streamlit 1.66.1</b> (smallest dependency set with row selection, charts, video and headless tests; Dash, Panel, Gradio, Spotlight, FiftyOne and LeRobot's viewer were compared and rejected, see the audit), <b>sliceline 0.3.0</b> (lens 2), <b>scipy</b> (Welch, Fisher), PyAV (video), MLflow (already the lineage store). Custom only where no tool knows our semantics: the results loader with its provenance label, the cluster, discrepancy and confirm stages, the removal-arm bridge, and the pages.</dd>
+    <dt>Implements</dt>
+    <dd>§2.7 both views; §4.5 heatmap and scatter; §4.2 groups; §3.4 on every shown number; §9.2 as an estimate (S9) and as a causal test plan (S10); §2.1 item 5 and §9.1 Step 4 as Round B; the server runbook.</dd>
+    <dt>Diverges</dt>
+    <dd>Owner-approved: "Label groups, Rule-like slices, Four metric groups" (no visual-similarity clusters); live local app; synthetic scores until server results exist; the planted labels as the definition of "bad" instead of building new screening (DemInf/RoboDrop); Round A on v3; Round B option (a), 33 trainings. Ours, disclosed: the "estimated" status and confirmation rule ⌈2n/3⌉ generalise "2 of 3"; slice finder minimum size lowered to 10 (1% of the data) for Round A so a 13-episode type can be isolated; <code>--matched-random</code> costs 45 jobs, not the 33 first planned (the chain gives each matched arm its own comparisons).</dd>
+    <dt>Not yet covered</dt>
+    <dd>Any real attribution result, real clusters, real confirmation (all need the GPU server). Screening methods (DemInf, RoboDrop) as a "looks bad" signal. Visual-similarity clusters (declined). Operator- or date-based findings (the LIBERO catalog has none).</dd>
+  </dl>
+</div>
+
+<h2>How it works</h2>
+<figure>
+<svg viewBox="0 0 760 470" role="img" aria-label="Dataflow of the dashboard feature">
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="f-ah"/></marker></defs>
+  <text class="f-n" x="14" y="18">ROUND A (server, SLURM)</text>
+  <rect class="f-box" x="14" y="26" width="170" height="52" rx="6"/><text class="f-t" x="24" y="48">attribute_run</text><text class="f-m" x="24" y="66">vlapoc/attribution.py</text>
+  <rect class="f-box" x="214" y="26" width="150" height="52" rx="6"/><text class="f-t" x="224" y="48">ensemble_run</text><text class="f-m" x="224" y="66">per-seed z-scores</text>
+  <rect class="f-box soft" x="394" y="26" width="170" height="52" rx="6"/><text class="f-t" x="404" y="48">clusters_run</text><text class="f-m" x="404" y="66">vlapoc/clusters.py</text>
+  <rect class="f-box" x="594" y="26" width="150" height="52" rx="6"/><text class="f-t" x="604" y="48">discrepancy_run</text><text class="f-m" x="604" y="66">vlapoc/discrepancy.py</text>
+  <path class="f-arrow" d="M184,52 H212" marker-end="url(#ah)"/><path class="f-arrow" d="M364,52 H392" marker-end="url(#ah)"/><path class="f-arrow" d="M564,52 H592" marker-end="url(#ah)"/>
+  <text class="f-m" x="14" y="104">attribute now also records influence_matrix + influence_index (S1)</text>
+  <rect class="f-box dash" x="394" y="116" width="200" height="40" rx="6"/><text class="f-t" x="404" y="134">cluster_recovery_run</text><text class="f-m" x="404" y="149">reads answer key AFTER (S3)</text>
+  <path class="f-arrow" d="M479,78 V114" marker-end="url(#ah)"/>
+
+  <rect class="f-box acc" x="14" y="196" width="730" height="70" rx="8"/>
+  <text class="f-t" x="26" y="218">Lineage store (MLflow runs + recorded, sha256-checked outputs)</text>
+  <text class="f-m" x="26" y="238">data/lineage  (real)    data/lineage_demo  (synthetic scores, real videos)</text>
+  <text class="f-m" x="26" y="256">vlapoc/results.py: find_runs, score_table, influence, rollouts, clusters, provenance</text>
+  <path class="f-arrow" d="M99,78 V194" marker-end="url(#ah)"/>
+  <path class="f-arrow" d="M289,78 V194" marker-end="url(#ah)"/>
+  <path class="f-arrow" d="M679,78 V194" marker-end="url(#ah)"/>
+  <path class="f-arrow" d="M590,136 H670 V194" marker-end="url(#ah)"/>
+
+  <rect class="f-box soft" x="14" y="304" width="360" height="104" rx="8"/>
+  <text class="f-t" x="26" y="326">Dashboard (read-only): dashboard/app.py</text>
+  <text class="f-m" x="26" y="346">views/overview  rollouts  episodes</text>
+  <text class="f-m" x="26" y="362">views/clusters  bad_vs_harmful</text>
+  <text class="f-m" x="26" y="378">common.py (provenance banner), words.py</text>
+  <text class="f-m" x="26" y="396">vlapoc/video.py: H.264 clips from LeRobot frames</text>
+  <path class="f-arrow" d="M194,266 V302" marker-end="url(#ah)"/>
+
+  <text class="f-n" x="400" y="296">ROUND B (server): is the estimate true?</text>
+  <rect class="f-box" x="394" y="304" width="170" height="52" rx="6"/><text class="f-t" x="404" y="326">drop_cluster / planted arm</text><text class="f-m" x="404" y="344">runs.select_run, planted_arms.py</text>
+  <rect class="f-box" x="394" y="366" width="170" height="44" rx="6"/><text class="f-t" x="404" y="386">train → eval → verify</text><text class="f-m" x="404" y="402">same recipe, 3 seeds</text>
+  <rect class="f-box warn" x="594" y="334" width="150" height="56" rx="6"/><text class="f-t" x="604" y="356">confirm_run /</text><text class="f-t" x="604" y="372">discrepancy_verdict_run</text>
+  <path class="f-arrow" d="M479,356 V364" marker-end="url(#ah)"/><path class="f-arrow" d="M564,388 L592,370" marker-end="url(#ah)"/>
+  <path class="f-arrow" d="M670,334 V268" marker-end="url(#ah)"/>
+  <text class="f-m" x="14" y="440">Runbook: .claude/skills/server-run/SKILL.md (15 steps) drives Round A, the stages by hand, the dashboard and Round B on the server.</text>
+  <text class="f-m" x="14" y="458">Scripts: scripts/stage.py (one subcommand per stage), scripts/server_pipeline.py (SLURM chain), scripts/dashboard_demo.py (demo store).</text>
+</svg>
+<figcaption><b>Where the feature sits.</b> Round A (existing attribution chain) writes into the lineage store; this feature adds the matrix it was missing, three stages that read the scores (clusters, discrepancy, score-clusters), the dashboard that reads the store, and Round B, which turns a group into a retraining test whose verdict flows back into the store and onto the screen. Sits at the end of PoC §9.1, after Steps 3–4, and delivers §2.7.</figcaption>
+</figure>
+
+<h2>Stories</h2>
+<a class="entry" href="S1-results-loader-provenance.html"><div class="top"><span class="title">S1 · Read side and the fail-closed label</span><span class="date">6/6 ACs</span></div><p class="sum">The influence matrix is now recorded and one loader reads results back; the SYNTHETIC / SMOKE / REAL label is computed from the runs (7/7 label cases correct; a tampered file is refused).</p></a>
+<a class="entry" href="S2-clusters-stage.html"><div class="top"><span class="title">S2 · Clusters stage, three lenses</span><span class="date">9/9 ACs</span></div><p class="sum">On synthetic scores the planted slice is the top harm slice on HRT in 10 of 10 seeds and a false alarm on F(30) in 0 of 10.</p></a>
+<a class="entry" href="S3-score-clusters-vs-planted.html"><div class="top"><span class="title">S3 · Score clusters against the planted types</span><span class="date">4/4 ACs</span></div><p class="sum">After discovery, each cluster is compared with the answer key (hand-built check: precision 0.5, recall 1.0, lift 36.9, Fisher p 1.2e-22).</p></a>
+<a class="entry" href="S4-round-b-cluster-arms.html"><div class="top"><span class="title">S4 · Round B for discovered clusters</span><span class="date">5/5 ACs</span></div><p class="sum">A cluster becomes a removal arm: 21 jobs / 6 trainings for two picks (45 / 12 with matched random), and a confirm rule that can say confirmed, not confirmed or refuted.</p></a>
+<a class="entry" href="S5-live-dashboard.html"><div class="top"><span class="title">S5 · The live local dashboard</span><span class="date">11/11 ACs</span></div><p class="sum">Five pages in Streamlit; a real browser check measures every chart at 240 px or taller and a row click that works.</p></a>
+<a class="entry" href="S6-synthetic-demo-store.html"><div class="top"><span class="title">S6 · The synthetic demo store</span><span class="date">5/5 ACs</span></div><p class="sum">Real videos, catalog and 20 real rollouts with synthetic scores (44 runs tagged synthetic) plus the real 2-step SmolVLA smoke chain; 13 MiB store.</p></a>
+<a class="entry" href="S7-drop-in-proof.html"><div class="top"><span class="title">S7 · Real runs drop in</span><span class="date">3/3 ACs</span></div><p class="sum">Re-tagging a chain to what the server writes removes the banner with no code change; one synthetic tag brings it back.</p></a>
+<a class="entry" href="S8-server-runbook.html"><div class="top"><span class="title">S8 · Server runbook skill</span><span class="date">9/9 ACs</span></div><p class="sum">15 steps, 13 stop-and-ask points, every dry-run count equal to a fresh run (116/24, 129/33, 21/6, 45/12); 5 steps checked here, 10 unchecked until a server session.</p></a>
+<a class="entry" href="S9-bad-vs-harmful.html"><div class="top"><span class="title">S9 · Bad-looking vs harmful (estimated)</span><span class="date">7/7 ACs</span></div><p class="sum">The §9.2 view over the planted labels; bounded wording ("no detectable harm, CI …"), Welch false-call rate 5.9% vs bootstrap 9.3% on a null test.</p></a>
+<a class="entry" href="S10-planted-arms-causal.html"><div class="top"><span class="title">S10 · The §9.2 claim as retraining arms</span><span class="date">6/6 ACs</span></div><p class="sum">Round B planted: 11 arms, 129 jobs / 33 trainings (~132 GPU-h inferred), with a positive control and a bounded verdict wording.</p></a>
+
+<h2>What changed</h2>
+<p class="small">Lines added on branch <code>dashboard</code> since the training-attribution branch (<code>git diff --numstat 1d18247 HEAD</code>): 34 files, 6,342 insertions, 50 deletions, 57 commits.</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>File</th><th>Change</th><th class="num">Lines</th></tr></thead>
+  <tbody>
+    <tr><td><code>vlapoc/results.py</code></td><td>Read-only loader of the lineage store and the provenance label</td><td class="num">+360</td></tr>
+    <tr><td><code>vlapoc/clusters.py</code></td><td>The clusters stage: three lenses, patterns, estimated effects</td><td class="num">+538</td></tr>
+    <tr><td><code>vlapoc/discrepancy.py</code></td><td>Bad-looking vs harmful table, Welch readings, H1–H8 layer</td><td class="num">+393</td></tr>
+    <tr><td><code>vlapoc/planted_arms.py</code>, <code>confirm.py</code></td><td>Planted-type removal arms and statuses; cluster confirmation</td><td class="num">+282, +129</td></tr>
+    <tr><td><code>vlapoc/recovery.py</code>, <code>synthetic.py</code>, <code>video.py</code></td><td>Cluster-vs-key scoring; synthetic score generator; H.264 clips</td><td class="num">+132, +99, +98</td></tr>
+    <tr><td><code>dashboard/app.py</code>, <code>common.py</code>, <code>words.py</code>, <code>views/*</code></td><td>The five-page Streamlit app and its plain-language layer</td><td class="num">+788</td></tr>
+    <tr><td><code>scripts/stage.py</code>, <code>server_pipeline.py</code></td><td>New subcommands; <code>--round-b</code>, <code>--round-b-planted</code></td><td class="num">+142, +154</td></tr>
+    <tr><td><code>scripts/dashboard_demo.py</code>, <code>dashboard_screenshots.py</code>, <code>repoint_lineage_store.py</code></td><td>Demo-store builder, headless-browser capture and measurements, store repointing</td><td class="num">+299, +169, +71</td></tr>
+    <tr><td><code>.claude/skills/server-run/SKILL.md</code></td><td>The 15-step server runbook</td><td class="num">+314</td></tr>
+    <tr><td><code>scripts/verify_dashboard.py</code>, <code>verify_runbook.py</code></td><td>The proofs (10 modes, 89 checks; 10 runbook checks)</td><td class="num">+1,825, +332</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Demo</h2>
+<div class="note bad"><p>Everything on this section's screens and in the tables is <b>SYNTHETIC</b> unless stated: the dashboard is running on the demo store. Real: the videos, the catalog, the 20 test attempts, the 91 planted labels, the dry-run counts and the smoke run.</p></div>
+<div class="tiles">
+  <div class="tile"><div class="label">Acceptance criteria</div><div class="value">65/65</div><div class="note">10 stories; analyzer round 3</div></div>
+  <div class="tile"><div class="label">Proof checks passing</div><div class="value">99</div><div class="note">89 dashboard (10 modes) + 10 runbook</div></div>
+  <div class="tile"><div class="label">Round A on v3/candidate</div><div class="value">116 jobs</div><div class="note">24 trainings; code dry run</div></div>
+  <div class="tile"><div class="label">Round B, planted data</div><div class="value">129 jobs</div><div class="note">33 trainings; ~132 GPU-h (inferred, 4 h each)</div></div>
+  <div class="tile"><div class="label">Real attribution results</div><div class="value">0</div><div class="note">all scores in the demo are SYNTHETIC</div></div>
+</div>
+
+<h3>1. The screens</h3>
+<figure>
+  <img class="shot" src="artifacts/screens/overview.png" alt="Overview page with SYNTHETIC banner and a table of what each metric explains">
+  <figcaption><b>Overview.</b> Notice the red SYNTHETIC banner on the first line (it cannot be turned off in the app) and the table of what each metric explains, with its time cap: the spec's §3.4 requirement that every number says what it is about. 960 training episodes, 6 metrics scored. The label comes from the recorded runs.</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="artifacts/screens/rollouts.png" alt="Rollouts page: failed rollout with video and the training episodes that pushed it">
+  <figcaption><b>Rollouts (§2.7, first view).</b> A real failed attempt (<code>libero_spatial/0/init000/seed0</code>, failure type "timeout no progress", real video) and the ten training episodes that pushed toward it and the ten that pushed away, each playable. The influence values are synthetic; the failure type and videos are real (the failure type equals <code>returns.parquet</code>'s).</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="artifacts/screens/episodes.png" alt="Episodes page: ranked harmful and helpful lists and aggregation by task">
+  <figcaption><b>Episodes (§2.7, second view).</b> Most harmful and most helpful episodes for the chosen metric, and "aggregate by a catalog column" (here: task, 48 episodes each, with a mean and 95% interval). Notice that the aggregation is per metadata group, as PoC §1 asks.</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="artifacts/screens/clusters.png" alt="Clusters page: heatmap, scatter, cluster table with pattern and status">
+  <figcaption><b>Clusters.</b> Left: episode × metric heatmap (red = more harmful than average). Right: throughput-vs-reliability scatter, one dot per episode, coloured by the four groups. Below: the cluster table (here the rule-like-slice lens), a sentence describing the pattern, the Round B verdict rows (status shown as "SYNTHETIC: confirmed"), the descriptors that differ most, and the three most influential member videos. Notice that a cluster says "estimated" until a confirm run exists, and the last table scores the cluster against the planted types only after discovery.</figcaption>
+</figure>
+
+<h3>2. The finding the spec calls the most compelling</h3>
+<figure>
+<svg viewBox="0 0 640 300" role="img" aria-label="Four quadrants: looks bad and hurts 10, looks bad and no detectable harm 81, looks clean and hurts 127, looks clean and no detectable harm 742">
+  <text class="f-n" x="320" y="16" text-anchor="middle">SYNTHETIC scores · metric: Success within 30 s · 960 training episodes</text>
+  <text class="f-m" x="170" y="40" text-anchor="middle">hurts (harm z ≥ 1)</text><text class="f-m" x="470" y="40" text-anchor="middle">no detectable harm</text>
+  <text class="f-m" x="20" y="120" transform="rotate(-90 20 120)" text-anchor="middle">looks bad (planted)</text>
+  <text class="f-m" x="20" y="240" transform="rotate(-90 20 240)" text-anchor="middle">looks clean</text>
+  <rect class="f-box" x="40" y="50" width="260" height="110" rx="6"/><rect class="f-bad" x="40" y="50" width="6" height="110"/>
+  <text class="f-t" x="170" y="95" text-anchor="middle">looks bad, hurts</text><text class="f-t" x="170" y="130" text-anchor="middle" style="font-size:26px">10</text>
+  <rect class="f-box warn" x="320" y="50" width="300" height="110" rx="6"/>
+  <text class="f-t" x="470" y="95" text-anchor="middle">looks bad, no detectable harm</text><text class="f-t" x="470" y="130" text-anchor="middle" style="font-size:26px">81</text>
+  <rect class="f-box" x="40" y="170" width="260" height="110" rx="6"/>
+  <text class="f-t" x="170" y="215" text-anchor="middle">looks clean, hurts</text><text class="f-t" x="170" y="250" text-anchor="middle" style="font-size:26px">127</text>
+  <rect class="f-box" x="320" y="170" width="300" height="110" rx="6"/>
+  <text class="f-t" x="470" y="215" text-anchor="middle">looks clean, no detectable harm</text><text class="f-t" x="470" y="250" text-anchor="middle" style="font-size:26px">742</text>
+</svg>
+<figcaption><b>The §9.2 view, demo store (synthetic scores, real planted labels).</b> The two off-diagonal boxes are the point: 81 of the 91 planted-bad episodes show no detectable harm on this metric, and 127 clean-looking episodes do. The counts come from <code>discrepancy_episodes.parquet</code> and equal what the Bad-vs-harmful page shows (<code>verify_dashboard.py --app</code>, check 5.5b). Because the scores are invented, this shows the <i>view</i>, not a fact about any policy. It is also an <i>estimate</i>; the retraining arms in S10 are what would make "not harmful" a causal claim.</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="artifacts/screens/bad_vs_harmful.png" alt="Bad vs harmful page: quadrant table, strip chart per planted type, per-type readings, Round B rows and corrupted vs original video">
+  <figcaption><b>Bad vs harmful page.</b> Top: the quadrant table and a strip chart with one row per planted type (dots further right are more harmful; the grey/purple row is the clean episodes). Then per-type readings with the Welch interval and Holm value, the Round B verdict rows, and the corrupted episode next to its clean original so the viewer can see the damage. Notice the "SYNTHETIC:" prefix on every verdict and that a not-significant row reads "no detectable harm, bounded", never "harmless".</figcaption>
+</figure>
+<div class="scroll">
+<table>
+  <thead><tr><th>Planted type (13 episodes)</th><th>Metric</th><th class="num">Difference vs clean (z)</th><th>Welch 95% interval</th><th class="num">Holm p (5 metrics)</th><th>Reading (estimated, uncorrected across 7 × 5)</th></tr></thead>
+  <tbody>
+    <tr><td>idle_padding</td><td>HRT (speed vs human)</td><td class="num">2.02</td><td>[1.26, 2.78]</td><td class="num">0.0003</td><td>harmful</td></tr>
+    <tr><td>idle_padding</td><td>F(30) (success within 30 s)</td><td class="num">0.03</td><td>[−0.56, 0.62]</td><td class="num">1.0</td><td>no detectable harm</td></tr>
+    <tr><td>action_noise</td><td>HRT</td><td class="num">0.10</td><td>[−0.45, 0.64]</td><td class="num">1.0</td><td>no detectable harm</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="small"><b>SYNTHETIC check, not a result.</b> From <code>artifacts/s9_discrepancy_types_SYNTHETIC.csv</code>, produced by the verifier with a planted effect (idle-padding members shifted +2 spread on HRT only, others not shifted): the reading recovers exactly what was planted. So what: the method can tell "harmful on one metric, no detectable harm on another" for the same corruption type. On a null test with no planted effect, the Welch rule called 41 of 700 type-metric cells (5.9%); the earlier bootstrap called 65 (9.3%) against a 5% target.</p>
+
+<h3>3. The server plan, with code-produced counts</h3>
+<figure>
+<svg viewBox="0 0 640 250" role="img" aria-label="Jobs and trainings for each server round">
+  <text class="f-n" x="10" y="16">JOBS (bar) · TRAININGS (number) · from scripts/server_pipeline.py --dry-run</text>
+  <g class="f-m">
+    <text x="10" y="52">Round A (v3/candidate)</text>
+    <text x="10" y="92">Round B, planted data</text>
+    <text x="10" y="132">Round B, 2 clusters</text>
+    <text x="10" y="172">…with matched random</text>
+    <text x="10" y="212">Round B planted, 2 draws</text>
+  </g>
+  <line class="f-axis" x1="170" y1="30" x2="170" y2="228"/>
+  <rect class="f-bar" x="170" y="38" width="116" height="20"/><text class="f-mt" x="292" y="53">116 jobs · 24 trainings</text>
+  <rect class="f-bar" x="170" y="78" width="129" height="20"/><text class="f-mt" x="305" y="93">129 jobs · 33 trainings</text>
+  <rect class="f-bar2" x="170" y="118" width="21" height="20"/><text class="f-mt" x="197" y="133">21 jobs · 6 trainings</text>
+  <rect class="f-bar2" x="170" y="158" width="45" height="20"/><text class="f-mt" x="221" y="173">45 jobs · 12 trainings</text>
+  <rect class="f-barw" x="170" y="198" width="162" height="20"/><text class="f-mt" x="338" y="213">162 jobs · 36 trainings</text>
+</svg>
+<figcaption><b>What each round costs.</b> Bars are job counts, to one scale (1 px = 1 job). Round B on the planted data has 33 trainings, about 132 GPU-hours if each training takes about 4 hours (inferred from earlier runs, not measured for this pipeline). Round B for two chosen clusters is 6 trainings (12 with matched random controls). Round A on the planted dataset is 24 trainings. The counts come from <code>artifacts/b2_dry_run_counts.json</code> and were re-matched against fresh dry runs by <code>verify_runbook.py</code> (check 8.2). Without the oracle pair Round B planted is 108 jobs / 27 trainings.</figcaption>
+</figure>
+
+<h3>4. From estimate to confirmed</h3>
+<figure>
+<svg viewBox="0 0 700 190" role="img" aria-label="Estimated to confirmed pipeline">
+  <defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="f-ah"/></marker></defs>
+  <rect class="f-box" x="6" y="30" width="130" height="70" rx="6"/><text class="f-t" x="16" y="54">Scores</text><text class="f-m" x="16" y="72">influence per</text><text class="f-m" x="16" y="86">episode, metric</text>
+  <rect class="f-box" x="166" y="30" width="130" height="70" rx="6"/><text class="f-t" x="176" y="54">Cluster</text><text class="f-m" x="176" y="72">status:</text><text class="f-mt" x="176" y="86">estimated</text>
+  <rect class="f-box" x="326" y="30" width="150" height="70" rx="6"/><text class="f-t" x="336" y="54">Removal arm</text><text class="f-m" x="336" y="72">retrain without it,</text><text class="f-m" x="336" y="86">3 seeds (Round B)</text>
+  <rect class="f-box acc" x="506" y="30" width="188" height="70" rx="6"/><text class="f-t" x="516" y="54">Two-step verdict</text><text class="f-m" x="516" y="72">gate, then per-metric</text><text class="f-m" x="516" y="86">intervals, Holm</text>
+  <path class="f-arrow" d="M136,65 H164" marker-end="url(#ah2)"/><path class="f-arrow" d="M296,65 H324" marker-end="url(#ah2)"/><path class="f-arrow" d="M476,65 H504" marker-end="url(#ah2)"/>
+  <rect class="f-box" x="330" y="124" width="110" height="44" rx="6"/><text class="f-t" x="340" y="143">confirmed</text><text class="f-m" x="340" y="159">≥ 2 of 3, none against</text>
+  <rect class="f-box warn" x="450" y="124" width="110" height="44" rx="6"/><text class="f-t" x="460" y="143">not confirmed</text><text class="f-m" x="460" y="159">too few, gate silent</text>
+  <rect class="f-box" x="570" y="124" width="124" height="44" rx="6"/><text class="f-t" x="580" y="143">refuted</text><text class="f-m" x="580" y="159">opposite direction</text>
+  <path class="f-arrow" d="M600,100 V122" marker-end="url(#ah2)"/>
+</svg>
+<figcaption><b>Why the app says "estimated".</b> A group is only a first-order estimate until a retraining test (right) passes. In the demo, the three picked clusters read confirmed, not confirmed and refuted (synthetic verdicts), to show the three outcomes the real run can produce (<code>artifacts/demo_manifest.json</code>).</figcaption>
+</figure>
+
+<h3>Run it yourself</h3>
+<pre><code># the live app on the demo store (open http://localhost:8501)
+.venv/bin/streamlit run dashboard/app.py -- --lineage-root data/lineage_demo --scores attribute-demo-ens
+
+# rebuild the demo store (about 8 minutes on MPS; includes the real 2-step smoke chain)
+.venv/bin/python scripts/dashboard_demo.py build --with-smoke --force
+
+# the proofs (one mode per story group)
+.venv/bin/python scripts/verify_dashboard.py --results   # also --clusters --planted --discrepancy --round-b --planted-arms --app --render --demo --dropin
+.venv/bin/python scripts/verify_runbook.py
+
+# the server plan: count only, submits nothing
+.venv/bin/python scripts/server_pipeline.py --tag v3cand --subset v3/candidate --curation per_task --metrics f30 hrt60_lin --dry-run</code></pre>
+<p class="small">Captured from the analyzer's round-3 reruns (<code>artifacts/verify_dashboard_*.json</code>, <code>verify_runbook.json</code>): <code>results 12/12, clusters 14/14, planted 7/7, discrepancy 10/10, round_b 13/13, planted_arms 8/8, app 11/11, render 4/4, demo 6/6, dropin 4/4, runbook 10/10</code>; the dry run prints <code>would submit 116 jobs</code> (24 trainings). Run IDs and timings in these JSONs change on each run.</p>
+<p>The Streamlit options are <code>--clusters &lt;run&gt;</code> and <code>--mlflow-ui &lt;url&gt;</code>; environment variables <code>DASH_LINEAGE_ROOT</code>, <code>DASH_SCORES</code>, <code>DASH_CLUSTERS</code>, <code>DASH_MLFLOW_UI</code> override them. To show real server results, point <code>--lineage-root</code> at the repointed store and <code>--scores</code> at the real ensemble run (runbook Steps 9 and 14).</p>
+
+<h2>The server runbook</h2>
+<p>The runbook is a Claude Code skill, <code>server-run</code>, so a fresh session on the GPU server loads it automatically, and <code>CLAUDE.md</code> now points to it (committed in <code>5e39224</code>, owner-approved). It cannot be run here, so each step carries a tag.</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>Steps</th><th>What</th><th>Tag</th></tr></thead>
+  <tbody>
+    <tr><td>1–3</td><td>Preflight; copy inputs (including the smoke checkpoint, 1.5 GiB) and <b>repoint the copied store</b>; smoke on CUDA</td><td>unchecked until server</td></tr>
+    <tr><td>4</td><td>Round A dry run: 116 jobs / 24 trainings</td><td>checked here</td></tr>
+    <tr><td>5–7</td><td>Submit, monitor, recover (<code>--from</code>)</td><td>unchecked until server</td></tr>
+    <tr><td>8–9</td><td>Clusters, planted-type scoring and discrepancy by hand; the real dashboard</td><td>checked here</td></tr>
+    <tr><td>10 / 11</td><td>Round B for clusters: dry run 21/6 (45/12 matched) / submit and confirm</td><td>checked here / unchecked</td></tr>
+    <tr><td>12 / 13</td><td>Round B planted: dry run 129/33 / submit and verdict</td><td>checked here / unchecked</td></tr>
+    <tr><td>14–15</td><td>Results back (repoint again); known server-only risks (database locking, <code>smolvla_base</code> revision <code>5e8d12a6</code> vs pinned <code>d9f33c94</code>)</td><td>unchecked until server</td></tr>
+  </tbody>
+</table>
+</div>
+<p><b>Why the repoint step exists (measured).</b> MLflow stores absolute artifact paths in <code>mlflow.db</code>. A store copied from the Mac to the server (or back) still points at the old machine's folders, and the loader fails with <i>"Failed to download artifacts from path 'attribution_scores.parquet'"</i>. <code>scripts/repoint_lineage_store.py</code> rewrites them (dry run first; 43 runs rewritten in the test; read check afterwards returns the 960 × 34 score table). The analyzer caught that the first runbook draft omitted this.</p>
+<p><b>Stop-and-ask.</b> 13 marked points: preflight failure, store-relocation read check, missing smoke checkpoint, revision mismatch, failed check, odd numbers, failed job, disk below threshold, any needed code change, a SYNTHETIC or SMOKE banner on supposedly real results, the Round B cluster pick, cost approval, "database is locked". Rules in the skill: no code edits, no push, no deletes.</p>
+<p><b>What is verified.</b> <code>verify_runbook.py</code> (10/10): every command in the skill exists and its flags parse (23 commands; 11 executed locally, 12 only parsed), every count equals a fresh dry run, every step is tagged, every smoke-checkpoint dependency is in the copy list, and the store-repoint worked on a moved copy of the demo store. <b>What is not:</b> anything that needs CUDA, SLURM or the server's disk layout.</p>
+
+<h2>Verification</h2>
+<p>The analyzer re-ran every proof itself in round 3 (see the table in the demo section) and the full regression: <code>verify_attribution.py</code> 32/32 and the training-attribution modes (<code>--blind</code>, <code>--functionals</code> 18/18, <code>--pipeline</code> 9/9, <code>--step4</code> 13/13, <code>--recovery</code> 11/11, <code>--names</code> 13/13, <code>--groups</code> 9/9, <code>--integration</code> 12/12). The real <code>data/lineage/mlflow.db</code> has the same sha256 before and after (<code>306af4123fda…bde79</code>). In a real headless Chrome at 1400 px: the Clusters scatter is 394×355 px, the Bad-vs-harmful strip chart 839×240 px, the heatmap axes 566×611 px, clicking row 5 of the Rollouts table selects that rollout, no number is truncated, and the sidebar has no stray auto-generated page links (<code>--render</code>, 4/4).</p>
+<p><b>Not verified:</b> that any of this holds for a real policy (no real scores exist); the GPU-hour estimates; steps 1–3, 5–7, 11, 13–15 of the runbook; the long <code>--local-smoke</code> (8-minute MPS chain) was not rerun separately in the last rounds, but its chain is the demo build's smoke run; the live app itself was not launched by the analyzer in round 3 (it relied on the headless-Chrome <code>--render</code> and re-captured screens), and row-click geometry depends on Streamlit 1.66.1, so it must be re-checked after an upgrade.</p>
+
+<h2>Process trail</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>Round</th><th>Verdict</th><th>Sent back to</th><th>What was caught</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>REWORK</td><td>planner + executor</td><td>Every verifier passed, but a real browser showed: the Bad-vs-harmful chart was 18 px tall (every point on zero), the Rollouts row click did nothing, the auto-generated sidebar links opened blank pages. The runbook never repointed the store and its Step 3 probe command failed. The per-type reading used a bootstrap that over-calls (9.9% vs 5% on the analyzer's own simulation); it had to be Welch and say "uncorrected". The pages were not stakeholder-ready (raw provenance strings, snake_case labels).</td></tr>
+    <tr><td>2</td><td>REWORK</td><td>executor</td><td>All nine round-1 items fixed and re-measured. New: the runbook's copy list omitted the smoke checkpoint that Step 3 loads, so a fresh server session would stop there; the lineage command shown on pages (<code>--lineage-root</code>) was rejected by the CLI; the heatmap wrote a stray untracked <code>.axes.json</code> on every run.</td></tr>
+    <tr><td>3</td><td><b>PASS</b></td><td>none</td><td>All three fixed; full regression passes; <code>mlflow.db</code> unchanged. Non-blocking items (distinct quadrant colours, "also found for" caption, plain names in pattern text) done.</td></tr>
+  </tbody>
+</table>
+</div>
+<h3>Reinvention audit</h3>
+<div class="scroll">
+<table>
+  <thead><tr><th>Mechanism</th><th>Open-source alternative</th><th>Decision</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>The live app</td><td>Streamlit (adopted); Dash, Panel, Gradio, Spotlight, FiftyOne, LeRobot viewer, Rerun</td><td>adopted Streamlit 1.66.1</td><td>5 pure-wheel dependencies on Python 3.14; Spotlight (50 packages) and FiftyOne (66, a bundled MongoDB, Python 3.14 not listed) rejected; LeRobot's viewer has no scores or linking</td></tr>
+    <tr><td>Lens 2, slice finding</td><td>sliceline 0.3.0</td><td>adopted</td><td>Needs categorical inputs, so we bin descriptors (quantiles with a zero bin); a decision-tree fallback was not needed</td></tr>
+    <tr><td><code>discrepancy.welch</code></td><td><code>scipy.stats.ttest_ind(…, equal_var=False).confidence_interval</code></td><td><b>replaced</b></td><td>The hand-rolled version equalled scipy to 1e-15; now one call (max difference 0.0)</td></tr>
+    <tr><td>Percentile bootstrap for the per-type reading</td><td>Welch interval</td><td><b>replaced</b></td><td>9.3% false readings vs 5.9% on a null test (analyzer reproduced 9.29% and 5.86%)</td></tr>
+    <tr><td><code>scripts/repoint_lineage_store.py</code> (71 lines)</td><td><code>mlflow-export-import</code></td><td>kept</td><td>That tool does not preserve run ids (per the package's documentation as relayed in search results); our stores keep run ids inside params, so new ids would break the graph. MLflow has no "move store" command (searched twice)</td></tr>
+    <tr><td><code>clusters.bin_spec</code></td><td><code>KBinsDiscretizer</code>, <code>pd.qcut</code></td><td>kept</td><td>Neither isolates the zero mass or merges bins by minimum support (inferred from their parameters)</td></tr>
+    <tr><td><code>dashboard_screenshots.py</code></td><td>Playwright (not installed)</td><td>kept</td><td>Carries the render measurements the analyzer asked for</td></tr>
+    <tr><td><code>results.provenance</code>, <code>confirm.status_of</code>, <code>clusters.dedupe</code></td><td>none</td><td>kept</td><td>Spec-specific rules; no tool has them</td></tr>
+  </tbody>
+</table>
+</div>
+<h3>Disputes and owner rulings</h3>
+<p>No disputes: the executor addressed every analyzer item. Owner decisions this feature carried, in the owner's words where recorded: <b>lenses</b> "Label groups (task, scene), Rule-like slices, Four metric groups" (not visual-similarity clusters); <b>form</b> "Live local app"; <b>data</b> "Synthetic scores, labelled"; <b>mid-planning addition</b> "a real pattern that would show that bad episodes are not always harmful for a policy", then "can't we use the planted bad episodes instead of screening?" (answered yes: the planted labels define "bad", no new screening); <b>Q1 Round A</b> "Planted-bad-data v3 (Recommended)"; <b>Q2 Round B</b> "33 trainings, ~132 GPU-h (Rec.)" (option a); <b>CLAUDE.md pointer</b> "Add it at the end of the feature" (done by the orchestrator, <code>5e39224</code>). A finding the planner flagged and the owner approved: the positive control removes 91 episodes, so it does not show power at 13.</p>
+
+<h2>How to read the code</h2>
+<ol>
+  <li><code>vlapoc/results.py</code> — start here: the only reader of the lineage store for the app and the cluster stage; <code>find_runs</code> → <code>score_table</code> / <code>influence</code> / <code>rollouts</code> / <code>clusters</code> → <code>provenance</code>.</li>
+  <li><code>vlapoc/attribution.py</code> (<code>attribute_run</code>, <code>influence_index</code>) — now also records the rollout × episode matrix and its index.</li>
+  <li><code>vlapoc/clusters.py</code> — <code>descriptor_table</code> → <code>bin_descriptors</code> → <code>label_clusters</code>, <code>slice_clusters</code>, <code>group_clusters</code> → <code>dedupe</code> → <code>pattern_of</code> → <code>clusters_run</code>. Never reads the answer key.</li>
+  <li><code>vlapoc/recovery.py</code> (<code>cluster_recovery_run</code>) and <code>vlapoc/discrepancy.py</code> (<code>quadrant_of</code> → <code>type_table</code> → <code>discrepancy_run</code>) — the ground-truth side, run after the method side.</li>
+  <li><code>vlapoc/confirm.py</code> (<code>status_of</code> → <code>confirm_run</code>) and <code>vlapoc/planted_arms.py</code> (<code>build_arm</code> → <code>statuses</code> → <code>discrepancy_verdict_run</code>) — Round B.</li>
+  <li><code>dashboard/app.py</code> (33 lines), <code>common.py</code>, <code>words.py</code>, <code>views/</code> — the pages; each exposes <code>render(ctx)</code>.</li>
+  <li><code>scripts/dashboard_demo.py</code>, <code>vlapoc/synthetic.py</code> — the demo store.</li>
+  <li><code>.claude/skills/server-run/SKILL.md</code>, <code>scripts/repoint_lineage_store.py</code>, <code>scripts/verify_runbook.py</code> — the runbook and its proof.</li>
+  <li><code>scripts/verify_dashboard.py</code> — one mode per story group; the module docstring lists each criterion.</li>
+</ol>
+
+<h2>Next</h2>
+<ul>
+  <li>Run Round A on the GPU server following the runbook (116 jobs, 24 trainings). This is the first real attribution result; the SYNTHETIC banner goes away only when the recorded runs justify it.</li>
+  <li>Read the real clusters and the bad-vs-harmful table in the same dashboard, then pick clusters for Round B (runbook Step 8, a stop-and-ask).</li>
+  <li>Run Round B (planted arms: 129 jobs / 33 trainings; cluster arms: 21 / 6) to turn estimates into confirmed, refuted or bounded-null findings. This completes the "Verification &amp; demo" row of PoC §10 (p. 20).</li>
+  <li>Open question for the owner: screening (DemInf, RoboDrop) is still out of scope; the planted labels stand in for "looks bad".</li>
+</ul>
+
+<h2>Changes since first release</h2>
+<p class="empty">None yet. Later changes are logged in <code>changelog.md</code> in this folder.</p>
+
+<footer class="doc">
+  Grounded in <a href="../../../docs/VLA_Data_Attribution_PoC.pdf">VLA_Data_Attribution_PoC.pdf</a>
+  · feature record: <a href="brief.md">brief</a> · <a href="plan.md">plan</a> · <a href="execution-log.md">execution log</a>
+  · <a href="refactor.md">refactor</a> · analyzer rounds <a href="analysis-r1.md">1</a>, <a href="analysis-r2.md">2</a>, <a href="analysis-r3.md">3</a>
+</footer>
+
+</div>
+</body>
+</html>
