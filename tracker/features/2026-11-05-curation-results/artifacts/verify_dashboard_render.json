@@ -1,0 +1,116 @@
+{
+ "mode": "render",
+ "pass": true,
+ "n_pass": 4,
+ "n": 4,
+ "seconds": 96,
+ "checks": [
+  {
+   "name": "5.10a every Altair chart's plot area is at least 200 px tall at 1400 px (SVG path.background; Clusters and Bad vs harmful each have one, Curation results two) and the matplotlib heatmap's axes area and displayed image are at least 200 px tall",
+   "pass": true,
+   "detail": "plot areas (w, h) {'Overview': [], 'Rollouts': [], 'Episodes': [], 'Clusters': [[394, 355]], 'Bad vs harmful': [[839, 240]], 'Curation results': [[592, 222], [720, 306]]}; heatmap axes 566x611px, displayed image heights [411]"
+  },
+  {
+   "name": "5.10b clicking row 5 of the Rollouts table makes the page show that row's rollout_id as the selected rollout",
+   "pass": true,
+   "detail": "expected 'libero_10/8/init000/seed0'; selected before 'libero spatial/0/init000/seed0', after 'libero 10/8/init000/seed0'"
+  },
+  {
+   "name": "5.10c no st.metric value is truncated, the sidebar holds no auto-generated page links (only the page radio), and no page shows an exception",
+   "pass": true,
+   "detail": "truncated []; sidebar page links 0; exceptions {}"
+  },
+  {
+   "name": "R real data/lineage/mlflow.db sha256 unchanged by this mode",
+   "pass": true,
+   "detail": "306af4123fda7e63..."
+  }
+ ],
+ "measurements": {
+  "width": 1400,
+  "pages": {
+   "Overview": {
+    "plots": [],
+    "metrics": [
+     {
+      "text": "SYNTHETIC",
+      "truncated": false
+     },
+     {
+      "text": "960",
+      "truncated": false
+     },
+     {
+      "text": "6",
+      "truncated": false
+     }
+    ],
+    "images": [],
+    "exceptions": 0
+   },
+   "Rollouts": {
+    "plots": [],
+    "metrics": [],
+    "images": [],
+    "exceptions": 0
+   },
+   "Episodes": {
+    "plots": [],
+    "metrics": [],
+    "images": [],
+    "exceptions": 0
+   },
+   "Clusters": {
+    "plots": [
+     [
+      394,
+      355
+     ]
+    ],
+    "metrics": [],
+    "images": [
+     [
+      1170,
+      1040,
+      411
+     ]
+    ],
+    "exceptions": 0
+   },
+   "Bad vs harmful": {
+    "plots": [
+     [
+      839,
+      240
+     ]
+    ],
+    "metrics": [],
+    "images": [],
+    "exceptions": 0
+   },
+   "Curation results": {
+    "plots": [
+     [
+      592,
+      222
+     ],
+     [
+      720,
+      306
+     ]
+    ],
+    "metrics": [],
+    "images": [],
+    "exceptions": 0
+   }
+  },
+  "sidebar_nav_links": 0,
+  "row_click": {
+   "row": 4,
+   "expected": "libero_10/8/init000/seed0",
+   "before": "libero spatial/0/init000/seed0",
+   "after": "libero 10/8/init000/seed0",
+   "selected_after_click": true
+  }
+ }
+}

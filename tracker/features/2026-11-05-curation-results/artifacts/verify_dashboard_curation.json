@@ -53,7 +53,7 @@
   {
    "name": "4.1 on the demo store every status and sentence the page shows equals the recorded summary's text verbatim: the arm table for two metrics (all 16 rows), the headline status and sentence (AppTest compares the rendered dataframe cells and markdown with step4_summary.json)",
    "pass": true,
-   "detail": "exceptions []; first load 1.8s; f30 table equal True, hrt60 table equal True; headline 'SYNTHETIC: inconclusive'"
+   "detail": "exceptions []; first load 1.9s; f30 table equal True, hrt60 table equal True; headline 'SYNTHETIC: inconclusive'"
   },
   {
    "name": "4.2 the forest plots' data equal treated_advantage of the recorded verdict.json rows recomputed here (and equal planted_arms.treated_advantage, asserted): headline rows oriented so positive means the curated policy wins its own metric (the F(30)-curated row is the HRT-curated advantage with its sign flipped); per-arm plot = 3 comparisons x 3 seeds",
@@ -98,7 +98,7 @@
   {
    "name": "info first load of the page on the demo store (provenance walks the chain)",
    "pass": true,
-   "detail": "1.8s"
+   "detail": "1.9s"
   },
   {
    "name": "R real data/lineage/mlflow.db sha256 unchanged by this mode",
@@ -107,5 +107,5 @@
   }
  ],
  "SYNTHETIC": true,
- "first_load_seconds": 1.8
+ "first_load_seconds": 1.9
 }

@@ -1,0 +1,87 @@
+{
+ "width": 1400,
+ "pages": {
+  "Overview": {
+   "plots": [],
+   "metrics": [
+    {
+     "text": "SYNTHETIC",
+     "truncated": false
+    },
+    {
+     "text": "960",
+     "truncated": false
+    },
+    {
+     "text": "6",
+     "truncated": false
+    }
+   ],
+   "images": [],
+   "exceptions": 0
+  },
+  "Rollouts": {
+   "plots": [],
+   "metrics": [],
+   "images": [],
+   "exceptions": 0
+  },
+  "Episodes": {
+   "plots": [],
+   "metrics": [],
+   "images": [],
+   "exceptions": 0
+  },
+  "Clusters": {
+   "plots": [
+    [
+     394,
+     355
+    ]
+   ],
+   "metrics": [],
+   "images": [
+    [
+     1170,
+     1040,
+     411
+    ]
+   ],
+   "exceptions": 0
+  },
+  "Bad vs harmful": {
+   "plots": [
+    [
+     839,
+     240
+    ]
+   ],
+   "metrics": [],
+   "images": [],
+   "exceptions": 0
+  },
+  "Curation results": {
+   "plots": [
+    [
+     592,
+     222
+    ],
+    [
+     720,
+     306
+    ]
+   ],
+   "metrics": [],
+   "images": [],
+   "exceptions": 0
+  }
+ },
+ "sidebar_nav_links": 0,
+ "row_click": {
+  "row": 4,
+  "expected": "libero_10/8/init000/seed0",
+  "before": "libero spatial/0/init000/seed0",
+  "after": "libero 10/8/init000/seed0",
+  "selected_after_click": true
+ }
+}

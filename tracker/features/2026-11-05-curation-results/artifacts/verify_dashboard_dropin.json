@@ -1,0 +1,40 @@
+{
+ "mode": "dropin",
+ "pass": true,
+ "n_pass": 6,
+ "n": 6,
+ "seconds": 241,
+ "checks": [
+  {
+   "name": "7.1 the real attribute -> ensemble -> clusters code path (SYNTHETIC features, scratch store, run through the stage CLI) loads in the dashboard by run name, every page, with no file under dashboard/, vlapoc/ or scripts/ modified (git status --porcelain empty before and after)",
+   "pass": true,
+   "detail": "porcelain before '' after ''; page errors []; banner on the untagged fixture: ['**SMOKE run:** real code on a toy-scale chain, not attributi']"
+  },
+  {
+   "name": "7.2 the same chain with its train/eval runs re-tagged to what the server writes (vlapoc.smoke=false, eval.attribution_grade=true, nothing synthetic) renders with no SYNTHETIC or SMOKE banner (caption 'Provenance: REAL'); re-adding one synthetic tag brings the SYNTHETIC banner back",
+   "pass": true,
+   "detail": "re-tagged: banners [], caption ['Provenance: REAL (9 recorded runs checke']; one synthetic tag re-added: banner back True"
+  },
+  {
+   "name": "7.3 the real --with-smoke attribute run (real attribute_run output, no adapter) renders on the Rollouts page with its 2 real rollouts and the SMOKE banner",
+   "pass": true,
+   "detail": "2 rollouts ['libero_spatial/0/init000/seed0', 'libero_spatial/0/init001/seed1']; banner ['**SMOKE run:** real code on a toy-scale chain, not attribution-grade; ']; 3 videos (rollout + episodes)"
+  },
+  {
+   "name": "5.1 through the stage CLI, the dry run's select (every arm), verify (family W) and step4-summary commands (only --lineage-root and --feats-root added by the runner; the fixture's own subset as parent, k scaled to it) produce a summary the Curation results page renders by score-run name, with every recorded status and sentence shown, no page raising, and git status --porcelain -- dashboard vlapoc scripts empty before and after",
+   "pass": true,
+   "detail": "7 selects (k 5/3), 48 verdicts, 16 summary rows, headline ['inconclusive']; page rows equal recorded: True; porcelain before '' after ''"
+  },
+  {
+   "name": "5.2 the same chain re-tagged to what the server writes (vlapoc.smoke=false, eval.attribution_grade=true, nothing synthetic) shows no SYNTHETIC or SMOKE banner on the Curation results page and the 'Provenance: REAL' caption (header and page); adding one synthetic tag to one arm's eval run brings the SYNTHETIC banner back",
+   "pass": true,
+   "detail": "re-tagged: banners [], REAL captions 2; one synthetic tag added: banner back True"
+  },
+  {
+   "name": "R real data/lineage/mlflow.db sha256 unchanged by this mode",
+   "pass": true,
+   "detail": "306af4123fda7e63..."
+  }
+ ],
+ "SYNTHETIC": "fixture features/rollouts/returns"
+}
