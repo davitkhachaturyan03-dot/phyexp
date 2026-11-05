@@ -33,6 +33,19 @@ or `grep -l acme calls/*` finds what you need.
    checklist.
 3. **The raw notes or transcript**, verbatim, so the digest can always be checked against the source.
 
+## Business ideas
+
+`calls/outcome_business_ideas/` holds one ideas file per call, which the `call-notes` skill writes right after
+the digest. It has the same name as the call file, with `_ideas` before `.md`, and the call file links to it
+under its title. Each ideas file covers:
+
+- what the call revealed about demand, quoted from the call;
+- 3–5 ranked ideas, each checked against existing products and tools, with sources;
+- which earlier ideas this call strengthens or weakens;
+- one recommendation and a next step.
+
+It's gitignored along with the rest of `calls/`.
+
 ## Privacy
 
 This folder holds personal and commercial information about other people. Its contents are

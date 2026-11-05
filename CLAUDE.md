@@ -25,8 +25,9 @@ fixes, questions and one-off scripts don't go through the pipeline.
 
 **On the GPU server, follow the `server-run` skill** (`.claude/skills/server-run/SKILL.md`): preflight → smoke → Round A → clusters → dashboard → Round B → results back, stopping to ask at every marked point.
 
-**Call notes go to `calls/` via the `call-notes` skill** (`.claude/skills/call-notes/SKILL.md`). That is
-business record-keeping, not PoC work: no `vla-build`, no feature folder. `calls/` is gitignored.
+**Call notes go to `calls/` via the `call-notes` skill** (`.claude/skills/call-notes/SKILL.md`). Each call
+also gets a business-ideas file in `calls/outcome_business_ideas/`. That is business record-keeping, not PoC
+work: no `vla-build`, no feature folder. `calls/` is gitignored.
 
 ## Ground every answer in what already exists
 

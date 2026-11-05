@@ -72,6 +72,56 @@ and calibration.
 - **Red, for outcome-based attribution:** egocentric human video only, with no robot to deploy on. Offline
   quality scoring (the DemInf baseline) is still possible, but it is the baseline to beat, not our method.
 
+## Questions to ask labs training models
+
+Here the lab trains, owns the checkpoints and runs the evaluation. We work on their training runs
+instead of training on their data ourselves. Ask in this order.
+
+### 1. Curation and screening (ask first)
+- How do you curate and screen your training data today: manual review, rules of thumb (episode length, idle
+  time, failed attempts), automatic quality scores, NeMo Curator, or CUPID- or DemInf-style scoring? What
+  gets removed, and by what rule?
+- Have you checked that this screening improves the trained policy, for example by training with and without
+  the removed data?
+- Why this comes first: their screening is the baseline we have to beat. In our ground-truth test,
+  label-free statistics already found six of seven planted corruption types at AUROC ≥ 0.95
+  (`tracker/index.html`). A method has to beat the best heuristic, not chance.
+
+### 2. Pain
+- When a run got worse after a data change, how did you find out why, and how long did it take?
+- Has clean-looking data ever hurt performance? (Pebblous: 93 correct episodes took GR00T from 73% to 43%,
+  PoC p. 1.)
+- How do you set mixture weights, and how do you decide what data to collect or buy next?
+
+### 3. Evaluation (still the deal-breaker)
+- Section 2 of the pilot-cooperator questions above applies unchanged.
+- How do you decide a new checkpoint is better: which metric, how many rollouts, any significance test? (A
+  binary test needs "roughly 600–1500 rollouts per cell" to detect a 5-point difference, PoC §3.3.)
+
+### 4. Lineage
+- Can you trace a checkpoint to the exact episode IDs, data versions and mixture it was trained on? If not,
+  start there: "Attribution is impossible without it" (PoC p. 2).
+
+### 5. Model, data and compute
+- Which model (π0/π0.5, GR00T, SmolVLA, in-house)? Pretraining or fine-tuning? How often do you retrain?
+- How many data sources, and with what per-episode metadata?
+- Do you keep intermediate checkpoints? How many extra training runs would you fund for counterfactual checks?
+
+### 6. Buying data
+- Do you buy data from vendors? How do you judge a dataset before you buy it?
+
+### 7. Access and the deal
+- Can anything leave your infrastructure, or would we run inside it? May we corrupt a copy of the data for
+  the ground-truth test (PoC §2.5)?
+- Who decides? What would a successful pilot look like, and what are the budget and timeline?
+
+### How to read their answers
+- **Green:** closed-loop evaluation with enough rollouts, checkpoints traceable to episodes, and a
+  regression they couldn't explain.
+- **Yellow:** they evaluate, but have no lineage. The first deliverable is lineage.
+- **Red:** they only look at offline loss. The PoC attributes against "closed-loop rollout outcomes, not
+  training or validation loss" (p. 2), so there is nothing yet for attribution to explain.
+
 ## Note for people collecting egocentric data
 
 *Send or read out as is. Statements marked (inferred) are our reasoning, not measurements.*
