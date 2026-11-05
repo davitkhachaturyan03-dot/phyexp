@@ -864,10 +864,13 @@ def step4_synthetic() -> int:
         h2h = {"h-shown": [{"hrt60": True, "f30": False}, {"hrt60": True, "f30": False}, {"hrt60": True, "f30": None}],
                "h-partly": [{"hrt60": True, "f30": None}, {"hrt60": True, "f30": None}, {"hrt60": None, "f30": None}],
                "h-contradicted": [{"hrt60": False, "f30": False}, {"hrt60": False, "f30": False}, {"hrt60": None, "f30": False}],
-               "h-inconclusive": [{"hrt60": True, "f30": False}] * 3}
+               "h-inconclusive": [{"hrt60": True, "f30": False}] * 3,  # gate fired 0/3
+               "h-notshown": [{"hrt60": False, "f30": None}, {"hrt60": None, "f30": True}, {"hrt60": None, "f30": None}],  # gate 3/3, hrt60 C,0,0 and f30 0,T,0 (the demo's pattern)
+               "h-notshownb": [{"hrt60": None, "f30": None}] * 3}  # gate 2/3 (INFERRED boundary: tests the inferred rule), calls 0,0,g
+        gate_of = {"h-inconclusive": [False] * 3, "h-notshownb": [True, True, False]}
         for pair, onlys in h2h.items():
             for sd in range(3):
-                verify(f"v3-{pair}-s{sd}", "head_to_head", f"{pair}-hrt60_lin-k5", f"{pair}-f30-k5", sd, synthetic_verdict(None, gate=pair != "h-inconclusive", only=onlys[sd]), c3)
+                verify(f"v3-{pair}-s{sd}", "head_to_head", f"{pair}-hrt60_lin-k5", f"{pair}-f30-k5", sd, synthetic_verdict(None, gate=gate_of.get(pair, [True] * 3)[sd], only=onlys[sd]), c3)
         step4.summary_run("t", "step4-summary-t3", chain=c3, out_dir=base / "out3", lineage_root=lr, allow_dirty=True)
         t3 = pd.read_csv(base / "out3" / "step4_summary.csv")
         j3 = json.loads((base / "out3" / "step4_summary.json").read_text())
@@ -878,14 +881,19 @@ def step4_synthetic() -> int:
               got == want and get3("case-confirmed")["f30__by_seed"] == "T,T,0" and get3("case-refuted")["f30__by_seed"] == "C,C,T" and get3("case-inconclusive")["f30__by_seed"] == "T,g,g"
               and get3("case-inconclusive")["gate_fires"] == "1/3" and get3("case-notconfirmed")["gate_fires"] == "3/3", f"status codes {got}")
         hl = {h["treated"].split("-hrt60")[0]: h for h in j3["headline"]}
-        want_h = {"h-shown": "shown", "h-partly": "partly shown", "h-contradicted": "contradicted", "h-inconclusive": "inconclusive"}
+        want_h = {"h-shown": "shown", "h-partly": "partly shown", "h-contradicted": "contradicted", "h-inconclusive": "inconclusive", "h-notshown": "not shown", "h-notshownb": "not shown"}
         inc = hl["h-inconclusive"]
-        check("1.2 the headline gives shown / partly shown / contradicted / inconclusive on four planted cases; every gate-not-fired seed reads 'inconclusive (gate did not fire)' in its per-seed reading",
-              {k: v["status_code"] for k, v in hl.items()} == want_h and all(p["speed"] == "inconclusive (gate did not fire)" and p["reliability"] == "inconclusive (gate did not fire)" for p in inc["per_seed"])
+        gates_of = {k: v["gate_fires"] for k, v in hl.items()}
+        winner_free = all("wins its own metric" not in hl[k]["sentence"] and "No winner is stated" in hl[k]["sentence"] for k in ("h-inconclusive", "h-notshown", "h-notshownb"))
+        check("1.2 the headline gives shown / partly shown / contradicted / inconclusive (gate 0/3) / not shown (gate 3/3, hrt60 C,0,0 and f30 0,T,0) / not shown at the INFERRED gate 2/3 boundary (g >= ceil(2n/3)); "
+              "every gate-not-fired seed reads 'inconclusive (gate did not fire)'; neither non-claim sentence says a policy wins its own metric and both say 'No winner is stated'",
+              {k: v["status_code"] for k, v in hl.items()} == want_h and gates_of["h-inconclusive"] == "0/3" and gates_of["h-notshown"] == "3/3" and gates_of["h-notshownb"] == "2/3"
+              and all(p["speed"] == "inconclusive (gate did not fire)" and p["reliability"] == "inconclusive (gate did not fire)" for p in inc["per_seed"]) and winner_free
               and hl["h-shown"]["per_seed"][0]["speed"] == "HRT-curated policy faster" and hl["h-shown"]["per_seed"][0]["reliability"] == "F(30)-curated policy more reliable",
-              f"headline codes {[(k, v['status_code']) for k, v in hl.items()]}; inconclusive per-seed {inc['per_seed'][0]['speed']!r}")
+              f"headline codes {[(k, v['status_code'], v['gate_fires']) for k, v in hl.items()]}")
         banned = ("harm" + "less", "no " + "effect", "no " + "difference")
         texts_all = [str(x) for df_ in (t3, tbl) for c_ in df_.columns if c_.endswith(("__sentence", "__status")) for x in df_[c_]] + [h["sentence"] for h in j3["headline"]] + [h["status"] for h in j3["headline"]]
+        assert len(j3["headline"]) == 6
         sent_f30 = [str(x) for x in t3["f30__sentence"]]
         plain = step4.annotate({"arm": "a", "comparison": "vs_base", "control": "base", "op": "drop_top_k_per_task", "direction": "highest", "metric_column": "harm_f30__same_task", "k": 5,
                                 "f30__by_seed": "T,T,T", "f30__expected": "treated_better"}, ["f30"], False)
@@ -894,8 +902,12 @@ def step4_synthetic() -> int:
               and all(x.startswith("SYNTHETIC: ") for x in texts_all) and not plain["f30__status"].startswith("SYNTHETIC") and not plain["f30__sentence"].startswith("SYNTHETIC")
               and "Success within 30 s (τ 30 s)" in plain["f30__sentence"], f"{len(texts_all)} texts scanned; example: {sent_f30[0][:160]!r}")
         doc = step4.__doc__
+        src_txt = (REPO_ROOT / "vlapoc" / "step4.py").read_text()
         check("1.6 the module docstring cites PoC §9.1 Step 4 p. 19, §4.5 p. 11, §4.4 p. 10 and §2.3 p. 4 and labels the rule inferred",
-              all(x in doc for x in ("§9.1 Step 4 (p. 19)", "§4.5 (p. 11)", "§4.4 (p. 10)", "§2.3 (p. 4)", "**inferred**")), "missing: " + str([x for x in ("§9.1 Step 4 (p. 19)", "§4.5 (p. 11)", "§4.4 (p. 10)", "§2.3 (p. 4)", "**inferred**") if x not in doc]))
+              all(x in doc for x in ("§9.1 Step 4 (p. 19)", "§4.5 (p. 11)", "§4.4 (p. 10)", "§2.3 (p. 4)", "**inferred**")) and src_txt.count("not shown") >= 2 and "``not shown`` otherwise" in doc and "inconclusive`` otherwise" not in doc and "not shown" in step4.RULE and "inconclusive" in step4.RULE, "missing: " + str([x for x in ("§9.1 Step 4 (p. 19)", "§4.5 (p. 11)", "§4.4 (p. 10)", "§2.3 (p. 4)", "**inferred**") if x not in doc]))
+        ph = step4.metric_phrase("rmst60_op_cap")
+        check("1.7 the family-O verdict metric is worded in plain language: metric_phrase('rmst60_op_cap') has no underscore and contains 'τ 60 s' (the plain name comes from the registry entry); the family-W phrase is unchanged",
+              "_" not in ph and "τ 60 s" in ph and step4.metric_phrase("f30") == "Success within 30 s (τ 30 s)", repr(ph))
         jobs, summ = dry_run("--subset", "v3/candidate", "--curation", "per_task", "--metrics", "f30", "hrt60_lin")
         sm = next(j for j in jobs if j["name"] == "step4-summary-t")
         check("1.5 no job change: the Round A dry run still plans 116 jobs and the step4-summary command is unchanged in form",
@@ -947,7 +959,11 @@ def step4_synthetic() -> int:
     sha1 = db_sha()
     check("R7 real mlflow.db sha256 unchanged", sha0 == sha1, f"{sha0[:16]}... == {sha1[:16]}...")
     ok_all = all(r[1] for r in results)
-    (ARTIFACTS / "s4_summary_and_selects.json").write_text(json.dumps({"pass": ok_all, "checks": [{"name": n, "pass": p_, "detail": d} for n, p_, d in results]}, indent=1))
+    mine = lambda n: n.startswith(("1.1 ", "1.2 ", "1.3 ", "1.4 ", "1.5 ", "1.6 ", "1.7 "))  # noqa: E731 - curation-results S1 checks go to that feature's artifacts
+    (ARTIFACTS / "s4_summary_and_selects.json").write_text(json.dumps({"pass": all(r[1] for r in results if not mine(r[0])), "checks": [{"name": n, "pass": p_, "detail": d} for n, p_, d in results if not mine(n)]}, indent=1))
+    cur_art = REPO_ROOT / "tracker" / "features" / "2026-11-05-curation-results" / "artifacts"
+    cur_art.mkdir(parents=True, exist_ok=True)
+    (cur_art / "verify_step4_curation.json").write_text(json.dumps({"pass": all(r[1] for r in results if mine(r[0])), "checks": [{"name": n, "pass": p_, "detail": d} for n, p_, d in results if mine(n)]}, indent=1))
     print(f"S4 summary/selects pass: {ok_all} ({sum(r[1] for r in results)}/{len(results)}, {time.time() - t0:.0f}s)")
     return 0 if ok_all else 1
 

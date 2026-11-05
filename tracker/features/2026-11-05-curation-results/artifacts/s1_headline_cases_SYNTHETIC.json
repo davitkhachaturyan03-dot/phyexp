@@ -58,7 +58,7 @@
     "reliability": "F(30)-curated policy more reliable"
    }
   ],
-  "rule": "per metric with an expectation: confirmed = expectation met (significant call in the expected direction, macro-KS gate fired) in >= ceil(2n/3) of n seeds and contradicted in none; refuted = the opposite significant call in >= ceil(2n/3) seeds; inconclusive = neither, and the gate fired in fewer than ceil(2n/3) seeds; otherwise not confirmed. Same-dataset-opposite-curations headline: shown = speed claim (HRT-curated arm better on the HRT ratio) and reliability claim (F(30)-curated arm better on F(30)) both confirmed; contradicted = either refuted; partly shown = exactly one confirmed and none refuted; otherwise inconclusive (inferred; stated before any result; the across-seed rule is vlapoc.confirm's)"
+  "rule": "per metric with an expectation: confirmed = expectation met (significant call in the expected direction, macro-KS gate fired) in >= ceil(2n/3) of n seeds and contradicted in none; refuted = the opposite significant call in >= ceil(2n/3) seeds; inconclusive = neither, and the gate fired in fewer than ceil(2n/3) seeds; otherwise not confirmed. Same-dataset-opposite-curations headline: shown = speed claim (HRT-curated arm better on the HRT ratio) and reliability claim (F(30)-curated arm better on F(30)) both confirmed; contradicted = either refuted; partly shown = exactly one confirmed and none refuted; inconclusive = none of those and the gate fired in fewer than ceil(2n/3) seeds; not shown = none of those and the gate fired in at least ceil(2n/3) seeds but neither claim replicated (inferred; stated before any result; the across-seed rule is vlapoc.confirm's)"
  },
  {
   "treated": "h-inconclusive-hrt60_lin-k5",
@@ -73,7 +73,7 @@
   "gate_fires": "0/3",
   "status_code": "inconclusive",
   "status": "SYNTHETIC: inconclusive",
-  "sentence": "SYNTHETIC: Same dataset, opposite curations: inconclusive. The macro-KS gate fired in 0 of 3 seeds; speed claim on Speed vs human (HRT) (τ 60 s): inconclusive; reliability claim on Success within 30 s (τ 30 s): inconclusive. No winner is stated.",
+  "sentence": "SYNTHETIC: Same dataset, opposite curations: inconclusive. The macro-KS gate fired in only 0 of 3 seeds, so no direction is claimed for either curated policy. No winner is stated.",
   "speed": {
    "metric": "hrt60",
    "status": "inconclusive",
@@ -119,7 +119,129 @@
     "reliability": "inconclusive (gate did not fire)"
    }
   ],
-  "rule": "per metric with an expectation: confirmed = expectation met (significant call in the expected direction, macro-KS gate fired) in >= ceil(2n/3) of n seeds and contradicted in none; refuted = the opposite significant call in >= ceil(2n/3) seeds; inconclusive = neither, and the gate fired in fewer than ceil(2n/3) seeds; otherwise not confirmed. Same-dataset-opposite-curations headline: shown = speed claim (HRT-curated arm better on the HRT ratio) and reliability claim (F(30)-curated arm better on F(30)) both confirmed; contradicted = either refuted; partly shown = exactly one confirmed and none refuted; otherwise inconclusive (inferred; stated before any result; the across-seed rule is vlapoc.confirm's)"
+  "rule": "per metric with an expectation: confirmed = expectation met (significant call in the expected direction, macro-KS gate fired) in >= ceil(2n/3) of n seeds and contradicted in none; refuted = the opposite significant call in >= ceil(2n/3) seeds; inconclusive = neither, and the gate fired in fewer than ceil(2n/3) seeds; otherwise not confirmed. Same-dataset-opposite-curations headline: shown = speed claim (HRT-curated arm better on the HRT ratio) and reliability claim (F(30)-curated arm better on F(30)) both confirmed; contradicted = either refuted; partly shown = exactly one confirmed and none refuted; inconclusive = none of those and the gate fired in fewer than ceil(2n/3) seeds; not shown = none of those and the gate fired in at least ceil(2n/3) seeds but neither claim replicated (inferred; stated before any result; the across-seed rule is vlapoc.confirm's)"
+ },
+ {
+  "treated": "h-notshown-hrt60_lin-k5",
+  "control": "h-notshown-f30-k5",
+  "family": "W",
+  "n_seeds": 3,
+  "seeds": [
+   "0",
+   "1",
+   "2"
+  ],
+  "gate_fires": "3/3",
+  "status_code": "not shown",
+  "status": "SYNTHETIC: not shown",
+  "sentence": "SYNTHETIC: Same dataset, opposite curations: not shown at this sample size (3 seeds). The two curated policies' time-to-success distributions differ (macro-KS gate fired in 3 of 3 seeds), but neither curated policy's win on its own metric replicated across seeds (speed claim on Speed vs human (HRT) (τ 60 s): not confirmed, 0 of 3; reliability claim on Success within 30 s (τ 30 s): not confirmed, 0 of 3). A change that is not detected is not evidence that the curations leave the policies unchanged. No winner is stated.",
+  "speed": {
+   "metric": "hrt60",
+   "status": "not confirmed",
+   "met": 0,
+   "contradicted": 1,
+   "calls": [
+    "C",
+    "0",
+    "0"
+   ]
+  },
+  "reliability": {
+   "metric": "f30",
+   "status": "not confirmed",
+   "met": 0,
+   "contradicted": 1,
+   "calls": [
+    "0",
+    "T",
+    "0"
+   ]
+  },
+  "per_seed": [
+   {
+    "seed": "0",
+    "speed_call": "C",
+    "reliability_call": "0",
+    "speed": "F(30)-curated policy faster",
+    "reliability": "not shown at this sample size"
+   },
+   {
+    "seed": "1",
+    "speed_call": "0",
+    "reliability_call": "T",
+    "speed": "not shown at this sample size",
+    "reliability": "HRT-curated policy more reliable"
+   },
+   {
+    "seed": "2",
+    "speed_call": "0",
+    "reliability_call": "0",
+    "speed": "not shown at this sample size",
+    "reliability": "not shown at this sample size"
+   }
+  ],
+  "rule": "per metric with an expectation: confirmed = expectation met (significant call in the expected direction, macro-KS gate fired) in >= ceil(2n/3) of n seeds and contradicted in none; refuted = the opposite significant call in >= ceil(2n/3) seeds; inconclusive = neither, and the gate fired in fewer than ceil(2n/3) seeds; otherwise not confirmed. Same-dataset-opposite-curations headline: shown = speed claim (HRT-curated arm better on the HRT ratio) and reliability claim (F(30)-curated arm better on F(30)) both confirmed; contradicted = either refuted; partly shown = exactly one confirmed and none refuted; inconclusive = none of those and the gate fired in fewer than ceil(2n/3) seeds; not shown = none of those and the gate fired in at least ceil(2n/3) seeds but neither claim replicated (inferred; stated before any result; the across-seed rule is vlapoc.confirm's)"
+ },
+ {
+  "treated": "h-notshownb-hrt60_lin-k5",
+  "control": "h-notshownb-f30-k5",
+  "family": "W",
+  "n_seeds": 3,
+  "seeds": [
+   "0",
+   "1",
+   "2"
+  ],
+  "gate_fires": "2/3",
+  "status_code": "not shown",
+  "status": "SYNTHETIC: not shown",
+  "sentence": "SYNTHETIC: Same dataset, opposite curations: not shown at this sample size (3 seeds). The two curated policies' time-to-success distributions differ (macro-KS gate fired in 2 of 3 seeds), but neither curated policy's win on its own metric replicated across seeds (speed claim on Speed vs human (HRT) (τ 60 s): not confirmed, 0 of 3; reliability claim on Success within 30 s (τ 30 s): not confirmed, 0 of 3). A change that is not detected is not evidence that the curations leave the policies unchanged. No winner is stated.",
+  "speed": {
+   "metric": "hrt60",
+   "status": "not confirmed",
+   "met": 0,
+   "contradicted": 0,
+   "calls": [
+    "0",
+    "0",
+    "g"
+   ]
+  },
+  "reliability": {
+   "metric": "f30",
+   "status": "not confirmed",
+   "met": 0,
+   "contradicted": 0,
+   "calls": [
+    "0",
+    "0",
+    "g"
+   ]
+  },
+  "per_seed": [
+   {
+    "seed": "0",
+    "speed_call": "0",
+    "reliability_call": "0",
+    "speed": "not shown at this sample size",
+    "reliability": "not shown at this sample size"
+   },
+   {
+    "seed": "1",
+    "speed_call": "0",
+    "reliability_call": "0",
+    "speed": "not shown at this sample size",
+    "reliability": "not shown at this sample size"
+   },
+   {
+    "seed": "2",
+    "speed_call": "g",
+    "reliability_call": "g",
+    "speed": "inconclusive (gate did not fire)",
+    "reliability": "inconclusive (gate did not fire)"
+   }
+  ],
+  "rule": "per metric with an expectation: confirmed = expectation met (significant call in the expected direction, macro-KS gate fired) in >= ceil(2n/3) of n seeds and contradicted in none; refuted = the opposite significant call in >= ceil(2n/3) seeds; inconclusive = neither, and the gate fired in fewer than ceil(2n/3) seeds; otherwise not confirmed. Same-dataset-opposite-curations headline: shown = speed claim (HRT-curated arm better on the HRT ratio) and reliability claim (F(30)-curated arm better on F(30)) both confirmed; contradicted = either refuted; partly shown = exactly one confirmed and none refuted; inconclusive = none of those and the gate fired in fewer than ceil(2n/3) seeds; not shown = none of those and the gate fired in at least ceil(2n/3) seeds but neither claim replicated (inferred; stated before any result; the across-seed rule is vlapoc.confirm's)"
  },
  {
   "treated": "h-partly-hrt60_lin-k5",
@@ -180,7 +302,7 @@
     "reliability": "not shown at this sample size"
    }
   ],
-  "rule": "per metric with an expectation: confirmed = expectation met (significant call in the expected direction, macro-KS gate fired) in >= ceil(2n/3) of n seeds and contradicted in none; refuted = the opposite significant call in >= ceil(2n/3) seeds; inconclusive = neither, and the gate fired in fewer than ceil(2n/3) seeds; otherwise not confirmed. Same-dataset-opposite-curations headline: shown = speed claim (HRT-curated arm better on the HRT ratio) and reliability claim (F(30)-curated arm better on F(30)) both confirmed; contradicted = either refuted; partly shown = exactly one confirmed and none refuted; otherwise inconclusive (inferred; stated before any result; the across-seed rule is vlapoc.confirm's)"
+  "rule": "per metric with an expectation: confirmed = expectation met (significant call in the expected direction, macro-KS gate fired) in >= ceil(2n/3) of n seeds and contradicted in none; refuted = the opposite significant call in >= ceil(2n/3) seeds; inconclusive = neither, and the gate fired in fewer than ceil(2n/3) seeds; otherwise not confirmed. Same-dataset-opposite-curations headline: shown = speed claim (HRT-curated arm better on the HRT ratio) and reliability claim (F(30)-curated arm better on F(30)) both confirmed; contradicted = either refuted; partly shown = exactly one confirmed and none refuted; inconclusive = none of those and the gate fired in fewer than ceil(2n/3) seeds; not shown = none of those and the gate fired in at least ceil(2n/3) seeds but neither claim replicated (inferred; stated before any result; the across-seed rule is vlapoc.confirm's)"
  },
  {
   "treated": "h-shown-hrt60_lin-k5",
@@ -241,6 +363,6 @@
     "reliability": "not shown at this sample size"
    }
   ],
-  "rule": "per metric with an expectation: confirmed = expectation met (significant call in the expected direction, macro-KS gate fired) in >= ceil(2n/3) of n seeds and contradicted in none; refuted = the opposite significant call in >= ceil(2n/3) seeds; inconclusive = neither, and the gate fired in fewer than ceil(2n/3) seeds; otherwise not confirmed. Same-dataset-opposite-curations headline: shown = speed claim (HRT-curated arm better on the HRT ratio) and reliability claim (F(30)-curated arm better on F(30)) both confirmed; contradicted = either refuted; partly shown = exactly one confirmed and none refuted; otherwise inconclusive (inferred; stated before any result; the across-seed rule is vlapoc.confirm's)"
+  "rule": "per metric with an expectation: confirmed = expectation met (significant call in the expected direction, macro-KS gate fired) in >= ceil(2n/3) of n seeds and contradicted in none; refuted = the opposite significant call in >= ceil(2n/3) seeds; inconclusive = neither, and the gate fired in fewer than ceil(2n/3) seeds; otherwise not confirmed. Same-dataset-opposite-curations headline: shown = speed claim (HRT-curated arm better on the HRT ratio) and reliability claim (F(30)-curated arm better on F(30)) both confirmed; contradicted = either refuted; partly shown = exactly one confirmed and none refuted; inconclusive = none of those and the gate fired in fewer than ceil(2n/3) seeds; not shown = none of those and the gate fired in at least ceil(2n/3) seeds but neither claim replicated (inferred; stated before any result; the across-seed rule is vlapoc.confirm's)"
  }
 ]

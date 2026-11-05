@@ -48,8 +48,11 @@ calls (``<m>__by_seed``), so the dashboard can compute the same text from an old
   differ, PoC §4.4 (p. 10): direction is claimed only after the gate fires). A metric with no expectation (a random-removal control arm) reads
   ``no expectation (control arm)``.
 - **Headline per head-to-head pair** (PoC §4.5 p. 11: "show that each curated policy wins on its own metric"): speed claim = the HRT-curated arm is better on
-  ``hrt60`` (``status_of(..., "T")``), reliability claim = the F(30)-curated arm is better on ``f30`` (``status_of(..., "C")``). ``shown`` if both are
-  confirmed, ``contradicted`` if either is refuted, ``partly shown`` if exactly one is confirmed and none refuted, ``inconclusive`` otherwise.
+  ``hrt60`` (``status_of(..., "T")``), reliability claim = the F(30)-curated arm is better on ``f30`` (``status_of(..., "C")``). Both claims come from the same
+  verdicts and share one gate count g (seeds whose macro-KS gate fired). In this order: ``contradicted`` if either claim is refuted; ``shown`` if both are
+  confirmed; ``partly shown`` if exactly one is confirmed (none refuted); ``inconclusive`` if g < ceil(2n/3) (the two policies were not shown to differ, PoC §4.4
+  (p. 10): direction only after the gate fires); ``not shown`` otherwise (g >= ceil(2n/3), the policies differ, but neither claim replicated). The first three
+  cannot happen when g < ceil(2n/3), so the order is unambiguous (the gate 2/3 boundary is a fixture case).
 - **Wording** (PoC §4.4 (p. 10) "Label every claim with its metric and time cap τ"): every sentence names the metric's plain name and its τ; a result that is
   not significant reads "not shown at this sample size" and says that is not evidence for anything else. The words "harmless", "no effect" and
   "no difference" are never used. With a synthetic input (a verify or select run tagged ``vlapoc.synthetic=true``, or a verdict carrying
@@ -120,7 +123,8 @@ def call(metric_row: dict, alpha: float = ALPHA, gate_fires: bool = True) -> str
 RULE = ("per metric with an expectation: confirmed = expectation met (significant call in the expected direction, macro-KS gate fired) in >= ceil(2n/3) of n seeds and "
         "contradicted in none; refuted = the opposite significant call in >= ceil(2n/3) seeds; inconclusive = neither, and the gate fired in fewer than ceil(2n/3) seeds; "
         "otherwise not confirmed. Same-dataset-opposite-curations headline: shown = speed claim (HRT-curated arm better on the HRT ratio) and reliability claim "
-        "(F(30)-curated arm better on F(30)) both confirmed; contradicted = either refuted; partly shown = exactly one confirmed and none refuted; otherwise inconclusive "
+        "(F(30)-curated arm better on F(30)) both confirmed; contradicted = either refuted; partly shown = exactly one confirmed and none refuted; inconclusive = none of those and "
+        "the gate fired in fewer than ceil(2n/3) seeds; not shown = none of those and the gate fired in at least ceil(2n/3) seeds but neither claim replicated "
         "(inferred; stated before any result; the across-seed rule is vlapoc.confirm's)")
 STATUS_NONE = "no expectation (control arm)"
 HEADLINE_PAIR = ("hrt60", "f30")  # PoC §4.5 p. 11: the speed metric (HRT-curated arm should win it) and the reliability metric (F(30)-curated arm should win it)
@@ -131,7 +135,10 @@ def _name_of(key: str) -> str:
     """Plain name of a verdict metric key (``f30`` -> ``Success within 30 s``), from ``metrics_registry.SHORT_NAMES``."""
     from vlapoc.metrics_registry import SHORT_NAMES
 
-    return SHORT_NAMES.get({"hrt60": "hrt60_lin", "auc_h": "auc_expected"}.get(key, key), key)
+    from vlapoc.metrics_registry import entry
+
+    base = {"hrt60": "hrt60_lin", "auc_h": "auc_expected"}.get(key, key)
+    return SHORT_NAMES.get(base) or entry(key)["metric"]  # family O keys (``rmst60_op_cap``) take the registry's plain ``metric`` name
 
 
 def metric_phrase(key: str) -> str:
@@ -244,8 +251,10 @@ def headline(rows: list[dict], synthetic: bool = False) -> list[dict]:
             code = "shown"
         elif "confirmed" in (s_status, r_status):
             code = "partly shown"
-        else:
+        elif gates < math.ceil(2 * n / 3):
             code = "inconclusive"
+        else:
+            code = "not shown"
         seeds = [s for s in str(row.get("seeds", "")).split(",") if s != ""]
         per_seed = []
         for i, (a, b) in enumerate(zip(sc, rc)):
@@ -265,9 +274,14 @@ def headline(rows: list[dict], synthetic: bool = False) -> list[dict]:
         elif code == "partly shown":
             text = (f"Same dataset, opposite curations: partly shown. Speed claim on {sp}: {s_status} ({s_met} of {n} seeds); reliability claim on {rp}: {r_status} ({r_met} of {n} seeds). "
                     "Only one of the two curated policies is shown to win its own metric.")
+        elif code == "not shown":
+            rr = row.get("rollouts_per_task")
+            size = f"{n} seeds" + (f" x {int(float(rr))} rollouts per task" if rr not in (None, "") and str(rr) != "nan" else "")
+            text = (f"Same dataset, opposite curations: not shown at this sample size ({size}). The two curated policies' time-to-success distributions differ (macro-KS gate fired in {gates} of {n} seeds), "
+                    f"but neither curated policy's win on its own metric replicated across seeds (speed claim on {sp}: {s_status}, {s_met} of {n}; reliability claim on {rp}: {r_status}, {r_met} of {n}). "
+                    "A change that is not detected is not evidence that the curations leave the policies unchanged. No winner is stated.")
         else:
-            text = (f"Same dataset, opposite curations: inconclusive. The macro-KS gate fired in {gates} of {n} seeds; speed claim on {sp}: {s_status}; reliability claim on {rp}: {r_status}. "
-                    "No winner is stated.")
+            text = (f"Same dataset, opposite curations: inconclusive. The macro-KS gate fired in only {gates} of {n} seeds, so no direction is claimed for either curated policy. No winner is stated.")
         out.append({"treated": row["arm"], "control": row["control"], "family": row.get("family", "W"), "n_seeds": n, "seeds": seeds, "gate_fires": row.get("gate_fires"),
                     "status_code": code, "status": pre + code, "sentence": pre + text,
                     "speed": {"metric": speed_m, "status": s_status, "met": s_met, "contradicted": s_con, "calls": sc},

@@ -1,0 +1,40 @@
+{
+ "pass": true,
+ "checks": [
+  {
+   "name": "1.4 (curation-results S1) the old columns and rows of step4_summary.csv from the existing fixture are byte-identical to the file at git HEAD; the new columns come last",
+   "pass": true,
+   "detail": "46 old columns equal HEAD: True; 18 new columns (last): ['k', 'rollouts_per_task', 'synthetic', 'f30__status_code']..."
+  },
+  {
+   "name": "1.1 planted cases, hand-computed: (T,T,0) confirmed; (C,C,T) refuted; (T,0,0) with the gate fired 3/3 not confirmed; gate fired 1/3 inconclusive; a random arm has no expectation",
+   "pass": true,
+   "detail": "status codes {'case-confirmed': 'confirmed', 'case-refuted': 'refuted', 'case-notconfirmed': 'not confirmed', 'case-inconclusive': 'inconclusive', 'random0-k5': 'no expectation (control arm)'}"
+  },
+  {
+   "name": "1.2 the headline gives shown / partly shown / contradicted / inconclusive (gate 0/3) / not shown (gate 3/3, hrt60 C,0,0 and f30 0,T,0) / not shown at the INFERRED gate 2/3 boundary (g >= ceil(2n/3)); every gate-not-fired seed reads 'inconclusive (gate did not fire)'; neither non-claim sentence says a policy wins its own metric and both say 'No winner is stated'",
+   "pass": true,
+   "detail": "headline codes [('h-contradicted', 'contradicted', '3/3'), ('h-inconclusive', 'inconclusive', '0/3'), ('h-notshown', 'not shown', '3/3'), ('h-notshownb', 'not shown', '2/3'), ('h-partly', 'partly shown', '3/3'), ('h-shown', 'shown', '3/3')]"
+  },
+  {
+   "name": "1.3 no status or sentence contains the banned words (case-insensitive); every sentence about a result names the metric's plain name and its \u03c4; with a synthetic input every status and sentence begins 'SYNTHETIC: '; without one nothing does",
+   "pass": true,
+   "detail": "162 texts scanned; example: 'SYNTHETIC: Removing the 5 episodes per task ranked most harmful for Success within 30 s improved Success within 30 s (\u03c4 30 s) compared with the original policy '"
+  },
+  {
+   "name": "1.6 the module docstring cites PoC \u00a79.1 Step 4 p. 19, \u00a74.5 p. 11, \u00a74.4 p. 10 and \u00a72.3 p. 4 and labels the rule inferred",
+   "pass": true,
+   "detail": "missing: []"
+  },
+  {
+   "name": "1.7 the family-O verdict metric is worded in plain language: metric_phrase('rmst60_op_cap') has no underscore and contains '\u03c4 60 s' (the plain name comes from the registry entry); the family-W phrase is unchanged",
+   "pass": true,
+   "detail": "'operation RMST, capped (\u03c4 60 s)'"
+  },
+  {
+   "name": "1.5 no job change: the Round A dry run still plans 116 jobs and the step4-summary command is unchanged in form",
+   "pass": true,
+   "detail": "would submit 116 jobs; chain t-2ce2cee4; arms: ['harm-f30-k5', 'help-f30-k5', 'harm-hrt60_lin-k5', 'help-hrt60_lin-k5', 'random0-k5', 'random1-k5', 'drop-random-20']"
+  }
+ ]
+}
