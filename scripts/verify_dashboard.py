@@ -1669,8 +1669,12 @@ def demo_mode() -> int:
 
     store, cache = du(DEMO), du(REPO_ROOT / "data" / "dashboard_cache")
     free = shutil.disk_usage(REPO_ROOT).free
-    C.check("6.5 disk: the demo store plus the dashboard cache stay under 2 GiB and free disk stays above 20 GiB", store + cache < 2 * 2**30 and free > 20 * 2**30,
+    # Free disk is a warning, not a check: the 20 GiB figure is the server-run runbook's rule for the server scratch disk, so as a pass/fail here it measured this machine, not the dashboard
+    # (curation-results analysis-r1/r2 N1).
+    C.check("6.5 disk: the demo store plus the dashboard cache stay under 2 GiB", store + cache < 2 * 2**30,
             f"demo store {store / 2**20:.0f} MiB (outputs of the smoke chain live under data/eval and data/attribution), cache {cache / 2**20:.0f} MiB, free {free / 2**30:.0f} GiB")
+    if free < 20 * 2**30:
+        print(f"[WARN] 6.5 free disk is {free / 2**30:.1f} GiB, below the 20 GiB the server-run runbook asks for on the server scratch disk (not a check here)", flush=True)
     del cl
     return C.finish({"SYNTHETIC": True, "manifest": {k: man[k] for k in ("planted", "warm", "confirm_overall", "picked_clusters", "seconds")}})
 
@@ -1800,6 +1804,7 @@ def curation_dropin(C: "Checker", base: Path, porcelain) -> None:
         k_task, k_all = max(1, min(5, int(per.min()) - 1)), max(1, min(20, len(eps) // 4))
 
         def argv(part: str) -> list[str]:
+            """The ``stage.py`` arguments of one dry-run command part, without the program and without ``--chain <id>`` (the fixture runs in its own chain)."""
             toks = shlex.split(part)[2:]  # drop "python scripts/stage.py"
             i = toks.index("--chain")
             return toks[:i] + toks[i + 2:]
@@ -2109,6 +2114,7 @@ def curation_mode() -> int:
     rows_by = {(r["arm"], r["comparison"], r["control"]): r for r in sj["rows"]}
 
     def table_ok(at_, m):
+        """The page's arm table for metric ``m`` holds exactly the recorded (status, sentence) pairs of ``step4_summary.json``, one row per summary row."""
         t = next(df.value for df in at_.dataframe if "sentence" in df.value.columns and "status" in df.value.columns and "arm" in df.value.columns and "metric" not in df.value.columns)
         want = {(r[f"{m}__status"], r[f"{m}__sentence"]) for r in sj["rows"]}
         return set(zip(t["status"], t["sentence"])) == want and len(t) == len(sj["rows"])

@@ -271,10 +271,6 @@ def round_a(lr: Path, ens_id: str, ens_name: str, episodes, out: Path) -> dict:
                 continue
             seed = int(d["seed-id"])
 
-            def arm_of(ename: str) -> str:
-                m = re.fullmatch(rf"eval-{TAG}(?:-(.+))?-s(\d+)", ename)
-                return m.group(1) or "base"
-
             a, b = arm_of(d["a"]), arm_of(d["b"])
             tags = {"step4.kind": d["comparison"], "step4.treated": d["treated"], "step4.control": d["control"], "step4.seed": d["seed-id"], "vlapoc.synthetic": "true"}
             verify_run(evals[(a, seed)], evals[(b, seed)], d["name"], family="W", chain=chain, extra_tags=tags, out_dir=out / "roundA_verdicts" / d["name"], lineage_root=lr)
@@ -291,12 +287,21 @@ def round_a(lr: Path, ens_id: str, ens_name: str, episodes, out: Path) -> dict:
             "seconds": round(time.time() - t0)}
 
 
+def arm_of(eval_run_name: str) -> str:
+    """Arm name of a demo eval run (``eval-demo-<arm>-s<seed>`` -> ``<arm>``; the unlabelled ``eval-demo-s<seed>`` is the ``base`` policy)."""
+    import re
+
+    m = re.fullmatch(rf"eval-{TAG}(?:-(.+))?-s(\d+)", eval_run_name)
+    return m.group(1) or "base"
+
+
 def argparse_ns():
     """The ``server_pipeline`` arguments of the Round A command (so ``server_pipeline.arms`` yields the arm names and controls, not retyped here)."""
     return argparse.Namespace(tag=TAG, subset="v3/candidate", curation="per_task", metrics=["f30", "hrt60_lin"], k_per_task=[5], n_tasks=20, random_draws=2, ac75=True)
 
 
 def build(with_smoke: bool, force: bool) -> int:
+    """Build ``data/lineage_demo`` (module docstring) and write ``demo_manifest.json``; returns a process exit code (2 = dirty tree or store exists without ``--force``)."""
     import numpy as np
     import pandas as pd
 
