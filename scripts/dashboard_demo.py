@@ -181,7 +181,8 @@ def round_a(lr: Path, ens_id: str, ens_name: str, episodes, out: Path) -> dict:
     """Build a SYNTHETIC Round A in the demo store from the exact jobs of ``server_pipeline.py --tag demo --subset v3/candidate --curation per_task --metrics f30 hrt60_lin
     --dry-run``: the real ``select_run`` for every arm on the demo ensemble's scores, SYNTHETIC ``train`` and ``eval`` runs (policies drawn with planted effects), the real
     ``verdict.verify_run`` (family W, n_boot 1000, n_boot_ks 2000) for every vs_base / curated_vs_random / head_to_head comparison the dry run lists, and the real
-    ``step4.summary_run``. Family O is not built (documented divergence: the page shows the declared family W). PoC §2.6 p. 5, §4.5 p. 11, §9.1 Step 4 p. 19."""
+    ``step4.summary_run``. Divergences from the server's Round A, both documented in the manifest: family O is not built (the page shows the declared family W), and the ranked arms
+    use the all-rollout score column instead of ``__same_task`` (the demo's SYNTHETIC rollouts cover only 2 of the 20 tasks). PoC §2.6 p. 5, §4.5 p. 11, §9.1 Step 4 p. 19."""
     import re
     import shlex
 
@@ -216,6 +217,8 @@ def round_a(lr: Path, ens_id: str, ens_name: str, episodes, out: Path) -> dict:
         d = {toks[i].lstrip("-"): toks[i + 1] for i in range(len(toks) - 1) if toks[i].startswith("--") and not toks[i + 1].startswith("--")}
         arm = d["name"].removeprefix(f"select-{TAG}-")
         extra = stage_mod.select_params(d["op"], "--headline" in toks, d.get("pipeline-curation"))
+        if d.get("metric"):  # DIVERGENCE (documented): the demo's SYNTHETIC rollouts cover 2 of the 20 tasks, so every ``__same_task`` score column is NaN for the other 18 tasks' episodes;
+            d["metric"] = d["metric"].replace("__same_task", "")  # the demo ranks (still within each task) by the all-rollout column of the same metric. The server ranks by ``__same_task``.
         sid, child = select_run("v3/candidate", d["name"], d["op"], k=int(d["k"]), seed=int(d["seed"]) if "seed" in d else None, score_path=spath if d["op"].startswith("drop_top_k") else None,
                                 metric=d.get("metric"), score_run_id=ens_id if d["op"].startswith("drop_top_k") else None, direction=d.get("direction", "highest"),
                                 require_declaration=d["op"].startswith("drop_top_k"), extra_params=extra, chain=chain, lineage_root=lr)
@@ -282,6 +285,7 @@ def round_a(lr: Path, ens_id: str, ens_name: str, episodes, out: Path) -> dict:
     sj = json.loads((out / f"step4-summary-{TAG}" / "step4_summary.json").read_text())
     return {"chain": chain, "dry_run": summary_line, "arms": list(arms), "planted_effects_in_words": {a: effects[a] for a in ["base", *arms]}, "base_effect": BASE_EFFECT, "jitter": POLICY_JITTER,
             "summary_run_id": sm["run_id"], "summary_name": f"step4-summary-{TAG}", "n_select": len(arms), "n_train": len(trains), "n_eval": len(evals), "n_verify_W": n_verdicts,
+            "divergences": ["family O verdicts are not built", "ranked arms use harm_<metric> (all rollouts) instead of harm_<metric>__same_task: the demo's SYNTHETIC rollouts cover 2 of 20 tasks"],
             "headline": [{"pair": f"{h['treated']} vs {h['control']}", "status": h["status"], "sentence": h["sentence"]} for h in sj["headline"]],
             "statuses": {f"{r['arm']}|{r['comparison']}|{r['control']}": {m: r[f"{m}__status_code"] for m in ("f30", "hrt60")} for r in sj["rows"]},
             "seconds": round(time.time() - t0)}
