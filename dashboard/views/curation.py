@@ -142,7 +142,7 @@ def render(ctx: dict) -> None:
                   if computed else "Statuses and sentences are shown as recorded, never re-worded here. ")
                + "Every verdict is the two-step test: the macro-KS gate (did the time-to-success distribution change at all?), then each metric's bootstrap interval for the direction, Holm-corrected across the 5 metrics.")
     verd = verdict_index(common.curation_verdicts(lr, cur["chain"]))
-    common.functional_note_text(metric_caption())
+    st.caption(metric_caption())
 
     # ---- 1. the headline ---------------------------------------------------------------------------------------------------
     st.markdown("#### Same dataset, opposite curations (the PoC's headline result)")
@@ -188,7 +188,8 @@ def render(ctx: dict) -> None:
     if sel_arm:  # the table cannot wrap long text, so the selected arm's recorded sentences are also given as text
         st.markdown(f"**Sentences for the arm selected under \"One arm in detail\" ({words.metric_name(m)}):**")
         for r in sorted((x for x in rows if x["arm"] == sel_arm), key=lambda x: (COMPARISONS.get(x["comparison"], 9), x["control"])):
-            st.markdown(f"- *{control_label(r)}* ({r[f'{m}__status']}): {r[f'{m}__sentence']}")
+            # a SYNTHETIC input prefixes both the recorded status and the recorded sentence with "SYNTHETIC: "; the label is shown once per line (display only)
+            st.markdown(f"- *{control_label(r)}* ({r[f'{m}__status']}): {r[f'{m}__sentence'].removeprefix('SYNTHETIC: ')}")
 
     # ---- 2b. family O (operation level), alongside --------------------------------------------------------------------------
     st.markdown("#### Operation-level check (family O), alongside")
