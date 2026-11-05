@@ -133,9 +133,7 @@ _CALL_WORDS = {"T": "the treated policy was better", "C": "the control policy wa
 
 def _name_of(key: str) -> str:
     """Plain name of a verdict metric key (``f30`` -> ``Success within 30 s``), from ``metrics_registry.SHORT_NAMES``."""
-    from vlapoc.metrics_registry import SHORT_NAMES
-
-    from vlapoc.metrics_registry import entry
+    from vlapoc.metrics_registry import SHORT_NAMES, entry
 
     base = {"hrt60": "hrt60_lin", "auc_h": "auc_expected"}.get(key, key)
     return SHORT_NAMES.get(base) or entry(key)["metric"]  # family O keys (``rmst60_op_cap``) take the registry's plain ``metric`` name
@@ -293,8 +291,8 @@ def headline(rows: list[dict], synthetic: bool = False) -> list[dict]:
 def treated_advantage(row: dict) -> tuple[float, float, float]:
     """``(advantage, lo, hi)`` of the treated arm B over the control A in "better" units, from one verdict metric row (what the Curation results page plots).
     ``diff`` and ``ci95`` are A minus B in raw units and ``diff_better`` is sign-corrected (> 0: A, the control, is better), so B's advantage is ``-diff_better`` and its
-    interval ``-sgn * ci95`` with ``sgn = +1`` for a higher-is-better metric. The same arithmetic as ``vlapoc.planted_arms.treated_advantage``, kept here so method-side
-    code (the dashboard page) does not import the ground-truth module; ``scripts/verify_dashboard.py --curation`` checks the two agree on recorded verdicts."""
+    interval ``-sgn * ci95`` with ``sgn = +1`` for a higher-is-better metric. This is the only copy: ``vlapoc.planted_arms`` (ground-truth side) imports it from here, so the method-side
+    dashboard page never has to import the ground-truth module."""
     sgn = 1.0 if row.get("higher_is_better", True) else -1.0
     if "higher_is_better" not in row and row.get("diff"):
         sgn = math.copysign(1.0, row["diff_better"] / row["diff"]) if row["diff_better"] else 1.0

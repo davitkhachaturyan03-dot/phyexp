@@ -1999,7 +1999,6 @@ def curation_mode() -> int:
     from vlapoc import step4
     from vlapoc import verdict as vdt
     from vlapoc.lineage import Subset
-    from vlapoc.planted_arms import treated_advantage as pa_adv
     from vlapoc.runs import client, experiment_id, stage_run
 
     C = Checker("curation")
@@ -2128,9 +2127,8 @@ def curation_mode() -> int:
     exp_rows = []
     for s in range(3):
         v = cv[("head_to_head", h0["treated"], h0["control"], s)]
-        a, lo, hi = pa_adv(v["metrics"]["hrt60"])
-        a2, lo2, hi2 = pa_adv(v["metrics"]["f30"])
-        assert (a, lo, hi) == step4.treated_advantage(v["metrics"]["hrt60"]) and (a2, lo2, hi2) == step4.treated_advantage(v["metrics"]["f30"])
+        a, lo, hi = step4.treated_advantage(v["metrics"]["hrt60"])
+        a2, lo2, hi2 = step4.treated_advantage(v["metrics"]["f30"])
         exp_rows += [(f"seed {s}: speed-curated policy, advantage on Speed vs human (HRT)", a, lo, hi), (f"seed {s}: reliability-curated policy, advantage on Success within 30 s", -a2, -hi2, -lo2)]
     got_rows = [(d["row"], d["est"], d["lo"], d["hi"]) for d in hd]
     arm_pick = at.selectbox(key="cur_arm").value
@@ -2139,7 +2137,7 @@ def curation_mode() -> int:
     for (kind, ctl) in (("vs_base", "base"), ("curated_vs_random", "random0-k5"), ("curated_vs_random", "random1-k5")):
         for s in range(3):
             exp2.append(step4.treated_advantage(cv[(kind, arm_pick, ctl, s)]["metrics"]["f30"]))
-    C.check("4.2 the forest plots' data equal treated_advantage of the recorded verdict.json rows recomputed here (and equal planted_arms.treated_advantage, asserted): headline rows oriented so positive means the curated policy wins its own metric (the F(30)-curated row is the HRT-curated advantage with its sign flipped); per-arm plot = 3 comparisons x 3 seeds",
+    C.check("4.2 the forest plots' data equal treated_advantage of the recorded verdict.json rows recomputed here (step4.treated_advantage is the only copy; planted_arms imports it): headline rows oriented so positive means the curated policy wins its own metric (the F(30)-curated row is the HRT-curated advantage with its sign flipped); per-arm plot = 3 comparisons x 3 seeds",
             all(g[0] == e[0] and abs(g[1] - e[1]) < 1e-12 and abs(g[2] - e[2]) < 1e-12 and abs(g[3] - e[3]) < 1e-12 for g, e in zip(got_rows, exp_rows)) and len(got_rows) == 6
             and sorted((round(d["est"], 12), round(d["lo"], 12), round(d["hi"], 12)) for d in pd_rows) == sorted((round(a, 12), round(lo, 12), round(hi, 12)) for a, lo, hi in exp2),
             f"headline rows {[(r[0][:12], round(r[1], 4)) for r in got_rows]}; per-arm {len(pd_rows)} rows for {arm_pick}")

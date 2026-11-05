@@ -42,7 +42,6 @@ Per (arm, metric), over the ``curated_vs_random`` verdicts (family W, every cont
 from __future__ import annotations
 
 import json
-import math
 from pathlib import Path
 
 import numpy as np
@@ -50,6 +49,7 @@ import pandas as pd
 
 from vlapoc.confirm import status_of
 from vlapoc.recovery import EXPECTED_METRICS
+from vlapoc.step4 import ALPHA, call, treated_advantage  # treated_advantage has one copy, in step4 (method side)
 
 ARM_KINDS = ("type", "cleanharm", "cleanrandom", "oracle", "cleanrandom_oracle")
 EFFECT_KINDS = ("type", "cleanharm", "oracle")  # arms whose removal is expected to help (harmful data removed)
@@ -166,23 +166,10 @@ def planted_select_run(parent: str, name: str, kind: str, *, corruption_type: st
 # ---------------------------------------------------------------------------------------------
 
 
-def treated_advantage(row: dict) -> tuple[float, float, float]:
-    """``(advantage, lo, hi)`` of the treated arm B over the control A in "better" units, from one verdict metric row: ``diff`` and ``ci95`` are
-    A minus B in raw units, ``diff_better`` is sign-corrected (> 0: A better). So B's advantage is ``-diff_better`` and its interval is
-    ``-sgn * ci95`` with ``sgn = +1`` for a higher-is-better metric (``higher_is_better``; else inferred from ``diff_better / diff``)."""
-    sgn = 1.0 if row.get("higher_is_better", True) else -1.0
-    if "higher_is_better" not in row and row.get("diff"):
-        sgn = math.copysign(1.0, row["diff_better"] / row["diff"]) if row["diff_better"] else 1.0
-    lo, hi = sorted(-sgn * c for c in row["ci95"])
-    return -float(row["diff_better"]), float(lo), float(hi)
-
-
 def statuses(records: list[dict], arms: dict[str, dict], n_total: int | None = None, synthetic: bool = False) -> pd.DataFrame:
     """One row per (arm, metric) over the family-W ``curated_vs_random`` verdicts of the planted effect arms (``type``, ``cleanharm``, ``oracle``):
     ``status`` (``STATUSES``), the wording ``sentence``, the by-record calls and the CI summary. ``records`` / ``arms`` are ``step4.collect``'s.
     The positive control and the all-null rule are in the module docstring."""
-    from vlapoc.step4 import ALPHA, call
-
     mine = {a for a, d in arms.items() if d.get("groundtruth_arm") and d.get("arm_kind") in EFFECT_KINDS}
     by: dict = {}
     for r in records:
