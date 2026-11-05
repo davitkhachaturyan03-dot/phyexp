@@ -16,6 +16,7 @@ Run from the repo root; each mode exits 0 when every check passes::
     .venv/bin/python scripts/verify_dashboard.py --render        # S5 (round 2): what a real browser draws: plot areas, row click, navigation, truncation
     .venv/bin/python scripts/verify_dashboard.py --demo          # S6: the demo store (data/lineage_demo, built by scripts/dashboard_demo.py)
     .venv/bin/python scripts/verify_dashboard.py --dropin        # S7: a real-code chain and the real smoke run render with no file changes
+    .venv/bin/python scripts/verify_dashboard.py --curation      # curation-results S2-S4: Round A loaders, the demo's SYNTHETIC Round A, the Curation results page
 
 Every MLflow-writing check runs on a scratch lineage store under ``data/scratch/dashboard/`` (``runs.scratch_lineage_copy``); the real
 ``data/lineage/mlflow.db`` sha256 is recorded before and after and must not change. Scratch runs use ``allow_dirty=True`` because
@@ -67,11 +68,12 @@ class Checker:
         print(f"[{'PASS' if ok else 'FAIL'}] {name}{'  ' + detail if detail else ''}", flush=True)
         return bool(ok)
 
-    def finish(self, extra: dict | None = None) -> int:
+    def finish(self, extra: dict | None = None, art: Path | None = None) -> int:
         self.check("R real data/lineage/mlflow.db sha256 unchanged by this mode", db_sha() == self.sha0, f"{self.sha0[:16]}...")
         ok = all(r[1] for r in self.results)
-        ARTIFACTS.mkdir(parents=True, exist_ok=True)
-        (ARTIFACTS / f"verify_dashboard_{self.mode}.json").write_text(json.dumps(
+        art = art or ARTIFACTS
+        art.mkdir(parents=True, exist_ok=True)
+        (art / f"verify_dashboard_{self.mode}.json").write_text(json.dumps(
             {"mode": self.mode, "pass": ok, "n_pass": sum(r[1] for r in self.results), "n": len(self.results), "seconds": round(time.time() - self.t0),
              "checks": [{"name": n, "pass": p, "detail": d} for n, p, d in self.results], **(extra or {})}, indent=1, default=str))
         print(f"{self.mode}: pass={ok} ({sum(r[1] for r in self.results)}/{len(self.results)}, {time.time() - self.t0:.0f}s)")
@@ -1329,7 +1331,7 @@ def planted_arms_mode() -> int:
 
 APP = REPO_ROOT / "dashboard" / "app.py"
 DEMO = REPO_ROOT / "data" / "lineage_demo"
-PAGES = ("Overview", "Rollouts", "Episodes", "Clusters", "Bad vs harmful")
+PAGES = ("Overview", "Rollouts", "Episodes", "Clusters", "Bad vs harmful", "Curation results")
 
 
 def app_test(lineage_root: str, scores: str, clusters: str = ""):
@@ -1688,6 +1690,8 @@ def dropin_mode() -> int:
     shutil.rmtree(SCRATCH / "dropin", ignore_errors=True)
     base = SCRATCH / "dropin"
     base.mkdir(parents=True)
+    shutil.rmtree(SCRATCH / "dropin_cur", ignore_errors=True)
+    (SCRATCH / "dropin_cur").mkdir(parents=True)
     CH, T = "di-fixture0", "di"
     made = [REPO_ROOT / "data" / "attribution" / n for n in (f"attribute-{T}-s0", f"attribute-{T}-s1", f"attribute-{T}-ens", f"clusters-{T}")]
     try:
@@ -1748,11 +1752,130 @@ def dropin_mode() -> int:
                     f"{len(rows)} rollouts {list(rows['rollout'])}; banner {warn[:1]}; {len(at.get('video'))} videos (rollout + episodes)")
         else:
             C.check("7.3 demo store present", False, "run scripts/dashboard_demo.py build --with-smoke")
+        curation_dropin(C, SCRATCH / "dropin_cur", porcelain)  # curation-results S5
     finally:
         shutil.rmtree(base, ignore_errors=True)
+        shutil.rmtree(SCRATCH / "dropin_cur", ignore_errors=True)
         for d in made:
             shutil.rmtree(d, ignore_errors=True)
-    return C.finish({"SYNTHETIC": "fixture features/rollouts/returns"})
+    return C.finish({"SYNTHETIC": "fixture features/rollouts/returns"}, art=CUR_ART)
+
+
+
+def curation_dropin(C: "Checker", base: Path, porcelain) -> None:
+    """curation-results S5, AC5.1-AC5.2: the Round A chain through the real stage CLI on a scratch store (the real ``select`` for every arm of the dry run, fake train runs on the child
+    subsets, eval runs that record the real eval's columns and the checkpoint input, then the dry run's own ``verify`` (family W) and ``step4-summary`` commands) renders on the Curation
+    results page by score-run name with no change under dashboard/, vlapoc/ or scripts/; re-tagged to what the server writes it shows no SYNTHETIC or SMOKE banner."""
+    import hashlib
+    import shlex
+    import subprocess
+
+    import dashboard_demo as dd
+    from verify_training_attribution import parse_dry_run
+    from vlapoc import results as res
+    from vlapoc.lineage import Subset
+    from vlapoc.runs import client, experiment_id
+
+    v = vt()
+    CH, T = "ra-fixture0", "ra"
+    t0 = time.time()
+    before_dirs = {p.name for p in (REPO_ROOT / "data" / "eval").glob("verdict-*")}
+    made = [REPO_ROOT / "data" / "attribution" / n for n in (f"attribute-{T}-s0", f"attribute-{T}-s1", f"attribute-{T}-ens", f"step4-summary-{T}")]
+    try:
+        fx = v.make_fixture(base, parent="v3/candidate", cover_types=True, chain=CH, train_name=f"train-{T}-fx0")
+        lr, feats = fx["lr"], base / "feats"
+        tr0 = fx["train"]
+        tr1 = v.make_train(fx, f"train-{T}-fx1", fx["subset"], "cd" * 32, seed=1)
+        v.add_eval(fx, "s0", train=tr0, eval_name=f"eval-{T}-fx0", returns_name=f"returns-{T}-fx0", seed=1)
+        v.add_eval(fx, "s1", train=tr1, eval_name=f"eval-{T}-fx1", returns_name=f"returns-{T}-fx1", seed=2)
+        Cli = lambda *a: v.stage_cli(list(a), lr, feats, CH)  # noqa: E731
+        for s_ in (0, 1):
+            Cli("attribute", "--train", f"train-{T}-fx{s_}", "--eval", f"eval-{T}-fx{s_}", "--returns", f"returns-{T}-fx{s_}", "--name", f"attribute-{T}-s{s_}", "--device", "cpu")
+        Cli("ensemble", "--runs", f"attribute-{T}-s0", f"attribute-{T}-s1", "--name", f"attribute-{T}-ens")
+        dry = subprocess.run([sys.executable, str(REPO_ROOT / "scripts" / "server_pipeline.py"), "--tag", T, "--subset", "v3/candidate", "--curation", "per_task", "--metrics", "f30", "hrt60_lin", "--dry-run"],
+                             check=True, capture_output=True, text=True, cwd=REPO_ROOT).stdout
+        jobs = parse_dry_run(dry)
+        eps = fx["episodes"]
+        per = eps.groupby(["suite", "libero_task_id"]).size()
+        k_task, k_all = max(1, min(5, int(per.min()) - 1)), max(1, min(20, len(eps) // 4))
+
+        def argv(part: str) -> list[str]:
+            toks = shlex.split(part)[2:]  # drop "python scripts/stage.py"
+            i = toks.index("--chain")
+            return toks[:i] + toks[i + 2:]
+
+        arms, n_sel = {}, 0
+        for part in next(j for j in jobs if j["name"] == f"select-{T}")["cmd"].split(" && "):
+            a = argv(part)
+            a[a.index("--parent") + 1] = "fixture/train"  # DIVERGENCE (documented): the fixture's own small subset instead of v3/candidate, and k scaled to it
+            a[a.index("--k") + 1] = str(k_task if a[a.index("--k") + 1] == "5" else k_all)
+            out = Cli(*a)
+            arms[a[a.index("--name") + 1].removeprefix(f"select-{T}-")] = out
+            n_sel += 1
+        cells = sorted({(s, int(t)) for s, t in eps[["suite", "libero_task_id"]].drop_duplicates().to_records(index=False).tolist()})
+        h = pd.read_parquet(REPO_ROOT / "data" / "eval" / "human_reference" / "human_reference.parquet")
+        h = h[h["success_any"].astype(bool)]
+        med = h.groupby(["suite", "libero_task_id"])["T_success_s"].median()
+        hm = {c_: float(med.loc[c_]) for c_ in cells}
+        for seed in range(3):
+            for arm in ["base", *arms]:
+                m = re.fullmatch(r"(harm|help)-(\w+)-k\d+", arm)
+                eff = {k_: v_ for k_, v_ in (dd.ARM_EFFECTS.get((m.group(1), m.group(2))) or dd.BASE_EFFECT).items() if k_ != "words"} if m else dd.BASE_EFFECT
+                tname = f"train-{T}-s{seed}" if arm == "base" else f"train-{T}-{arm}-s{seed}"
+                sub = fx["subset"] if arm == "base" else Subset.load(arms[arm]["subset_id"], lr)
+                sha = hashlib.sha256(tname.encode()).hexdigest()
+                tid = v.fake_train_run(lr, tname, sub, sha, CH)
+                v.add_eval_outcomes(fx, f"eval-{T}-s{seed}" if arm == "base" else f"eval-{T}-{arm}-s{seed}", {"train_id": tid, "sha": sha},
+                                    dd.synthetic_rollouts(eff, seed * 1000 + len(arm), cells, hm, n_per_cell=20))
+        n_ver = 0
+        for j in jobs:
+            if j["name"].startswith("verify-"):
+                for part in j["cmd"].split(" && "):
+                    if "--family W" in part:
+                        Cli(*argv(part))
+                        n_ver += 1
+        sm = next(j for j in jobs if j["name"] == f"step4-summary-{T}")
+        a = argv(sm["cmd"])
+        a[a.index("--chain-id") + 1] = CH
+        Cli(*a)
+        print(f"  curation drop-in chain: {n_sel} selects, {n_ver} verdicts through the stage CLI in {time.time() - t0:.0f}s", flush=True)
+        pre = porcelain()
+        at = app_test(str(lr), f"attribute-{T}-ens")
+        go(at, "Curation results")
+        post = porcelain()
+        cur = res.curation_runs(res.resolve_run(f"attribute-{T}-ens", "attribute", lr), lr)
+        sj = cur["summary_json"] if cur else None
+        tbl = next((df.value for df in at.dataframe if "sentence" in df.value.columns and "arm" in df.value.columns), None)
+        shown = set(zip(tbl["status"], tbl["sentence"])) if tbl is not None else set()
+        want = {(r["f30__status"], r["f30__sentence"]) for r in sj["rows"]} if sj else set()
+        C.check("5.1 through the stage CLI, the dry run's select (every arm), verify (family W) and step4-summary commands (only --lineage-root and --feats-root added by the runner; the fixture's own subset as parent, k scaled to it) produce a summary the Curation results page renders by score-run name, "
+                "with every recorded status and sentence shown, no page raising, and git status --porcelain -- dashboard vlapoc scripts empty before and after",
+                cur is not None and shown == want and len(want) > 0 and not at.exception and not pre and not post and len(sj["rows"]) == 16,
+                f"{n_sel} selects (k {k_task}/{k_all}), {n_ver} verdicts, {len(sj['rows']) if sj else 0} summary rows, headline {[h_['status'] for h_ in sj['headline']] if sj else None}; page rows equal recorded: {shown == want}; porcelain before {pre!r} after {post!r}")
+        c = client(lr)
+        for r in [*c.search_runs([experiment_id(lr)], "tags.stage = 'train'", max_results=2000), *c.search_runs([experiment_id(lr)], "tags.stage = 'eval'", max_results=2000)]:
+            if r.data.tags.get("stage") == "train" and r.info.run_name.startswith(f"train-{T}"):
+                c.set_tag(r.info.run_id, "vlapoc.smoke", "false")
+            if r.data.tags.get("stage") == "eval" and r.info.run_name.startswith(f"eval-{T}"):
+                c.set_tag(r.info.run_id, "eval.attribution_grade", "true")
+        at = app_test(str(lr), f"attribute-{T}-ens")
+        go(at, "Curation results")
+        flagged = [str(e.value)[:80] for e in at.error] + [str(e.value)[:80] for e in at.warning]
+        caps = [str(e.value) for e in at.caption]
+        real_ok = not any(("SYNTHETIC" in x or "SMOKE" in x) for x in flagged) and sum(x.startswith("Provenance: REAL") for x in caps) >= 2
+        ev_run = c.search_runs([experiment_id(lr)], f"tags.mlflow.runName = 'eval-{T}-harm-f30-k5-s0'")[0]
+        c.set_tag(ev_run.info.run_id, "vlapoc.synthetic", "true")
+        at = app_test(str(lr), f"attribute-{T}-ens")
+        go(at, "Curation results")
+        back = any("SYNTHETIC" in str(e.value) for e in at.error)
+        C.check("5.2 the same chain re-tagged to what the server writes (vlapoc.smoke=false, eval.attribution_grade=true, nothing synthetic) shows no SYNTHETIC or SMOKE banner on the Curation results page and the 'Provenance: REAL' caption (header and page); adding one synthetic tag to one arm's eval run brings the SYNTHETIC banner back",
+                real_ok and back and not at.exception, f"re-tagged: banners {flagged}, REAL captions {sum(x.startswith('Provenance: REAL') for x in caps)}; one synthetic tag added: banner back {back}")
+    finally:
+        for d in made:
+            shutil.rmtree(d, ignore_errors=True)
+        for d in (REPO_ROOT / "data" / "eval").glob("verdict-*"):
+            if d.name not in before_dirs:
+                shutil.rmtree(d, ignore_errors=True)
 
 
 def render_mode() -> int:
@@ -1786,14 +1909,14 @@ def render_mode() -> int:
     finally:
         srv.terminate()
         srv.wait(timeout=15)
-    ARTIFACTS.mkdir(parents=True, exist_ok=True)
-    (ARTIFACTS / "s5_render_measurements.json").write_text(json.dumps(m, indent=1))
+    CUR_ART.mkdir(parents=True, exist_ok=True)  # curation-results S5: this feature's evidence; the dashboard feature's released artifacts are not rewritten
+    (CUR_ART / "render_measurements.json").write_text(json.dumps(m, indent=1))
     plots = {pg: v["plots"] for pg, v in m["pages"].items()}
     small = {pg: [x for x in ps if x[1] < 200] for pg, ps in plots.items() if any(x[1] < 200 for x in ps)}
     axes = json.loads(next((REPO_ROOT / "data" / "dashboard_cache" / "figs").glob(f"{man['scores_run_id']}-heatmap-v2.axes.json")).read_text())
     imgs = m["pages"]["Clusters"]["images"]
-    C.check("5.10a every Altair chart's plot area is at least 200 px tall at 1400 px (SVG path.background; Clusters and Bad vs harmful each have one) and the matplotlib heatmap's axes area and displayed image are at least 200 px tall",
-            not small and len(plots["Clusters"]) >= 1 and len(plots["Bad vs harmful"]) >= 1 and axes["axes_height_px"] >= 200 and all(i[2] >= 200 for i in imgs),
+    C.check("5.10a every Altair chart's plot area is at least 200 px tall at 1400 px (SVG path.background; Clusters and Bad vs harmful each have one, Curation results two) and the matplotlib heatmap's axes area and displayed image are at least 200 px tall",
+            not small and len(plots["Clusters"]) >= 1 and len(plots["Bad vs harmful"]) >= 1 and len(plots["Curation results"]) >= 2 and axes["axes_height_px"] >= 200 and all(i[2] >= 200 for i in imgs),
             f"plot areas (w, h) {plots}; heatmap axes {axes['axes_width_px']:.0f}x{axes['axes_height_px']:.0f}px, displayed image heights {[i[2] for i in imgs]}")
     rc = m.get("row_click", {})
     C.check("5.10b clicking row 5 of the Rollouts table makes the page show that row's rollout_id as the selected rollout", rc.get("selected_after_click") is True and rc.get("before") != rc.get("after"),
@@ -1802,16 +1925,304 @@ def render_mode() -> int:
     exc = {pg: v["exceptions"] for pg, v in m["pages"].items() if v["exceptions"]}
     C.check("5.10c no st.metric value is truncated, the sidebar holds no auto-generated page links (only the page radio), and no page shows an exception",
             not trunc and m["sidebar_nav_links"] == 0 and not exc, f"truncated {trunc}; sidebar page links {m['sidebar_nav_links']}; exceptions {exc}")
-    return C.finish({"measurements": m})
+    return C.finish({"measurements": m}, art=CUR_ART)
 
 
-MODES = {"results": results, "clusters": clusters_mode, "planted": planted_mode, "discrepancy": discrepancy_mode, "round_b": round_b_mode, "planted_arms": planted_arms_mode, "app": app_mode, "render": render_mode, "demo": demo_mode, "dropin": dropin_mode}
+
+# ---------------------------------------------------------------------------------------------
+# curation-results: S2 loaders, S3 demo Round A, S4 page (--curation)
+# ---------------------------------------------------------------------------------------------
+
+CUR_ART = REPO_ROOT / "tracker" / "features" / "2026-11-05-curation-results" / "artifacts"
+BANNED = ("harm" + "less", "no " + "effect", "no " + "difference")
+
+
+def demo_copy(name: str) -> Path:
+    """A scratch copy of the demo store with its artifact locations repointed (so a tampered artifact in the copy is the one MLflow reads); the demo itself is never touched."""
+    import repoint_lineage_store as rp
+
+    dst = SCRATCH / "cur" / name
+    shutil.rmtree(dst, ignore_errors=True)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(DEMO, dst, ignore=shutil.ignore_patterns("outputs", "verdicts"))
+    rp.repoint(dst / "mlflow.db", str(DEMO), str(dst))
+    return dst
+
+
+def artifact_path(lr: Path, run_id: str, fname: str) -> Path:
+    """Where the copy keeps output file ``fname`` of a run (its MLflow artifact directory)."""
+    from vlapoc.runs import client
+
+    uri = client(lr).get_run(run_id).info.artifact_uri
+    return Path(uri.removeprefix("file://")) / fname
+
+
+def set_recorded_sha(lr: Path, run_id: str, out: str, path: Path) -> None:
+    """Make the run's recorded sha256 of output ``out`` match the (edited) file, so the sha check passes on a deliberately edited scratch copy."""
+    from vlapoc.catalog import sha256_file
+    from vlapoc.runs import client
+
+    client(lr).set_tag(run_id, f"output.{out}.sha256", sha256_file(path))
+
+
+def figure_data(at, i: int) -> list[dict]:
+    """The inline data rows of the i-th Altair chart on the page (what the browser draws)."""
+    import pyarrow as pa
+
+    for d in at.get("vega_lite_chart")[i].proto.datasets:  # Streamlit ships the chart's data as Arrow tables beside the spec
+        df = pa.ipc.open_stream(d.data.data).read_all().to_pandas()
+        if "est" in df.columns:
+            return df.to_dict("records")
+    return []
+
+
+def curation_mode() -> int:
+    """curation-results S2 (loaders), S3 (the demo's SYNTHETIC Round A) and S4 (the Curation results page), AC2.1-AC4.9 (module docstring of the feature plan)."""
+    import subprocess
+
+    import server_pipeline as sp
+    from dashboard import words
+    from verify_training_attribution import parse_dry_run
+    from vlapoc import evaluation as ev
+    from vlapoc import results as res
+    from vlapoc import step4
+    from vlapoc import verdict as vdt
+    from vlapoc.lineage import Subset
+    from vlapoc.planted_arms import treated_advantage as pa_adv
+    from vlapoc.runs import client, experiment_id, stage_run
+
+    C = Checker("curation")
+    if not DEMO.exists():
+        print("data/lineage_demo is missing: run scripts/dashboard_demo.py build --with-smoke first")
+        return 2
+    man = json.loads((DEMO / "demo_manifest.json").read_text())
+    ra = man["round_a"]
+    ens, lr = man["scores_run_id"], DEMO
+    c = client(lr)
+    # ---------- S3 ----------
+    runs = [r for r in c.search_runs([experiment_id(lr)], max_results=50000) if r.data.tags.get("vlapoc.chain") == ra["chain"]]
+    by_stage = {s: [r for r in runs if r.data.tags.get("stage") == s] for s in ("select", "train", "eval", "verify", "summarize")}
+    kinds = pd.Series([r.data.tags.get("step4.kind") for r in by_stage["verify"]]).value_counts().to_dict()
+    prov = res.provenance(ra["summary_run_id"], lr)
+    dry = subprocess.run([sys.executable, str(REPO_ROOT / "scripts" / "server_pipeline.py"), "--tag", "demo", "--subset", "v3/candidate", "--curation", "per_task", "--metrics", "f30", "hrt60_lin", "--dry-run"],
+                         check=True, capture_output=True, text=True, cwd=REPO_ROOT).stdout
+    import shlex
+
+    want_w = {shlex.split(p)[shlex.split(p).index("--name") + 1] for j in parse_dry_run(dry) if j["name"].startswith("verify-") for p in j["cmd"].split(" && ") if "--family W" in p}
+    got_w = {r.info.run_name for r in by_stage["verify"]}
+    C.check("3.1 the demo store holds the Round A of the dry run: 7 select runs, 24 SYNTHETIC train and 24 eval runs (3 x (7 arms + base)), 48 W verify runs (21 vs_base + 24 curated_vs_random + 3 head_to_head, the dry run's own names) and 1 summary run; all tagged synthetic; provenance SYNTHETIC; the real store untouched",
+            len(by_stage["select"]) == 7 and len(by_stage["train"]) == 24 and len(by_stage["eval"]) == 24 and len(by_stage["verify"]) == 48 and kinds == {"vs_base": 21, "curated_vs_random": 24, "head_to_head": 3}
+            and got_w == want_w and len(by_stage["summarize"]) == 1 and all(r.data.tags.get("vlapoc.synthetic") == "true" for r in runs) and prov["label"] == "SYNTHETIC" and db_sha() == C.sha0,
+            f"{ {s: len(v) for s, v in by_stage.items()} }; verify kinds {kinds}; names equal the dry run's {len(want_w)}; provenance {prov['label']} ({prov['n_runs']} runs walked)")
+    # AC3.2: one recorded pair recomputed from the recorded rollouts
+    vrun = next(r for r in by_stage["verify"] if r.info.run_name == "verify-demo-harm-hrt60_lin-k5-vs-harm-f30-k5-s1-W")
+    rec = res._fetch(vrun, "verdict", lr, lambda p: json.loads(p.read_text()))
+    ea, eb = vrun.data.params["eval_a"], vrun.data.params["eval_b"]
+    da, db = vdt.eval_rollouts(ea, lr), vdt.eval_rollouts(eb, lr)
+    arm_a, arm_b = ev.libero_arm(da, "W"), ev.libero_arm(db, "W")
+    again = vdt.compare_policies(arm_a, arm_b, ev.libero_human_arm("W", sorted(set(arm_a) | set(arm_b))), "W", n_boot=int(vrun.data.params["n_boot"]), n_boot_ks=int(vrun.data.params["n_boot_ks"]),
+                                 seed=int(vrun.data.params["seed"]), names=tuple(rec["arms"]))
+    same = again["gate"]["p"] == rec["gate"]["p"] and all(again["metrics"][k][f] == rec["metrics"][k][f] for k in rec["metrics"] for f in ("diff", "ci95", "p_holm"))
+    C.check("3.2 re-running compare_policies on the recorded eval rollouts of one recorded pair (HRT-curated vs F30-curated, seed 1) with the recorded seed and bootstrap sizes reproduces its gate p and every metric's difference, 95% CI and Holm p exactly",
+            same and rec["gate"]["fires"] == again["gate"]["fires"], f"gate p {rec['gate']['p']:.6g} == {again['gate']['p']:.6g}; metrics {list(rec['metrics'])}; f30 diff {rec['metrics']['f30']['diff']:+.4f} CI {rec['metrics']['f30']['ci95'][0]:+.4f}..{rec['metrics']['f30']['ci95'][1]:+.4f}")
+    sj = res.output_json(ra["summary_run_id"], "step4_summary_json", lr)
+    codes = {m: {r[f"{m}__status_code"] for r in sj["rows"]} for m in ("f30", "hrt60")}
+    allc = codes["f30"] | codes["hrt60"]
+    C.check("3.3 the recorded summary contains a confirmed row, a row that is not confirmed or inconclusive, and a head-to-head headline (whatever the values: printed as produced, not asserted to a target)",
+            "confirmed" in allc and bool(allc & {"not confirmed", "inconclusive"}) and len(sj["headline"]) == 1,
+            f"status codes {sorted(allc)}; headline {sj['headline'][0]['status']!r}: {sj['headline'][0]['sentence']}")
+    src = (REPO_ROOT / "scripts" / "dashboard_demo.py").read_text()
+    tree = ast.parse(src)
+    fn = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "synthetic_rollouts")
+    seg = ast.get_source_segment(src, fn)
+    pe = c.get_run(by_stage["eval"][0].info.run_id).data.params["planted_effect"]
+    C.check("3.5 the synthetic outcome generator (synthetic_rollouts) names nothing of groundtruth / recovery / discrepancy and takes no store; the planted effect is stated in plain words in every eval run's params",
+            not any(w in seg for w in ("groundtruth", "recovery", "discrepancy", "open_for_method")) and all("planted_effect" in r.data.params for r in by_stage["eval"]) and "f " in pe, f"example param: {pe!r}")
+    # ---------- S2 ----------
+    cur = res.curation_runs(ens, lr)
+    plan = {x["arm"] for x in sp.arms(__import__("argparse").Namespace(tag="demo", subset="v3/candidate", curation="per_task", metrics=["f30", "hrt60_lin"], k_per_task=[5], n_tasks=20, random_draws=2, ac75=True))}
+    cp = demo_copy("extra_summary")
+    with stage_run("summarize", "step4-summary-roundb-like", cp, chain=ra["chain"], allow_dirty=True) as r_:  # a newer summary of the same chain whose rows are Round B (cluster) rows
+        pth = SCRATCH / "cur" / "roundb_like.json"
+        pth.write_text(json.dumps({"tag": "demo", "chain": ra["chain"], "rows": [{"arm": "cluster0", "comparison": "vs_base", "op": "drop_cluster"}]}))
+        r_.output_file("step4_summary_json", pth, kind="table")
+    cur2 = res.curation_runs(ens, cp)
+    C.check("2.1 curation_runs(<demo ensemble>) returns the Round A summary run and its 7 select runs (the arms of server_pipeline.arms), and skips a newer summary of the same chain whose rows are Round B (cluster) rows",
+            cur is not None and cur["summary"]["run_id"] == ra["summary_run_id"] and set(cur["selects"]) == plan and len(cur["selects"]) == 7 and cur2 is not None and cur2["summary"]["run_id"] == ra["summary_run_id"],
+            f"summary {cur['summary']['name']}; arms {sorted(cur['selects'])}; with a newer Round B-like summary in the chain it still returns {cur2['summary']['name']}")
+    v3 = Subset.load("v3/candidate", lr)
+    ok, det = True, []
+    for arm, s in cur["selects"].items():
+        rem = res.removed_episodes(s["run_id"], lr)
+        child = Subset.load(c.get_run(s["run_id"]).data.tags["output.subset"].split(":", 1)[1], lr)
+        tag = c.get_run(s["run_id"]).data.tags["select.dropped"]
+        prefix = tag[2:].split('", "')[:-1] if len(tag) >= 7900 else json.loads(tag)
+        want_n = 20 if arm == "drop-random-20" else 100
+        per_task = rem.groupby(["suite", "libero_task_id"]).size()
+        good = set(rem["episode_id"]) == set(v3.episode_ids) - set(child.episode_ids) and len(rem) == want_n and (arm == "drop-random-20" or (set(per_task) == {5} and len(per_task) == 20)) \
+            and list(rem["episode_id"].sort_values()[:len(prefix)]) == prefix
+        ok &= good
+        det.append(f"{arm}: {len(rem)} ({'prefix of ' + str(len(prefix)) if len(tag) >= 7900 else 'whole'} tag ids equal)")
+    C.check("2.2 removed_episodes returns exactly parent - child for every arm (k5 per task: 100 ids, 5 in each of 20 tasks; drop-random-20: 20), and the ids parsed from the select.dropped tag (cut at 7,900 characters for the k5 arms) are a prefix of them",
+            ok, "; ".join(det))
+    rk = res.removed_episodes(cur["selects"]["harm-f30-k5"]["run_id"], lr)
+    sc = res.score_table(ens, lr)
+    top = sc.sort_values(["suite", "libero_task_id", "harm_f30", "episode_id"], ascending=[True, True, False, True]).groupby(["suite", "libero_task_id"]).head(5)
+    C.check("2.2b the rank column of a ranked arm is the rank within its task by the ranked score (highest first, ties by episode_id), recomputed here from the score table", set(top["episode_id"]) == set(rk["episode_id"]) and rk["rank"].between(1, 5).all(),
+            f"{len(rk)} removed episodes, ranks {sorted(set(rk['rank']))}")
+    c1 = demo_copy("tamper_summary")
+    sp_path = artifact_path(c1, ra["summary_run_id"], "step4_summary.json")
+    sp_path.write_text(sp_path.read_text() + " ")
+    c2 = demo_copy("tamper_verdict")
+    vv = next(r for r in c.search_runs([experiment_id(lr)], "tags.stage = 'verify'", max_results=100) if r.data.tags.get("vlapoc.chain") == ra["chain"])
+    vp = artifact_path(c2, vv.info.run_id, "verdict.json")
+    vp.write_text(vp.read_text() + " ")
+    errs = []
+    for label, fn_ in (("summary", lambda: res.curation_runs(ens, c1)), ("verdict", lambda: res.verdicts(c2, ra["chain"], body=True))):
+        try:
+            fn_()
+            errs.append((label, "no error"))
+        except ValueError as e:
+            errs.append((label, "sha256" in str(e)))
+    none_ok = res.curation_runs(man["smoke"]["attribute_run"] if "smoke" in man else man["seed_runs"][0], lr) is None and res.curation_runs("0" * 32, lr) is None
+    C.check("2.3 a tampered summary artifact and a tampered verdict artifact raise (sha check); a score run with no Round A chain (the smoke attribute run, an unknown id) returns None instead of raising",
+            all(e[1] is True for e in errs) and none_ok, f"{errs}; None for the smoke run: {none_ok}")
+    rsrc = (REPO_ROOT / "vlapoc" / "results.py").read_text()
+    C.check("2.4 results.py cites PoC §9.1 Step 4 p. 19 and §2.6 p. 5 for the new loaders and still imports nothing from groundtruth / recovery / discrepancy",
+            "§9.1 Step 4 (p. 19)" in rsrc and "§2.6 (p. 5)" in rsrc and not forbidden_imports(REPO_ROOT / "vlapoc" / "results.py"), f"forbidden imports {forbidden_imports(REPO_ROOT / 'vlapoc' / 'results.py')}")
+    # ---------- S4 ----------
+    t0 = time.time()
+    at = app_test("data/lineage_demo", "attribute-demo-ens")
+    go(at, "Curation results")
+    first_load = time.time() - t0
+    exc = [e.value[:100] for e in at.exception]
+    rows_by = {(r["arm"], r["comparison"], r["control"]): r for r in sj["rows"]}
+
+    def table_ok(at_, m):
+        t = next(df.value for df in at_.dataframe if "sentence" in df.value.columns and "status" in df.value.columns and "arm" in df.value.columns)
+        want = {(r[f"{m}__status"], r[f"{m}__sentence"]) for r in sj["rows"]}
+        return set(zip(t["status"], t["sentence"])) == want and len(t) == len(sj["rows"])
+
+    md = " ".join(str(e.value) for e in at.markdown)
+    h0 = sj["headline"][0]
+    ok_f30 = table_ok(at, "f30")
+    at.selectbox(key="cur_metric").set_value("hrt60").run()
+    ok_hrt = table_ok(at, "hrt60")
+    at.selectbox(key="cur_metric").set_value("f30").run()
+    C.check("4.1 on the demo store every status and sentence the page shows equals the recorded summary's text verbatim: the arm table for two metrics (all 16 rows), the headline status and sentence (AppTest compares the rendered dataframe cells and markdown with step4_summary.json)",
+            not exc and ok_f30 and ok_hrt and h0["status"] in md and h0["sentence"] in md, f"exceptions {exc}; first load {first_load:.1f}s; f30 table equal {ok_f30}, hrt60 table equal {ok_hrt}; headline {h0['status']!r}")
+    # AC4.2: forest data
+    cv = {(r["kind"], r["treated"], r["control"], int(r["seed"])): r["verdict"] for r in res.verdicts(lr, ra["chain"], body=True)}
+    hd = figure_data(at, 0)
+    exp_rows = []
+    for s in range(3):
+        v = cv[("head_to_head", h0["treated"], h0["control"], s)]
+        a, lo, hi = pa_adv(v["metrics"]["hrt60"])
+        a2, lo2, hi2 = pa_adv(v["metrics"]["f30"])
+        assert (a, lo, hi) == step4.treated_advantage(v["metrics"]["hrt60"]) and (a2, lo2, hi2) == step4.treated_advantage(v["metrics"]["f30"])
+        exp_rows += [(f"seed {s}: speed-curated policy, advantage on Speed vs human (HRT)", a, lo, hi), (f"seed {s}: reliability-curated policy, advantage on Success within 30 s", -a2, -hi2, -lo2)]
+    got_rows = [(d["row"], d["est"], d["lo"], d["hi"]) for d in hd]
+    arm_pick = at.selectbox(key="cur_arm").value
+    pd_rows = figure_data(at, 1)
+    exp2 = []
+    for (kind, ctl) in (("vs_base", "base"), ("curated_vs_random", "random0-k5"), ("curated_vs_random", "random1-k5")):
+        for s in range(3):
+            exp2.append(step4.treated_advantage(cv[(kind, arm_pick, ctl, s)]["metrics"]["f30"]))
+    C.check("4.2 the forest plots' data equal treated_advantage of the recorded verdict.json rows recomputed here (and equal planted_arms.treated_advantage, asserted): headline rows oriented so positive means the curated policy wins its own metric (the F(30)-curated row is the HRT-curated advantage with its sign flipped); per-arm plot = 3 comparisons x 3 seeds",
+            all(g[0] == e[0] and abs(g[1] - e[1]) < 1e-12 and abs(g[2] - e[2]) < 1e-12 and abs(g[3] - e[3]) < 1e-12 for g, e in zip(got_rows, exp_rows)) and len(got_rows) == 6
+            and sorted((round(d["est"], 12), round(d["lo"], 12), round(d["hi"], 12)) for d in pd_rows) == sorted((round(a, 12), round(lo, 12), round(hi, 12)) for a, lo, hi in exp2),
+            f"headline rows {[(r[0][:12], round(r[1], 4)) for r in got_rows]}; per-arm {len(pd_rows)} rows for {arm_pick}")
+    # AC4.3
+    rem = res.removed_episodes(cur["selects"][arm_pick]["run_id"], lr)
+    shown = next(df.value for df in at.dataframe if "episode" in df.value.columns and "task" in df.value.columns)
+    md2 = " ".join(str(e.value) for e in at.markdown)
+    cmds = [x.value for x in at.code if "vlapoc.lineage trace" in x.value]
+    rcs = [subprocess.run(x.split(), cwd=REPO_ROOT, capture_output=True, text=True).returncode for x in cmds]
+    C.check("4.3 the removed-episodes table of the selected arm equals removed_episodes (100 episodes, same order and ranks); the lineage expander links the arm's select run (MLflow URL with its run id) and shows trace commands for the summary and the select run that exit 0",
+            list(shown["episode"]) == [words.plain(e)[-70:] for e in rem["episode_id"]] and list(shown.iloc[:, 2]) == list(rem["rank"]) and f"/runs/{cur['selects'][arm_pick]['run_id']}" in md2 and len(cmds) == 2 and all(r_ == 0 for r_ in rcs),
+            f"{len(shown)} rows; trace commands {len(cmds)} rc {rcs}")
+    # AC4.4 / 4.5 / 4.6
+    caps = " ".join(str(e.value) for e in at.caption)
+    decl = json.loads(c.get_run(cur["selects"][arm_pick]["run_id"]).data.params["metric_declaration"])
+    un = unreached(at)
+    C.check("4.4 declared functional reachable: unreached() is empty (every metric name shown has '<name>: <functional> [τ ...]' in a caption or tooltip) and the ranking functional of the selected arm (from its select run) is displayed",
+            un == [] and decl["functional"] in caps and "This arm was ranked by:" in caps, f"unreached {un}; ranking caption has {decl['functional']!r}")
+    txt = " ".join(texts(at)) + " " + " ".join(str(v) for df in at.dataframe for v in df.value.to_numpy().ravel())
+    sn = snake_labels(at)
+    errors = [str(e.value) for e in at.error]
+    C.check("4.5 plain language: snake_labels() is empty outside backticked names and ids; the banner is one line with its reasons in an expander (two banners: the header's and the page's, each a single line); none of 'harm'+'less', 'no '+'effect', 'no '+'difference' appears in the rendered page (text and table cells)",
+            sn == [] and len(errors) == 2 and all("\n" not in e for e in errors) and any("Why this label" in str(x.label) for x in at.expander) and not any(b in txt.lower() for b in BANNED),
+            f"snake labels {sn}; banners {len(errors)}; expanders {[str(x.label)[:30] for x in at.expander]}")
+    stat = {r["f30__status"] for r in sj["rows"]} | {r["hrt60__status"] for r in sj["rows"]} | {h["status"] for h in sj["headline"]} | {r["f30__sentence"][:11] for r in sj["rows"]}
+    C.check("4.6 provenance: the page shows the SYNTHETIC banner whose label equals results.provenance(<summary run>) and every recorded status, headline status and sentence begins 'SYNTHETIC: '",
+            prov["label"] == "SYNTHETIC" and all("SYNTHETIC" in e for e in errors) and all(s_.startswith("SYNTHETIC: ") for s_ in stat), f"{len(stat)} distinct recorded texts checked; label {prov['label']}")
+    # AC4.7: a copy in which the head-to-head gate did not fire in every seed
+    c3 = demo_copy("gate_off")
+    sp3 = artifact_path(c3, ra["summary_run_id"], "step4_summary.json")
+    j3 = json.loads(sp3.read_text())
+    keys = ["f30", "auc_h", "rmst60", "hrt60", "censored60"]
+    for r in j3["rows"]:
+        if r["comparison"] == "head_to_head":
+            for m_ in keys:
+                r[f"{m_}__by_seed"] = "g,g,g"
+            r["gate_fires"] = "0/3"
+            r.update(step4.annotate(r, keys, True))
+    j3["headline"] = step4.headline(j3["rows"], True)
+    sp3.write_text(json.dumps(j3))
+    set_recorded_sha(c3, ra["summary_run_id"], "step4_summary_json", sp3)
+    for r in res.verdicts(c3, ra["chain"], body=False):
+        if r["kind"] == "head_to_head":
+            p_ = artifact_path(c3, r["run_id"], "verdict.json")
+            v_ = json.loads(p_.read_text())
+            v_["gate"]["fires"] = False
+            p_.write_text(json.dumps(v_))
+            set_recorded_sha(c3, r["run_id"], "verdict", p_)
+    at3 = app_test(str(c3), "attribute-demo-ens")
+    go(at3, "Curation results")
+    md3 = " ".join(str(e.value) for e in at3.markdown)
+    seeds3 = next(df.value for df in at3.dataframe if "seed" in df.value.columns and "reliability (Success within 30 s)" in df.value.columns)
+    fg = figure_data(at3, 0)
+    C.check("4.7 gate honesty: with the head-to-head gate not fired in every seed, the card says 'inconclusive' and 'No winner is stated', every seed reads 'inconclusive (gate did not fire)', every forest row is marked 'did not fire', and the page states no winner (no 'wins its own metric')",
+            not at3.exception and "inconclusive" in md3 and "No winner is stated" in md3 and set(seeds3.iloc[:, 1]) == {"inconclusive (gate did not fire)"} and set(seeds3.iloc[:, 2]) == {"inconclusive (gate did not fire)"}
+            and {d["gate"] for d in fg} == {"did not fire"} and "wins its own metric" not in md3 and "wins its own metric" not in " ".join(str(x.value) for x in at3.caption),
+            f"exceptions {[e.value[:80] for e in at3.exception]}; seed readings {set(seeds3.iloc[:, 1])}; forest gates {sorted({d['gate'] for d in fg})}")
+    # AC4.8
+    at4 = app_test("data/lineage_demo", man["smoke"]["attribute_name"] if "smoke" in man else "attribute-demo-s0")
+    go(at4, "Curation results")
+    infos = [str(e.value) for e in at4.info]
+    C.check("4.8 a score run with no Round A chain (the smoke attribute run) shows an info message naming the command that produces one (server_pipeline.py ... --from select) and raises no exception",
+            not at4.exception and any("server_pipeline.py" in i and "--from select" in i for i in infos), f"info: {infos[:1]}")
+    # AC4.9
+    c5 = demo_copy("old_summary")
+    sp5 = artifact_path(c5, ra["summary_run_id"], "step4_summary.json")
+    j5 = json.loads(sp5.read_text())
+    for r in j5["rows"]:
+        for k_ in [k for k in r if k.endswith(("__status_code", "__status", "__sentence"))]:
+            del r[k_]
+    j5.pop("headline")
+    sp5.write_text(json.dumps(j5))
+    set_recorded_sha(c5, ra["summary_run_id"], "step4_summary_json", sp5)
+    at5 = app_test(str(c5), "attribute-demo-ens")
+    go(at5, "Curation results")
+    t5 = next(df.value for df in at5.dataframe if "sentence" in df.value.columns and "arm" in df.value.columns)
+    md5 = " ".join(str(e.value) for e in at5.markdown) + " ".join(str(e.value) for e in at5.caption)
+    C.check("4.9 a summary run without the recorded status columns still renders: the statuses are computed by the same step4 function from the recorded per-seed calls (equal to the recorded ones here, since the code is the same) and the page says 'computed at display time from the recorded per-seed calls'",
+            not at5.exception and set(zip(t5["status"], t5["sentence"])) == {(r["f30__status"], r["f30__sentence"]) for r in sj["rows"]} and "computed at display time from the recorded per-seed calls" in md5 and h0["sentence"] in md5,
+            f"exceptions {[e.value[:80] for e in at5.exception]}; {len(t5)} rows recomputed")
+    for d in ("extra_summary", "tamper_summary", "tamper_verdict", "gate_off", "old_summary"):
+        shutil.rmtree(SCRATCH / "cur" / d, ignore_errors=True)
+    C.results.append(("info first load of the page on the demo store (provenance walks the chain)", True, f"{first_load:.1f}s"))
+    ARTIFACTS_BACKUP = None  # noqa: F841
+    return C.finish({"SYNTHETIC": True, "first_load_seconds": round(first_load, 1)}, art=CUR_ART)
+
+
+MODES = {"results": results, "clusters": clusters_mode, "planted": planted_mode, "discrepancy": discrepancy_mode, "round_b": round_b_mode, "planted_arms": planted_arms_mode, "app": app_mode, "render": render_mode, "demo": demo_mode, "dropin": dropin_mode, "curation": curation_mode}
 
 
 def main() -> int:
     """Run the selected modes (module docstring); the exit code is the worst mode's."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    for m, h in (("results", "S1"), ("clusters", "S2"), ("planted", "S3"), ("discrepancy", "S9"), ("round_b", "S4"), ("planted_arms", "S10"), ("app", "S5"), ("render", "S5 rendering"), ("demo", "S6"), ("dropin", "S7")):
+    for m, h in (("results", "S1"), ("clusters", "S2"), ("planted", "S3"), ("discrepancy", "S9"), ("round_b", "S4"), ("planted_arms", "S10"), ("app", "S5"), ("render", "S5 rendering"), ("demo", "S6"), ("dropin", "S7"), ("curation", "curation-results S2-S4")):
         ap.add_argument(f"--{m.replace('_', '-')}", dest=m, action="store_true", help=h)
     a = ap.parse_args()
     ran = [m for m in MODES if getattr(a, m, False)]

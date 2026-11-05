@@ -22,9 +22,9 @@ import streamlit as st  # noqa: E402
 st.set_page_config(page_title="VLA attribution dashboard", layout="wide")
 
 from dashboard import common  # noqa: E402
-from dashboard.views import bad_vs_harmful, clusters, episodes, overview, rollouts  # noqa: E402
+from dashboard.views import bad_vs_harmful, clusters, curation, episodes, overview, rollouts  # noqa: E402
 
-RENDER = {"Overview": overview.render, "Rollouts": rollouts.render, "Episodes": episodes.render, "Clusters": clusters.render, "Bad vs harmful": bad_vs_harmful.render}
+RENDER = {"Overview": overview.render, "Rollouts": rollouts.render, "Episodes": episodes.render, "Clusters": clusters.render, "Bad vs harmful": bad_vs_harmful.render, "Curation results": curation.render}
 
 cfg = common.get_config()
 ctx = common.header(cfg)

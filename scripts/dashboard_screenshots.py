@@ -23,7 +23,7 @@ import urllib.request
 from pathlib import Path
 
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-PAGES = ("Overview", "Rollouts", "Episodes", "Clusters", "Bad vs harmful")
+PAGES = ("Overview", "Rollouts", "Episodes", "Clusters", "Bad vs harmful", "Curation results")
 
 
 class Cdp:

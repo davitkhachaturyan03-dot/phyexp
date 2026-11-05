@@ -231,6 +231,28 @@ def add_eval(fx: dict, tag: str, per_task: int = 6, drop_traj: int | None = None
     return {"eval_id": eval_id, "returns_id": returns_id, "rollout_prefix": prefix, "n_rollouts": n, "train": tr, "name": ename}
 
 
+def add_eval_outcomes(fx: dict, name: str, train: dict, rollouts: "pd.DataFrame") -> str:
+    """An eval run that records the columns the real ``eval`` stage records and the verdict reads (``suite``, ``libero_task_id``, ``rollout_id``, ``T_s``, ``event``,
+    ``tau_episode_steps``, ``censored``, ``pairs``), and that consumes the train run's checkpoint entity so ``trace`` reaches the train run (the real ``eval_run`` records
+    ``input_entity("checkpoint")``; read from ``vlapoc.runs`` l.738). SYNTHETIC outcomes (curation-results S5); returns the eval run id."""
+    import numpy as np
+
+    from vlapoc.runs import stage_run
+
+    ro = rollouts.copy()
+    ro["censored"] = ro["event"] == 0
+    ro["pairs"] = [json.dumps([[float(t) if e else float(tau) / 20.0, int(e)]]) for t, e, tau in zip(ro["T_s"], ro["event"], ro["tau_episode_steps"])]
+    ro["traj_episode_index"] = np.arange(len(ro), dtype=float)
+    out = fx["base"] / "evals" / name
+    out.mkdir(parents=True, exist_ok=True)
+    ro.to_parquet(out / "rollouts.parquet", index=False)
+    with stage_run("eval", name, fx["lr"], allow_dirty=True, chain=fx.get("chain")) as r:
+        r.input_entity("checkpoint", train["sha"], "checkpoint")
+        r.params({"train_run_id": train["train_id"], "checkpoint_sha256": train["sha"]})
+        r.output_file("rollouts", out / "rollouts.parquet", kind="rollouts")
+        return r.run_id
+
+
 def run_attribute(fx: dict, ev: dict, name: str, **kw) -> dict:
     """``attribute_run`` on the fixture (CPU, scratch store, allow_dirty)."""
     from vlapoc.attribution import attribute_run

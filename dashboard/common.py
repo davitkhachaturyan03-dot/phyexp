@@ -157,6 +157,24 @@ def rollout_video(lr: str, eval_run_id: str, traj_episode_index: int) -> bytes |
     return video.episode_video(root, int(traj_episode_index), f"{eval_run_id[:16]}-{int(traj_episode_index)}")
 
 
+@st.cache_data(show_spinner=False, ttl=30)
+def curation_of(lr: str, run_id: str) -> dict | None:
+    """The Round A curation results of a score run (``results.curation_runs``): summary run, its sha-checked JSON and the select runs, or ``None``."""
+    return res.curation_runs(run_id, _r(lr))
+
+
+@st.cache_data(show_spinner=False)
+def curation_verdicts(lr: str, chain: str) -> list[dict]:
+    """The verdicts (with their ``verdict.json`` bodies, sha-checked) of one chain (``results.verdicts``)."""
+    return res.verdicts(_r(lr), chain, body=True)
+
+
+@st.cache_data(show_spinner=False)
+def removed_of(lr: str, select_run_id: str) -> pd.DataFrame:
+    """The episodes a curation select run removed, from the child subset (``results.removed_episodes``)."""
+    return res.removed_episodes(select_run_id, _r(lr))
+
+
 # ---------------------------------------------------------------------------------------------
 # labels, banner, header
 # ---------------------------------------------------------------------------------------------
@@ -178,7 +196,12 @@ def declared_caption(cols: list[str], decls: dict) -> None:
     st.caption("What the scores explain: " + " | ".join(declared(c, decls) for c in cols))
 
 
-def banner(prov: dict) -> None:
+def functional_note_text(text: str) -> None:
+    """A caption stating the declared functionals in view as ready-made text (PoC §3.4 p. 7)."""
+    st.caption(text)
+
+
+def banner(prov: dict, condense: bool = False) -> None:
     """The provenance banner, one line (SYNTHETIC in red, SMOKE in amber, a quiet caption for REAL), with the recorded reasons in an expander below it
     (decided by ``results.provenance`` from the recorded runs; PoC §3.4 and the owner's "labelled everywhere")."""
     if prov["label"] == "SYNTHETIC":
@@ -189,11 +212,33 @@ def banner(prov: dict) -> None:
         st.caption(f"Provenance: REAL ({prov['n_runs']} recorded runs checked: every train run is not smoke, every eval run is attribution-grade, nothing synthetic).")
     if prov["reasons"]:
         with st.expander("Why this label (recorded runs)"):
-            for r in prov["reasons"]:
+            for r in (condensed_reasons(prov["reasons"]) if condense else prov["reasons"]):
                 st.caption(r)
 
 
-PAGES = ("Overview", "Rollouts", "Episodes", "Clusters", "Bad vs harmful")
+def condensed_reasons(reasons: list[str]) -> list[str]:
+    """Group the recorded reasons (``<kind>: <run name> (<stage>, <id8>): <condition>``) by kind, stage and condition, for a result whose chain holds hundreds of runs
+    (the Curation results page): ``synthetic: 72 eval runs: `tag vlapoc.synthetic=true` (e.g. `eval-demo-s0`, `eval-demo-s1`)``. Names and conditions are in backticks."""
+    import re
+
+    groups: dict = {}
+    for r in reasons:
+        m = re.fullmatch(r"(\w+): (.+?) \((\w+)(?:, [0-9a-f]{8})?\): (.*)", r)
+        if not m:
+            groups.setdefault((r, "", ""), []).append("")
+            continue
+        groups.setdefault((m.group(1), m.group(3), m.group(4)), []).append(m.group(2))
+    out = []
+    for (kind, stage, cond), names in groups.items():
+        if not stage:
+            out.append(re.sub(r"(\S+_\S+)", r"`\1`", kind))
+            continue
+        e = ", ".join(f"`{n}`" for n in names[:2])
+        out.append(f"{kind}: {len(names)} {stage} run{'s' if len(names) > 1 else ''}, `{cond}` (e.g. {e})")
+    return out
+
+
+PAGES = ("Overview", "Rollouts", "Episodes", "Clusters", "Bad vs harmful", "Curation results")
 
 
 def header(cfg: Config) -> dict:

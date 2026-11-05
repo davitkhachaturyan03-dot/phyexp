@@ -1,0 +1,111 @@
+{
+ "mode": "curation",
+ "pass": true,
+ "n_pass": 20,
+ "n": 20,
+ "seconds": 20,
+ "checks": [
+  {
+   "name": "3.1 the demo store holds the Round A of the dry run: 7 select runs, 24 SYNTHETIC train and 24 eval runs (3 x (7 arms + base)), 48 W verify runs (21 vs_base + 24 curated_vs_random + 3 head_to_head, the dry run's own names) and 1 summary run; all tagged synthetic; provenance SYNTHETIC; the real store untouched",
+   "pass": true,
+   "detail": "{'select': 7, 'train': 24, 'eval': 24, 'verify': 48, 'summarize': 1}; verify kinds {'curated_vs_random': 24, 'vs_base': 21, 'head_to_head': 3}; names equal the dry run's 48; provenance SYNTHETIC (111 runs walked)"
+  },
+  {
+   "name": "3.2 re-running compare_policies on the recorded eval rollouts of one recorded pair (HRT-curated vs F30-curated, seed 1) with the recorded seed and bootstrap sizes reproduces its gate p and every metric's difference, 95% CI and Holm p exactly",
+   "pass": true,
+   "detail": "gate p 0.00049975 == 0.00049975; metrics ['f30', 'auc_h', 'rmst60', 'hrt60', 'censored60']; f30 diff -0.0590 CI -0.0930..-0.0200"
+  },
+  {
+   "name": "3.3 the recorded summary contains a confirmed row, a row that is not confirmed or inconclusive, and a head-to-head headline (whatever the values: printed as produced, not asserted to a target)",
+   "pass": true,
+   "detail": "status codes ['confirmed', 'inconclusive', 'no expectation (control arm)', 'not confirmed']; headline 'SYNTHETIC: inconclusive': SYNTHETIC: Same dataset, opposite curations: inconclusive. The macro-KS gate fired in 3 of 3 seeds; speed claim on Speed vs human (HRT) (\u03c4 60 s): not confirmed; reliability claim on Success within 30 s (\u03c4 30 s): not confirmed. No winner is stated."
+  },
+  {
+   "name": "3.5 the synthetic outcome generator (synthetic_rollouts) names nothing of groundtruth / recovery / discrepancy and takes no store; the planted effect is stated in plain words in every eval run's params",
+   "pass": true,
+   "detail": "example param: 'same as the base policy (random removal) (f 3.0, sigma 0.5, p 0.8)'"
+  },
+  {
+   "name": "2.1 curation_runs(<demo ensemble>) returns the Round A summary run and its 7 select runs (the arms of server_pipeline.arms), and skips a newer summary of the same chain whose rows are Round B (cluster) rows",
+   "pass": true,
+   "detail": "summary step4-summary-demo; arms ['drop-random-20', 'harm-f30-k5', 'harm-hrt60_lin-k5', 'help-f30-k5', 'help-hrt60_lin-k5', 'random0-k5', 'random1-k5']; with a newer Round B-like summary in the chain it still returns step4-summary-demo"
+  },
+  {
+   "name": "2.2 removed_episodes returns exactly parent - child for every arm (k5 per task: 100 ids, 5 in each of 20 tasks; drop-random-20: 20), and the ids parsed from the select.dropped tag (cut at 7,900 characters for the k5 arms) are a prefix of them",
+   "pass": true,
+   "detail": "drop-random-20: 20 (whole tag ids equal); random1-k5: 100 (prefix of 78 tag ids equal); random0-k5: 100 (prefix of 78 tag ids equal); help-hrt60_lin-k5: 100 (prefix of 78 tag ids equal); harm-hrt60_lin-k5: 100 (prefix of 78 tag ids equal); help-f30-k5: 100 (prefix of 78 tag ids equal); harm-f30-k5: 100 (prefix of 78 tag ids equal)"
+  },
+  {
+   "name": "2.2b the rank column of a ranked arm is the rank within its task by the ranked score (highest first, ties by episode_id), recomputed here from the score table",
+   "pass": true,
+   "detail": "100 removed episodes, ranks [1, 2, 3, 4, 5]"
+  },
+  {
+   "name": "2.3 a tampered summary artifact and a tampered verdict artifact raise (sha check); a score run with no Round A chain (the smoke attribute run, an unknown id) returns None instead of raising",
+   "pass": true,
+   "detail": "[('summary', True), ('verdict', True)]; None for the smoke run: True"
+  },
+  {
+   "name": "2.4 results.py cites PoC \u00a79.1 Step 4 p. 19 and \u00a72.6 p. 5 for the new loaders and still imports nothing from groundtruth / recovery / discrepancy",
+   "pass": true,
+   "detail": "forbidden imports []"
+  },
+  {
+   "name": "4.1 on the demo store every status and sentence the page shows equals the recorded summary's text verbatim: the arm table for two metrics (all 16 rows), the headline status and sentence (AppTest compares the rendered dataframe cells and markdown with step4_summary.json)",
+   "pass": true,
+   "detail": "exceptions []; first load 1.8s; f30 table equal True, hrt60 table equal True; headline 'SYNTHETIC: inconclusive'"
+  },
+  {
+   "name": "4.2 the forest plots' data equal treated_advantage of the recorded verdict.json rows recomputed here (and equal planted_arms.treated_advantage, asserted): headline rows oriented so positive means the curated policy wins its own metric (the F(30)-curated row is the HRT-curated advantage with its sign flipped); per-arm plot = 3 comparisons x 3 seeds",
+   "pass": true,
+   "detail": "headline rows [('seed 0: spee', -0.0303), ('seed 0: reli', 0.009), ('seed 1: spee', 0.0149), ('seed 1: reli', -0.059), ('seed 2: spee', 0.0045), ('seed 2: reli', -0.041)]; per-arm 9 rows for harm-f30-k5"
+  },
+  {
+   "name": "4.3 the removed-episodes table of the selected arm equals removed_episodes (100 episodes, same order and ranks); the lineage expander links the arm's select run (MLflow URL with its run id) and shows trace commands for the summary and the select run that exit 0",
+   "pass": true,
+   "detail": "100 rows; trace commands 2 rc [0, 0]"
+  },
+  {
+   "name": "4.4 declared functional reachable: unreached() is empty (every metric name shown has '<name>: <functional> [\u03c4 ...]' in a caption or tooltip) and the ranking functional of the selected arm (from its select run) is displayed",
+   "pass": true,
+   "detail": "unreached []; ranking caption has 'F(30) = P(T <= 30 s)'"
+  },
+  {
+   "name": "4.5 plain language: snake_labels() is empty outside backticked names and ids; the banner is one line with its reasons in an expander (two banners: the header's and the page's, each a single line); none of 'harm'+'less', 'no '+'effect', 'no '+'difference' appears in the rendered page (text and table cells)",
+   "pass": true,
+   "detail": "snake labels []; banners 2; expanders ['Why this label (recorded runs)', 'Why this label (recorded runs)', 'Lineage of these results (ids ']"
+  },
+  {
+   "name": "4.6 provenance: the page shows the SYNTHETIC banner whose label equals results.provenance(<summary run>) and every recorded status, headline status and sentence begins 'SYNTHETIC: '",
+   "pass": true,
+   "detail": "5 distinct recorded texts checked; label SYNTHETIC"
+  },
+  {
+   "name": "4.7 gate honesty: with the head-to-head gate not fired in every seed, the card says 'inconclusive' and 'No winner is stated', every seed reads 'inconclusive (gate did not fire)', every forest row is marked 'did not fire', and the page states no winner (no 'wins its own metric')",
+   "pass": true,
+   "detail": "exceptions []; seed readings {'inconclusive (gate did not fire)'}; forest gates ['did not fire']"
+  },
+  {
+   "name": "4.8 a score run with no Round A chain (the smoke attribute run) shows an info message naming the command that produces one (server_pipeline.py ... --from select) and raises no exception",
+   "pass": true,
+   "detail": "info: ['No curation results (Round A retraining) are recorded for this score run. They come from the removal tests of the server chain: `.venv/bin/python scripts/server_pipeline.py --tag <tag> --subset v3/candidate --curation per_task --metrics f30 hrt60_lin --from select` (see the server-run runbook), which ends in the `step4-summary` run this page reads.']"
+  },
+  {
+   "name": "4.9 a summary run without the recorded status columns still renders: the statuses are computed by the same step4 function from the recorded per-seed calls (equal to the recorded ones here, since the code is the same) and the page says 'computed at display time from the recorded per-seed calls'",
+   "pass": true,
+   "detail": "exceptions []; 16 rows recomputed"
+  },
+  {
+   "name": "info first load of the page on the demo store (provenance walks the chain)",
+   "pass": true,
+   "detail": "1.8s"
+  },
+  {
+   "name": "R real data/lineage/mlflow.db sha256 unchanged by this mode",
+   "pass": true,
+   "detail": "306af4123fda7e63..."
+  }
+ ],
+ "SYNTHETIC": true,
+ "first_load_seconds": 1.8
+}
