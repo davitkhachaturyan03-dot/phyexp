@@ -1831,9 +1831,8 @@ def curation_dropin(C: "Checker", base: Path, porcelain) -> None:
         for j in jobs:
             if j["name"].startswith("verify-"):
                 for part in j["cmd"].split(" && "):
-                    if "--family W" in part:
-                        Cli(*argv(part))
-                        n_ver += 1
+                    Cli(*argv(part))  # as written: the vs_base jobs run family W and family O (AC5.5)
+                    n_ver += 1
         sm = next(j for j in jobs if j["name"] == f"step4-summary-{T}")
         a = argv(sm["cmd"])
         a[a.index("--chain-id") + 1] = CH
@@ -1845,13 +1844,24 @@ def curation_dropin(C: "Checker", base: Path, porcelain) -> None:
         post = porcelain()
         cur = res.curation_runs(res.resolve_run(f"attribute-{T}-ens", "attribute", lr), lr)
         sj = cur["summary_json"] if cur else None
-        tbl = next((df.value for df in at.dataframe if "sentence" in df.value.columns and "arm" in df.value.columns), None)
+        tbl = next((df.value for df in at.dataframe if "sentence" in df.value.columns and "arm" in df.value.columns and "metric" not in df.value.columns), None)
         shown = set(zip(tbl["status"], tbl["sentence"])) if tbl is not None else set()
-        want = {(r["f30__status"], r["f30__sentence"]) for r in sj["rows"]} if sj else set()
+        want = {(r["f30__status"], r["f30__sentence"]) for r in sj["rows"] if r["family"] == "W"} if sj else set()
         C.check("5.1 through the stage CLI, the dry run's select (every arm), verify (family W) and step4-summary commands (only --lineage-root and --feats-root added by the runner; the fixture's own subset as parent, k scaled to it) produce a summary the Curation results page renders by score-run name, "
                 "with every recorded status and sentence shown, no page raising, and git status --porcelain -- dashboard vlapoc scripts empty before and after",
-                cur is not None and shown == want and len(want) > 0 and not at.exception and not pre and not post and len(sj["rows"]) == 16,
-                f"{n_sel} selects (k {k_task}/{k_all}), {n_ver} verdicts, {len(sj['rows']) if sj else 0} summary rows, headline {[h_['status'] for h_ in sj['headline']] if sj else None}; page rows equal recorded: {shown == want}; porcelain before {pre!r} after {post!r}")
+                cur is not None and shown == want and len(want) > 0 and not at.exception and not pre and not post and sum(r["family"] == "W" for r in sj["rows"]) == 16,
+                f"{n_sel} selects (k {k_task}/{k_all}), {n_ver} verdicts, {len(sj['rows']) if sj else 0} summary rows ({sum(r['family'] == 'O' for r in sj['rows'])} family O), headline {[h_['status'] for h_ in sj['headline']] if sj else None}; page rows equal recorded: {shown == want}; porcelain before {pre!r} after {post!r}")
+        orows = [r for r in sj["rows"] if r["family"] == "O"]
+        okey = [k for k in orows[0] if k.endswith("__by_seed")][0].removesuffix("__by_seed") if orows else None
+        otab = next((df.value for df in at.dataframe if "metric" in df.value.columns and "sentence" in df.value.columns and "arm" in df.value.columns), None)
+        wtab_n = len(tbl) if tbl is not None else -1
+        unr, snk = unreached(at), snake_labels(at)
+        forest_n = [len(figure_data(at, i)) for i in range(len(at.get("vega_lite_chart")))]
+        C.check("5.5 the drop-in runs the dry run's vs_base commands as written (family W and family O), the summary has 23 rows (16 W + 7 O vs_base), and the page's operation-level table has exactly the 7 recorded O rows with status and sentence verbatim; "
+                "no O row is in the W arm table (16 rows), the headline or the forest data; unreached() and snake_labels() are empty with O shown",
+                len(sj["rows"]) == 23 and len(orows) == 7 and all(r["comparison"] == "vs_base" for r in orows) and otab is not None
+                and set(zip(otab["status"], otab["sentence"])) == {(r[f"{okey}__status"], r[f"{okey}__sentence"]) for r in orows} and len(otab) == 7 and wtab_n == 16 and not unr and not snk and all(n_ in (6, 9) for n_ in forest_n),
+                f"{len(sj['rows'])} summary rows, O metric {okey!r}, O table {len(otab) if otab is not None else None} rows, W table {wtab_n}; forest rows {forest_n}; unreached {unr}; snake {snk}; {n_ver} verdicts ran in total")
         c = client(lr)
         for r in [*c.search_runs([experiment_id(lr)], "tags.stage = 'train'", max_results=2000), *c.search_runs([experiment_id(lr)], "tags.stage = 'eval'", max_results=2000)]:
             if r.data.tags.get("stage") == "train" and r.info.run_name.startswith(f"train-{T}"):
@@ -2099,7 +2109,7 @@ def curation_mode() -> int:
     rows_by = {(r["arm"], r["comparison"], r["control"]): r for r in sj["rows"]}
 
     def table_ok(at_, m):
-        t = next(df.value for df in at_.dataframe if "sentence" in df.value.columns and "status" in df.value.columns and "arm" in df.value.columns)
+        t = next(df.value for df in at_.dataframe if "sentence" in df.value.columns and "status" in df.value.columns and "arm" in df.value.columns and "metric" not in df.value.columns)
         want = {(r[f"{m}__status"], r[f"{m}__sentence"]) for r in sj["rows"]}
         return set(zip(t["status"], t["sentence"])) == want and len(t) == len(sj["rows"])
 
@@ -2139,7 +2149,7 @@ def curation_mode() -> int:
     cmds = [x.value for x in at.code if "vlapoc.lineage trace" in x.value]
     rcs = [subprocess.run(x.split(), cwd=REPO_ROOT, capture_output=True, text=True).returncode for x in cmds]
     C.check("4.3 the removed-episodes table of the selected arm equals removed_episodes (100 episodes, same order and ranks); the lineage expander links the arm's select run (MLflow URL with its run id) and shows trace commands for the summary and the select run that exit 0",
-            list(shown["episode"]) == [words.plain(e)[-70:] for e in rem["episode_id"]] and list(shown.iloc[:, 2]) == list(rem["rank"]) and f"/runs/{cur['selects'][arm_pick]['run_id']}" in md2 and len(cmds) == 2 and all(r_ == 0 for r_ in rcs),
+            list(shown["episode"]) == [words.plain(e.split("/")[-1]) for e in rem["episode_id"]] and list(shown.iloc[:, 2]) == list(rem["rank"]) and f"/runs/{cur['selects'][arm_pick]['run_id']}" in md2 and len(cmds) == 2 and all(r_ == 0 for r_ in rcs),
             f"{len(shown)} rows; trace commands {len(cmds)} rc {rcs}")
     # AC4.4 / 4.5 / 4.6
     caps = " ".join(str(e.value) for e in at.caption)
@@ -2182,10 +2192,28 @@ def curation_mode() -> int:
     md3 = " ".join(str(e.value) for e in at3.markdown)
     seeds3 = next(df.value for df in at3.dataframe if "seed" in df.value.columns and "reliability (Success within 30 s)" in df.value.columns)
     fg = figure_data(at3, 0)
-    C.check("4.7 gate honesty: with the head-to-head gate not fired in every seed, the card says 'inconclusive' and 'No winner is stated', every seed reads 'inconclusive (gate did not fire)', every forest row is marked 'did not fire', and the page states no winner (no 'wins its own metric')",
+    C.check("4.7a gate honesty, gate fired in 0/3 seeds (scratch copy): the card says 'inconclusive' and 'No winner is stated', every seed reads 'inconclusive (gate did not fire)', every forest row is marked 'did not fire', and the page states no winner (no 'wins its own metric')",
             not at3.exception and "inconclusive" in md3 and "No winner is stated" in md3 and set(seeds3.iloc[:, 1]) == {"inconclusive (gate did not fire)"} and set(seeds3.iloc[:, 2]) == {"inconclusive (gate did not fire)"}
             and {d["gate"] for d in fg} == {"did not fire"} and "wins its own metric" not in md3 and "wins its own metric" not in " ".join(str(x.value) for x in at3.caption),
             f"exceptions {[e.value[:80] for e in at3.exception]}; seed readings {set(seeds3.iloc[:, 1])}; forest gates {sorted({d['gate'] for d in fg})}")
+    card = [str(e.value) for e in at.markdown if str(e.value).startswith("**SYNTHETIC: ") and "**" in str(e.value)[2:]][0]
+    card_text = card + " " + h0["sentence"]
+    C.check("4.7b the demo as built (head-to-head gate fired in every seed, calls hrt60 C,0,0 / f30 0,T,0): the card says 'not shown' and 'No winner is stated', does not say 'inconclusive', and no element of the headline card or the page states a winner (no 'wins its own metric')",
+            h0["status_code"] == "not shown" and "not shown" in card and "No winner is stated" in h0["sentence"] and "inconclusive" not in card.lower() and "inconclusive" not in h0["sentence"].lower() and "wins its own metric" not in md
+            and "wins its own metric" not in caps and h0["gate_fires"] == "3/3", f"card {card!r}; headline gate {h0['gate_fires']}; sentence: {h0['sentence'][:200]}")
+    hrow = next(r for r in sj["rows"] if r["comparison"] == "head_to_head")
+    row3 = next(r for r in j3["rows"] if r["comparison"] == "head_to_head")
+    ok_c = True
+    for lab_, rows_, head_ in (("demo", [hrow], h0), ("gate 0/3 copy", [row3], j3["headline"][0])):
+        again = step4.headline([r_ for r_ in rows_], True)[0]
+        both_inc = rows_[0]["hrt60__status_code"] == "inconclusive" and rows_[0]["f30__status_code"] == "inconclusive"
+        ok_c &= again["status_code"] == head_["status_code"] and ((head_["status_code"] == "inconclusive") == both_inc)
+    C.check("4.7c consistency, on both stores: the card's status code equals step4.headline recomputed from the recorded head-to-head row's by-seed calls, and the card reads 'inconclusive' if and only if that row's hrt60 and f30 statuses are both 'inconclusive'",
+            ok_c, f"demo: card {h0['status_code']!r}, row statuses hrt60 {hrow['hrt60__status_code']!r} / f30 {hrow['f30__status_code']!r}; gate-0/3 copy: card {j3['headline'][0]['status_code']!r}, row {row3['hrt60__status_code']!r} / {row3['f30__status_code']!r}")
+    capt = " ".join(str(e.value) for e in at.caption)
+    nW = len(next(df.value for df in at.dataframe if "sentence" in df.value.columns and "arm" in df.value.columns and "metric" not in df.value.columns))
+    C.check("4.11a family O is never silently dropped: on the demo store, which records no O rows, the page shows the caption 'No operation-level (family O) verdicts are recorded for this chain.' and the family-W arm table still has its 16 rows",
+            "No operation-level (family O) verdicts are recorded for this chain." in capt and nW == 16 and not any(r.get("family") == "O" for r in sj["rows"]), f"W table rows {nW}; O rows recorded 0")
     # AC4.8
     at4 = app_test("data/lineage_demo", man["smoke"]["attribute_name"] if "smoke" in man else "attribute-demo-s0")
     go(at4, "Curation results")
@@ -2204,7 +2232,7 @@ def curation_mode() -> int:
     set_recorded_sha(c5, ra["summary_run_id"], "step4_summary_json", sp5)
     at5 = app_test(str(c5), "attribute-demo-ens")
     go(at5, "Curation results")
-    t5 = next(df.value for df in at5.dataframe if "sentence" in df.value.columns and "arm" in df.value.columns)
+    t5 = next(df.value for df in at5.dataframe if "sentence" in df.value.columns and "arm" in df.value.columns and "metric" not in df.value.columns)
     md5 = " ".join(str(e.value) for e in at5.markdown) + " ".join(str(e.value) for e in at5.caption)
     C.check("4.9 a summary run without the recorded status columns still renders: the statuses are computed by the same step4 function from the recorded per-seed calls (equal to the recorded ones here, since the code is the same) and the page says 'computed at display time from the recorded per-seed calls'",
             not at5.exception and set(zip(t5["status"], t5["sentence"])) == {(r["f30__status"], r["f30__sentence"]) for r in sj["rows"]} and "computed at display time from the recorded per-seed calls" in md5 and h0["sentence"] in md5,

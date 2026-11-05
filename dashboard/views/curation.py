@@ -4,10 +4,12 @@ What it shows, from the Round A ``step4-summary`` run of the chosen score run (c
 
 1. the PoC §4.5 headline, "same dataset, opposite curations": did the policy retrained without the episodes ranked most harmful for speed (HRT) win on speed, and the one
    retrained without those ranked most harmful for reliability (F(30 s)) win on reliability? The status and sentence are the recorded ones, shown verbatim; "inconclusive"
-   where the macro-KS gate did not fire; a forest plot per seed oriented so that "wins its own metric" is positive;
+   where the macro-KS gate fired in fewer than ceil(2n/3) seeds; "not shown" where it fired in at least ceil(2n/3) seeds but neither curated policy's win on its own metric
+   replicated; a forest plot per seed oriented so that "wins its own metric" is positive;
 2. every curated arm judged against the original policy and against random removal (§2.6 "more than random removal"), per metric, with the recorded status, the calls per seed
    (T/C/0/g) and the sentence;
-3. a per-arm forest plot, the episodes each arm removed (read from the child subset, with a training video), the lineage (MLflow links, trace command), and the declared
+3. an operation-level (family O) section, recorded alongside (vs the original policy only, outside the headline), or a caption saying none is recorded;
+4. a per-arm forest plot, the episodes each arm removed (read from the child subset, with a training video), the lineage (MLflow links, trace command), and the declared
    functionals: what each arm was ranked by and what each verdict judges, with the point that the HRT arm was ranked by the linearized return and judged on the ratio (§4.3 p. 10).
 
 The words are not written here: they come from ``vlapoc.step4`` (``annotate`` / ``headline``), recorded in the summary run. A summary run recorded before those columns existed is
@@ -24,6 +26,7 @@ import pandas as pd
 import streamlit as st
 
 from dashboard import common, words
+from vlapoc import results as res
 from vlapoc import step4
 from vlapoc.metrics_registry import entry, verdict_key_of
 
@@ -118,13 +121,16 @@ def render(ctx: dict) -> None:
     common.banner(prov, condense=True)
     syn = prov["label"] == "SYNTHETIC"
     prefix = "SYNTHETIC - " if syn else ""
-    rows = [r for r in sj["rows"] if r.get("op") in ("drop_top_k", "drop_top_k_per_task", "drop_random_k", "drop_random_k_per_task") or r["comparison"] == "head_to_head"]
-    rows = [r for r in rows if r.get("family", "W") == "W"]
+    all_rows = [r for r in sj["rows"] if r.get("op") in res.CURATION_OPS or r["comparison"] == "head_to_head"]
+    rows = [r for r in all_rows if r.get("family", "W") == "W"]
+    orows = [r for r in all_rows if r.get("family", "W") == "O"]  # family O (operation level): recorded alongside, only vs the original policy; never in the headline, the W table or the plots
     keys = [c[:-len("__by_seed")] for c in rows[0] if c.endswith("__by_seed")]
     computed = any(f"{m}__status" not in r for r in rows for m in keys)
     if computed:  # a summary recorded before the status columns existed: the same function, from the recorded per-seed calls
         for r in rows:
             r.update(step4.annotate(r, keys, syn))
+        for r in orows:
+            r.update(step4.annotate(r, [c[:-len("__by_seed")] for c in r if c.endswith("__by_seed")], syn))
     heads = sj.get("headline") if not computed and "headline" in sj else step4.headline(rows, syn)
     st.caption(f"Summary run `{summ['name']}` ({summ['run_id'][:8]}), chain `{cur['chain']}`: {len(rows)} comparisons over {max(int(r['n_seeds']) for r in rows)} training seeds. "
                + ("The statuses and sentences were computed at display time from the recorded per-seed calls (this run predates the recorded columns); otherwise they are shown as recorded. "
@@ -172,6 +178,27 @@ def render(ctx: dict) -> None:
                "A random-removal arm has no expectation; it is the control. Nothing is corrected across arms or seeds: the status is a replication rule "
                "(the expectation met in at least 2 of 3 seeds and contradicted in none), not a further test.")
     st.dataframe(show, hide_index=True, width="stretch", key="cur_table")
+    cur_arms = sorted({r["arm"] for r in rows if str(r.get("op", "")).startswith("drop_top_k")})
+    sel_arm = st.session_state.get("cur_arm") if st.session_state.get("cur_arm") in cur_arms else (cur_arms[0] if cur_arms else None)
+    if sel_arm:  # the table cannot wrap long text, so the selected arm's recorded sentences are also given as text
+        st.markdown(f"**Sentences for the arm selected under \"One arm in detail\" ({words.metric_name(m)}):**")
+        for r in sorted((x for x in rows if x["arm"] == sel_arm), key=lambda x: (COMPARISONS.get(x["comparison"], 9), x["control"])):
+            st.markdown(f"- *{control_label(r)}* ({r[f'{m}__status']}): {r[f'{m}__sentence']}")
+
+    # ---- 2b. family O (operation level), alongside --------------------------------------------------------------------------
+    st.markdown("#### Operation-level check (family O), alongside")
+    if not orows:
+        st.caption("No operation-level (family O) verdicts are recorded for this chain.")
+    else:
+        okeys = [c[:-len("__by_seed")] for c in orows[0] if c.endswith("__by_seed")]
+        orec = [(r, k) for r in sorted(orows, key=lambda r: (r["arm"], r["control"])) for k in okeys]
+        otab = pd.DataFrame({"arm": [arm_label(r) for r, _ in orec], "metric": [entry(k)["metric"] for _, k in orec], "compared with": [control_label(r) for r, _ in orec],
+                             "status": [r[f"{k}__status"] for r, k in orec], "calls by seed": [", ".join(CALL_WORDS[c] for c in str(r[f"{k}__by_seed"]).split(",")) for r, k in orec],
+                             "gate fired": [r["gate_fires"] for r, _ in orec], "sentence": [r[f"{k}__sentence"] for r, k in orec]})
+        st.caption("Operation-level verdicts: " + " | ".join(f"{entry(k)['metric']}: {entry(k)['functional']} [τ {str(entry(k)['tau']).split(' =')[0]}]" for k in okeys)
+                   + ". The arms were ranked by a family-W return; family W (whole-task time) is the declared verdict family and carries the headline; family O is recorded alongside, "
+                   "only against the original policy, and is not part of the headline.")
+        st.dataframe(otab, hide_index=True, width="stretch", key="cur_table_o")
 
     # ---- 3. per-arm detail -----------------------------------------------------------------------------------------------
     curated = [r for r in rows if str(r.get("op", "")).startswith("drop_top_k")]
@@ -205,12 +232,13 @@ def render(ctx: dict) -> None:
             rem = common.removed_of(lr, sr["run_id"])
             per_task = rem.groupby(["suite", "libero_task_id"]).size()
             total = int(sp.get("child_n_episodes", 0)) + len(rem)
-            st.markdown(f"**{arm_label(prow)}**: {len(rem)} of {total} episodes removed ({per_task.min()} to {per_task.max()} in each of {len(per_task)} tasks).")
-            tbl = pd.DataFrame({"episode": [words.plain(e)[-70:] for e in rem["episode_id"]], "task": [words.plain(t) for t in rem["task_name"]]})
+            span = f"{per_task.min()} in each of {len(per_task)} tasks" if per_task.min() == per_task.max() else f"{per_task.min()} to {per_task.max()} in each of {len(per_task)} tasks"
+            st.markdown(f"**{arm_label(prow)}**: {len(rem)} of {total} episodes removed ({span}).")
+            tbl = pd.DataFrame({"episode": [words.plain(e.split("/")[-1]) for e in rem["episode_id"]], "task": [words.plain(t) for t in rem["task_name"]]})
             if "rank" in rem:
                 tbl["rank in its task (1 = removed first)"], tbl["score (higher = more harmful)" if prow.get("direction") == "highest" else "score (lower = more helpful)"] = rem["rank"].to_numpy(), rem["score"].to_numpy()
             st.dataframe(tbl, hide_index=True, width="stretch", key="cur_removed")
-            vid = st.selectbox("Watch a removed episode", list(rem["episode_id"]), format_func=lambda e: words.plain(e)[-70:], key="cur_video")
+            vid = st.selectbox("Watch a removed episode", list(rem["episode_id"]), format_func=lambda e: words.plain(e.split("/")[-2])[:40] + " / " + words.plain(e.split("/")[-1]), key="cur_video")
             try:
                 st.video(common.training_video(lr, ctx["run_id"], vid), width=360)
             except Exception as e:  # noqa: BLE001 - the dataset may not be on this machine
