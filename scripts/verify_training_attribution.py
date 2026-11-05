@@ -28,6 +28,7 @@ import ast
 import hashlib
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -814,8 +815,72 @@ def step4_synthetic() -> int:
         run = client(lr).get_run(res["run_id"])
         check("4.4g the summary is a tracked run (stage summarize) with the table as an output",
               run.data.tags["stage"] == "summarize" and "output.step4_summary_csv.sha256" in run.data.tags, f"{res['rows']} rows from {res['n_verify_runs']} verify runs")
+        # ---- curation-results S1: status, sentence and the §4.5 headline (AC1.1-AC1.6) --------------------------------
+        import subprocess
+
+        new_cols = [c for c in tbl.columns if c.endswith(("__status_code", "__status", "__sentence")) or c in ("k", "rollouts_per_task", "synthetic")]
+        old_cols = [c for c in tbl.columns if c not in new_cols]
+        head_txt = subprocess.run(["git", "show", "HEAD:tracker/features/2026-10-20-training-attribution/artifacts/s4_step4_summary_SYNTHETIC.csv"], cwd=REPO_ROOT, capture_output=True, text=True).stdout
+        same_old = tbl[old_cols].to_csv(index=False) == head_txt
+        check("1.4 (curation-results S1) the old columns and rows of step4_summary.csv from the existing fixture are byte-identical to the file at git HEAD; the new columns come last",
+              same_old and list(tbl.columns[:len(old_cols)]) == old_cols and len(new_cols) > 0, f"{len(old_cols)} old columns equal HEAD: {same_old}; {len(new_cols)} new columns (last): {new_cols[:4]}...")
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
-        tbl.to_csv(ARTIFACTS / "s4_step4_summary_SYNTHETIC.csv", index=False)
+        tbl[old_cols].to_csv(ARTIFACTS / "s4_step4_summary_SYNTHETIC.csv", index=False)  # this feature's artifact stays as released; the full table goes to the curation feature
+        c3 = "t-cccc3333"
+        CUR_ART = REPO_ROOT / "tracker" / "features" / "2026-11-05-curation-results" / "artifacts"
+        cases = {"case-confirmed": ("highest", [True, True, None], [True] * 3), "case-refuted": ("highest", [False, False, True], [True] * 3),
+                 "case-notconfirmed": ("highest", [True, None, None], [True] * 3), "case-inconclusive": ("highest", [True, True, True], [True, False, False])}
+        for arm, (direction, calls3, gates3) in cases.items():
+            with stage_run("select", f"select-t-{arm}", lr, chain=c3, allow_dirty=True) as r:
+                r.params({"op": "drop_top_k_per_task", "k": 5, "direction": direction, "metric": decl["column"], "curation": "per_task", "metric_declaration": json.dumps(decl)})
+            for sd in range(3):
+                verify(f"v3-{arm}-s{sd}", "vs_base", arm, "base", sd, synthetic_verdict(calls3[sd], gate=gates3[sd]), c3)
+        with stage_run("select", "select-t-random0-k5", lr, chain=c3, allow_dirty=True) as r:
+            r.params({"op": "drop_random_k_per_task", "k": 5, "seed": 0, "curation": "per_task"})
+        for sd in range(3):
+            verify(f"v3-random-s{sd}", "vs_base", "random0-k5", "base", sd, synthetic_verdict(True), c3)
+        h2h = {"h-shown": [{"hrt60": True, "f30": False}, {"hrt60": True, "f30": False}, {"hrt60": True, "f30": None}],
+               "h-partly": [{"hrt60": True, "f30": None}, {"hrt60": True, "f30": None}, {"hrt60": None, "f30": None}],
+               "h-contradicted": [{"hrt60": False, "f30": False}, {"hrt60": False, "f30": False}, {"hrt60": None, "f30": False}],
+               "h-inconclusive": [{"hrt60": True, "f30": False}] * 3}
+        for pair, onlys in h2h.items():
+            for sd in range(3):
+                verify(f"v3-{pair}-s{sd}", "head_to_head", f"{pair}-hrt60_lin-k5", f"{pair}-f30-k5", sd, synthetic_verdict(None, gate=pair != "h-inconclusive", only=onlys[sd]), c3)
+        step4.summary_run("t", "step4-summary-t3", chain=c3, out_dir=base / "out3", lineage_root=lr, allow_dirty=True)
+        t3 = pd.read_csv(base / "out3" / "step4_summary.csv")
+        j3 = json.loads((base / "out3" / "step4_summary.json").read_text())
+        get3 = lambda arm, kind="vs_base": t3[(t3["arm"] == arm) & (t3["comparison"] == kind)].iloc[0]  # noqa: E731
+        want = {"case-confirmed": "confirmed", "case-refuted": "refuted", "case-notconfirmed": "not confirmed", "case-inconclusive": "inconclusive", "random0-k5": step4.STATUS_NONE}
+        got = {a: get3(a)["f30__status_code"] for a in want}
+        check("1.1 planted cases, hand-computed: (T,T,0) confirmed; (C,C,T) refuted; (T,0,0) with the gate fired 3/3 not confirmed; gate fired 1/3 inconclusive; a random arm has no expectation",
+              got == want and get3("case-confirmed")["f30__by_seed"] == "T,T,0" and get3("case-refuted")["f30__by_seed"] == "C,C,T" and get3("case-inconclusive")["f30__by_seed"] == "T,g,g"
+              and get3("case-inconclusive")["gate_fires"] == "1/3" and get3("case-notconfirmed")["gate_fires"] == "3/3", f"status codes {got}")
+        hl = {h["treated"].split("-hrt60")[0]: h for h in j3["headline"]}
+        want_h = {"h-shown": "shown", "h-partly": "partly shown", "h-contradicted": "contradicted", "h-inconclusive": "inconclusive"}
+        inc = hl["h-inconclusive"]
+        check("1.2 the headline gives shown / partly shown / contradicted / inconclusive on four planted cases; every gate-not-fired seed reads 'inconclusive (gate did not fire)' in its per-seed reading",
+              {k: v["status_code"] for k, v in hl.items()} == want_h and all(p["speed"] == "inconclusive (gate did not fire)" and p["reliability"] == "inconclusive (gate did not fire)" for p in inc["per_seed"])
+              and hl["h-shown"]["per_seed"][0]["speed"] == "HRT-curated policy faster" and hl["h-shown"]["per_seed"][0]["reliability"] == "F(30)-curated policy more reliable",
+              f"headline codes {[(k, v['status_code']) for k, v in hl.items()]}; inconclusive per-seed {inc['per_seed'][0]['speed']!r}")
+        banned = ("harm" + "less", "no " + "effect", "no " + "difference")
+        texts_all = [str(x) for df_ in (t3, tbl) for c_ in df_.columns if c_.endswith(("__sentence", "__status")) for x in df_[c_]] + [h["sentence"] for h in j3["headline"]] + [h["status"] for h in j3["headline"]]
+        sent_f30 = [str(x) for x in t3["f30__sentence"]]
+        plain = step4.annotate({"arm": "a", "comparison": "vs_base", "control": "base", "op": "drop_top_k_per_task", "direction": "highest", "metric_column": "harm_f30__same_task", "k": 5,
+                                "f30__by_seed": "T,T,T", "f30__expected": "treated_better"}, ["f30"], False)
+        check("1.3 no status or sentence contains the banned words (case-insensitive); every sentence about a result names the metric's plain name and its τ; with a synthetic input every status and sentence begins 'SYNTHETIC: '; without one nothing does",
+              not any(b in x.lower() for x in texts_all for b in banned) and all("Success within 30 s (τ 30 s)" in x for x in sent_f30)
+              and all(x.startswith("SYNTHETIC: ") for x in texts_all) and not plain["f30__status"].startswith("SYNTHETIC") and not plain["f30__sentence"].startswith("SYNTHETIC")
+              and "Success within 30 s (τ 30 s)" in plain["f30__sentence"], f"{len(texts_all)} texts scanned; example: {sent_f30[0][:160]!r}")
+        doc = step4.__doc__
+        check("1.6 the module docstring cites PoC §9.1 Step 4 p. 19, §4.5 p. 11, §4.4 p. 10 and §2.3 p. 4 and labels the rule inferred",
+              all(x in doc for x in ("§9.1 Step 4 (p. 19)", "§4.5 (p. 11)", "§4.4 (p. 10)", "§2.3 (p. 4)", "**inferred**")), "missing: " + str([x for x in ("§9.1 Step 4 (p. 19)", "§4.5 (p. 11)", "§4.4 (p. 10)", "§2.3 (p. 4)", "**inferred**") if x not in doc]))
+        jobs, summ = dry_run("--subset", "v3/candidate", "--curation", "per_task", "--metrics", "f30", "hrt60_lin")
+        sm = next(j for j in jobs if j["name"] == "step4-summary-t")
+        check("1.5 no job change: the Round A dry run still plans 116 jobs and the step4-summary command is unchanged in form",
+              len(jobs) == 116 and re.sub(r"t-[0-9a-f]{8}", "t-X", sm["cmd"]) == "python scripts/stage.py --chain t-X step4-summary --tag t --name step4-summary-t --chain-id t-X", summ)
+        CUR_ART.mkdir(parents=True, exist_ok=True)
+        t3.to_csv(CUR_ART / "s1_step4_summary_SYNTHETIC.csv", index=False)
+        (CUR_ART / "s1_headline_cases_SYNTHETIC.json").write_text(json.dumps(j3["headline"], indent=1, ensure_ascii=False))
 
         # ---- AC4.5: every select arm of the chain on the real v0/candidate manifests ---------------------------------
         lr2 = scratch_lineage_copy(base / "lineage_select")

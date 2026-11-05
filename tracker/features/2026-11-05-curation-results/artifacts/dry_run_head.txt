@@ -1,0 +1,349 @@
+[dry 1] train-v3cand-s0  deps=-
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset v3/candidate --name train-v3cand-s0 --seed 0
+    sbatch --parsable --job-name=train-v3cand-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 2] eval-v3cand-s0  deps=J1
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-s0 --name eval-v3cand-s0 --batch-size 50
+    sbatch --parsable --job-name=eval-v3cand-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J1 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 3] returns-v3cand-s0  deps=J2
+    python scripts/stage.py --chain v3cand-d078bfbd returns --eval eval-v3cand-s0 --name returns-v3cand-s0
+    sbatch --parsable --job-name=returns-v3cand-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J2 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 4] feat-v3cand-s0-train  deps=J1
+    python scripts/stage.py --chain v3cand-d078bfbd features --train train-v3cand-s0 --which train --shard {i}/4
+    sbatch --parsable --job-name=feat-v3cand-s0-train --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%A_%a.out --array=0-3 --time=1-00:00:00 --dependency=afterok:J1 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 5] feat-v3cand-s0-roll  deps=J2
+    python scripts/stage.py --chain v3cand-d078bfbd features --train train-v3cand-s0 --which rollouts --eval eval-v3cand-s0 --shard {i}/4
+    sbatch --parsable --job-name=feat-v3cand-s0-roll --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%A_%a.out --array=0-3 --time=1-00:00:00 --dependency=afterok:J2 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 6] attribute-v3cand-s0  deps=J3,J4,J5
+    python scripts/stage.py --chain v3cand-d078bfbd attribute --train train-v3cand-s0 --eval eval-v3cand-s0 --returns returns-v3cand-s0 --name attribute-v3cand-s0
+    sbatch --parsable --job-name=attribute-v3cand-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --time=06:00:00 --dependency=afterok:J3:J4:J5 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 7] train-v3cand-s1  deps=-
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset v3/candidate --name train-v3cand-s1 --seed 1
+    sbatch --parsable --job-name=train-v3cand-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 8] eval-v3cand-s1  deps=J7
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-s1 --name eval-v3cand-s1 --batch-size 50
+    sbatch --parsable --job-name=eval-v3cand-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J7 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 9] returns-v3cand-s1  deps=J8
+    python scripts/stage.py --chain v3cand-d078bfbd returns --eval eval-v3cand-s1 --name returns-v3cand-s1
+    sbatch --parsable --job-name=returns-v3cand-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J8 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 10] feat-v3cand-s1-train  deps=J7
+    python scripts/stage.py --chain v3cand-d078bfbd features --train train-v3cand-s1 --which train --shard {i}/4
+    sbatch --parsable --job-name=feat-v3cand-s1-train --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%A_%a.out --array=0-3 --time=1-00:00:00 --dependency=afterok:J7 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 11] feat-v3cand-s1-roll  deps=J8
+    python scripts/stage.py --chain v3cand-d078bfbd features --train train-v3cand-s1 --which rollouts --eval eval-v3cand-s1 --shard {i}/4
+    sbatch --parsable --job-name=feat-v3cand-s1-roll --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%A_%a.out --array=0-3 --time=1-00:00:00 --dependency=afterok:J8 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 12] attribute-v3cand-s1  deps=J9,J10,J11
+    python scripts/stage.py --chain v3cand-d078bfbd attribute --train train-v3cand-s1 --eval eval-v3cand-s1 --returns returns-v3cand-s1 --name attribute-v3cand-s1
+    sbatch --parsable --job-name=attribute-v3cand-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --time=06:00:00 --dependency=afterok:J9:J10:J11 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 13] train-v3cand-s2  deps=-
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset v3/candidate --name train-v3cand-s2 --seed 2
+    sbatch --parsable --job-name=train-v3cand-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 14] eval-v3cand-s2  deps=J13
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-s2 --name eval-v3cand-s2 --batch-size 50
+    sbatch --parsable --job-name=eval-v3cand-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J13 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 15] returns-v3cand-s2  deps=J14
+    python scripts/stage.py --chain v3cand-d078bfbd returns --eval eval-v3cand-s2 --name returns-v3cand-s2
+    sbatch --parsable --job-name=returns-v3cand-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J14 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 16] feat-v3cand-s2-train  deps=J13
+    python scripts/stage.py --chain v3cand-d078bfbd features --train train-v3cand-s2 --which train --shard {i}/4
+    sbatch --parsable --job-name=feat-v3cand-s2-train --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%A_%a.out --array=0-3 --time=1-00:00:00 --dependency=afterok:J13 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 17] feat-v3cand-s2-roll  deps=J14
+    python scripts/stage.py --chain v3cand-d078bfbd features --train train-v3cand-s2 --which rollouts --eval eval-v3cand-s2 --shard {i}/4
+    sbatch --parsable --job-name=feat-v3cand-s2-roll --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%A_%a.out --array=0-3 --time=1-00:00:00 --dependency=afterok:J14 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 18] attribute-v3cand-s2  deps=J15,J16,J17
+    python scripts/stage.py --chain v3cand-d078bfbd attribute --train train-v3cand-s2 --eval eval-v3cand-s2 --returns returns-v3cand-s2 --name attribute-v3cand-s2
+    sbatch --parsable --job-name=attribute-v3cand-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --time=06:00:00 --dependency=afterok:J15:J16:J17 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 19] ensemble-v3cand  deps=J6,J12,J18
+    python scripts/stage.py --chain v3cand-d078bfbd ensemble --runs attribute-v3cand-s0 attribute-v3cand-s1 attribute-v3cand-s2 --name attribute-v3cand-ens
+    sbatch --parsable --job-name=ensemble-v3cand --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J6:J12:J18 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 20] analyze-v3cand  deps=J19
+    python scripts/stage.py --chain v3cand-d078bfbd analyze --scores attribute-v3cand-ens --name analyze-v3cand
+    sbatch --parsable --job-name=analyze-v3cand --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J19 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 21] clusters-v3cand  deps=J19
+    python scripts/stage.py --chain v3cand-d078bfbd clusters --scores attribute-v3cand-ens --name clusters-v3cand --min-sup-fraction 0.01
+    sbatch --parsable --job-name=clusters-v3cand --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J19 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 22] score-v3cand  deps=J19
+    python scripts/stage.py --chain v3cand-d078bfbd score --scores attribute-v3cand-ens --version v3 --subset candidate --name score-v3cand
+    sbatch --parsable --job-name=score-v3cand --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J19 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 23] score-clusters-v3cand  deps=J21
+    python scripts/stage.py --chain v3cand-d078bfbd score-clusters --clusters clusters-v3cand --version v3 --subset candidate --name score-clusters-v3cand
+    sbatch --parsable --job-name=score-clusters-v3cand --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J21 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 24] discrepancy-v3cand  deps=J19
+    python scripts/stage.py --chain v3cand-d078bfbd discrepancy --scores attribute-v3cand-ens --version v3 --subset candidate --name discrepancy-v3cand
+    sbatch --parsable --job-name=discrepancy-v3cand --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J19 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 25] select-v3cand  deps=J19
+    python scripts/stage.py --chain v3cand-d078bfbd select --parent v3/candidate --name select-v3cand-harm-f30-k5 --op drop_top_k_per_task --k 5 --metric harm_f30__same_task --direction highest --scores attribute-v3cand-ens --pipeline-curation per_task && python scripts/stage.py --chain v3cand-d078bfbd select --parent v3/candidate --name select-v3cand-help-f30-k5 --op drop_top_k_per_task --k 5 --metric harm_f30__same_task --direction lowest --scores attribute-v3cand-ens --pipeline-curation per_task && python scripts/stage.py --chain v3cand-d078bfbd select --parent v3/candidate --name select-v3cand-harm-hrt60_lin-k5 --op drop_top_k_per_task --k 5 --metric harm_hrt60_lin__same_task --direction highest --scores attribute-v3cand-ens --pipeline-curation per_task && python scripts/stage.py --chain v3cand-d078bfbd select --parent v3/candidate --name select-v3cand-help-hrt60_lin-k5 --op drop_top_k_per_task --k 5 --metric harm_hrt60_lin__same_task --direction lowest --scores attribute-v3cand-ens --pipeline-curation per_task && python scripts/stage.py --chain v3cand-d078bfbd select --parent v3/candidate --name select-v3cand-random0-k5 --op drop_random_k_per_task --k 5 --seed 0 --pipeline-curation per_task && python scripts/stage.py --chain v3cand-d078bfbd select --parent v3/candidate --name select-v3cand-random1-k5 --op drop_random_k_per_task --k 5 --seed 1 --pipeline-curation per_task && python scripts/stage.py --chain v3cand-d078bfbd select --parent v3/candidate --name select-v3cand-drop-random-20 --op drop_random_k --k 20 --seed 0
+    sbatch --parsable --job-name=select-v3cand --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J19 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 26] train-v3cand-harm-f30-k5-s0  deps=J25
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset select:select-v3cand-harm-f30-k5 --name train-v3cand-harm-f30-k5-s0 --seed 0
+    sbatch --parsable --job-name=train-v3cand-harm-f30-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J25 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 27] eval-v3cand-harm-f30-k5-s0  deps=J26
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-harm-f30-k5-s0 --name eval-v3cand-harm-f30-k5-s0 --batch-size 50 --no-trajectories
+    sbatch --parsable --job-name=eval-v3cand-harm-f30-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J26 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 28] verify-v3cand-harm-f30-k5-s0  deps=J27,J2
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s0 --b eval-v3cand-harm-f30-k5-s0 --family W --name verify-v3cand-harm-f30-k5-s0-W --comparison vs_base --treated harm-f30-k5 --control base --seed-id 0 && python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s0 --b eval-v3cand-harm-f30-k5-s0 --family O --name verify-v3cand-harm-f30-k5-s0-O --comparison vs_base --treated harm-f30-k5 --control base --seed-id 0
+    sbatch --parsable --job-name=verify-v3cand-harm-f30-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J27:J2 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 29] train-v3cand-harm-f30-k5-s1  deps=J25
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset select:select-v3cand-harm-f30-k5 --name train-v3cand-harm-f30-k5-s1 --seed 1
+    sbatch --parsable --job-name=train-v3cand-harm-f30-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J25 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 30] eval-v3cand-harm-f30-k5-s1  deps=J29
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-harm-f30-k5-s1 --name eval-v3cand-harm-f30-k5-s1 --batch-size 50 --no-trajectories
+    sbatch --parsable --job-name=eval-v3cand-harm-f30-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J29 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 31] verify-v3cand-harm-f30-k5-s1  deps=J30,J8
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s1 --b eval-v3cand-harm-f30-k5-s1 --family W --name verify-v3cand-harm-f30-k5-s1-W --comparison vs_base --treated harm-f30-k5 --control base --seed-id 1 && python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s1 --b eval-v3cand-harm-f30-k5-s1 --family O --name verify-v3cand-harm-f30-k5-s1-O --comparison vs_base --treated harm-f30-k5 --control base --seed-id 1
+    sbatch --parsable --job-name=verify-v3cand-harm-f30-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J30:J8 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 32] train-v3cand-harm-f30-k5-s2  deps=J25
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset select:select-v3cand-harm-f30-k5 --name train-v3cand-harm-f30-k5-s2 --seed 2
+    sbatch --parsable --job-name=train-v3cand-harm-f30-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J25 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 33] eval-v3cand-harm-f30-k5-s2  deps=J32
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-harm-f30-k5-s2 --name eval-v3cand-harm-f30-k5-s2 --batch-size 50 --no-trajectories
+    sbatch --parsable --job-name=eval-v3cand-harm-f30-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J32 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 34] verify-v3cand-harm-f30-k5-s2  deps=J33,J14
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s2 --b eval-v3cand-harm-f30-k5-s2 --family W --name verify-v3cand-harm-f30-k5-s2-W --comparison vs_base --treated harm-f30-k5 --control base --seed-id 2 && python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s2 --b eval-v3cand-harm-f30-k5-s2 --family O --name verify-v3cand-harm-f30-k5-s2-O --comparison vs_base --treated harm-f30-k5 --control base --seed-id 2
+    sbatch --parsable --job-name=verify-v3cand-harm-f30-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J33:J14 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 35] train-v3cand-help-f30-k5-s0  deps=J25
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset select:select-v3cand-help-f30-k5 --name train-v3cand-help-f30-k5-s0 --seed 0
+    sbatch --parsable --job-name=train-v3cand-help-f30-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J25 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 36] eval-v3cand-help-f30-k5-s0  deps=J35
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-help-f30-k5-s0 --name eval-v3cand-help-f30-k5-s0 --batch-size 50 --no-trajectories
+    sbatch --parsable --job-name=eval-v3cand-help-f30-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J35 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 37] verify-v3cand-help-f30-k5-s0  deps=J36,J2
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s0 --b eval-v3cand-help-f30-k5-s0 --family W --name verify-v3cand-help-f30-k5-s0-W --comparison vs_base --treated help-f30-k5 --control base --seed-id 0 && python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s0 --b eval-v3cand-help-f30-k5-s0 --family O --name verify-v3cand-help-f30-k5-s0-O --comparison vs_base --treated help-f30-k5 --control base --seed-id 0
+    sbatch --parsable --job-name=verify-v3cand-help-f30-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J36:J2 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 38] train-v3cand-help-f30-k5-s1  deps=J25
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset select:select-v3cand-help-f30-k5 --name train-v3cand-help-f30-k5-s1 --seed 1
+    sbatch --parsable --job-name=train-v3cand-help-f30-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J25 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 39] eval-v3cand-help-f30-k5-s1  deps=J38
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-help-f30-k5-s1 --name eval-v3cand-help-f30-k5-s1 --batch-size 50 --no-trajectories
+    sbatch --parsable --job-name=eval-v3cand-help-f30-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J38 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 40] verify-v3cand-help-f30-k5-s1  deps=J39,J8
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s1 --b eval-v3cand-help-f30-k5-s1 --family W --name verify-v3cand-help-f30-k5-s1-W --comparison vs_base --treated help-f30-k5 --control base --seed-id 1 && python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s1 --b eval-v3cand-help-f30-k5-s1 --family O --name verify-v3cand-help-f30-k5-s1-O --comparison vs_base --treated help-f30-k5 --control base --seed-id 1
+    sbatch --parsable --job-name=verify-v3cand-help-f30-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J39:J8 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 41] train-v3cand-help-f30-k5-s2  deps=J25
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset select:select-v3cand-help-f30-k5 --name train-v3cand-help-f30-k5-s2 --seed 2
+    sbatch --parsable --job-name=train-v3cand-help-f30-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J25 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 42] eval-v3cand-help-f30-k5-s2  deps=J41
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-help-f30-k5-s2 --name eval-v3cand-help-f30-k5-s2 --batch-size 50 --no-trajectories
+    sbatch --parsable --job-name=eval-v3cand-help-f30-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J41 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 43] verify-v3cand-help-f30-k5-s2  deps=J42,J14
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s2 --b eval-v3cand-help-f30-k5-s2 --family W --name verify-v3cand-help-f30-k5-s2-W --comparison vs_base --treated help-f30-k5 --control base --seed-id 2 && python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s2 --b eval-v3cand-help-f30-k5-s2 --family O --name verify-v3cand-help-f30-k5-s2-O --comparison vs_base --treated help-f30-k5 --control base --seed-id 2
+    sbatch --parsable --job-name=verify-v3cand-help-f30-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J42:J14 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 44] train-v3cand-harm-hrt60_lin-k5-s0  deps=J25
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset select:select-v3cand-harm-hrt60_lin-k5 --name train-v3cand-harm-hrt60_lin-k5-s0 --seed 0
+    sbatch --parsable --job-name=train-v3cand-harm-hrt60_lin-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J25 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 45] eval-v3cand-harm-hrt60_lin-k5-s0  deps=J44
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-harm-hrt60_lin-k5-s0 --name eval-v3cand-harm-hrt60_lin-k5-s0 --batch-size 50 --no-trajectories
+    sbatch --parsable --job-name=eval-v3cand-harm-hrt60_lin-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J44 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 46] verify-v3cand-harm-hrt60_lin-k5-s0  deps=J45,J2
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s0 --b eval-v3cand-harm-hrt60_lin-k5-s0 --family W --name verify-v3cand-harm-hrt60_lin-k5-s0-W --comparison vs_base --treated harm-hrt60_lin-k5 --control base --seed-id 0 && python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s0 --b eval-v3cand-harm-hrt60_lin-k5-s0 --family O --name verify-v3cand-harm-hrt60_lin-k5-s0-O --comparison vs_base --treated harm-hrt60_lin-k5 --control base --seed-id 0
+    sbatch --parsable --job-name=verify-v3cand-harm-hrt60_lin-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J45:J2 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 47] train-v3cand-harm-hrt60_lin-k5-s1  deps=J25
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset select:select-v3cand-harm-hrt60_lin-k5 --name train-v3cand-harm-hrt60_lin-k5-s1 --seed 1
+    sbatch --parsable --job-name=train-v3cand-harm-hrt60_lin-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J25 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 48] eval-v3cand-harm-hrt60_lin-k5-s1  deps=J47
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-harm-hrt60_lin-k5-s1 --name eval-v3cand-harm-hrt60_lin-k5-s1 --batch-size 50 --no-trajectories
+    sbatch --parsable --job-name=eval-v3cand-harm-hrt60_lin-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J47 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 49] verify-v3cand-harm-hrt60_lin-k5-s1  deps=J48,J8
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s1 --b eval-v3cand-harm-hrt60_lin-k5-s1 --family W --name verify-v3cand-harm-hrt60_lin-k5-s1-W --comparison vs_base --treated harm-hrt60_lin-k5 --control base --seed-id 1 && python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s1 --b eval-v3cand-harm-hrt60_lin-k5-s1 --family O --name verify-v3cand-harm-hrt60_lin-k5-s1-O --comparison vs_base --treated harm-hrt60_lin-k5 --control base --seed-id 1
+    sbatch --parsable --job-name=verify-v3cand-harm-hrt60_lin-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J48:J8 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 50] train-v3cand-harm-hrt60_lin-k5-s2  deps=J25
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset select:select-v3cand-harm-hrt60_lin-k5 --name train-v3cand-harm-hrt60_lin-k5-s2 --seed 2
+    sbatch --parsable --job-name=train-v3cand-harm-hrt60_lin-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J25 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 51] eval-v3cand-harm-hrt60_lin-k5-s2  deps=J50
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-harm-hrt60_lin-k5-s2 --name eval-v3cand-harm-hrt60_lin-k5-s2 --batch-size 50 --no-trajectories
+    sbatch --parsable --job-name=eval-v3cand-harm-hrt60_lin-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J50 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 52] verify-v3cand-harm-hrt60_lin-k5-s2  deps=J51,J14
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s2 --b eval-v3cand-harm-hrt60_lin-k5-s2 --family W --name verify-v3cand-harm-hrt60_lin-k5-s2-W --comparison vs_base --treated harm-hrt60_lin-k5 --control base --seed-id 2 && python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s2 --b eval-v3cand-harm-hrt60_lin-k5-s2 --family O --name verify-v3cand-harm-hrt60_lin-k5-s2-O --comparison vs_base --treated harm-hrt60_lin-k5 --control base --seed-id 2
+    sbatch --parsable --job-name=verify-v3cand-harm-hrt60_lin-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J51:J14 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 53] train-v3cand-help-hrt60_lin-k5-s0  deps=J25
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset select:select-v3cand-help-hrt60_lin-k5 --name train-v3cand-help-hrt60_lin-k5-s0 --seed 0
+    sbatch --parsable --job-name=train-v3cand-help-hrt60_lin-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J25 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 54] eval-v3cand-help-hrt60_lin-k5-s0  deps=J53
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-help-hrt60_lin-k5-s0 --name eval-v3cand-help-hrt60_lin-k5-s0 --batch-size 50 --no-trajectories
+    sbatch --parsable --job-name=eval-v3cand-help-hrt60_lin-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J53 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 55] verify-v3cand-help-hrt60_lin-k5-s0  deps=J54,J2
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s0 --b eval-v3cand-help-hrt60_lin-k5-s0 --family W --name verify-v3cand-help-hrt60_lin-k5-s0-W --comparison vs_base --treated help-hrt60_lin-k5 --control base --seed-id 0 && python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s0 --b eval-v3cand-help-hrt60_lin-k5-s0 --family O --name verify-v3cand-help-hrt60_lin-k5-s0-O --comparison vs_base --treated help-hrt60_lin-k5 --control base --seed-id 0
+    sbatch --parsable --job-name=verify-v3cand-help-hrt60_lin-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J54:J2 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 56] train-v3cand-help-hrt60_lin-k5-s1  deps=J25
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset select:select-v3cand-help-hrt60_lin-k5 --name train-v3cand-help-hrt60_lin-k5-s1 --seed 1
+    sbatch --parsable --job-name=train-v3cand-help-hrt60_lin-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J25 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 57] eval-v3cand-help-hrt60_lin-k5-s1  deps=J56
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-help-hrt60_lin-k5-s1 --name eval-v3cand-help-hrt60_lin-k5-s1 --batch-size 50 --no-trajectories
+    sbatch --parsable --job-name=eval-v3cand-help-hrt60_lin-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J56 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 58] verify-v3cand-help-hrt60_lin-k5-s1  deps=J57,J8
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s1 --b eval-v3cand-help-hrt60_lin-k5-s1 --family W --name verify-v3cand-help-hrt60_lin-k5-s1-W --comparison vs_base --treated help-hrt60_lin-k5 --control base --seed-id 1 && python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s1 --b eval-v3cand-help-hrt60_lin-k5-s1 --family O --name verify-v3cand-help-hrt60_lin-k5-s1-O --comparison vs_base --treated help-hrt60_lin-k5 --control base --seed-id 1
+    sbatch --parsable --job-name=verify-v3cand-help-hrt60_lin-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J57:J8 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 59] train-v3cand-help-hrt60_lin-k5-s2  deps=J25
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset select:select-v3cand-help-hrt60_lin-k5 --name train-v3cand-help-hrt60_lin-k5-s2 --seed 2
+    sbatch --parsable --job-name=train-v3cand-help-hrt60_lin-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J25 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 60] eval-v3cand-help-hrt60_lin-k5-s2  deps=J59
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-help-hrt60_lin-k5-s2 --name eval-v3cand-help-hrt60_lin-k5-s2 --batch-size 50 --no-trajectories
+    sbatch --parsable --job-name=eval-v3cand-help-hrt60_lin-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J59 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 61] verify-v3cand-help-hrt60_lin-k5-s2  deps=J60,J14
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s2 --b eval-v3cand-help-hrt60_lin-k5-s2 --family W --name verify-v3cand-help-hrt60_lin-k5-s2-W --comparison vs_base --treated help-hrt60_lin-k5 --control base --seed-id 2 && python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s2 --b eval-v3cand-help-hrt60_lin-k5-s2 --family O --name verify-v3cand-help-hrt60_lin-k5-s2-O --comparison vs_base --treated help-hrt60_lin-k5 --control base --seed-id 2
+    sbatch --parsable --job-name=verify-v3cand-help-hrt60_lin-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J60:J14 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 62] train-v3cand-random0-k5-s0  deps=J25
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset select:select-v3cand-random0-k5 --name train-v3cand-random0-k5-s0 --seed 0
+    sbatch --parsable --job-name=train-v3cand-random0-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J25 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 63] eval-v3cand-random0-k5-s0  deps=J62
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-random0-k5-s0 --name eval-v3cand-random0-k5-s0 --batch-size 50 --no-trajectories
+    sbatch --parsable --job-name=eval-v3cand-random0-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J62 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 64] verify-v3cand-random0-k5-s0  deps=J63,J2
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s0 --b eval-v3cand-random0-k5-s0 --family W --name verify-v3cand-random0-k5-s0-W --comparison vs_base --treated random0-k5 --control base --seed-id 0 && python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s0 --b eval-v3cand-random0-k5-s0 --family O --name verify-v3cand-random0-k5-s0-O --comparison vs_base --treated random0-k5 --control base --seed-id 0
+    sbatch --parsable --job-name=verify-v3cand-random0-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J63:J2 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 65] train-v3cand-random0-k5-s1  deps=J25
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset select:select-v3cand-random0-k5 --name train-v3cand-random0-k5-s1 --seed 1
+    sbatch --parsable --job-name=train-v3cand-random0-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J25 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 66] eval-v3cand-random0-k5-s1  deps=J65
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-random0-k5-s1 --name eval-v3cand-random0-k5-s1 --batch-size 50 --no-trajectories
+    sbatch --parsable --job-name=eval-v3cand-random0-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J65 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 67] verify-v3cand-random0-k5-s1  deps=J66,J8
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s1 --b eval-v3cand-random0-k5-s1 --family W --name verify-v3cand-random0-k5-s1-W --comparison vs_base --treated random0-k5 --control base --seed-id 1 && python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s1 --b eval-v3cand-random0-k5-s1 --family O --name verify-v3cand-random0-k5-s1-O --comparison vs_base --treated random0-k5 --control base --seed-id 1
+    sbatch --parsable --job-name=verify-v3cand-random0-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J66:J8 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 68] train-v3cand-random0-k5-s2  deps=J25
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset select:select-v3cand-random0-k5 --name train-v3cand-random0-k5-s2 --seed 2
+    sbatch --parsable --job-name=train-v3cand-random0-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J25 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 69] eval-v3cand-random0-k5-s2  deps=J68
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-random0-k5-s2 --name eval-v3cand-random0-k5-s2 --batch-size 50 --no-trajectories
+    sbatch --parsable --job-name=eval-v3cand-random0-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J68 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 70] verify-v3cand-random0-k5-s2  deps=J69,J14
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s2 --b eval-v3cand-random0-k5-s2 --family W --name verify-v3cand-random0-k5-s2-W --comparison vs_base --treated random0-k5 --control base --seed-id 2 && python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s2 --b eval-v3cand-random0-k5-s2 --family O --name verify-v3cand-random0-k5-s2-O --comparison vs_base --treated random0-k5 --control base --seed-id 2
+    sbatch --parsable --job-name=verify-v3cand-random0-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J69:J14 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 71] train-v3cand-random1-k5-s0  deps=J25
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset select:select-v3cand-random1-k5 --name train-v3cand-random1-k5-s0 --seed 0
+    sbatch --parsable --job-name=train-v3cand-random1-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J25 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 72] eval-v3cand-random1-k5-s0  deps=J71
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-random1-k5-s0 --name eval-v3cand-random1-k5-s0 --batch-size 50 --no-trajectories
+    sbatch --parsable --job-name=eval-v3cand-random1-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J71 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 73] verify-v3cand-random1-k5-s0  deps=J72,J2
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s0 --b eval-v3cand-random1-k5-s0 --family W --name verify-v3cand-random1-k5-s0-W --comparison vs_base --treated random1-k5 --control base --seed-id 0 && python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s0 --b eval-v3cand-random1-k5-s0 --family O --name verify-v3cand-random1-k5-s0-O --comparison vs_base --treated random1-k5 --control base --seed-id 0
+    sbatch --parsable --job-name=verify-v3cand-random1-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J72:J2 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 74] train-v3cand-random1-k5-s1  deps=J25
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset select:select-v3cand-random1-k5 --name train-v3cand-random1-k5-s1 --seed 1
+    sbatch --parsable --job-name=train-v3cand-random1-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J25 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 75] eval-v3cand-random1-k5-s1  deps=J74
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-random1-k5-s1 --name eval-v3cand-random1-k5-s1 --batch-size 50 --no-trajectories
+    sbatch --parsable --job-name=eval-v3cand-random1-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J74 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 76] verify-v3cand-random1-k5-s1  deps=J75,J8
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s1 --b eval-v3cand-random1-k5-s1 --family W --name verify-v3cand-random1-k5-s1-W --comparison vs_base --treated random1-k5 --control base --seed-id 1 && python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s1 --b eval-v3cand-random1-k5-s1 --family O --name verify-v3cand-random1-k5-s1-O --comparison vs_base --treated random1-k5 --control base --seed-id 1
+    sbatch --parsable --job-name=verify-v3cand-random1-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J75:J8 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 77] train-v3cand-random1-k5-s2  deps=J25
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset select:select-v3cand-random1-k5 --name train-v3cand-random1-k5-s2 --seed 2
+    sbatch --parsable --job-name=train-v3cand-random1-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J25 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 78] eval-v3cand-random1-k5-s2  deps=J77
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-random1-k5-s2 --name eval-v3cand-random1-k5-s2 --batch-size 50 --no-trajectories
+    sbatch --parsable --job-name=eval-v3cand-random1-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J77 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 79] verify-v3cand-random1-k5-s2  deps=J78,J14
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s2 --b eval-v3cand-random1-k5-s2 --family W --name verify-v3cand-random1-k5-s2-W --comparison vs_base --treated random1-k5 --control base --seed-id 2 && python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s2 --b eval-v3cand-random1-k5-s2 --family O --name verify-v3cand-random1-k5-s2-O --comparison vs_base --treated random1-k5 --control base --seed-id 2
+    sbatch --parsable --job-name=verify-v3cand-random1-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J78:J14 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 80] train-v3cand-drop-random-20-s0  deps=J25
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset select:select-v3cand-drop-random-20 --name train-v3cand-drop-random-20-s0 --seed 0
+    sbatch --parsable --job-name=train-v3cand-drop-random-20-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J25 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 81] eval-v3cand-drop-random-20-s0  deps=J80
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-drop-random-20-s0 --name eval-v3cand-drop-random-20-s0 --batch-size 50 --no-trajectories
+    sbatch --parsable --job-name=eval-v3cand-drop-random-20-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J80 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 82] verify-v3cand-drop-random-20-s0  deps=J81,J2
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s0 --b eval-v3cand-drop-random-20-s0 --family W --name verify-v3cand-drop-random-20-s0-W --comparison vs_base --treated drop-random-20 --control base --seed-id 0 && python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s0 --b eval-v3cand-drop-random-20-s0 --family O --name verify-v3cand-drop-random-20-s0-O --comparison vs_base --treated drop-random-20 --control base --seed-id 0
+    sbatch --parsable --job-name=verify-v3cand-drop-random-20-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J81:J2 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 83] train-v3cand-drop-random-20-s1  deps=J25
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset select:select-v3cand-drop-random-20 --name train-v3cand-drop-random-20-s1 --seed 1
+    sbatch --parsable --job-name=train-v3cand-drop-random-20-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J25 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 84] eval-v3cand-drop-random-20-s1  deps=J83
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-drop-random-20-s1 --name eval-v3cand-drop-random-20-s1 --batch-size 50 --no-trajectories
+    sbatch --parsable --job-name=eval-v3cand-drop-random-20-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J83 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 85] verify-v3cand-drop-random-20-s1  deps=J84,J8
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s1 --b eval-v3cand-drop-random-20-s1 --family W --name verify-v3cand-drop-random-20-s1-W --comparison vs_base --treated drop-random-20 --control base --seed-id 1 && python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s1 --b eval-v3cand-drop-random-20-s1 --family O --name verify-v3cand-drop-random-20-s1-O --comparison vs_base --treated drop-random-20 --control base --seed-id 1
+    sbatch --parsable --job-name=verify-v3cand-drop-random-20-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J84:J8 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 86] train-v3cand-drop-random-20-s2  deps=J25
+    python scripts/stage.py --chain v3cand-d078bfbd train --subset select:select-v3cand-drop-random-20 --name train-v3cand-drop-random-20-s2 --seed 2
+    sbatch --parsable --job-name=train-v3cand-drop-random-20-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J25 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 87] eval-v3cand-drop-random-20-s2  deps=J86
+    python scripts/stage.py --chain v3cand-d078bfbd eval --train train-v3cand-drop-random-20-s2 --name eval-v3cand-drop-random-20-s2 --batch-size 50 --no-trajectories
+    sbatch --parsable --job-name=eval-v3cand-drop-random-20-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J86 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/gpu.sbatch
+[dry 88] verify-v3cand-drop-random-20-s2  deps=J87,J14
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s2 --b eval-v3cand-drop-random-20-s2 --family W --name verify-v3cand-drop-random-20-s2-W --comparison vs_base --treated drop-random-20 --control base --seed-id 2 && python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-s2 --b eval-v3cand-drop-random-20-s2 --family O --name verify-v3cand-drop-random-20-s2-O --comparison vs_base --treated drop-random-20 --control base --seed-id 2
+    sbatch --parsable --job-name=verify-v3cand-drop-random-20-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J87:J14 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 89] verify-v3cand-harm-f30-k5-vs-random0-k5-s0  deps=J27,J63
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random0-k5-s0 --b eval-v3cand-harm-f30-k5-s0 --family W --name verify-v3cand-harm-f30-k5-vs-random0-k5-s0-W --comparison curated_vs_random --treated harm-f30-k5 --control random0-k5 --seed-id 0
+    sbatch --parsable --job-name=verify-v3cand-harm-f30-k5-vs-random0-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J27:J63 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 90] verify-v3cand-harm-f30-k5-vs-random0-k5-s1  deps=J30,J66
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random0-k5-s1 --b eval-v3cand-harm-f30-k5-s1 --family W --name verify-v3cand-harm-f30-k5-vs-random0-k5-s1-W --comparison curated_vs_random --treated harm-f30-k5 --control random0-k5 --seed-id 1
+    sbatch --parsable --job-name=verify-v3cand-harm-f30-k5-vs-random0-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J30:J66 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 91] verify-v3cand-harm-f30-k5-vs-random0-k5-s2  deps=J33,J69
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random0-k5-s2 --b eval-v3cand-harm-f30-k5-s2 --family W --name verify-v3cand-harm-f30-k5-vs-random0-k5-s2-W --comparison curated_vs_random --treated harm-f30-k5 --control random0-k5 --seed-id 2
+    sbatch --parsable --job-name=verify-v3cand-harm-f30-k5-vs-random0-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J33:J69 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 92] verify-v3cand-harm-f30-k5-vs-random1-k5-s0  deps=J27,J72
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random1-k5-s0 --b eval-v3cand-harm-f30-k5-s0 --family W --name verify-v3cand-harm-f30-k5-vs-random1-k5-s0-W --comparison curated_vs_random --treated harm-f30-k5 --control random1-k5 --seed-id 0
+    sbatch --parsable --job-name=verify-v3cand-harm-f30-k5-vs-random1-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J27:J72 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 93] verify-v3cand-harm-f30-k5-vs-random1-k5-s1  deps=J30,J75
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random1-k5-s1 --b eval-v3cand-harm-f30-k5-s1 --family W --name verify-v3cand-harm-f30-k5-vs-random1-k5-s1-W --comparison curated_vs_random --treated harm-f30-k5 --control random1-k5 --seed-id 1
+    sbatch --parsable --job-name=verify-v3cand-harm-f30-k5-vs-random1-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J30:J75 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 94] verify-v3cand-harm-f30-k5-vs-random1-k5-s2  deps=J33,J78
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random1-k5-s2 --b eval-v3cand-harm-f30-k5-s2 --family W --name verify-v3cand-harm-f30-k5-vs-random1-k5-s2-W --comparison curated_vs_random --treated harm-f30-k5 --control random1-k5 --seed-id 2
+    sbatch --parsable --job-name=verify-v3cand-harm-f30-k5-vs-random1-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J33:J78 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 95] verify-v3cand-help-f30-k5-vs-random0-k5-s0  deps=J36,J63
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random0-k5-s0 --b eval-v3cand-help-f30-k5-s0 --family W --name verify-v3cand-help-f30-k5-vs-random0-k5-s0-W --comparison curated_vs_random --treated help-f30-k5 --control random0-k5 --seed-id 0
+    sbatch --parsable --job-name=verify-v3cand-help-f30-k5-vs-random0-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J36:J63 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 96] verify-v3cand-help-f30-k5-vs-random0-k5-s1  deps=J39,J66
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random0-k5-s1 --b eval-v3cand-help-f30-k5-s1 --family W --name verify-v3cand-help-f30-k5-vs-random0-k5-s1-W --comparison curated_vs_random --treated help-f30-k5 --control random0-k5 --seed-id 1
+    sbatch --parsable --job-name=verify-v3cand-help-f30-k5-vs-random0-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J39:J66 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 97] verify-v3cand-help-f30-k5-vs-random0-k5-s2  deps=J42,J69
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random0-k5-s2 --b eval-v3cand-help-f30-k5-s2 --family W --name verify-v3cand-help-f30-k5-vs-random0-k5-s2-W --comparison curated_vs_random --treated help-f30-k5 --control random0-k5 --seed-id 2
+    sbatch --parsable --job-name=verify-v3cand-help-f30-k5-vs-random0-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J42:J69 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 98] verify-v3cand-help-f30-k5-vs-random1-k5-s0  deps=J36,J72
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random1-k5-s0 --b eval-v3cand-help-f30-k5-s0 --family W --name verify-v3cand-help-f30-k5-vs-random1-k5-s0-W --comparison curated_vs_random --treated help-f30-k5 --control random1-k5 --seed-id 0
+    sbatch --parsable --job-name=verify-v3cand-help-f30-k5-vs-random1-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J36:J72 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 99] verify-v3cand-help-f30-k5-vs-random1-k5-s1  deps=J39,J75
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random1-k5-s1 --b eval-v3cand-help-f30-k5-s1 --family W --name verify-v3cand-help-f30-k5-vs-random1-k5-s1-W --comparison curated_vs_random --treated help-f30-k5 --control random1-k5 --seed-id 1
+    sbatch --parsable --job-name=verify-v3cand-help-f30-k5-vs-random1-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J39:J75 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 100] verify-v3cand-help-f30-k5-vs-random1-k5-s2  deps=J42,J78
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random1-k5-s2 --b eval-v3cand-help-f30-k5-s2 --family W --name verify-v3cand-help-f30-k5-vs-random1-k5-s2-W --comparison curated_vs_random --treated help-f30-k5 --control random1-k5 --seed-id 2
+    sbatch --parsable --job-name=verify-v3cand-help-f30-k5-vs-random1-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J42:J78 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 101] verify-v3cand-harm-hrt60_lin-k5-vs-random0-k5-s0  deps=J45,J63
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random0-k5-s0 --b eval-v3cand-harm-hrt60_lin-k5-s0 --family W --name verify-v3cand-harm-hrt60_lin-k5-vs-random0-k5-s0-W --comparison curated_vs_random --treated harm-hrt60_lin-k5 --control random0-k5 --seed-id 0
+    sbatch --parsable --job-name=verify-v3cand-harm-hrt60_lin-k5-vs-random0-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J45:J63 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 102] verify-v3cand-harm-hrt60_lin-k5-vs-random0-k5-s1  deps=J48,J66
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random0-k5-s1 --b eval-v3cand-harm-hrt60_lin-k5-s1 --family W --name verify-v3cand-harm-hrt60_lin-k5-vs-random0-k5-s1-W --comparison curated_vs_random --treated harm-hrt60_lin-k5 --control random0-k5 --seed-id 1
+    sbatch --parsable --job-name=verify-v3cand-harm-hrt60_lin-k5-vs-random0-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J48:J66 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 103] verify-v3cand-harm-hrt60_lin-k5-vs-random0-k5-s2  deps=J51,J69
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random0-k5-s2 --b eval-v3cand-harm-hrt60_lin-k5-s2 --family W --name verify-v3cand-harm-hrt60_lin-k5-vs-random0-k5-s2-W --comparison curated_vs_random --treated harm-hrt60_lin-k5 --control random0-k5 --seed-id 2
+    sbatch --parsable --job-name=verify-v3cand-harm-hrt60_lin-k5-vs-random0-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J51:J69 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 104] verify-v3cand-harm-hrt60_lin-k5-vs-random1-k5-s0  deps=J45,J72
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random1-k5-s0 --b eval-v3cand-harm-hrt60_lin-k5-s0 --family W --name verify-v3cand-harm-hrt60_lin-k5-vs-random1-k5-s0-W --comparison curated_vs_random --treated harm-hrt60_lin-k5 --control random1-k5 --seed-id 0
+    sbatch --parsable --job-name=verify-v3cand-harm-hrt60_lin-k5-vs-random1-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J45:J72 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 105] verify-v3cand-harm-hrt60_lin-k5-vs-random1-k5-s1  deps=J48,J75
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random1-k5-s1 --b eval-v3cand-harm-hrt60_lin-k5-s1 --family W --name verify-v3cand-harm-hrt60_lin-k5-vs-random1-k5-s1-W --comparison curated_vs_random --treated harm-hrt60_lin-k5 --control random1-k5 --seed-id 1
+    sbatch --parsable --job-name=verify-v3cand-harm-hrt60_lin-k5-vs-random1-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J48:J75 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 106] verify-v3cand-harm-hrt60_lin-k5-vs-random1-k5-s2  deps=J51,J78
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random1-k5-s2 --b eval-v3cand-harm-hrt60_lin-k5-s2 --family W --name verify-v3cand-harm-hrt60_lin-k5-vs-random1-k5-s2-W --comparison curated_vs_random --treated harm-hrt60_lin-k5 --control random1-k5 --seed-id 2
+    sbatch --parsable --job-name=verify-v3cand-harm-hrt60_lin-k5-vs-random1-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J51:J78 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 107] verify-v3cand-help-hrt60_lin-k5-vs-random0-k5-s0  deps=J54,J63
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random0-k5-s0 --b eval-v3cand-help-hrt60_lin-k5-s0 --family W --name verify-v3cand-help-hrt60_lin-k5-vs-random0-k5-s0-W --comparison curated_vs_random --treated help-hrt60_lin-k5 --control random0-k5 --seed-id 0
+    sbatch --parsable --job-name=verify-v3cand-help-hrt60_lin-k5-vs-random0-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J54:J63 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 108] verify-v3cand-help-hrt60_lin-k5-vs-random0-k5-s1  deps=J57,J66
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random0-k5-s1 --b eval-v3cand-help-hrt60_lin-k5-s1 --family W --name verify-v3cand-help-hrt60_lin-k5-vs-random0-k5-s1-W --comparison curated_vs_random --treated help-hrt60_lin-k5 --control random0-k5 --seed-id 1
+    sbatch --parsable --job-name=verify-v3cand-help-hrt60_lin-k5-vs-random0-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J57:J66 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 109] verify-v3cand-help-hrt60_lin-k5-vs-random0-k5-s2  deps=J60,J69
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random0-k5-s2 --b eval-v3cand-help-hrt60_lin-k5-s2 --family W --name verify-v3cand-help-hrt60_lin-k5-vs-random0-k5-s2-W --comparison curated_vs_random --treated help-hrt60_lin-k5 --control random0-k5 --seed-id 2
+    sbatch --parsable --job-name=verify-v3cand-help-hrt60_lin-k5-vs-random0-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J60:J69 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 110] verify-v3cand-help-hrt60_lin-k5-vs-random1-k5-s0  deps=J54,J72
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random1-k5-s0 --b eval-v3cand-help-hrt60_lin-k5-s0 --family W --name verify-v3cand-help-hrt60_lin-k5-vs-random1-k5-s0-W --comparison curated_vs_random --treated help-hrt60_lin-k5 --control random1-k5 --seed-id 0
+    sbatch --parsable --job-name=verify-v3cand-help-hrt60_lin-k5-vs-random1-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J54:J72 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 111] verify-v3cand-help-hrt60_lin-k5-vs-random1-k5-s1  deps=J57,J75
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random1-k5-s1 --b eval-v3cand-help-hrt60_lin-k5-s1 --family W --name verify-v3cand-help-hrt60_lin-k5-vs-random1-k5-s1-W --comparison curated_vs_random --treated help-hrt60_lin-k5 --control random1-k5 --seed-id 1
+    sbatch --parsable --job-name=verify-v3cand-help-hrt60_lin-k5-vs-random1-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J57:J75 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 112] verify-v3cand-help-hrt60_lin-k5-vs-random1-k5-s2  deps=J60,J78
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-random1-k5-s2 --b eval-v3cand-help-hrt60_lin-k5-s2 --family W --name verify-v3cand-help-hrt60_lin-k5-vs-random1-k5-s2-W --comparison curated_vs_random --treated help-hrt60_lin-k5 --control random1-k5 --seed-id 2
+    sbatch --parsable --job-name=verify-v3cand-help-hrt60_lin-k5-vs-random1-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J60:J78 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 113] verify-v3cand-harm-hrt60_lin-k5-vs-harm-f30-k5-s0  deps=J45,J27
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-harm-f30-k5-s0 --b eval-v3cand-harm-hrt60_lin-k5-s0 --family W --name verify-v3cand-harm-hrt60_lin-k5-vs-harm-f30-k5-s0-W --comparison head_to_head --treated harm-hrt60_lin-k5 --control harm-f30-k5 --seed-id 0
+    sbatch --parsable --job-name=verify-v3cand-harm-hrt60_lin-k5-vs-harm-f30-k5-s0 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J45:J27 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 114] verify-v3cand-harm-hrt60_lin-k5-vs-harm-f30-k5-s1  deps=J48,J30
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-harm-f30-k5-s1 --b eval-v3cand-harm-hrt60_lin-k5-s1 --family W --name verify-v3cand-harm-hrt60_lin-k5-vs-harm-f30-k5-s1-W --comparison head_to_head --treated harm-hrt60_lin-k5 --control harm-f30-k5 --seed-id 1
+    sbatch --parsable --job-name=verify-v3cand-harm-hrt60_lin-k5-vs-harm-f30-k5-s1 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J48:J30 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 115] verify-v3cand-harm-hrt60_lin-k5-vs-harm-f30-k5-s2  deps=J51,J33
+    python scripts/stage.py --chain v3cand-d078bfbd verify --a eval-v3cand-harm-f30-k5-s2 --b eval-v3cand-harm-hrt60_lin-k5-s2 --family W --name verify-v3cand-harm-hrt60_lin-k5-vs-harm-f30-k5-s2-W --comparison head_to_head --treated harm-hrt60_lin-k5 --control harm-f30-k5 --seed-id 2
+    sbatch --parsable --job-name=verify-v3cand-harm-hrt60_lin-k5-vs-harm-f30-k5-s2 --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J51:J33 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+[dry 116] step4-summary-v3cand  deps=J28,J31,J34,J37,J40,J43,J46,J49,J52,J55,J58,J61,J64,J67,J70,J73,J76,J79,J82,J85,J88,J89,J90,J91,J92,J93,J94,J95,J96,J97,J98,J99,J100,J101,J102,J103,J104,J105,J106,J107,J108,J109,J110,J111,J112,J113,J114,J115
+    python scripts/stage.py --chain v3cand-d078bfbd step4-summary --tag v3cand --name step4-summary-v3cand --chain-id v3cand-d078bfbd
+    sbatch --parsable --job-name=step4-summary-v3cand --partition=gpu --output=/path/to/scratch/phyexp/logs/%x-%j.out --dependency=afterok:J28:J31:J34:J37:J40:J43:J46:J49:J52:J55:J58:J61:J64:J67:J70:J73:J76:J79:J82:J85:J88:J89:J90:J91:J92:J93:J94:J95:J96:J97:J98:J99:J100:J101:J102:J103:J104:J105:J106:J107:J108:J109:J110:J111:J112:J113:J114:J115 /Users/davit_khachaturyan/Projects/personal/vlaExp/slurm/cpu.sbatch
+would submit 116 jobs; chain v3cand-d078bfbd; arms: ['harm-f30-k5', 'help-f30-k5', 'harm-hrt60_lin-k5', 'help-hrt60_lin-k5', 'random0-k5', 'random1-k5', 'drop-random-20']

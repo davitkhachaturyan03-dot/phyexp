@@ -35,6 +35,28 @@ support, PoC §4.4 p. 10, §9.1 Step 4.4 p. 19; training-attribution round 2). T
 ``vlapoc.verdict`` implements it; this module aggregates, it does not re-test. It refuses verdicts from several chains
 under one tag unless a chain id is given, and a verify run whose chain differs from the requested one.
 
+Status, sentence and the §4.5 headline (curation-results S1; the rule is **inferred**, stated before any result, recorded as a run param
+and open to the owner's override)
+-------------------------------------------------------------------------------------------------------------------------------------
+``annotate`` adds, per metric ``<m>``, ``<m>__status_code`` / ``<m>__status`` / ``<m>__sentence`` to a summary row and ``headline`` reads the
+PoC §4.5 (p. 11) "same dataset, opposite curations" claim from the ``head_to_head`` rows. Both are pure functions of the recorded per-seed
+calls (``<m>__by_seed``), so the dashboard can compute the same text from an older summary run that lacks the columns.
+
+- **Per metric with an expectation** (PoC §9.1 Step 4.3-4.5 p. 19, §2.6 p. 5; across seeds the replication rule of ``vlapoc.confirm``, ceil(2n/3) seeds,
+  none contradicting, PoC §2.3 p. 4 "2-3 seeds per data configuration"): ``confirmed`` / ``refuted`` / ``not confirmed`` from ``confirm.status_of``;
+  ``inconclusive`` instead of ``not confirmed`` when the macro-KS gate fired in fewer than ceil(2n/3) seeds (the two policies were not shown to
+  differ, PoC §4.4 (p. 10): direction is claimed only after the gate fires). A metric with no expectation (a random-removal control arm) reads
+  ``no expectation (control arm)``.
+- **Headline per head-to-head pair** (PoC §4.5 p. 11: "show that each curated policy wins on its own metric"): speed claim = the HRT-curated arm is better on
+  ``hrt60`` (``status_of(..., "T")``), reliability claim = the F(30)-curated arm is better on ``f30`` (``status_of(..., "C")``). ``shown`` if both are
+  confirmed, ``contradicted`` if either is refuted, ``partly shown`` if exactly one is confirmed and none refuted, ``inconclusive`` otherwise.
+- **Wording** (PoC §4.4 (p. 10) "Label every claim with its metric and time cap τ"): every sentence names the metric's plain name and its τ; a result that is
+  not significant reads "not shown at this sample size" and says that is not evidence for anything else. The words "harmless", "no effect" and
+  "no difference" are never used. With a synthetic input (a verify or select run tagged ``vlapoc.synthetic=true``, or a verdict carrying
+  ``"SYNTHETIC"``) every status and sentence begins ``SYNTHETIC: `` (fail-closed, no flag). ``<m>__status_code`` keeps the canonical word.
+- The HRT arm is *ranked* by the linearized return ``hrt60_lin`` and *judged* on the HRT ratio ``hrt60`` (PoC §4.3 p. 10: "HRT is a ratio, so it needs
+  a first-order (linearized) approximation"); the sentence says so for that metric.
+
 Expected direction (stated before any result exists): removing the most harmful episodes should leave the treated policy
 better than its control (``treated_better``); removing the most helpful should leave it worse (``treated_worse``);
 for the HRT-vs-reliability head-to-head the HRT-curated arm should win on ``hrt60`` and the F(30)-curated arm on ``f30``.
@@ -45,6 +67,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -90,6 +113,169 @@ def call(metric_row: dict, alpha: float = ALPHA, gate_fires: bool = True) -> str
     return "C" if metric_row["diff_better"] > 0 else "T"
 
 
+# ---------------------------------------------------------------------------------------------
+# status, sentence and the §4.5 headline (curation-results S1)
+# ---------------------------------------------------------------------------------------------
+
+RULE = ("per metric with an expectation: confirmed = expectation met (significant call in the expected direction, macro-KS gate fired) in >= ceil(2n/3) of n seeds and "
+        "contradicted in none; refuted = the opposite significant call in >= ceil(2n/3) seeds; inconclusive = neither, and the gate fired in fewer than ceil(2n/3) seeds; "
+        "otherwise not confirmed. Same-dataset-opposite-curations headline: shown = speed claim (HRT-curated arm better on the HRT ratio) and reliability claim "
+        "(F(30)-curated arm better on F(30)) both confirmed; contradicted = either refuted; partly shown = exactly one confirmed and none refuted; otherwise inconclusive "
+        "(inferred; stated before any result; the across-seed rule is vlapoc.confirm's)")
+STATUS_NONE = "no expectation (control arm)"
+HEADLINE_PAIR = ("hrt60", "f30")  # PoC §4.5 p. 11: the speed metric (HRT-curated arm should win it) and the reliability metric (F(30)-curated arm should win it)
+_CALL_WORDS = {"T": "the treated policy was better", "C": "the control policy was better", "0": "not shown at this sample size", "g": "inconclusive (gate did not fire)"}
+
+
+def _name_of(key: str) -> str:
+    """Plain name of a verdict metric key (``f30`` -> ``Success within 30 s``), from ``metrics_registry.SHORT_NAMES``."""
+    from vlapoc.metrics_registry import SHORT_NAMES
+
+    return SHORT_NAMES.get({"hrt60": "hrt60_lin", "auc_h": "auc_expected"}.get(key, key), key)
+
+
+def metric_phrase(key: str) -> str:
+    """``Success within 30 s (τ 30 s)``: the plain name and the time cap of a verdict metric, so no sentence carries a bare number (PoC §4.4 p. 10)."""
+    from vlapoc.metrics_registry import entry
+
+    tau = str(entry(key)["tau"])
+    return f"{_name_of(key)} ({'no τ cap' if tau.startswith('none') else 'τ ' + tau.split(' =')[0]})"
+
+
+def status_of_calls(calls: list[str], expected: str | None) -> tuple[str, int, int]:
+    """``(status code, seeds as expected, seeds contradicting)`` of one metric's per-seed calls against its expectation (module docstring rule)."""
+    from vlapoc.confirm import status_of
+
+    want = {"treated_better": "T", "treated_worse": "C"}.get(expected or "")
+    if want is None:
+        return STATUS_NONE, 0, 0
+    status, met, contra = status_of(calls, want)
+    need = math.ceil(2 * len(calls) / 3) if calls else 1
+    if status == "not confirmed" and len(calls) - calls.count("g") < need:
+        status = "inconclusive"
+    return status, met, contra
+
+
+def _removed(row: dict) -> str:
+    """What the treated arm removed, in words (``the 5 episodes per task ranked most harmful for Speed vs human (HRT)``)."""
+    import re
+
+    k = row.get("k")
+    per_task = str(row.get("op", "")).endswith("_per_task")
+    n = f"{int(float(k))} episodes{' per task' if per_task else ''}" if k not in (None, "", "nan") and str(k) != "nan" else "the top-ranked episodes"
+    if str(row.get("op", "")).startswith("drop_random"):
+        return f"{n} chosen at random"
+    base = re.sub(r"^harm_|__same_task$", "", str(row.get("metric_column", "")))
+    what = _name_of(base) if base else "the ranked metric"
+    return f"the {n} ranked " + ("most harmful" if row.get("direction") == "highest" else "most helpful") + f" for {what}"
+
+
+def _control_words(row: dict) -> str:
+    """The control of a comparison in words."""
+    c, kind = str(row.get("control", "")), row.get("comparison")
+    if kind == "vs_base":
+        return "the original policy"
+    if kind == "head_to_head":
+        return f"the policy curated the other way ({c})"
+    return f"removing the same number of random episodes per task ({c})"
+
+
+def sentence_of(row: dict, m: str, status: str, met: int, contra: int, calls: list[str]) -> str:
+    """The bounded sentence of one metric of one summary row (module docstring: names the metric and τ; "not shown at this sample size" for a result that is not significant)."""
+    n = len(calls)
+    gates = n - calls.count("g")
+    mp, rem, ctl = metric_phrase(m), _removed(row), _control_words(row)
+    rpt = row.get("rollouts_per_task")
+    size = f"{n} seeds" + (f" x {int(float(rpt))} rollouts per task" if rpt not in (None, "") and str(rpt) != "nan" else "")
+    gate = f"macro-KS gate fired in {gates} of {n}"
+    exp = row.get(f"{m}__expected")
+    tail = (" The arm was ranked by the linearized HRT return and judged on the HRT ratio (PoC §4.3)." if m == "hrt60" and "hrt60_lin" in str(row.get("metric_column", "")) else "")
+    if status == STATUS_NONE:
+        return f"No expectation for this arm; reported for reference. {mp}: calls by seed {','.join(calls)} ({gate}).{tail}"
+    better = exp == "treated_better"
+    if row.get("comparison") == "head_to_head":
+        return f"{mp}: {met} of {n} seeds went as the PoC expects, {contra} the other way ({gate}): {status}.{tail}"
+    verb = "improved" if better else "made worse"
+    if status == "confirmed":
+        return f"Removing {rem} {verb} {mp} compared with {ctl} in {met} of {n} seeds ({gate}): confirmed.{tail}"
+    if status == "refuted":
+        return f"Removing {rem} made {mp} {'worse instead of better' if better else 'better instead of worse'} compared with {ctl} in {contra} of {n} seeds; {met} as expected ({gate}): refuted.{tail}"
+    if status == "inconclusive":
+        return f"Inconclusive: the macro-KS gate (did the time-to-success distribution change at all?) fired in only {gates} of {n} seeds, so no direction is claimed for {mp}.{tail}"
+    return (f"Not shown at this sample size ({size}): removing {rem} moved {mp} as expected compared with {ctl} in {met} of {n} seeds ({gate}). "
+            f"A change that is not detected is not evidence that removal leaves the policy unchanged: not confirmed.{tail}")
+
+
+def annotate(row: dict, keys: list[str], synthetic: bool = False) -> dict:
+    """The new columns of one summary row: per metric ``<m>__status_code`` (canonical word), ``<m>__status`` (display: ``SYNTHETIC: `` first when
+    ``synthetic``) and ``<m>__sentence``. Needs only ``<m>__by_seed``, ``<m>__expected`` and the row's identifiers, so the dashboard uses the same
+    function on a summary run that predates these columns."""
+    pre = "SYNTHETIC: " if synthetic else ""
+    out = {}
+    for m in keys:
+        calls = [c for c in str(row[f"{m}__by_seed"]).split(",") if c]
+        exp = row.get(f"{m}__expected")
+        code, met, contra = status_of_calls(calls, None if exp in (None, "-") else exp)
+        out[f"{m}__status_code"] = code
+        out[f"{m}__status"] = pre + code
+        out[f"{m}__sentence"] = pre + sentence_of(row, m, code, met, contra, calls)
+    return out
+
+
+def headline(rows: list[dict], synthetic: bool = False) -> list[dict]:
+    """PoC §4.5 (p. 11) "same dataset, opposite curations", one record per ``head_to_head`` family-W row (treated = HRT-curated arm, control = F(30)-curated arm):
+    the speed and reliability claims (each with its status, seeds as expected, seeds contradicting, gates fired), the per-seed readings, the headline status
+    (module docstring) and its sentence. Needs the rows' ``<m>__by_seed`` only."""
+    speed_m, rel_m = HEADLINE_PAIR
+    pre = "SYNTHETIC: " if synthetic else ""
+    out = []
+    for row in rows:
+        if row.get("comparison") != "head_to_head" or row.get("family", "W") != "W" or f"{speed_m}__by_seed" not in row or f"{rel_m}__by_seed" not in row:
+            continue
+        sc = [c for c in str(row[f"{speed_m}__by_seed"]).split(",") if c]
+        rc = [c for c in str(row[f"{rel_m}__by_seed"]).split(",") if c]
+        n = len(sc)
+        s_status, s_met, s_con = status_of_calls(sc, "treated_better")
+        r_status, r_met, r_con = status_of_calls(rc, "treated_worse")
+        gates = n - sc.count("g")
+        if "refuted" in (s_status, r_status):
+            code = "contradicted"
+        elif s_status == "confirmed" and r_status == "confirmed":
+            code = "shown"
+        elif "confirmed" in (s_status, r_status):
+            code = "partly shown"
+        else:
+            code = "inconclusive"
+        seeds = [s for s in str(row.get("seeds", "")).split(",") if s != ""]
+        per_seed = []
+        for i, (a, b) in enumerate(zip(sc, rc)):
+            per_seed.append({"seed": seeds[i] if i < len(seeds) else str(i), "speed_call": a, "reliability_call": b,
+                             "speed": {"T": "HRT-curated policy faster", "C": "F(30)-curated policy faster", "0": "not shown at this sample size",
+                                       "g": "inconclusive (gate did not fire)"}[a],
+                             "reliability": {"C": "F(30)-curated policy more reliable", "T": "HRT-curated policy more reliable", "0": "not shown at this sample size",
+                                             "g": "inconclusive (gate did not fire)"}[b]})
+        sp, rp = metric_phrase(speed_m), metric_phrase(rel_m)
+        if code == "shown":
+            text = (f"Same dataset, opposite curations: shown. The policy trained without the episodes ranked most harmful for speed was faster on {sp} in {s_met} of {n} seeds, "
+                    f"and the policy trained without those ranked most harmful for reliability was better on {rp} in {r_met} of {n} seeds (macro-KS gate fired in {gates} of {n}): "
+                    "each curated policy wins on its own metric.")
+        elif code == "contradicted":
+            text = (f"Same dataset, opposite curations: contradicted. At least one curated policy lost on its own metric in at least {math.ceil(2 * n / 3)} of {n} seeds "
+                    f"(speed claim on {sp}: {s_status}; reliability claim on {rp}: {r_status}).")
+        elif code == "partly shown":
+            text = (f"Same dataset, opposite curations: partly shown. Speed claim on {sp}: {s_status} ({s_met} of {n} seeds); reliability claim on {rp}: {r_status} ({r_met} of {n} seeds). "
+                    "Only one of the two curated policies is shown to win its own metric.")
+        else:
+            text = (f"Same dataset, opposite curations: inconclusive. The macro-KS gate fired in {gates} of {n} seeds; speed claim on {sp}: {s_status}; reliability claim on {rp}: {r_status}. "
+                    "No winner is stated.")
+        out.append({"treated": row["arm"], "control": row["control"], "family": row.get("family", "W"), "n_seeds": n, "seeds": seeds, "gate_fires": row.get("gate_fires"),
+                    "status_code": code, "status": pre + code, "sentence": pre + text,
+                    "speed": {"metric": speed_m, "status": s_status, "met": s_met, "contradicted": s_con, "calls": sc},
+                    "reliability": {"metric": rel_m, "status": r_status, "met": r_met, "contradicted": r_con, "calls": rc},
+                    "per_seed": per_seed, "rule": RULE})
+    return out
+
+
 def summarize(records: list[dict], arms: dict[str, dict]) -> pd.DataFrame:
     """The Step 4 table: one row per (treated arm, comparison kind, control, family).
 
@@ -100,7 +286,7 @@ def summarize(records: list[dict], arms: dict[str, dict]) -> pd.DataFrame:
     (seeds whose significant call matches the expectation), ``<m>__consistency`` (text); and the declared functional.
     """
     df = pd.DataFrame([{"kind": r["kind"], "treated": r["treated"], "control": r["control"], "seed": int(r["seed"]),
-                        "family": r["verdict"]["family"], "verdict": r["verdict"]} for r in records])
+                        "family": r["verdict"]["family"], "verdict": r["verdict"], "synthetic": bool(r.get("synthetic"))} for r in records])
     rows = []
     for (treated, kind, control, family), g in df.groupby(["treated", "kind", "control", "family"], sort=True):
         g = g.sort_values("seed")
@@ -126,6 +312,14 @@ def summarize(records: list[dict], arms: dict[str, dict]) -> pd.DataFrame:
             row[f"{m}__supports"] = supports if supports is not None else "-"
             row[f"{m}__consistency"] = (f"treated better in {n_t}/{len(g)} seeds, control better in {n_c}/{len(g)}, gate not fired in {calls.count('g')}/{len(g)}"
                                         + (f"; expectation ({exp}) met in {supports}/{len(g)}" if want else ""))
+        # curation-results S1: new columns come last, so the columns above are unchanged
+        synthetic = bool(arm.get("synthetic")) or bool(g["synthetic"].any()) or any(bool(v.get("SYNTHETIC")) for v in g["verdict"])
+        v0 = g["verdict"].iloc[0]
+        sizes = v0.get("n_episodes") or {}
+        row["k"] = arm.get("k", "")
+        row["rollouts_per_task"] = round(min(sizes.values()) / len(v0["cells"])) if sizes and v0.get("cells") else ""
+        row["synthetic"] = synthetic
+        row.update(annotate(row, keys, synthetic))
         rows.append(row)
     return pd.DataFrame(rows)
 
@@ -155,7 +349,7 @@ def collect(tag: str, chain: str | None = None, lineage_root: Path | None = None
         raise ValueError(f"chain {chain!r} has no FINISHED step4 verify runs under tag {tag!r}")
     records = [{"kind": r.data.tags["step4.kind"], "treated": r.data.tags["step4.treated"], "control": r.data.tags["step4.control"],
                 "seed": r.data.tags["step4.seed"], "run_id": r.info.run_id, "name": r.info.run_name,
-                "verdict_sha256": r.data.tags["output.verdict.sha256"],
+                "verdict_sha256": r.data.tags["output.verdict.sha256"], "synthetic": r.data.tags.get("vlapoc.synthetic") == "true",
                 "verdict": _artifact_json(r, "verdict", lineage_root)} for r in runs]
     arms = {}
     for treated in sorted({x["treated"] for x in records}):
@@ -168,7 +362,7 @@ def collect(tag: str, chain: str | None = None, lineage_root: Path | None = None
             ebm = p.get("expected_by_metric")
             arms[treated] = {"expected_by_metric": json.loads(ebm) if ebm and ebm.startswith("{") else None, "groundtruth_arm": p.get("groundtruth_arm") == "True", "cluster_run_id": p.get("cluster_run_id"), "cluster_id": p.get("cluster_id"),
                              "definition": p.get("definition"), "arm_kind": p.get("arm_kind"), "corruption_type": p.get("corruption_type"),
-                             "n_dropped": p.get("n_dropped"), "child_n_episodes": p.get("child_n_episodes"), "op": p.get("op", ""), "direction": p.get("direction", ""), "metric": p.get("metric", ""),
+                             "n_dropped": p.get("n_dropped"), "child_n_episodes": p.get("child_n_episodes"), "k": p.get("k", ""), "synthetic": sel[0].data.tags.get("vlapoc.synthetic") == "true", "op": p.get("op", ""), "direction": p.get("direction", ""), "metric": p.get("metric", ""),
                              "curation": p.get("curation", ""),
                              "declaration": json.loads(decl) if decl and decl.startswith("{") else None}
     return records, arms, chain
@@ -183,20 +377,24 @@ def summary_run(tag: str, name: str, chain: str | None = None, out_dir: Path | N
 
     records, arms, chain_id = collect(tag, chain, lineage_root)
     table = summarize(records, arms)
+    synthetic = bool(table["synthetic"].any())
+    head = headline(table.to_dict("records"), synthetic)
     out_dir = Path(out_dir) if out_dir else Path("data") / "attribution" / name
     out_dir.mkdir(parents=True, exist_ok=True)
     csv, js = out_dir / "step4_summary.csv", out_dir / "step4_summary.json"
     table.to_csv(csv, index=False)
-    js.write_text(json.dumps({"tag": tag, "chain": chain_id, "alpha": ALPHA, "n_verify_runs": len(records),
+    js.write_text(json.dumps({"tag": tag, "chain": chain_id, "alpha": ALPHA, "n_verify_runs": len(records), "synthetic": synthetic, "rule": RULE, "headline": head,
                               "verify_run_ids": sorted(r["run_id"] for r in records), "rows": table.to_dict("records")}, indent=1, default=str))
-    with stage_run("summarize", name, lineage_root, chain=run_chain or chain_id, allow_dirty=allow_dirty) as r:
+    with stage_run("summarize", name, lineage_root, chain=run_chain or chain_id, allow_dirty=allow_dirty,
+                   extra_tags={"vlapoc.synthetic": "true"} if synthetic else None) as r:
         for rec in records:
             r.input_entity("verdict", rec["verdict_sha256"], f"verify.{rec['name']}"[:200])
         r.params({"tag": tag, "source_chain": chain_id, "n_verify_runs": len(records), "alpha": ALPHA, "rows": len(table),
-                  "kinds": sorted({x["kind"] for x in records})})
+                  "kinds": sorted({x["kind"] for x in records}), "rule": RULE, "synthetic": synthetic,
+                  "headline": {h["treated"] + " vs " + h["control"]: h["status"] for h in head}})
         r.output_file("step4_summary_csv", csv, kind="table")
         r.output_file("step4_summary_json", js, kind="table")
-        return {"run_id": r.run_id, "table": rel(csv), "rows": len(table), "n_verify_runs": len(records), "chain": chain_id}
+        return {"run_id": r.run_id, "table": rel(csv), "rows": len(table), "n_verify_runs": len(records), "chain": chain_id, "headline": {h["treated"] + " vs " + h["control"]: h["status"] for h in head}}
 
 
 def main(argv: list[str] | None = None) -> int:
