@@ -310,9 +310,14 @@ def main() -> int:
     check("8.8 every train run the Step 3 commands evaluate has its checkpoint directory in Step 2's copy list (name and size), an existence check, and a STOP AND ASK; the checkpoint exists on this machine",
           train_ids and not missing_in and "STOP AND ASK (missing smoke checkpoint)" in step2 and "1.5 GiB" in step2, f"train runs {[t[:8] for t in train_ids]}; checkpoint dirs not covered: {missing_in}")
     # --- AC8.5 ---
-    now = subprocess.run(["git", "diff", "--stat", "CLAUDE.md"], cwd=REPO, capture_output=True, text=True).stdout
-    before = (ART / "b1_claude_md_diffstat_before.txt").read_text()
-    check("8.5 CLAUDE.md is untouched by the dashboard batches: `git diff --stat CLAUDE.md` equals the recorded value from before B1", now == before, f"{now.strip()!r}")
+    # Re-anchored (curation-results r2, analysis-r1 B2): the old check compared the working-tree diffstat with a value recorded while the OWNER's edit was uncommitted
+    # (b1_claude_md_diffstat_before.txt, kept as history); that edit was committed as bad0241, so the diff became empty. What the check means is "no agent commit touches
+    # CLAUDE.md": no commit after the recorded base touches it and the working tree has no change to it.
+    base = (REPO / "tracker" / "features" / "2026-11-05-curation-results" / "artifacts" / "claude_md_base_commit.txt").read_text().strip()
+    later = subprocess.run(["git", "log", "--format=%h", f"{base}..HEAD", "--", "CLAUDE.md"], cwd=REPO, capture_output=True, text=True).stdout.split()
+    dirty_md = subprocess.run(["git", "diff", "--stat", "HEAD", "--", "CLAUDE.md"], cwd=REPO, capture_output=True, text=True).stdout
+    check("8.5 CLAUDE.md is untouched by the agent batches: no commit after the recorded base (the owner's commit bad0241, claude_md_base_commit.txt) touches it, and the working tree has no change to it",
+          not later and not dirty_md, f"base {base[:8]}; commits touching CLAUDE.md after it: {later}; working-tree diff {dirty_md.strip()!r}")
     # --- AC8.6 ---
     import yaml
 
