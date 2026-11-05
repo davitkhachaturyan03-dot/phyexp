@@ -1,9 +1,9 @@
 {
  "mode": "curation",
  "pass": true,
- "n_pass": 20,
- "n": 20,
- "seconds": 20,
+ "n_pass": 23,
+ "n": 23,
+ "seconds": 21,
  "checks": [
   {
    "name": "3.1 the demo store holds the Round A of the dry run: 7 select runs, 24 SYNTHETIC train and 24 eval runs (3 x (7 arms + base)), 48 W verify runs (21 vs_base + 24 curated_vs_random + 3 head_to_head, the dry run's own names) and 1 summary run; all tagged synthetic; provenance SYNTHETIC; the real store untouched",
@@ -18,7 +18,7 @@
   {
    "name": "3.3 the recorded summary contains a confirmed row, a row that is not confirmed or inconclusive, and a head-to-head headline (whatever the values: printed as produced, not asserted to a target)",
    "pass": true,
-   "detail": "status codes ['confirmed', 'inconclusive', 'no expectation (control arm)', 'not confirmed']; headline 'SYNTHETIC: inconclusive': SYNTHETIC: Same dataset, opposite curations: inconclusive. The macro-KS gate fired in 3 of 3 seeds; speed claim on Speed vs human (HRT) (\u03c4 60 s): not confirmed; reliability claim on Success within 30 s (\u03c4 30 s): not confirmed. No winner is stated."
+   "detail": "status codes ['confirmed', 'inconclusive', 'no expectation (control arm)', 'not confirmed']; headline 'SYNTHETIC: not shown': SYNTHETIC: Same dataset, opposite curations: not shown at this sample size (3 seeds x 50 rollouts per task). The two curated policies' time-to-success distributions differ (macro-KS gate fired in 3 of 3 seeds), but neither curated policy's win on its own metric replicated across seeds (speed claim on Speed vs human (HRT) (\u03c4 60 s): not confirmed, 0 of 3; reliability claim on Success within 30 s (\u03c4 30 s): not confirmed, 0 of 3). A change that is not detected is not evidence that the curations leave the policies unchanged. No winner is stated."
   },
   {
    "name": "3.5 the synthetic outcome generator (synthetic_rollouts) names nothing of groundtruth / recovery / discrepancy and takes no store; the planted effect is stated in plain words in every eval run's params",
@@ -53,7 +53,7 @@
   {
    "name": "4.1 on the demo store every status and sentence the page shows equals the recorded summary's text verbatim: the arm table for two metrics (all 16 rows), the headline status and sentence (AppTest compares the rendered dataframe cells and markdown with step4_summary.json)",
    "pass": true,
-   "detail": "exceptions []; first load 1.9s; f30 table equal True, hrt60 table equal True; headline 'SYNTHETIC: inconclusive'"
+   "detail": "exceptions []; first load 1.9s; f30 table equal True, hrt60 table equal True; headline 'SYNTHETIC: not shown'"
   },
   {
    "name": "4.2 the forest plots' data equal treated_advantage of the recorded verdict.json rows recomputed here (and equal planted_arms.treated_advantage, asserted): headline rows oriented so positive means the curated policy wins its own metric (the F(30)-curated row is the HRT-curated advantage with its sign flipped); per-arm plot = 3 comparisons x 3 seeds",
@@ -78,12 +78,27 @@
   {
    "name": "4.6 provenance: the page shows the SYNTHETIC banner whose label equals results.provenance(<summary run>) and every recorded status, headline status and sentence begins 'SYNTHETIC: '",
    "pass": true,
-   "detail": "5 distinct recorded texts checked; label SYNTHETIC"
+   "detail": "6 distinct recorded texts checked; label SYNTHETIC"
   },
   {
-   "name": "4.7 gate honesty: with the head-to-head gate not fired in every seed, the card says 'inconclusive' and 'No winner is stated', every seed reads 'inconclusive (gate did not fire)', every forest row is marked 'did not fire', and the page states no winner (no 'wins its own metric')",
+   "name": "4.7a gate honesty, gate fired in 0/3 seeds (scratch copy): the card says 'inconclusive' and 'No winner is stated', every seed reads 'inconclusive (gate did not fire)', every forest row is marked 'did not fire', and the page states no winner (no 'wins its own metric')",
    "pass": true,
    "detail": "exceptions []; seed readings {'inconclusive (gate did not fire)'}; forest gates ['did not fire']"
+  },
+  {
+   "name": "4.7b the demo as built (head-to-head gate fired in every seed, calls hrt60 C,0,0 / f30 0,T,0): the card says 'not shown' and 'No winner is stated', does not say 'inconclusive', and no element of the headline card or the page states a winner (no 'wins its own metric')",
+   "pass": true,
+   "detail": "card '**SYNTHETIC: not shown**'; headline gate 3/3; sentence: SYNTHETIC: Same dataset, opposite curations: not shown at this sample size (3 seeds x 50 rollouts per task). The two curated policies' time-to-success distributions differ (macro-KS gate fired in 3 of"
+  },
+  {
+   "name": "4.7c consistency, on both stores: the card's status code equals step4.headline recomputed from the recorded head-to-head row's by-seed calls, and the card reads 'inconclusive' if and only if that row's hrt60 and f30 statuses are both 'inconclusive'",
+   "pass": true,
+   "detail": "demo: card 'not shown', row statuses hrt60 'not confirmed' / f30 'not confirmed'; gate-0/3 copy: card 'inconclusive', row 'inconclusive' / 'inconclusive'"
+  },
+  {
+   "name": "4.11a family O is never silently dropped: on the demo store, which records no O rows, the page shows the caption 'No operation-level (family O) verdicts are recorded for this chain.' and the family-W arm table still has its 16 rows",
+   "pass": true,
+   "detail": "W table rows 16; O rows recorded 0"
   },
   {
    "name": "4.8 a score run with no Round A chain (the smoke attribute run) shows an info message naming the command that produces one (server_pipeline.py ... --from select) and raises no exception",

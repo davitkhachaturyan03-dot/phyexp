@@ -1,9 +1,9 @@
 {
  "mode": "dropin",
  "pass": true,
- "n_pass": 6,
- "n": 6,
- "seconds": 241,
+ "n_pass": 7,
+ "n": 7,
+ "seconds": 278,
  "checks": [
   {
    "name": "7.1 the real attribute -> ensemble -> clusters code path (SYNTHETIC features, scratch store, run through the stage CLI) loads in the dashboard by run name, every page, with no file under dashboard/, vlapoc/ or scripts/ modified (git status --porcelain empty before and after)",
@@ -23,7 +23,12 @@
   {
    "name": "5.1 through the stage CLI, the dry run's select (every arm), verify (family W) and step4-summary commands (only --lineage-root and --feats-root added by the runner; the fixture's own subset as parent, k scaled to it) produce a summary the Curation results page renders by score-run name, with every recorded status and sentence shown, no page raising, and git status --porcelain -- dashboard vlapoc scripts empty before and after",
    "pass": true,
-   "detail": "7 selects (k 5/3), 48 verdicts, 16 summary rows, headline ['inconclusive']; page rows equal recorded: True; porcelain before '' after ''"
+   "detail": "7 selects (k 5/3), 69 verdicts, 23 summary rows (7 family O), headline ['not shown']; page rows equal recorded: True; porcelain before '' after ''"
+  },
+  {
+   "name": "5.5 the drop-in runs the dry run's vs_base commands as written (family W and family O), the summary has 23 rows (16 W + 7 O vs_base), and the page's operation-level table has exactly the 7 recorded O rows with status and sentence verbatim; no O row is in the W arm table (16 rows), the headline or the forest data; unreached() and snake_labels() are empty with O shown",
+   "pass": true,
+   "detail": "23 summary rows, O metric 'rmst60_op_cap', O table 7 rows, W table 16; forest rows [6, 9]; unreached []; snake []; 69 verdicts ran in total"
   },
   {
    "name": "5.2 the same chain re-tagged to what the server writes (vlapoc.smoke=false, eval.attribution_grade=true, nothing synthetic) shows no SYNTHETIC or SMOKE banner on the Curation results page and the 'Provenance: REAL' caption (header and page); adding one synthetic tag to one arm's eval run brings the SYNTHETIC banner back",

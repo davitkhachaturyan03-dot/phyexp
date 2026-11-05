@@ -34,7 +34,7 @@
   {
    "name": "1.5 no job change: the Round A dry run still plans 116 jobs and the step4-summary command is unchanged in form",
    "pass": true,
-   "detail": "would submit 116 jobs; chain t-2ce2cee4; arms: ['harm-f30-k5', 'help-f30-k5', 'harm-hrt60_lin-k5', 'help-hrt60_lin-k5', 'random0-k5', 'random1-k5', 'drop-random-20']"
+   "detail": "would submit 116 jobs; chain t-af929c92; arms: ['harm-f30-k5', 'help-f30-k5', 'harm-hrt60_lin-k5', 'help-hrt60_lin-k5', 'random0-k5', 'random1-k5', 'drop-random-20']"
   }
  ]
 }
