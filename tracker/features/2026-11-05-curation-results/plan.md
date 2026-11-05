@@ -1,6 +1,38 @@
 # Plan: curation headline results in the dashboard
 
-Round 1 (planner), 2026-11-05. Branch `curation-results` at `8383995`.
+Round 1 (planner), 2026-11-05. Branch `curation-results` at `8383995`. Revised r1 on 2026-11-05 after
+[analysis-r1.md](analysis-r1.md) (branch at `95fb1d9`). The delta is listed in the section below. Everything else stands as accepted.
+
+## Revision r1 (after analysis-r1)
+
+Scope: only the analyzer's "Feedback: planner" items (B1, B3) and the self-contradiction it noted. Items already accepted
+in analysis-r1 are not reopened: the across-seed rule, demo ranking by `harm_<m>`, the demo headline not being tuned,
+`mark_rule` + `mark_point`, the `treated_advantage` copy, and the W-only drop-in for the headline. B2 (runbook check
+8.5) and the execution-log labelling are executor items and need no plan change, because AC1.5 already requires
+`verify_runbook.py` to pass.
+
+**Changes in this revision**
+
+1. **B1, headline rule.** New headline state **`not shown`**: the gate fired in at least ⌈2n/3⌉ seeds, but neither
+   claim was confirmed or refuted. `inconclusive` is now kept only for a gate that fired in fewer than ⌈2n/3⌉ seeds.
+   Both states get a bounded sentence. See S1, "The rule". **Changed ACs:**
+   - **AC1.2** gains the fifth planted case (`not shown`, gate 3/3) and a boundary case (gate 2/3), and pins
+     `h-inconclusive` at gate 0/3.
+   - **AC1.3** adds the new headline sentences to the banned-word scan.
+   - **AC1.6** requires `RULE` and the module docstring to name both states.
+   - **AC4.7** is rewritten for the two states, with a card/table consistency check.
+   - **S4 deliverables** add the page-docstring item 1 wording.
+2. **Self-contradiction fixed.** The rule's sentence wording no longer contains the banned phrase. The plan now uses the
+   executor's wording: "a change that is not detected is not evidence that removal leaves the policy unchanged".
+   **Changed:** S1 "The rule", last bullet.
+3. **B3, family O.** Decision: the page **shows recorded family-O verdicts in their own section**, alongside, outside
+   the headline. It does not hide them behind a caption. Grounding and the measured facts are under S4 "Family O
+   decision".
+   - **New ACs:** AC1.7 (plain name for the O metric in step4's sentences), AC4.11 (the O section, or a visible "none
+     recorded" caption) and AC5.5 (the drop-in runs the dry run's family-O verify commands and the page shows them).
+   - **Changed:** the "Out of scope" family-O line, and the "Risks" section (two new premises).
+
+No new BLOCKING question.
 
 ## Request
 
@@ -144,22 +176,51 @@ function, a demo section and checks.
     than ⌈2n/3⌉ seeds (the distributions were not shown to differ). Metrics with no expectation (random arms,
     `drop-random-20`) read `no expectation (control arm)`.
   - §4.5 headline per (mode, k): speed claim = `status_of(hrt60 calls, "T")` (the HRT-curated arm better on HRT); reliability
-    claim = `status_of(f30 calls, "C")` (the F30-curated arm better on F30). The headline is `shown` if both are confirmed,
-    `contradicted` if either is refuted, `partly shown` if exactly one is confirmed and none is refuted, and `inconclusive`
-    otherwise. The sentence names the gate-fired count and the number of seeds.
+    claim = `status_of(f30 calls, "C")` (the F30-curated arm better on F30). Both claims come from the same per-seed
+    verdict, so they share one gate count `g` (seeds whose gate fired) out of `n`. **(r1)** The headline is, in this
+    order:
+    1. `contradicted` if either claim is refuted;
+    2. `shown` if both are confirmed;
+    3. `partly shown` if exactly one is confirmed and none is refuted;
+    4. `inconclusive` if `g < ⌈2n/3⌉` (the two policies were not shown to differ, PoC §4.4 p.10: direction only after
+       the gate fires). This matches the per-metric rule above, so both head-to-head metric rows then read
+       `inconclusive` too;
+    5. `not shown` otherwise: `g ≥ ⌈2n/3⌉` and neither claim is confirmed or refuted.
+
+    Steps 1–3 cannot trigger when `g < ⌈2n/3⌉`, because confirmed and refuted each need ⌈2n/3⌉ significant calls and a
+    significant call needs a fired gate. So the order is unambiguous (inferred from the definitions, and checked by the
+    AC1.2 cases).
+    - `not shown` sentence (bounded): "Same dataset, opposite curations: not shown at this sample size (n seeds × r
+      rollouts per task). The two curated policies' time-to-success distributions differ (macro-KS gate fired in g of
+      n seeds), but neither curated policy's win on its own metric replicated across seeds (speed claim on <HRT
+      phrase>: <status>, s of n; reliability claim on <F30 phrase>: <status>, r of n). No winner is stated."
+    - `inconclusive` sentence: "Same dataset, opposite curations: inconclusive. The macro-KS gate fired in only g of n
+      seeds, so no direction is claimed for either curated policy. No winner is stated."
+    - Every sentence names the gate-fired count and the number of seeds.
   - Sentences never contain "harmless", "no effect" or "no difference". A non-significant result reads "not shown at this
-    sample size (n seeds × rollouts per task)" and adds "this is not evidence that removal has no effect".
+    sample size (n seeds × rollouts per task)" and adds **(r1)** "a change that is not detected is not evidence that
+    removal leaves the policy unchanged" (the executor's wording, accepted in analysis-r1).
 - **Acceptance criteria:**
   - [ ] AC1.1 On synthetic verdict records with 3 seeds (the `verify_training_attribution.py --step4` fixture, extended),
     the new columns equal a hand-computed table for these planted cases: confirmed (T,T,0), refuted (C,C,T),
     not confirmed (T,0,0 with the gate fired 3/3), inconclusive (gate fired 1/3), and no expectation (random arm).
     [PoC §9.1 Step 4 p.19; confirm.RULE]
-  - [ ] AC1.2 The head-to-head headline gives `shown`, `partly shown`, `contradicted` and `inconclusive` on four planted
-    synthetic cases, and every gate-not-fired seed reads "inconclusive (gate did not fire)" in its per-seed reading.
-    [PoC §4.5 p.11; §4.4 p.10; brief]
+  - [ ] AC1.2 **(r1)** The head-to-head headline gives these codes on planted synthetic cases (3 seeds, ⌈2·3/3⌉ = 2),
+    with the expected codes written as literals in the fixture:
+    - `shown`, `partly shown` and `contradicted` (as in round 1);
+    - `h-inconclusive`: gate fired **0/3**, every call `g` → `inconclusive`;
+    - `h-notshown` (the fifth case): gate fired **3/3**, hrt60 calls `C,0,0`, f30 calls `0,T,0` → `not shown`. This is
+      the pattern the demo records (analysis-r1 B1, measured);
+    - `h-notshown-boundary`: gate fired **2/3**, hrt60 `0,0,g`, f30 `0,0,g` → `not shown`. Gate 2/3 meets ⌈2n/3⌉, so
+      this pins the threshold. The case is labelled inferred, because it tests the inferred rule.
+
+    Every gate-not-fired seed reads "inconclusive (gate did not fire)" in its per-seed reading. Neither the
+    `inconclusive` nor the `not shown` sentence contains "wins its own metric", and both contain "No winner is
+    stated". [PoC §4.5 p.11; §4.4 p.10; brief "'inconclusive' where the gate did not fire"; analysis-r1 B1]
   - [ ] AC1.3 No status or sentence contains the forbidden words (case-insensitive scan for `harmless`, `no effect`,
-    `no difference`). Every sentence names the metric's plain name and τ. With a synthetic input, every status and
-    sentence begins `SYNTHETIC: `. [PoC §4.4 p.10; brief wording discipline]
+    `no difference`). **(r1)** The scan covers the headline sentences of all six AC1.2 cases. Every sentence names the metric's
+    plain name and τ. With a synthetic input, every status and sentence begins `SYNTHETIC: `. [PoC §4.4 p.10; brief
+    wording discipline]
   - [ ] AC1.4 Existing columns and rows are unchanged. The `step4_summary.csv` produced by the existing `--step4`
     fixture, restricted to the old columns, is byte-identical to the one from HEAD `8383995`. `confirm` and
     `discrepancy-verdict` outputs on the demo store are unchanged (they read `collect`, not these columns).
@@ -167,7 +228,15 @@ function, a demo section and checks.
   - [ ] AC1.5 No job change: the Round A dry run still prints 116 jobs, `scripts/verify_runbook.py` passes, and the
     `step4-summary` job command string is identical to the one at HEAD. [brief constraint]
   - [ ] AC1.6 The grounding docstring cites §9.1 Step 4 p.19, §4.5 p.11, §4.4 p.10 and §2.3 p.4, and labels the rule
-    **inferred**. [vla-build]
+    **inferred**. **(r1)** `step4.RULE` and the module docstring's headline bullet both name `not shown` and
+    `inconclusive`, each with its gate condition (`grep -c "not shown" vlapoc/step4.py` ≥ 2, and the docstring bullet
+    no longer says "inconclusive otherwise"). [vla-build; analysis-r1 B1]
+  - [ ] AC1.7 **(r1, B3)** The family-O verdict metric is worded in plain language. `step4.metric_phrase("rmst60_op_cap")`
+    returns a string that contains no `_` and contains `τ 60 s`. Today it returns `rmst60_op_cap (τ 60 s)` (**measured**
+    in this revision with `.venv/bin/python -c "from vlapoc import step4; print(step4.metric_phrase('rmst60_op_cap'))"`).
+    The plain name should come from the registry entry's `metric` field ("operation RMST, capped"), not from new
+    hard-coded text. The family-W phrases are unchanged (AC1.3 still passes, and AC1.4's old columns are still
+    byte-identical). [PoC §4.4 p.10 "Label every claim with its metric and time cap τ"; brief plain language]
 - **Verify by:** `.venv/bin/python scripts/verify_training_attribution.py --step4` (extended) ;
   `.venv/bin/python scripts/verify_runbook.py` ; the dry-run command above | `tail -1`.
 - **Demo value:** the recorded sentence the page shows verbatim, e.g. "SYNTHETIC: Removing the 100 episodes ranked most
@@ -268,6 +337,47 @@ function, a demo section and checks.
      the verdict labels). An explicit note that the HRT arm was ranked by the linearized HRT return and judged on the HRT
      ratio (§4.3 p.10). Holm across the 5 metrics within each verdict; nothing corrected across arms or seeds, and the
      page says so.
+  8. **(r1, B3) Operation-level check (family O, shown alongside).** This section sits after the arm table. It holds
+     one table of the recorded family-O summary rows, with arm, comparison, status, calls by seed, gates fired k/n and
+     sentence (status and sentence verbatim). Its caption gives the O functional from the registry (`rmst60_op_cap`:
+     "mean over operation samples of min(T_k, 60), unfinished attempt = 60", family O, τ 60 s). The caption also says
+     three things:
+     - the arms were ranked by a family-W return;
+     - family W is the declared verdict family;
+     - family O is recorded alongside, only against the original policy, and is not part of the headline.
+
+     O rows never enter the headline card, the family-W arm table or the forest plots: the existing
+     `family == "W"` filters stay. When the chain records no O rows (the demo), the section shows the caption "No
+     operation-level (family O) verdicts are recorded for this chain."
+- **(r1, B1) Page docstring, item 1:** replace "'inconclusive' where the macro-KS gate did not fire" with
+  "'inconclusive' where the macro-KS gate fired in fewer than ⌈2n/3⌉ seeds; 'not shown' where it fired in at least
+  ⌈2n/3⌉ seeds but neither curated policy's win on its own metric replicated". Add an item for the family-O section.
+- **(r1) Family O decision (B3): show in its own section.** Grounding and evidence:
+  - **PoC §3.4 (p.7)** (quoted): "Declared targets. Scalars can rank policies in opposite orders. Every attribution
+    result states which functional it explains, following PhAIL's disclosure principle." The same table gives the
+    operation level as a PoC signal (quoted): "Operation-level (T, event) pairs give several outcome samples per
+    rollout".
+  - **PoC §4.4 (p.10)** (quoted): "Label every claim with its metric and time cap τ, following PhAIL's disclosure
+    principle." Family O is a declared functional with a τ: `vlapoc/metrics_registry.py` l.11–14 (quoted) "**family
+    O** (per-operation T_k, PhAIL §3.1 pairs) is declared separately, with the attribution functional
+    ``rmst60_op_cap``", and the registry entry gives `tau: "60 s"`. So a recorded O verdict is a labelled claim. The
+    disclosure principle is better served by showing it under its own label than by dropping it.
+  - **PoC §9.1 Step 4 (p.19)** (quoted): "Output: Confirmation, or refutation, that the attribution is causally
+    correct." The recorded O rows carry exactly such a status. `step4.expected_direction` gives harm and help arms an
+    expectation for every metric, O included (source l.80–100, read), and `annotate` runs over every key of the row
+    (l.314–334, read).
+  - **What Round A records (measured, source):**
+    - `server_pipeline.py` l.420 builds each vs_base job as `--family W && --family O`, and the module docstring l.22
+      reads (quoted) "family W (declared) and O (alongside)".
+    - curated_vs_random (l.427) and head_to_head (l.433) are `--family W` only.
+    - `metrics_registry.VERDICT_FAMILIES["O"] == ["rmst60_op_cap"]` (l.178).
+    - So Round A records 21 O verify runs. `summarize` groups by family, giving **7 O summary rows** (one per arm, vs
+      base, one metric each); 23 rows in all.
+  - **Why not a caption only:** a caption would hide 7 recorded, status-bearing, functional-labelled results from a
+    page whose purpose is to show the chain's verdicts. Showing them costs one table: the statuses and sentences already
+    exist, and the only text change is AC1.7's plain name. A caption is used only when no O row is recorded.
+  - **Why outside the headline:** §4.5's claim is about the arms' *own* metrics (HRT and F(30 s)), which are family-W
+    functionals, and the head-to-head is recorded in W only (l.433).
 - **Acceptance criteria:**
   - [ ] AC4.1 On the demo store, every status and sentence shown equals the recorded summary's text verbatim (AppTest
     compares the rendered dataframe cells and markdown with `step4_summary.json`). [PoC §9.1 Step 4 p.19; dashboard AC5.5b]
@@ -285,16 +395,36 @@ function, a demo section and checks.
     the rendered page is empty. [brief; dashboard AC5.9]
   - [ ] AC4.6 Provenance: on the demo store the page shows the SYNTHETIC banner and every recorded status begins
     `SYNTHETIC:`. The banner's label equals `results.provenance(<summary run>)["label"]`. [owner "labelled everywhere"]
-  - [ ] AC4.7 Gate honesty: a seed whose gate did not fire shows no direction (the call `g`, and its forest row is
-    marked "gate did not fire"). When the headline is `inconclusive`, the card says "inconclusive" and nothing on the
-    page states a winner. [PoC §4.4 p.10; §9.1 Step 4.3–4.4 p.19; brief]
+  - [ ] AC4.7 **(r1)** Gate honesty, for both non-claim states. A seed whose gate did not fire shows no direction
+    (the call `g`, and its forest row is marked "gate did not fire").
+    - (a) On a scratch copy where the head-to-head gate fired in **0/3** seeds, the card says "inconclusive" and "No
+      winner is stated", and nothing on the page states a winner (no "wins its own metric").
+    - (b) On the demo store as built (head-to-head gate fired 3/3, calls `C,0,0` / `0,T,0`; analysis-r1 B1, measured),
+      the card says "not shown", "No winner is stated" and does **not** contain "inconclusive". Nothing on the page
+      states a winner.
+    - (c) Consistency, on both stores: the card's status code equals `step4.headline` recomputed from the recorded
+      head-to-head row's `<m>__by_seed`. The card reads `inconclusive` if and only if that row's hrt60 and f30
+      statuses are both `inconclusive`.
+
+    [PoC §4.4 p.10; §9.1 Step 4.3–4.4 p.19; §4.5 p.11; brief; analysis-r1 B1]
   - [ ] AC4.8 A score run with no Round A chain (the smoke attribute run in the demo store) shows an info message naming
     the command that produces one (`server_pipeline.py … --from select`) and raises no exception. [vla-build robustness]
   - [ ] AC4.9 A summary run without the S1 columns (simulated by deleting them in a scratch copy) still renders. The
     statuses are computed by the same `step4` function from the recorded `<m>__by_seed`, and the page says "computed
     at display time from the recorded per-seed calls". [drop-in for a server run on an older commit]
   - [ ] AC4.10 Screenshots of the page at 1400 px are captured and looked at, with paths in the execution log.
-    [dashboard AC5.10]
+    [dashboard AC5.10] **(r1)** Re-captured after the B1/B3 changes, so the card shows the demo's new state.
+  - [ ] AC4.11 **(r1, B3)** Family O is shown, never silently dropped.
+    - (a) On the demo store, which records no O rows, AppTest finds the caption "No operation-level (family O)
+      verdicts are recorded for this chain." The family-W arm table still has 16 rows (unchanged).
+    - (b) On the S5 drop-in store, which records the dry run's O verifies (AC5.5), the O table has exactly the
+      recorded family-O summary rows (7). Each row's status and sentence equal the recorded `rmst60_op_cap__status` /
+      `__sentence` verbatim. No O row appears in the W arm table, the headline card or the forest data.
+    - (c) On that store, `unreached()` and `snake_labels()` return `[]`: the O metric's functional is reachable in a
+      caption, and its plain name comes from AC1.7.
+
+    Checked by `verify_dashboard.py --curation` (a) and `--dropin` (b, c). [PoC §3.4 p.7; §4.4 p.10; §9.1 Step 4
+    p.19; analysis-r1 B3]
 - **Verify by:** `.venv/bin/python scripts/verify_dashboard.py --curation --app`, and
   `.venv/bin/streamlit run dashboard/app.py -- --lineage-root data/lineage_demo --scores attribute-demo-ens`
   (manual look).
@@ -327,6 +457,18 @@ function, a demo section and checks.
     --planted-arms --app --render --demo --dropin --curation`, `verify_training_attribution.py --step4` and
     `verify_runbook.py` all pass. The real store sha256 stays `306af412…bde79`. Tracked artifacts that the verifiers
     rewrite only for ids and timings are restored (dashboard analysis-r3 housekeeping). [brief constraints]
+  - [ ] AC5.5 **(r1, B3)** The drop-in runs the dry run's vs_base commands **as written**, i.e. both the `--family W`
+    and the `--family O` parts of each `&&` job. Today it keeps only the `--family W` parts (`verify_dashboard.py`
+    l.1834, read). That gives 21 more verify runs through the stage CLI.
+    - The recorded summary has 23 rows: 16 W plus 7 O, each O row with `family == "O"` and comparison `vs_base`. The
+      execution log prints the count and the added drop-in time.
+    - The fixture eval already records `pairs` (`add_eval_outcomes`, `verify_training_attribution.py` l.244, read).
+      The family-O human anchor covers the same 20 cells as the W anchor (**measured** in this revision:
+      `human_operations.parquet` has 20 `(suite, libero_task_id)` cells, a superset of `human_reference.parquet`'s 20).
+      So no new fixture data is needed.
+    - The existing 5.1 comparison (W rows' f30 status and sentence equal recorded) still passes.
+
+    [brief drop-in "no code change"; PoC §9.1 Step 4 p.19; analysis-r1 B3]
 - **Verify by:** `.venv/bin/python scripts/verify_dashboard.py --dropin --render`, then the full regression above.
 - **Demo value:** the claim "the day Round A finishes, this page shows it unchanged, labelled REAL", backed by a passing
   check.
@@ -345,7 +487,10 @@ function, a demo section and checks.
   planted data. Gap 2 is the natural next add-on for this page.
 - **Global curation arms** (`gharm-*`, `--curation global`) are not run in Round A. The page groups by the recorded
   `curation` column, so they appear in their own section if they are ever recorded. The demo does not build them.
-- **Family O verdicts** in the demo (S3) are not built. The page shows W (declared) first and O where recorded.
+- **Family O verdicts** in the demo (S3) are not built: the demo's synthetic rollouts carry no `pairs` column
+  (`grep pairs scripts/dashboard_demo.py`, measured: no rollout writer). **(r1)** The page shows recorded O verdicts in
+  their own section (AC4.11). It is exercised end to end by the drop-in (AC5.5), and on the demo it shows the visible
+  "none recorded" caption. Building O into the demo would add 21 verdicts to the build for no new page behaviour.
 - **Any change to server jobs, counts or the runbook.** None is needed (measured above).
 - **Multiplicity correction across arms and seeds.** The across-seed rule is a replication rule, not a test. The page
   states this rather than adding a correction the PoC does not ask for (§4.4 asks for correction "across metrics").
@@ -355,11 +500,15 @@ function, a demo section and checks.
 - BLOCKING: none.
 - Non-blocking:
   1. The **across-seed rule** (≥ ⌈2n/3⌉ seeds and none contradicting) is reused from `vlapoc.confirm`, where it is labelled
-     inferred. The **headline rule** (shown / partly shown / contradicted / inconclusive) is new and inferred. Both are
-     recorded as params, and the owner may override either.
-  2. **"inconclusive" vs "not confirmed"**: a row is inconclusive when the gate fired in fewer than ⌈2n/3⌉ seeds, and
-     not confirmed when the gate fired but the direction did not replicate. This is my reading of the brief's
-     "'inconclusive' where the gate did not fire".
+     inferred. The **headline rule** (shown / partly shown / contradicted / **not shown** / inconclusive, r1) is new
+     and inferred. Both are recorded as params, and the owner may override either.
+  2. **"inconclusive" vs "not confirmed" / "not shown"**: a metric row is inconclusive when the gate fired in fewer than
+     ⌈2n/3⌉ seeds, and not confirmed when the gate fired but the direction did not replicate. **(r1)** The headline
+     follows the same split: `inconclusive` when the gate fired in fewer than ⌈2n/3⌉ seeds, `not shown` otherwise
+     when neither claim is confirmed or refuted. This is my reading of the brief's "'inconclusive' where the gate did
+     not fire", now applied consistently to the card and the table.
+  5. **(r1) Family O on the page** is shown alongside in its own section (S4 item 8), not in the headline. If the owner
+     prefers the page to show W only, AC4.11 becomes "caption only" with no other change.
   3. **`headline` param**: with `--curation per_task` it is False for every arm (measured). The page treats `per_task`
      arms as the headline (owner Q1: "per-task headline") rather than reading that param.
   4. **The Round A summary for a chain sharing its SHA with a later Round B**: `ch.chain = <tag>-<sha8>`, so a Round B
@@ -382,5 +531,14 @@ function, a demo section and checks.
   cells.
 - **Demo regression.** Rebuilding the demo changes run ids. Existing checks that pin ids or artifact files must still
   pass (AC3.4), and rewritten tracked artifacts are restored if only ids and timings changed.
+- **(r1) Drop-in readers assume W columns.**
+  - Code that loops over all `summary_json["rows"]` and reads `f30__status`, such as the 5.1 `want` set in
+    `verify_dashboard.py`, will raise `KeyError` once O rows exist. Filter by `family` there.
+  - The page's existing `family == "W"` filters are what keep O out of the headline and W table. Keep them, and add the
+    O section separately (inferred from the source read; confirm when running AC5.5).
+- **(r1) Family-O verdict on the fixture.** `compare_policies(..., family="O")` has not been run on the drop-in fixture
+  before. The fixture writes one pair per rollout (`[T or τ, event]`). Confirm before relying on it that the O verify
+  completes and its `rmst60_op_cap` row has `p_holm` and `diff_better`. If it fails, report it; do not drop O from the
+  drop-in.
 - **Scratch files** go under `data/scratch/` only. `data.zip` is never touched. The real store sha must stay
   `306af4123fda7e635892d459a2e34008ba1cb62f6c4fce152c546e0da7bdde79`.
