@@ -97,6 +97,11 @@ def forest(df: pd.DataFrame, title: str, xtitle: str) -> alt.Chart:
     return (zero + bars + pts).properties(title=title, height=alt.Step(max(34, -(-PLOT_HEIGHT_MIN // max(len(df), 1)))))
 
 
+def row_keys(row: dict) -> list[str]:
+    """The metric keys a summary row actually holds (``<m>__by_seed`` is a text): the recorded JSON gives every row every column, empty (NaN) for the other family's metrics."""
+    return [c[:-len("__by_seed")] for c, v in row.items() if c.endswith("__by_seed") and isinstance(v, str) and v]
+
+
 def verdict_index(records: list[dict]) -> dict:
     """``{(kind, treated, control, seed): verdict.json}`` of the family-W Step 4 verdicts (the newest run when a comparison was recorded twice)."""
     out: dict = {}
@@ -124,13 +129,13 @@ def render(ctx: dict) -> None:
     all_rows = [r for r in sj["rows"] if r.get("op") in res.CURATION_OPS or r["comparison"] == "head_to_head"]
     rows = [r for r in all_rows if r.get("family", "W") == "W"]
     orows = [r for r in all_rows if r.get("family", "W") == "O"]  # family O (operation level): recorded alongside, only vs the original policy; never in the headline, the W table or the plots
-    keys = [c[:-len("__by_seed")] for c in rows[0] if c.endswith("__by_seed")]
-    computed = any(f"{m}__status" not in r for r in rows for m in keys)
+    keys = row_keys(rows[0])
+    computed = any(f"{m}__status" not in r for r in rows for m in row_keys(r))
     if computed:  # a summary recorded before the status columns existed: the same function, from the recorded per-seed calls
         for r in rows:
-            r.update(step4.annotate(r, keys, syn))
+            r.update(step4.annotate(r, row_keys(r), syn))
         for r in orows:
-            r.update(step4.annotate(r, [c[:-len("__by_seed")] for c in r if c.endswith("__by_seed")], syn))
+            r.update(step4.annotate(r, row_keys(r), syn))
     heads = sj.get("headline") if not computed and "headline" in sj else step4.headline(rows, syn)
     st.caption(f"Summary run `{summ['name']}` ({summ['run_id'][:8]}), chain `{cur['chain']}`: {len(rows)} comparisons over {max(int(r['n_seeds']) for r in rows)} training seeds. "
                + ("The statuses and sentences were computed at display time from the recorded per-seed calls (this run predates the recorded columns); otherwise they are shown as recorded. "
@@ -190,7 +195,7 @@ def render(ctx: dict) -> None:
     if not orows:
         st.caption("No operation-level (family O) verdicts are recorded for this chain.")
     else:
-        okeys = [c[:-len("__by_seed")] for c in orows[0] if c.endswith("__by_seed")]
+        okeys = row_keys(orows[0])
         orec = [(r, k) for r in sorted(orows, key=lambda r: (r["arm"], r["control"])) for k in okeys]
         otab = pd.DataFrame({"arm": [arm_label(r) for r, _ in orec], "metric": [entry(k)["metric"] for _, k in orec], "compared with": [control_label(r) for r, _ in orec],
                              "status": [r[f"{k}__status"] for r, k in orec], "calls by seed": [", ".join(CALL_WORDS[c] for c in str(r[f"{k}__by_seed"]).split(",")) for r, k in orec],

@@ -1851,17 +1851,6 @@ def curation_dropin(C: "Checker", base: Path, porcelain) -> None:
                 "with every recorded status and sentence shown, no page raising, and git status --porcelain -- dashboard vlapoc scripts empty before and after",
                 cur is not None and shown == want and len(want) > 0 and not at.exception and not pre and not post and sum(r["family"] == "W" for r in sj["rows"]) == 16,
                 f"{n_sel} selects (k {k_task}/{k_all}), {n_ver} verdicts, {len(sj['rows']) if sj else 0} summary rows ({sum(r['family'] == 'O' for r in sj['rows'])} family O), headline {[h_['status'] for h_ in sj['headline']] if sj else None}; page rows equal recorded: {shown == want}; porcelain before {pre!r} after {post!r}")
-        orows = [r for r in sj["rows"] if r["family"] == "O"]
-        okey = [k for k in orows[0] if k.endswith("__by_seed")][0].removesuffix("__by_seed") if orows else None
-        otab = next((df.value for df in at.dataframe if "metric" in df.value.columns and "sentence" in df.value.columns and "arm" in df.value.columns), None)
-        wtab_n = len(tbl) if tbl is not None else -1
-        unr, snk = unreached(at), snake_labels(at)
-        forest_n = [len(figure_data(at, i)) for i in range(len(at.get("vega_lite_chart")))]
-        C.check("5.5 the drop-in runs the dry run's vs_base commands as written (family W and family O), the summary has 23 rows (16 W + 7 O vs_base), and the page's operation-level table has exactly the 7 recorded O rows with status and sentence verbatim; "
-                "no O row is in the W arm table (16 rows), the headline or the forest data; unreached() and snake_labels() are empty with O shown",
-                len(sj["rows"]) == 23 and len(orows) == 7 and all(r["comparison"] == "vs_base" for r in orows) and otab is not None
-                and set(zip(otab["status"], otab["sentence"])) == {(r[f"{okey}__status"], r[f"{okey}__sentence"]) for r in orows} and len(otab) == 7 and wtab_n == 16 and not unr and not snk and all(n_ in (6, 9) for n_ in forest_n),
-                f"{len(sj['rows'])} summary rows, O metric {okey!r}, O table {len(otab) if otab is not None else None} rows, W table {wtab_n}; forest rows {forest_n}; unreached {unr}; snake {snk}; {n_ver} verdicts ran in total")
         c = client(lr)
         for r in [*c.search_runs([experiment_id(lr)], "tags.stage = 'train'", max_results=2000), *c.search_runs([experiment_id(lr)], "tags.stage = 'eval'", max_results=2000)]:
             if r.data.tags.get("stage") == "train" and r.info.run_name.startswith(f"train-{T}"):
@@ -1873,6 +1862,18 @@ def curation_dropin(C: "Checker", base: Path, porcelain) -> None:
         flagged = [str(e.value)[:80] for e in at.error] + [str(e.value)[:80] for e in at.warning]
         caps = [str(e.value) for e in at.caption]
         real_ok = not any(("SYNTHETIC" in x or "SMOKE" in x) for x in flagged) and sum(x.startswith("Provenance: REAL") for x in caps) >= 2
+        orows = [r for r in sj["rows"] if r["family"] == "O"]
+        okey = next(k for k, v in orows[0].items() if k.endswith("__by_seed") and isinstance(v, str)).removesuffix("__by_seed") if orows else None
+        otab = next((df.value for df in at.dataframe if "metric" in df.value.columns and "sentence" in df.value.columns and "arm" in df.value.columns), None)
+        tbl = next((df.value for df in at.dataframe if "sentence" in df.value.columns and "arm" in df.value.columns and "metric" not in df.value.columns), None)
+        wtab_n = len(tbl) if tbl is not None else -1
+        unr, snk = unreached(at), snake_labels(at)
+        forest_n = [len(figure_data(at, i)) for i in range(len(at.get("vega_lite_chart")))]
+        C.check("5.5 the drop-in runs the dry run's vs_base commands as written (family W and family O), the summary has 23 rows (16 W + 7 O vs_base), and the page's operation-level table has exactly the 7 recorded O rows with status and sentence verbatim; "
+                "no O row is in the W arm table (16 rows), the headline or the forest data; unreached() and snake_labels() are empty with O shown",
+                len(sj["rows"]) == 23 and len(orows) == 7 and all(r["comparison"] == "vs_base" for r in orows) and otab is not None
+                and set(zip(otab["status"], otab["sentence"])) == {(r[f"{okey}__status"], r[f"{okey}__sentence"]) for r in orows} and len(otab) == 7 and wtab_n == 16 and not unr and not snk and all(n_ in (6, 9) for n_ in forest_n),
+                f"{len(sj['rows'])} summary rows, O metric {okey!r}, O table {len(otab) if otab is not None else None} rows, W table {wtab_n}; forest rows {forest_n}; unreached {unr}; snake {snk}; {n_ver} verdicts ran in total")
         ev_run = c.search_runs([experiment_id(lr)], f"tags.mlflow.runName = 'eval-{T}-harm-f30-k5-s0'")[0]
         c.set_tag(ev_run.info.run_id, "vlapoc.synthetic", "true")
         at = app_test(str(lr), f"attribute-{T}-ens")
