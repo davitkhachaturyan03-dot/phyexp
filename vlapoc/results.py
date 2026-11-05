@@ -21,6 +21,9 @@ Grounding
   imports nothing from ``vlapoc.groundtruth``, ``vlapoc.recovery`` or ``vlapoc.discrepancy`` (a source scan in
   ``scripts/verify_dashboard.py --results`` enforces it).
 
+- PoC §9.1 Step 4 (p. 19) and §2.6 (p. 5), §4.5 (p. 11) (curation-results S2): ``curation_runs`` finds the Round A removal tests and their ``step4-summary`` of a score
+  run, ``removed_episodes`` the full list of episodes an arm removed (read from the child subset, not the truncated ``select.dropped`` tag).
+
 Provenance rule (fail-closed; owner answer "the SYNTHETIC label disappearing only when the data is real")
 -----------------------------------------------------------------------------------------------------
 ``provenance(run_id)`` walks ``runs.trace(run_id)`` and inspects every run in it:
@@ -266,6 +269,68 @@ def verdicts(lineage_root: Path | None = None, chain: str | None = None, body: b
             rec["verdict"] = _fetch(r, "verdict", lineage_root, lambda p: json.loads(p.read_text()))
         out.append(rec)
     return out
+
+
+# ---------------------------------------------------------------------------------------------
+# Round A curation results (curation-results S2)
+# ---------------------------------------------------------------------------------------------
+
+CURATION_OPS = ("drop_top_k", "drop_top_k_per_task", "drop_random_k", "drop_random_k_per_task")  # the ``select`` ops of Round A (PoC §2.6 p. 5; §9.1 Step 4 p. 19)
+
+
+def curation_runs(score_run_id: str, lineage_root: Path | None = None) -> dict | None:
+    """The Round A curation results built from one score run, or ``None`` when the store holds none (PoC §9.1 Step 4 p. 19: removal tests; §4.5 p. 11 headline).
+
+    Finds the ranked ``select`` runs whose ``score_run_id`` param is ``score_run_id`` (their ``vlapoc.chain`` identifies the Round A chain), then the newest
+    ``summarize`` run of such a chain that recorded ``step4_summary_json`` and holds at least one row whose ``op`` is a curation op (a Round B summary that shares
+    the chain id has only cluster or planted rows and is skipped). Returns ``{"chain", "summary": {run_id, name, ...}, "summary_json": <the sha-checked JSON>,
+    "selects": {arm: {run_id, name, params}}}``, ``selects`` holding every curation ``select`` run of the chain (ranked arms and random controls), keyed by arm name
+    (``select-<tag>-<arm>``). Read-only; every artifact is sha-checked (``ValueError`` on a mismatch)."""
+    ranked = [r for r in runs_with_param("select", "score_run_id", score_run_id, lineage_root) if r["params"].get("op") in CURATION_OPS and r["chain"]]
+    chains = sorted({r["chain"] for r in ranked})
+    cands = sorted((x for ch in chains for x in find_runs("summarize", lineage_root, chain=ch) if "step4_summary_json" in x["outputs"] and x["chain"] in chains),
+                   key=lambda x: -x["start_time"])
+    for cand in cands:
+        sj = output_json(cand["run_id"], "step4_summary_json", lineage_root)
+        if not any(row.get("op") in CURATION_OPS for row in sj["rows"]):
+            continue
+        tag = sj["tag"]
+        selects = {}
+        for sel in find_runs("select", lineage_root, chain=cand["chain"]):
+            if not sel["name"].startswith(f"select-{tag}-") or sel["chain"] != cand["chain"]:
+                continue
+            info = run_summary(sel["run_id"], lineage_root)
+            if info["params"].get("op") in CURATION_OPS:
+                selects[sel["name"].removeprefix(f"select-{tag}-")] = {"run_id": sel["run_id"], "name": sel["name"], "params": info["params"]}
+        return {"chain": cand["chain"], "summary": cand, "summary_json": sj, "selects": selects}
+    return None
+
+
+def removed_episodes(select_run_id: str, lineage_root: Path | None = None) -> pd.DataFrame:
+    """The episodes a curation ``select`` run removed (PoC §2.6 p. 5), read from the child subset's derivation, which holds the full list: the run's ``select.dropped``
+    tag is cut at 7,900 characters, which is a prefix for a k-per-task arm (100 ids are about 9,200 characters; measured). One row per removed episode with the
+    catalog columns of the parent (``task_name``, ``source``, ``length_steps`` ...). For a ranked arm also ``score`` (the ranked column of the score run, sha-checked)
+    and ``rank`` (1 = removed first; within the task for a ``_per_task`` op, ties by ``episode_id`` as ``lineage.drop_top_k_per_task``)."""
+    from vlapoc.lineage import Subset
+
+    run = _get_run(select_run_id, lineage_root)
+    t, p = run.data.tags, run.data.params
+    if p.get("op") not in CURATION_OPS:
+        raise NotRecordedError(f"run {select_run_id[:12]} ({run.info.run_name}) is not a curation select run (op {p.get('op')!r})")
+    child = Subset.load(t["output.subset"].split(":", 1)[1], lineage_root)
+    dropped = list(child.derivation["dropped"])
+    parent = Subset.load(p["parent_subset_id"], lineage_root).episodes(lineage_root).set_index("episode_id")
+    df = parent.loc[dropped].reset_index().sort_values(["suite", "libero_task_id", "episode_id"]).reset_index(drop=True)
+    if p["op"].startswith("drop_top_k") and p.get("score_run_id") and p.get("metric"):
+        sc = score_table(p["score_run_id"], lineage_root).set_index("episode_id")[p["metric"]]
+        df["score"] = sc.loc[df["episode_id"]].to_numpy()
+        sign = -1.0 if p.get("direction") == "highest" else 1.0
+        rk = parent.reset_index().assign(_s=sign * sc.loc[parent.index].to_numpy())
+        keys = ["suite", "libero_task_id"] if p["op"].endswith("_per_task") else []
+        rk = rk.sort_values(keys + ["_s", "episode_id"], kind="mergesort")
+        rk["rank"] = (rk.groupby(keys).cumcount() if keys else pd.Series(np.arange(len(rk)), index=rk.index)) + 1
+        df["rank"] = df["episode_id"].map(rk.set_index("episode_id")["rank"]).astype(int)
+    return df
 
 
 # ---------------------------------------------------------------------------------------------

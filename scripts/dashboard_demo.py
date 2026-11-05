@@ -14,6 +14,9 @@ What it builds, in a ``runs.scratch_lineage_copy`` of the real store (so version
                     ``attribution.score_table`` and ``column_declarations``; outputs include the influence matrix and index
     ensemble        the real ``ensemble_run`` over them;  analyze, clusters, score-clusters, discrepancy: the real stages
     Round B         the real ``drop_cluster`` / planted-arm select runs, SYNTHETIC verdicts, the real ``confirm`` and ``discrepancy-verdict`` stages
+    Round A         (curation-results S3) the real ``select_run`` of every arm of ``server_pipeline.py --tag demo --subset v3/candidate --curation per_task --metrics f30 hrt60_lin``
+                    on the demo ensemble's scores, SYNTHETIC train and eval runs (policies drawn with planted effects, chain ``demo-ra000000``), the real ``verdict.verify_run``
+                    (family W) for every comparison of that dry run, and the real ``step4.summary_run`` (status, sentence and the PoC §4.5 headline are computed by the real code)
     --with-smoke    the real chain of ``verify_training_attribution.py --local-smoke`` (train run on v0/reference, 2 rollouts, features, attribute) kept in the
                     store; it shows as SMOKE
 
@@ -138,6 +141,157 @@ def warm_videos(lr: Path, scores_run: str, cluster_run: str, extra_runs: list[st
     return {"training_episode_clips": n, "rollout_clips": nroll, "original_clips": n_orig, "seconds": round(time.time() - t0)}
 
 
+# ---------------------------------------------------------------------------------------------
+# Round A (curation-results S3): real select runs, SYNTHETIC train/eval runs, the real verdict and step4 code
+# ---------------------------------------------------------------------------------------------
+
+ROUND_A_CHAIN = "demo-ra000000"
+# Planted policy-level effects (SYNTHETIC; described in plain words in the run params and the manifest). Each trained policy draws whole-task times
+# T = human median of the task x f x exp(N(0, sigma)) and completes with probability p (T >= 60 s is a timeout, censored at tau_episode = 60 s).
+BASE_EFFECT = {"f": 3.0, "sigma": 0.5, "p": 0.80}
+ARM_EFFECTS = {  # (kind, metric) -> effect; random and drop-random arms use BASE_EFFECT
+    ("harm", "hrt60_lin"): {"f": 1.9, "sigma": 0.9, "p": 0.82, "words": "faster but more variable (typical time 37% shorter), completes as often as the base"},
+    ("harm", "f30"): {"f": 2.6, "sigma": 0.15, "p": 0.88, "words": "more reliable (completes 88% of attempts, base 80%) with a tight time spread"},
+    ("help", "f30"): {"f": 3.0, "sigma": 0.5, "p": 0.68, "words": "less reliable (completes 68% of attempts)"},
+    ("help", "hrt60_lin"): {"f": 3.1, "sigma": 0.5, "p": 0.80, "words": "slightly slower (3% longer): planted weak so its gate may not fire"},
+}
+POLICY_JITTER = {"f": 0.015, "p": 0.01}  # training-seed variance of one trained policy (PoC §2.3 p. 4), added to every policy including the base and the random arms
+
+
+def synthetic_rollouts(effect: dict, seed: int, cells: list, human_median: dict, n_per_cell: int = 50) -> "pd.DataFrame":
+    """SYNTHETIC rollouts of one trained policy (columns ``verdict.verify_run`` reads). No answer key, no ground-truth import (PoC §2.1 item 4 p. 3):
+    the planted effect is a property of the policy (``effect``), not of any episode."""
+    import numpy as np
+    import pandas as pd
+
+    rng = np.random.default_rng(seed)
+    f = effect["f"] * float(np.exp(rng.normal(0, POLICY_JITTER["f"])))
+    p = float(np.clip(effect["p"] + rng.normal(0, POLICY_JITTER["p"]), 0.05, 0.99))
+    rows = []
+    for suite, tid in cells:
+        for i in range(n_per_cell):
+            t = human_median[(suite, tid)] * f * float(np.exp(rng.normal(0, effect["sigma"])))
+            ok = bool(rng.random() < p) and t < 60.0
+            rows.append({"suite": suite, "libero_task_id": int(tid), "rollout_id": f"{suite}/{tid}/init{i:03d}/seed{seed}", "T_s": round(t * 20) / 20 if ok else float("nan"),
+                         "event": int(ok), "tau_episode_steps": 1200})
+    return pd.DataFrame(rows)
+
+
+def round_a(lr: Path, ens_id: str, ens_name: str, episodes, out: Path) -> dict:
+    """Build a SYNTHETIC Round A in the demo store from the exact jobs of ``server_pipeline.py --tag demo --subset v3/candidate --curation per_task --metrics f30 hrt60_lin
+    --dry-run``: the real ``select_run`` for every arm on the demo ensemble's scores, SYNTHETIC ``train`` and ``eval`` runs (policies drawn with planted effects), the real
+    ``verdict.verify_run`` (family W, n_boot 1000, n_boot_ks 2000) for every vs_base / curated_vs_random / head_to_head comparison the dry run lists, and the real
+    ``step4.summary_run``. Family O is not built (documented divergence: the page shows the declared family W). PoC §2.6 p. 5, §4.5 p. 11, §9.1 Step 4 p. 19."""
+    import re
+    import shlex
+
+    import numpy as np
+    import pandas as pd
+
+    import stage as stage_mod
+    from verify_training_attribution import parse_dry_run
+    from vlapoc import results as res
+    from vlapoc import step4
+    from vlapoc.lineage import Subset
+    from vlapoc.runs import select_run, stage_run
+    from vlapoc.verdict import verify_run
+
+    t0 = time.time()
+    dry = subprocess.run([sys.executable, str(REPO_ROOT / "scripts" / "server_pipeline.py"), "--tag", TAG, "--subset", "v3/candidate", "--curation", "per_task", "--metrics", "f30", "hrt60_lin", "--dry-run"],
+                         check=True, capture_output=True, text=True, cwd=REPO_ROOT).stdout
+    jobs = parse_dry_run(dry)
+    summary_line = dry.strip().splitlines()[-1]
+    sel_job = next(j for j in jobs if j["name"] == f"select-{TAG}")
+    chain, c = ROUND_A_CHAIN, None
+    from vlapoc.runs import client
+
+    c = client(lr)
+    spath = out / "roundA_scores.parquet"
+    out.mkdir(parents=True, exist_ok=True)
+    res.score_table(ens_id, lr).to_parquet(spath, index=False)
+    # --- the real select runs, with the dry run's own arguments ---
+    arms: dict[str, dict] = {}
+    for part in sel_job["cmd"].split(" && "):
+        toks = shlex.split(part)
+        d = {toks[i].lstrip("-"): toks[i + 1] for i in range(len(toks) - 1) if toks[i].startswith("--") and not toks[i + 1].startswith("--")}
+        arm = d["name"].removeprefix(f"select-{TAG}-")
+        extra = stage_mod.select_params(d["op"], "--headline" in toks, d.get("pipeline-curation"))
+        sid, child = select_run("v3/candidate", d["name"], d["op"], k=int(d["k"]), seed=int(d["seed"]) if "seed" in d else None, score_path=spath if d["op"].startswith("drop_top_k") else None,
+                                metric=d.get("metric"), score_run_id=ens_id if d["op"].startswith("drop_top_k") else None, direction=d.get("direction", "highest"),
+                                require_declaration=d["op"].startswith("drop_top_k"), extra_params=extra, chain=chain, lineage_root=lr)
+        c.set_tag(sid, "vlapoc.synthetic", "true")  # the ranking is of SYNTHETIC scores; random selections are labelled with the rest of the round
+        arms[arm] = {"select_run_id": sid, "child": child, "op": d["op"], "metric": d.get("metric"), "direction": d.get("direction")}
+    # --- SYNTHETIC train + eval runs per (arm, seed), the base per seed ---
+    cells = sorted({(s, int(t)) for s, t in episodes[["suite", "libero_task_id"]].drop_duplicates().to_records(index=False).tolist()})
+    h = pd.read_parquet(REPO_ROOT / "data" / "eval" / "human_reference" / "human_reference.parquet")
+    h = h[h["success_any"].astype(bool)]
+    med = h.groupby(["suite", "libero_task_id"])["T_success_s"].median()
+    human_median = {cell: float(med.loc[cell]) for cell in cells}
+    v3 = Subset.load("v3/candidate", lr)
+    plan_arms = {x["arm"]: x for x in __import__("server_pipeline").arms(argparse_ns())}
+    effects, evals, trains = {}, {}, {}
+    for seed in range(3):
+        for arm in ["base", *arms]:
+            tname, ename = (f"train-{TAG}-s{seed}", f"eval-{TAG}-s{seed}") if arm == "base" else (f"train-{TAG}-{arm}-s{seed}", f"eval-{TAG}-{arm}-s{seed}")
+            subset = v3 if arm == "base" else arms[arm]["child"]
+            x = plan_arms.get(arm)
+            eff = ARM_EFFECTS.get((x["kind"], x["metric"])) if x else None
+            eff = eff or BASE_EFFECT
+            effects[arm] = eff.get("words", "same as the base policy (random removal)" if arm != "base" else "the original policy")
+            ck = hashlib.sha256(f"synthetic-checkpoint:{tname}".encode()).hexdigest()
+            tags = {"vlapoc.synthetic": "true"}
+            with stage_run("train", tname, lr, chain=chain, extra_tags=tags) as r:
+                r.input_subset(subset, "training", None)
+                r.params({"synthetic": True, "note": "SYNTHETIC: no model was trained; a policy drawn from planted effects", "arm": arm, "seed": seed})
+                r.produced("checkpoint", ck, "checkpoint")
+                trains[(arm, seed)] = r.run_id
+            ro = synthetic_rollouts({k: v for k, v in eff.items() if k != "words"}, seed * 1000 + (0 if arm == "base" else 1 + list(arms).index(arm)), cells, human_median)
+            rp = out / "roundA_rollouts" / f"{ename}.parquet"
+            rp.parent.mkdir(parents=True, exist_ok=True)
+            ro.to_parquet(rp, index=False)
+            with stage_run("eval", ename, lr, chain=chain, extra_tags=tags) as r:
+                r.input_entity("checkpoint", ck, "checkpoint")
+                r.params({"synthetic": True, "train_run_id": trains[(arm, seed)], "planted_effect": f"{effects[arm]} (f {eff['f']}, sigma {eff['sigma']}, p {eff['p']})", "arm": arm, "seed": seed,
+                          "generator": "scripts/dashboard_demo.py synthetic_rollouts (imports nothing from groundtruth, recovery or discrepancy)"})
+                r.output_file("rollouts", rp, kind="rollouts")
+                evals[(arm, seed)] = r.run_id
+    print(f"round A: {len(arms)} select runs, {len(trains)} SYNTHETIC train + {len(evals)} eval runs ({time.time() - t0:.0f}s)", flush=True)
+    # --- the real verdict for every W comparison of the dry run ---
+    n_verdicts, t1 = 0, time.time()
+    for j in jobs:
+        if not j["name"].startswith("verify-"):
+            continue
+        for part in j["cmd"].split(" && "):
+            toks = shlex.split(part)
+            d = {toks[i].lstrip("-"): toks[i + 1] for i in range(len(toks) - 1) if toks[i].startswith("--") and not toks[i + 1].startswith("--")}
+            if d.get("family") != "W":
+                continue
+            seed = int(d["seed-id"])
+
+            def arm_of(ename: str) -> str:
+                m = re.fullmatch(rf"eval-{TAG}(?:-(.+))?-s(\d+)", ename)
+                return m.group(1) or "base"
+
+            a, b = arm_of(d["a"]), arm_of(d["b"])
+            tags = {"step4.kind": d["comparison"], "step4.treated": d["treated"], "step4.control": d["control"], "step4.seed": d["seed-id"], "vlapoc.synthetic": "true"}
+            verify_run(evals[(a, seed)], evals[(b, seed)], d["name"], family="W", chain=chain, extra_tags=tags, out_dir=out / "roundA_verdicts" / d["name"], lineage_root=lr)
+            n_verdicts += 1
+    print(f"round A: {n_verdicts} verdicts in {time.time() - t1:.0f}s", flush=True)
+    sm = step4.summary_run(TAG, f"step4-summary-{TAG}", chain=chain, run_chain=chain, out_dir=out / f"step4-summary-{TAG}", lineage_root=lr)
+    print(f"round A summary: {sm['rows']} rows from {sm['n_verify_runs']} verify runs; headline {sm['headline']}", flush=True)
+    sj = json.loads((out / f"step4-summary-{TAG}" / "step4_summary.json").read_text())
+    return {"chain": chain, "dry_run": summary_line, "arms": list(arms), "planted_effects_in_words": {a: effects[a] for a in ["base", *arms]}, "base_effect": BASE_EFFECT, "jitter": POLICY_JITTER,
+            "summary_run_id": sm["run_id"], "summary_name": f"step4-summary-{TAG}", "n_select": len(arms), "n_train": len(trains), "n_eval": len(evals), "n_verify_W": n_verdicts,
+            "headline": [{"pair": f"{h['treated']} vs {h['control']}", "status": h["status"], "sentence": h["sentence"]} for h in sj["headline"]],
+            "statuses": {f"{r['arm']}|{r['comparison']}|{r['control']}": {m: r[f"{m}__status_code"] for m in ("f30", "hrt60")} for r in sj["rows"]},
+            "seconds": round(time.time() - t0)}
+
+
+def argparse_ns():
+    """The ``server_pipeline`` arguments of the Round A command (so ``server_pipeline.arms`` yields the arm names and controls, not retyped here)."""
+    return argparse.Namespace(tag=TAG, subset="v3/candidate", curation="per_task", metrics=["f30", "hrt60_lin"], k_per_task=[5], n_tasks=20, random_draws=2, ac75=True)
+
+
 def build(with_smoke: bool, force: bool) -> int:
     import numpy as np
     import pandas as pd
@@ -251,6 +405,10 @@ def build(with_smoke: bool, force: bool) -> int:
             add_verify(lr, DEMO / "verdicts", f"v-{ptag}-{arm}-s{sd}", "curated_vs_random", arm, ctrl, sd, verdict_json(None, only=only_of[arm]), pchain)
     dv = pa.discrepancy_verdict_run(ptag, f"discrepancy-verdict-{ptag}", out_dir=out / f"discrepancy-verdict-{ptag}", lineage_root=lr, synthetic=True)
     print(f"discrepancy-verdict: {dv['rows']} rows, positive control {dv['positive_control']}")
+    # --- Round A (curation-results S3): the 116-job chain's curation arms, SYNTHETIC outcomes, the real verdict and step4 code ---
+    ra = round_a(lr, ens, f"attribute-{TAG}-ens", episodes, out)
+    manifest["round_a"] = ra
+    print(f"round A headline: {ra['headline']}")
     # --- tag everything built so far SYNTHETIC (the real stages have no tag option) ---
     mid = run_ids(lr) - before
     for rid in mid:
