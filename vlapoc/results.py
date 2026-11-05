@@ -339,40 +339,51 @@ def removed_episodes(select_run_id: str, lineage_root: Path | None = None) -> pd
 
 
 def provenance(run_id: str, lineage_root: Path | None = None) -> dict:
-    """``{"label": "REAL" | "SMOKE" | "SYNTHETIC", "reasons": [...], "n_runs": n}`` for a run, from its recorded trace (module
-    docstring: the fail-closed rule). ``reasons`` names every run and condition that kept the label from being REAL (empty only
-    for REAL), each as ``"<kind>: <run name> (<stage>): <condition>"`` with kind ``synthetic`` or ``smoke``."""
+    """``{"label": "REAL" | "SMOKE" | "SYNTHETIC", "reasons": [...], "reason_items": [...], "n_runs": n}`` for a run, from its recorded trace
+    (module docstring: the fail-closed rule).
+
+    ``reasons`` names every run and condition that kept the label from being REAL (empty only for REAL), each as
+    ``"<kind>: <run name> (<stage>, <run id[:8]>): <condition>"`` with kind ``synthetic`` or ``smoke``. ``reason_items`` holds the same reasons as
+    dicts ``{"kind", "run", "stage", "condition", "text"}`` (``text`` is the string in ``reasons``), so a caller that groups them (the dashboard's
+    ``condensed_reasons``) reads fields instead of parsing text; ``run`` and ``stage`` are ``None`` for the one reason that names no run (a trace with no
+    train or no eval run)."""
     from vlapoc.runs import trace
 
     tr = trace(run_id, lineage_root)
     c = _client(lineage_root)
     synthetic, smoke = [], []
+
+    def reason(kind: str, run: str | None, stage: str | None, rid: str | None, condition: str, out: list) -> None:
+        text = f"{kind}: {run} ({stage}, {rid[:8]}): {condition}" if run else f"{kind}: {condition}"
+        out.append({"kind": kind, "run": run, "stage": stage, "condition": condition, "text": text})
+
     stages = {"train": 0, "eval": 0}
     for rid in tr["runs"]:
         r = c.get_run(rid)
         t, p, stage = r.data.tags, r.data.params, r.data.tags.get("stage")
-        who = f"{r.info.run_name} ({stage}, {rid[:8]})"
+        name = r.info.run_name
         if t.get("vlapoc.synthetic") == "true":
-            synthetic.append(f"synthetic: {who}: tag vlapoc.synthetic=true")
+            reason("synthetic", name, stage, rid, "tag vlapoc.synthetic=true", synthetic)
         if str(p.get("synthetic", "")).lower() == "true":
-            synthetic.append(f"synthetic: {who}: param synthetic=True")
+            reason("synthetic", name, stage, rid, "param synthetic=True", synthetic)
         if t.get("vlapoc.stand_in") == "true":
-            smoke.append(f"smoke: {who}: tag vlapoc.stand_in=true (a stand-in, not the real stage)")
+            reason("smoke", name, stage, rid, "tag vlapoc.stand_in=true (a stand-in, not the real stage)", smoke)
         if stage == "train":
             stages["train"] += 1
             v = t.get("vlapoc.smoke")
             if v != "false":
-                smoke.append(f"smoke: {who}: tag vlapoc.smoke is {v!r}, not 'false'")
+                reason("smoke", name, stage, rid, f"tag vlapoc.smoke is {v!r}, not 'false'", smoke)
         if stage == "eval":
             stages["eval"] += 1
             v = t.get("eval.attribution_grade")
             if v != "true":
-                smoke.append(f"smoke: {who}: tag eval.attribution_grade is {v!r}, not 'true'")
+                reason("smoke", name, stage, rid, f"tag eval.attribution_grade is {v!r}, not 'true'", smoke)
     for k, n in stages.items():
         if n == 0:
-            smoke.append(f"smoke: trace of {run_id[:8]}: no {k} run reached (the chain is not fully recorded)")
+            reason("smoke", None, None, None, f"trace of {run_id[:8]}: no {k} run reached (the chain is not fully recorded)", smoke)
+    items = synthetic + smoke
     label = "SYNTHETIC" if synthetic else ("SMOKE" if smoke else "REAL")
-    return {"label": label, "reasons": synthetic + smoke, "n_runs": len(tr["runs"])}
+    return {"label": label, "reasons": [x["text"] for x in items], "reason_items": items, "n_runs": len(tr["runs"])}
 
 
 # ---------------------------------------------------------------------------------------------

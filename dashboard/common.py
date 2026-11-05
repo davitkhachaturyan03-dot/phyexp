@@ -196,11 +196,6 @@ def declared_caption(cols: list[str], decls: dict) -> None:
     st.caption("What the scores explain: " + " | ".join(declared(c, decls) for c in cols))
 
 
-def functional_note_text(text: str) -> None:
-    """A caption stating the declared functionals in view as ready-made text (PoC §3.4 p. 7)."""
-    st.caption(text)
-
-
 def banner(prov: dict, condense: bool = False) -> None:
     """The provenance banner, one line (SYNTHETIC in red, SMOKE in amber, a quiet caption for REAL), with the recorded reasons in an expander below it
     (decided by ``results.provenance`` from the recorded runs; PoC §3.4 and the owner's "labelled everywhere")."""
@@ -212,26 +207,24 @@ def banner(prov: dict, condense: bool = False) -> None:
         st.caption(f"Provenance: REAL ({prov['n_runs']} recorded runs checked: every train run is not smoke, every eval run is attribution-grade, nothing synthetic).")
     if prov["reasons"]:
         with st.expander("Why this label (recorded runs)"):
-            for r in (condensed_reasons(prov["reasons"]) if condense else prov["reasons"]):
+            for r in (condensed_reasons(prov["reason_items"]) if condense else prov["reasons"]):
                 st.caption(r)
 
 
-def condensed_reasons(reasons: list[str]) -> list[str]:
-    """Group the recorded reasons (``<kind>: <run name> (<stage>, <id8>): <condition>``) by kind, stage and condition, for a result whose chain holds hundreds of runs
-    (the Curation results page): ``synthetic: 72 eval runs: `tag vlapoc.synthetic=true` (e.g. `eval-demo-s0`, `eval-demo-s1`)``. Names and conditions are in backticks."""
-    import re
-
+def condensed_reasons(reasons: list[dict]) -> list[str]:
+    """Group the recorded reasons (``results.provenance(...)["reason_items"]``) by kind, stage and condition, for a result whose chain holds hundreds of runs
+    (the Curation results page): ``synthetic: 72 eval runs, `tag vlapoc.synthetic=true` (e.g. `eval-demo-s0`, `eval-demo-s1`)``. Run names and conditions are in
+    backticks. A reason that names no run (a trace with no train or eval run) is shown as its recorded text."""
     groups: dict = {}
     for r in reasons:
-        m = re.fullmatch(r"(\w+): (.+?) \((\w+)(?:, [0-9a-f]{8})?\): (.*)", r)
-        if not m:
-            groups.setdefault((r, "", ""), []).append("")
-            continue
-        groups.setdefault((m.group(1), m.group(3), m.group(4)), []).append(m.group(2))
+        if r["run"] is None:
+            groups.setdefault((r["text"], "", ""), []).append("")
+        else:
+            groups.setdefault((r["kind"], str(r["stage"]), r["condition"]), []).append(r["run"])
     out = []
     for (kind, stage, cond), names in groups.items():
         if not stage:
-            out.append(re.sub(r"(\S+_\S+)", r"`\1`", kind))
+            out.append(kind)
             continue
         e = ", ".join(f"`{n}`" for n in names[:2])
         out.append(f"{kind}: {len(names)} {stage} run{'s' if len(names) > 1 else ''}, `{cond}` (e.g. {e})")
