@@ -32,6 +32,12 @@
   <span class="pill good">verified</span></div>
 </a>
 -->
+<a class="entry" href="features/2026-11-05-curation-results/report.html">
+  <div class="top"><span class="title">Curation results in the dashboard</span><span class="date">2026-11-05 → 2026-11-06</span></div>
+  <p class="sum">A sixth dashboard page for Round A: the §4.5 “same dataset, opposite curations” headline with five honest states, every curated arm judged against the original policy and random removal, a family-O section, and the removed episodes with video. On the SYNTHETIC demo the headline reads “not shown”: the two policies differed in 3 of 3 seeds, but neither win replicated (not a finding). No new server jobs (Round A still 116 jobs / 24 trainings); the analyzer sent it back once (3 blockers) before passing.</p>
+  <div class="tags"><span class="pill accent">§4.5 p.11</span><span class="pill accent">§2.6 p.5</span><span class="pill accent">§9.1 Step 4 p.19</span><span class="pill">Streamlit + Altair</span>
+  <span class="pill good">verified locally</span><span class="pill warn">real results pending server</span></div>
+</a>
 <a class="entry" href="features/2026-10-22-dashboard/report.html">
   <div class="top"><span class="title">Dashboard, clusters and server runbook</span><span class="date">2026-10-22 → 2026-10-27</span></div>
   <p class="sum">A live local web app (Streamlit) over the lineage store: pick a failed rollout and see the training episodes that pushed it, with video; browse clusters (label groups, sliceline rules, the four metric groups); and the §9.2 "looks bad but not harmful" view over the planted labels. Plus a 15-step server runbook skill (Round A on v3: 116 jobs / 24 trainings; Round B planted: 129 / 33). <b>No real attribution results yet:</b> every score shown is SYNTHETIC; clusters are estimates until a removal arm passes the two-step verdict.</p>
@@ -107,6 +113,16 @@ One row per PoC section a feature touches.</p>
     <tr><td>§2.1</td><td>3</td><td>Episode lineage via …</td>
         <td><a href="features/2026-09-28-<slug>/report.html">slug</a></td><td>none</td></tr>
 -->
+    <tr><td>§4.5</td><td>11</td><td>The “same dataset, opposite curations” headline on a Curation results page: five states (shown, partly shown, contradicted, not shown, inconclusive) with a bounded sentence, per-seed table and forest plot of each curated policy's advantage on its own metric</td>
+        <td><a href="features/2026-11-05-curation-results/report.html">curation-results</a></td><td>No real result yet: the demo is SYNTHETIC and reads “not shown” (gate fired 3 of 3, no win replicated; not a finding). Headline rule and the gate-2/3 boundary are <b>inferred</b> (owner question)</td></tr>
+    <tr><td>§2.6</td><td>5</td><td>Curated removal compared with the original policy and with random removal (two draws), per seed and across seeds; the removed episodes listed with rank, video and lineage</td>
+        <td><a href="features/2026-11-05-curation-results/report.html">curation-results</a></td><td>Demo ranks by the all-rollout column, server by per-task (recorded divergence). Across-seed rule (at least 2 of 3, none contradicting) reused from Round B and <b>inferred</b></td></tr>
+    <tr><td>§9.1 Step 4</td><td>19</td><td>Confirmation or refutation per arm and metric, written into the <code>step4-summary</code> run (status and sentence columns, headline); family O verdicts shown in their own section</td>
+        <td><a href="features/2026-11-05-curation-results/report.html">curation-results</a></td><td>No new server jobs (Round A 116 / 24; Round B 129 / 33 and 21 / 6 unchanged). Drop-in proven on a server-shaped chain (69 verdicts, 23 rows); first real render awaits Round A</td></tr>
+    <tr><td>§4.4</td><td>10</td><td>Gate first, then direction: a seed whose macro-KS gate did not fire claims no direction; every sentence names its metric and τ; never “harmless”; Holm across metrics comes from the existing verdict</td>
+        <td><a href="features/2026-11-05-curation-results/report.html">curation-results</a></td><td>No correction across arms or seeds (the page says so; §4.4 asks across metrics only). Forest plot uses <code>mark_rule</code> (recorded)</td></tr>
+    <tr><td>§3.4</td><td>7</td><td>Ranking functional and verdict functional both declared on the page, reachable on every metric name (caption or tooltip)</td>
+        <td><a href="features/2026-11-05-curation-results/report.html">curation-results</a></td><td>none</td></tr>
     <tr><td>§2.7</td><td>5</td><td>Live local dashboard, both views: Rollouts (failure type, most influential training episodes with video and source file) and Episodes (ranked, aggregated by any catalog column); provenance banner SYNTHETIC / SMOKE / REAL computed from the recorded runs</td>
         <td><a href="features/2026-10-22-dashboard/report.html">dashboard</a></td><td>Owner-approved: live Streamlit app; shown on synthetic scores until server results exist (drop-in proven, no code change). Not shown: telemetry traces of PhAIL's run explorer</td></tr>
     <tr><td>§1 / §2.2</td><td>3–4</td><td>Clusters stage with three lenses: label groups (task, scene, suite), rule-like slices (sliceline over 12 binned descriptors), four metric groups; each with a plain pattern sentence</td>

@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S4 The Curation results page — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.good{border-left-color:var(--good)}.note.bad{border-left-color:var(--bad)}.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}code{overflow-wrap:anywhere}pre code{overflow-wrap:normal}
+table.gloss th.grp{background:var(--surface-2);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+table.gloss td:first-child{min-width:11em}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}.f-box.acc{stroke:var(--accent);stroke-width:1.8}.f-box.warn{stroke:var(--warn)}.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}.f-box.dash{stroke-dasharray:6 4}
+.f-t{fill:var(--text);font:600 13px var(--sans)}.f-m{fill:var(--muted);font:11.5px var(--mono)}.f-mt{fill:var(--text);font:12px var(--mono)}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}.f-ah{fill:var(--muted)}.f-bar{fill:var(--accent)}.f-bar2{fill:var(--muted)}.f-barw{fill:var(--warn)}
+.f-good{fill:var(--good)}.f-bad{fill:var(--bad)}.f-none{fill:var(--surface-2);stroke:var(--border)}.f-gate{fill:var(--surface);stroke:var(--warn);stroke-dasharray:3 2}
+.f-axis{stroke:var(--border);stroke-width:1.2}.f-hollow{fill:var(--surface);stroke:var(--text);stroke-width:1.6}.f-solid{fill:var(--accent)}
+.tag-syn{display:inline-block;font:600 11px/1.6 var(--mono);padding:1px 8px;border-radius:999px;border:1px solid var(--warn);color:var(--warn);margin-left:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Curation results in the dashboard</a></p>
+  <h1>S4 · The Curation results page</h1>
+  <p class="dek">A sixth dashboard page: the headline card with its five states, per-seed table and forest plot, every arm's verdict against the original policy and random removal, family O alongside, and the removed episodes with video.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">11/11</span></span>
+    <span><b>Depends on</b> S1, S2, S3</span>
+    <span><b>Data</b> <span class="pill warn">demo is SYNTHETIC; no real Round A yet</span></span>
+  </div>
+</header>
+
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>This is the page a stakeholder opens. It answers one question: <i>does removing the data the ranking called harmful improve the policy?</i> At the top is the spec's headline experiment: curate the dataset once for speed and once for reliability, retrain, and ask whether each curated policy wins on its own metric. The card says in words what was found, the table shows each seed, and the plot shows each policy's advantage with its uncertainty.</p>
+  <p>Below that is every curated arm judged against the original policy and against random removal of the same number of episodes. Then a short section for the operation-level check (family O), and finally the list of training episodes an arm removed, with video. A red banner says SYNTHETIC on the demo and cannot be switched off. Nothing is corrected across arms or seeds and the page says so.</p>
+  <p class="small">Terms are defined in the <a href="report.html#glossary">glossary</a> of the main report.</p>
+</div>
+
+<h2>Why</h2>
+<p>PoC §4.5 calls the head-to-head “the headline result of the PoC”; §2.6 says curated removal must beat random removal; §4.4 asks for the gate first and every claim labelled with metric and τ; §3.4 asks that every number declare what it explains.</p>
+<blockquote>“Label every claim with its metric and time cap τ, following PhAIL's disclosure principle.” — §4.4, p. 10</blockquote>
+
+<h2>What was built</h2>
+<div class="scroll"><table class=""><thead><tr><th>File / function</th><th>What it does</th></tr></thead><tbody><tr><td><code>dashboard/views/curation.py</code></td><td>The page, in five numbered sections: headline card and forest plot; arm table with a metric picker and the selected arm's sentences; family O section; one arm in detail; removed episodes with video and a lineage expander. Helpers: <code>arm_label</code>, <code>control_label</code>, <code>row_keys</code>, <code>verdict_index</code>, <code>forest</code></td></tr><tr><td><code>dashboard/common.py::banner, condensed_reasons</code></td><td>Provenance banner (one line, reasons in an expander), grouped from structured <code>reason_items</code></td></tr><tr><td><code>dashboard/app.py::RENDER</code></td><td>Registers the sixth page in the sidebar</td></tr><tr><td><code>scripts/verify_dashboard.py --curation</code></td><td>23 checks with Streamlit's own AppTest, on the demo store and on scratch copies</td></tr></tbody></table></div>
+
+<h2>Acceptance criteria</h2>
+<p class="small">Results as the analyzer reproduced them in round 2 (commands from the repo root; the full outputs are in <code>artifacts/</code>).</p>
+<div class="scroll"><table class=""><thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead><tbody><tr><td>4.1 every status and sentence shown equals the recorded text verbatim</td><td>§4.4 p.10</td><td>✅</td><td><code>exceptions []; first load 1.9s; f30 table equal True, hrt60 table equal True; headline 'SYNTHETIC: not shown'</code></td></tr><tr><td>4.2 forest data equals <code>treated_advantage</code> of the recorded verdicts</td><td>§4.5 p.11</td><td>✅</td><td><code>headline rows [('seed 0: spee', -0.0303), ('seed 0: reli', 0.009), ('seed 1: spee', 0.0149), ('seed 1: reli', -0.059), ('seed 2: spee', 0.0045), ('seed 2: reli', -0.041)]</code></td></tr><tr><td>4.3 removed-episodes table equals <code>removed_episodes</code>; trace commands run</td><td>§2.6 p.5</td><td>✅</td><td><code>100 rows; trace commands 2 rc [0, 0]</code></td></tr><tr><td>4.4 declared functional reachable on every metric name</td><td>§3.4 p.7</td><td>✅</td><td><code>unreached []; ranking caption has 'F(30) = P(T <= 30 s)'</code></td></tr><tr><td>4.5 plain language; no snake_case labels; one-line banners</td><td>dashboard AC5.9</td><td>✅</td><td><code>snake labels []; banners 2</code></td></tr><tr><td>4.6 SYNTHETIC banner equals the recorded provenance</td><td>brief</td><td>✅</td><td><code>6 distinct recorded texts checked; label SYNTHETIC</code></td></tr><tr><td>4.7 gate honesty: a seed whose gate did not fire claims no direction; the card and the rows agree</td><td>§4.4 p.10</td><td>✅</td><td><code>4.7a gate 0/3 -> 'inconclusive'; 4.7b demo -> 'not shown'; 4.7c card 'inconclusive' iff both row statuses are 'inconclusive'</code></td></tr><tr><td>4.8 a score run without Round A shows an info message with the command to produce it</td><td>brief</td><td>✅</td><td><code>info names server_pipeline.py ... --from select</code></td></tr><tr><td>4.9 a summary without the S1 columns still renders (computed at display time)</td><td>back-compat</td><td>✅</td><td><code>16 rows recomputed</code></td></tr><tr><td>4.10 screenshots at 1400 px captured and looked at</td><td>AC5.10</td><td>✅</td><td><code>artifacts/screens/curation_results.png (1400 x 4588)</code></td></tr><tr><td>4.11 family O is never silently dropped (own section, or a visible “none recorded” line)</td><td>§3.4 p.7, §4.4</td><td>✅</td><td><code>demo: W table rows 16; O rows recorded 0 (caption on the page)</code></td></tr></tbody></table></div>
+
+<h2>Example</h2>
+<p>Real recorded values on the demo's headline card (SYNTHETIC). Positive means the curated policy did better on its own metric. A dot with a recorded significant call is solid; the others are hollow (no significant call recorded).</p>
+<pre><code>seed 0  speed-curated policy, advantage on Speed vs human (HRT) (τ 60 s)      -0.0303   call C (the other policy was faster)
+seed 0  reliability-curated policy, advantage on Success within 30 s (τ 30 s) +0.0090   call 0
+seed 1  speed-curated                                                          +0.0149   call 0
+seed 1  reliability-curated                                                    -0.0590   call T (the other policy was more reliable)
+seed 2  speed-curated                                                          +0.0045   call 0
+seed 2  reliability-curated                                                    -0.0410   call 0</code></pre>
+
+<h2>Visual</h2>
+<figure><img class="shot" src="artifacts/screens/curation_results.png" alt="Curation results page at 1400 px"><figcaption><b>The whole page, SYNTHETIC demo.</b> Top: banner and headline card reading “not shown”. Then the per-seed table, the forest plot, the arm table with its sentences, the “none recorded” line for family O, one arm in detail and the removed-episode list with a video.</figcaption></figure>
+<figure><svg viewBox="0 0 700 270" role="img" aria-label="Point estimates of each curated policy's advantage per seed" style="width:100%;height:auto">
+<text x="12" y="20" class="f-t">Advantage of each curated policy on its own metric (point estimates only)</text>
+<line x1="470" y1="34" x2="470" y2="212" class="svg-grid" style="stroke:var(--muted);stroke-dasharray:4 3"/>
+<line x1="250" y1="212" x2="690" y2="212" class="f-axis"/>
+<text x="250" y="230" text-anchor="middle" class="f-m">-0.08</text><text x="360" y="230" text-anchor="middle" class="f-m">-0.04</text><text x="470" y="230" text-anchor="middle" class="f-m">0</text><text x="580" y="230" text-anchor="middle" class="f-m">+0.04</text>
+<text x="470" y="250" text-anchor="middle" class="f-m">advantage in the metric's own units (positive = the curated policy wins)</text>
+<text x="240" y="54" text-anchor="end" class="f-m">seed 0 speed</text><circle cx="386.7" cy="50" r="7" class="f-solid"/>
+<text x="240" y="82" text-anchor="end" class="f-m">seed 0 reliability</text><circle cx="494.8" cy="78" r="7" class="f-hollow"/>
+<text x="240" y="110" text-anchor="end" class="f-m">seed 1 speed</text><circle cx="511" cy="106" r="7" class="f-hollow"/>
+<text x="240" y="138" text-anchor="end" class="f-m">seed 1 reliability</text><circle cx="307.8" cy="134" r="7" class="f-solid"/>
+<text x="240" y="166" text-anchor="end" class="f-m">seed 2 speed</text><circle cx="482.4" cy="162" r="7" class="f-hollow"/>
+<text x="240" y="194" text-anchor="end" class="f-m">seed 2 reliability</text><circle cx="357.3" cy="190" r="7" class="f-hollow"/>
+</svg><figcaption><b>What to notice.</b> To win, a dot must sit to the right of zero with its interval clear of zero. None does: the two solid dots (a recorded significant call) are both left of zero, i.e. the wrong way, and the rest carry no significant call, so nothing can be claimed. Values are from check 4.2; the page also draws each 95% interval (not redrawn here because the artifacts record only the points). The two metrics have different units, which is why the page labels the axis “in the metric's own units”.</figcaption></figure>
+
+<h2>Divergences and limitations</h2>
+<ul>
+<li><b>Recorded divergence: the forest plot uses <code>mark_rule</code> + <code>mark_point</code>, not <code>mark_errorbar</code>.</b> Measured in headless Chrome: the layered errorbar chart drew a plot area 22 px and 74 px tall despite <code>height=220/270</code>; with rules and points the areas measure 222 and 306 px (check 5.10a). Both are built-in Altair marks; the analyzer accepted this and did not reproduce the 22 px figure itself.</li>
+<li><b>Recorded divergence: the page ranks by the all-rollout column on the demo</b> and says “rollouts: all” in the caption (see S3).</li>
+<li><b>Recorded divergence: the demo shows only the not-shown state.</b> The other four states are exercised by the S1 fixture; the page has no branch that depends on the state (it prints the recorded status and sentence verbatim), so that is the right place to cover them. The gate-0/3 card is tested on a scratch copy (4.7a).</li>
+<li>Page checks run only on the demo and scratch copies. The real server summary is first rendered the day Round A finishes.</li>
+<li>Streamlit's <code>st.dataframe</code> does not wrap text, so the long sentences are shown as text under the arm table, not in cells.</li>
+<li>Cosmetic: the selected arm's list showed “SYNTHETIC:” twice per line; the refactor removed the duplicate (N6).</li>
+</ul>
+
+</div>
+</body>
+</html>

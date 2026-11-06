@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S2 Reading Round A back from the lineage store — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.good{border-left-color:var(--good)}.note.bad{border-left-color:var(--bad)}.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}code{overflow-wrap:anywhere}pre code{overflow-wrap:normal}
+table.gloss th.grp{background:var(--surface-2);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+table.gloss td:first-child{min-width:11em}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}.f-box.acc{stroke:var(--accent);stroke-width:1.8}.f-box.warn{stroke:var(--warn)}.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}.f-box.dash{stroke-dasharray:6 4}
+.f-t{fill:var(--text);font:600 13px var(--sans)}.f-m{fill:var(--muted);font:11.5px var(--mono)}.f-mt{fill:var(--text);font:12px var(--mono)}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}.f-ah{fill:var(--muted)}.f-bar{fill:var(--accent)}.f-bar2{fill:var(--muted)}.f-barw{fill:var(--warn)}
+.f-good{fill:var(--good)}.f-bad{fill:var(--bad)}.f-none{fill:var(--surface-2);stroke:var(--border)}.f-gate{fill:var(--surface);stroke:var(--warn);stroke-dasharray:3 2}
+.f-axis{stroke:var(--border);stroke-width:1.2}.f-hollow{fill:var(--surface);stroke:var(--text);stroke-width:1.6}.f-solid{fill:var(--accent)}
+.tag-syn{display:inline-block;font:600 11px/1.6 var(--mono);padding:1px 8px;border-radius:999px;border:1px solid var(--warn);color:var(--warn);margin-left:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Curation results in the dashboard</a></p>
+  <h1>S2 · Reading Round A back from the lineage store</h1>
+  <p class="dek">Three loaders find the Round A chain of a score run, read its verdicts with a checksum test, and recover the full list of removed episodes.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">4/4</span></span>
+    <span><b>Depends on</b> S1</span>
+    <span><b>Data</b> <span class="pill warn">demo is SYNTHETIC; no real Round A yet</span></span>
+  </div>
+</header>
+
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>Everything the server does is recorded as runs in a store (MLflow), each with files attached. The page needs to find the right ones: the summary of the removal tests, the individual verdicts, and which training recordings each curated arm removed. This story adds the readers. They refuse a file whose checksum no longer matches what was recorded, and they say "none recorded" (rather than crash) when the score run never had a Round A.</p>
+  <p>One detail: the store keeps the removed episodes as a shortened list. For the demo, the stored tag held only 78 of the 100 ids. The reader therefore recomputes the full list as "the parent subset minus the child subset", which is exact.</p>
+  <p class="small">Terms are defined in the <a href="report.html#glossary">glossary</a> of the main report.</p>
+</div>
+
+<h2>Why</h2>
+<p>PoC §9.1 Step 4 says the output is confirmation or refutation that the attribution is causally correct, and §2.6 says what is removed must be traceable. The dashboard reads only through <code>results.py</code> (no hard-coded paths), like the other pages.</p>
+<blockquote>“Output: Confirmation, or refutation, that the attribution is causally correct.” — §9.1 Step 4, p. 19</blockquote>
+
+<h2>What was built</h2>
+<div class="scroll"><table class=""><thead><tr><th>File / function</th><th>What it does</th></tr></thead><tbody><tr><td><code>vlapoc/results.py::CURATION_OPS, curation_runs</code></td><td>Finds the newest Round A summary run of a score run's chain and its select runs; a Round B summary sharing the chain id is skipped by an operation filter</td></tr><tr><td><code>vlapoc/results.py::removed_episodes</code></td><td>The full list of removed episodes per arm (parent minus child), with the rank inside its task recomputed from the score table (the derivation stores the list sorted, so rank is not recoverable from it)</td></tr><tr><td><code>vlapoc/results.py::provenance (reason_items)</code></td><td>Added by the refactor: the reasons behind a SYNTHETIC / SMOKE / REAL label as structured items, so the page no longer parses its own formatted text</td></tr><tr><td><code>dashboard/common.py::curation_of, curation_verdicts, removed_of</code></td><td>Cached wrappers the page calls</td></tr></tbody></table></div>
+
+<h2>Acceptance criteria</h2>
+<p class="small">Results as the analyzer reproduced them in round 2 (commands from the repo root; the full outputs are in <code>artifacts/</code>).</p>
+<div class="scroll"><table class=""><thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead><tbody><tr><td>2.1 finds the summary and the 7 arms; a newer Round-B-like summary does not displace it</td><td>§9.1 Step 4 p.19</td><td>✅</td><td><code>summary step4-summary-demo; arms ['drop-random-20','harm-f30-k5','harm-hrt60_lin-k5','help-f30-k5','help-hrt60_lin-k5','random0-k5','random1-k5']</code></td></tr><tr><td>2.2 removed episodes equal parent minus child; ranks 1 to 5 within each task</td><td>§2.6 p.5</td><td>✅</td><td><code>drop-random-20: 20; the six k5 arms: 100 (prefix of 78 tag ids equal); ranks [1, 2, 3, 4, 5]</code></td></tr><tr><td>2.3 a tampered summary or verdict file raises; a score run without Round A returns None</td><td>fail-closed, like S1 of dashboard</td><td>✅</td><td><code>[('summary', True), ('verdict', True)]; None for the smoke run: True</code></td></tr><tr><td>2.4 docstrings cite §9.1 Step 4 p.19 and §2.6 p.5; no import from ground-truth modules</td><td>vla-build step 4</td><td>✅</td><td><code>forbidden imports []</code></td></tr></tbody></table></div>
+
+<h2>Example</h2>
+<p>The arm harm-f30-k5 (the 5 episodes per task ranked most harmful for “Success within 30 s”, removed from each of 20 tasks) on the demo store. The check compares what the loader returns with the recorded selection.</p>
+<pre><code>arm harm-f30-k5      removed episodes recovered: 100   (5 in each of 20 tasks)
+recorded tag holds   : 78 of the 100 ids (cut at 7,900 characters)  -> the tag is a prefix of the recovered list: equal
+rank in its task     : [1, 2, 3, 4, 5] for every task, equal to a recomputation from the score table
+drop-random-20       : 20 recovered, the whole tag, equal</code></pre>
+
+<h2>Visual</h2>
+<figure><svg viewBox="0 0 700 150" role="img" aria-label="Recorded tag holds 78 of 100 removed episode ids; the loader recovers all 100" style="width:100%;height:auto">
+<text x="12" y="22" class="f-t">harm-f30-k5, demo store: removed episodes (100 = 5 per task x 20 tasks)</text>
+<rect x="12" y="38" width="676" height="26" rx="4" class="f-none"/><rect x="12" y="38" width="527" height="26" rx="4" class="f-bar2"/>
+<text x="20" y="56" class="f-mt" style="fill:var(--surface)">recorded tag: 78 ids (truncated)</text>
+<rect x="12" y="84" width="676" height="26" rx="4" class="f-bar"/><text x="20" y="102" class="f-mt" style="fill:var(--surface)">removed_episodes(): 100 ids = parent subset minus child subset</text>
+<text x="12" y="134" class="f-m">Bar lengths are proportional to 78 and 100. The recovered list begins with the recorded 78 (checked equal), so nothing the store says is contradicted.</text>
+</svg><figcaption><b>Why a loader and not just the tag.</b> The recorded tag is cut at 7,900 characters, so on its own it would silently show 78 of 100 episodes. Recomputing from the two subsets gives the full list and the check proves the two agree on the part they share.</figcaption></figure>
+
+<h2>Divergences and limitations</h2>
+<ul>
+<li>The loaders are thin adapters over <code>find_runs</code> and <code>runs_with_param</code> (MLflow's <code>search_runs</code> underneath). The analyzer's audit found nothing off the shelf for “the Round A chain of this score run”.</li>
+<li>On the server the select runs record <code>__same_task</code> columns; the demo records the all-rollout column (see <a href="S3-synthetic-round-a.html">S3</a>). The loaders handle both.</li>
+<li>Seen only on the demo store and scratch copies; the real server summary is first read the day Round A finishes (<a href="S5-dropin-render.html">S5</a> proves the shape).</li>
+</ul>
+
+</div>
+</body>
+</html>

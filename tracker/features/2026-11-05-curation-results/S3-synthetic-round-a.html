@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S3 A SYNTHETIC Round A in the demo store — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.good{border-left-color:var(--good)}.note.bad{border-left-color:var(--bad)}.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}code{overflow-wrap:anywhere}pre code{overflow-wrap:normal}
+table.gloss th.grp{background:var(--surface-2);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+table.gloss td:first-child{min-width:11em}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}.f-box.acc{stroke:var(--accent);stroke-width:1.8}.f-box.warn{stroke:var(--warn)}.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}.f-box.dash{stroke-dasharray:6 4}
+.f-t{fill:var(--text);font:600 13px var(--sans)}.f-m{fill:var(--muted);font:11.5px var(--mono)}.f-mt{fill:var(--text);font:12px var(--mono)}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}.f-ah{fill:var(--muted)}.f-bar{fill:var(--accent)}.f-bar2{fill:var(--muted)}.f-barw{fill:var(--warn)}
+.f-good{fill:var(--good)}.f-bad{fill:var(--bad)}.f-none{fill:var(--surface-2);stroke:var(--border)}.f-gate{fill:var(--surface);stroke:var(--warn);stroke-dasharray:3 2}
+.f-axis{stroke:var(--border);stroke-width:1.2}.f-hollow{fill:var(--surface);stroke:var(--text);stroke-width:1.6}.f-solid{fill:var(--accent)}
+.tag-syn{display:inline-block;font:600 11px/1.6 var(--mono);padding:1px 8px;border-radius:999px;border:1px solid var(--warn);color:var(--warn);margin-left:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Curation results in the dashboard</a></p>
+  <h1>S3 · A SYNTHETIC Round A in the demo store</h1>
+  <p class="dek">The demo builder now writes a whole labelled-synthetic Round A: 7 selections, 24 trainings and evaluations, 48 verdicts and the step4 summary, all through the real code.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">5/5</span></span>
+    <span><b>Depends on</b> S1, S2</span>
+    <span><b>Data</b> <span class="pill warn">demo is SYNTHETIC; no real Round A yet</span></span>
+  </div>
+</header>
+
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>The server has not run Round A yet, so the page needed something to show. The demo builder now creates a complete, invented Round A in the demo store: the same 7 ways of removing episodes, 3 seeds each, judged by the same verdict code the server will use. Only the robot attempts themselves are invented, drawn from a generator whose planted effects are written out in words on every run. Every run is tagged synthetic.</p>
+  <p>I did not tune the invented effects until the headline looked like a win. The first tries, where the reliability-curated policy completes more attempts, made it win on speed too, so the two curations did not trade off. The demo therefore honestly says <b>not shown</b>. It demonstrates that the page and the wording behave, not that the idea works.</p>
+  <p class="small">Terms are defined in the <a href="report.html#glossary">glossary</a> of the main report.</p>
+</div>
+
+<h2>Why</h2>
+<p>PoC §10 (p. 20) lists a “dashboard linking failed rollouts to influential episodes” and counterfactual removal tests; the brief asked for a labelled synthetic demo until the server runs, with the drop-in proof (S5) that real runs render with no code change.</p>
+<blockquote>“Verification & demo | Counterfactual removal tests; dashboard linking failed rollouts to influential episodes” — §10, p. 20</blockquote>
+
+<h2>What was built</h2>
+<div class="scroll"><table class=""><thead><tr><th>File / function</th><th>What it does</th></tr></thead><tbody><tr><td><code>scripts/dashboard_demo.py::round_a</code></td><td>Parses the server dry run's commands and runs the real <code>select_run</code>, <code>verify_run</code> and <code>summary_run</code> on the demo data</td></tr><tr><td><code>scripts/dashboard_demo.py::synthetic_rollouts, ARM_EFFECTS</code></td><td>Generates invented rollout outcomes per arm and seed with the planted effect stated in words; imports nothing from ground truth, recovery or discrepancy</td></tr><tr><td><code>scripts/dashboard_demo.py::arm_of, argparse_ns</code></td><td>Small helpers (the refactor moved <code>arm_of</code> out of a loop)</td></tr><tr><td><code>data/lineage_demo/</code></td><td>The rebuilt demo store (not committed; rebuild with <code>--with-smoke --force</code>)</td></tr></tbody></table></div>
+
+<h2>Acceptance criteria</h2>
+<p class="small">Results as the analyzer reproduced them in round 2 (commands from the repo root; the full outputs are in <code>artifacts/</code>).</p>
+<div class="scroll"><table class=""><thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead><tbody><tr><td>3.1 store holds 7 selects, 24 trains, 24 evals, 48 verifies and 1 summary; all synthetic; real store untouched</td><td>§2.6 p.5</td><td>✅</td><td><code>{'select': 7, 'train': 24, 'eval': 24, 'verify': 48, 'summarize': 1}; kinds {'curated_vs_random': 24, 'vs_base': 21, 'head_to_head': 3}; provenance SYNTHETIC (111 runs walked)</code></td></tr><tr><td>3.2 re-running <code>compare_policies</code> on one recorded pair reproduces gate p, differences, CIs and Holm p exactly</td><td>§4.4 p.10</td><td>✅</td><td><code>gate p 0.00049975 == 0.00049975; f30 diff -0.0590 CI -0.0930..-0.0200</code></td></tr><tr><td>3.3 summary has a confirmed row, a not-confirmed or inconclusive row and a headline; printed as produced</td><td>§4.5 p.11</td><td>✅</td><td><code>status codes ['confirmed', 'inconclusive', 'no expectation (control arm)', 'not confirmed']; headline 'SYNTHETIC: not shown'</code></td></tr><tr><td>3.4 existing demo checks still pass after the rebuild</td><td>regression</td><td>✅</td><td><code>--app 11/11, --render 4/4, --dropin 7/7, --demo 6/6 (after the refactor: 6.5 became a warning)</code></td></tr><tr><td>3.5 the generator uses no ground-truth modules; planted effect stated in words in every eval run</td><td>method boundary</td><td>✅</td><td><code>'same as the base policy (random removal) (f 3.0, sigma 0.5, p 0.8)'</code></td></tr></tbody></table></div>
+
+<h2>Example</h2>
+<p>One eval run's recorded parameters and the build cost. Build times are measured from the manifest in round 2: the whole demo build with smoke runs took 881 s, of which Round A took 380 s (48 verdicts, about 7.9 s each).</p>
+<pre><code>planted effect (words, recorded on each eval run):
+  base policy / random-removal arms : 'same as the base policy (random removal) (f 3.0, sigma 0.5, p 0.8)'
+  HRT-curated   : faster but more variable (f 1.9, sigma 0.9, completes 82%)
+  F30-curated   : more reliable, tight spread (f 2.6, sigma 0.15, completes 88%)
+  help-F30      : completes 68%         help-HRT : weak (f 3.1)
+every trained policy also gets seed jitter (f 1.5%, completion 1 point)</code></pre>
+
+<h2>Visual</h2>
+<figure><svg viewBox="0 0 700 200" role="img" aria-label="Planted completion rates in the synthetic generator" style="width:100%;height:auto">
+<text x="12" y="20" class="f-t">Planted completion probability in the synthetic generator (SYNTHETIC input, not a result)</text>
+<line x1="170" y1="34" x2="170" y2="170" class="f-axis"/>
+<text x="162" y="62" text-anchor="end" class="f-m">base / random</text><rect x="170" y="48" width="400" height="20" class="f-bar2"/><text x="576" y="63" class="f-mt">80%</text>
+<text x="162" y="92" text-anchor="end" class="f-m">HRT-curated</text><rect x="170" y="78" width="410" height="20" class="f-bar"/><text x="586" y="93" class="f-mt">82%</text>
+<text x="162" y="122" text-anchor="end" class="f-m">F30-curated</text><rect x="170" y="108" width="440" height="20" class="f-bar"/><text x="616" y="123" class="f-mt">88%</text>
+<text x="162" y="152" text-anchor="end" class="f-m">help-F30 (worse)</text><rect x="170" y="138" width="340" height="20" class="f-barw"/><text x="516" y="153" class="f-mt">68%</text>
+<text x="170" y="190" class="f-m">axis 0 to 100% of attempts completed; bar length = value x 5 px</text>
+</svg><figcaption><b>What was planted.</b> These are inputs to the generator, taken from the build log. Because the F30-curated policy completes more attempts, it also does better on time-to-success measures that count timeouts at 60 s (the reason is <i>inferred</i>; the observation was <i>measured</i> in pilots: HRT difference +0.058, Holm p 0.033). That is why a clean “each wins its own metric” could not be planted, and why the demo reads “not shown”.</figcaption></figure>
+
+<h2>Divergences and limitations</h2>
+<ul>
+<li><b>Recorded divergence: the demo ranks each task by the all-rollout column <code>harm_&lt;m&gt;</code>, not the per-task column <code>harm_&lt;m&gt;__same_task</code>.</b> The demo's invented rollouts cover only 2 of the 20 tasks, so the per-task columns are empty (NaN) for the other 18 and the select step refuses (measured: <code>LineageError: score table has NaN in 'harm_f30__same_task'</code>). The select run records the column it used and the page's caption says “rollouts: all”. The server ranks by <code>__same_task</code>; S5 exercises that column through the real stage commands. Owner option: build invented rollouts for all 20 tasks.</li>
+<li>Family-O verdicts are not built in the demo (the demo rollouts carry no operation pairs); the page shows a “none recorded” line for them, and S5 covers O on a server-shaped chain.</li>
+<li>The invented rollouts cover only part of the picture by design; none of this says anything about a real policy.</li>
+</ul>
+
+</div>
+</body>
+</html>

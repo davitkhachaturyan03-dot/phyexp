@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S5 Drop-in proof and real-browser checks — VLA PoC</title>
+<link rel="stylesheet" href="../../assets/tracker.css">
+<style>
+.plain{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 18px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.plain h2{margin-top:0;border:0;padding-top:0}.plain p:last-child{margin-bottom:0}
+p.small,.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:6px;margin:0 0 18px;max-width:72ch}
+.note.good{border-left-color:var(--good)}.note.bad{border-left-color:var(--bad)}.note p:last-child{margin-bottom:0}
+blockquote{margin:0 0 16px;padding:8px 16px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:72ch}
+ul,ol{max-width:72ch}code{overflow-wrap:anywhere}pre code{overflow-wrap:normal}
+table.gloss th.grp{background:var(--surface-2);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+table.gloss td:first-child{min-width:11em}
+img.shot{display:block;width:100%;height:auto;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.f-box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}.f-box.acc{stroke:var(--accent);stroke-width:1.8}.f-box.warn{stroke:var(--warn)}.f-box.soft{fill:var(--accent-soft);stroke:var(--accent)}.f-box.dash{stroke-dasharray:6 4}
+.f-t{fill:var(--text);font:600 13px var(--sans)}.f-m{fill:var(--muted);font:11.5px var(--mono)}.f-mt{fill:var(--text);font:12px var(--mono)}
+.f-arrow{stroke:var(--muted);stroke-width:1.5;fill:none}.f-ah{fill:var(--muted)}.f-bar{fill:var(--accent)}.f-bar2{fill:var(--muted)}.f-barw{fill:var(--warn)}
+.f-good{fill:var(--good)}.f-bad{fill:var(--bad)}.f-none{fill:var(--surface-2);stroke:var(--border)}.f-gate{fill:var(--surface);stroke:var(--warn);stroke-dasharray:3 2}
+.f-axis{stroke:var(--border);stroke-width:1.2}.f-hollow{fill:var(--surface);stroke:var(--text);stroke-width:1.6}.f-solid{fill:var(--accent)}
+.tag-syn{display:inline-block;font:600 11px/1.6 var(--mono);padding:1px 8px;border-radius:999px;border:1px solid var(--warn);color:var(--warn);margin-left:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow"><a class="backlink" href="report.html">← Curation results in the dashboard</a></p>
+  <h1>S5 · Drop-in proof and real-browser checks</h1>
+  <p class="dek">The page renders a chain built from the server's own commands with no code change, and its plots are the right size in real Chrome.</p>
+  <div class="meta">
+    <span><b>ACs</b> <span class="pill good">5/5</span></span>
+    <span><b>Depends on</b> S1 to S4</span>
+    <span><b>Data</b> <span class="pill warn">demo is SYNTHETIC; no real Round A yet</span></span>
+  </div>
+</header>
+
+<div class="plain">
+  <h2>In plain words</h2>
+  <p>A demo on invented data proves little unless real server results will show up in the same page. This story builds a tiny chain by running the server's actual Round A commands (the dry run's select, verify and step4-summary commands) through the same stage tool the server uses, on a toy fixture. The page must then show exactly what was recorded. A second check re-labels that chain the way the server would write it and confirms the SYNTHETIC and SMOKE banners disappear and a REAL caption appears; adding one synthetic tag brings the banner back.</p>
+  <p>The same story checks the page in a real browser (headless Chrome at 1400 px) so that plots are not collapsed, and re-runs the older checks to make sure nothing else changed.</p>
+  <p class="small">Terms are defined in the <a href="report.html#glossary">glossary</a> of the main report.</p>
+</div>
+
+<h2>Why</h2>
+<p>PoC §10 (p. 20) wants the verification step demonstrated; the brief demands that real Round A runs render with no code change and that the real-browser check covers the new page. Round 1 of the analysis added family O here, because the server records 21 operation-level verdicts and the page had been hiding them.</p>
+<blockquote>“Verification & demo | Counterfactual removal tests; dashboard linking failed rollouts to influential episodes” — §10, p. 20</blockquote>
+
+<h2>What was built</h2>
+<div class="scroll"><table class=""><thead><tr><th>File / function</th><th>What it does</th></tr></thead><tbody><tr><td><code>scripts/verify_dashboard.py::curation_dropin, --dropin, --curation</code></td><td>Runs the dry run's own commands through <code>scripts/stage.py</code> on a fixture; compares the page's rows with the recorded ones; the re-tag test; family-O check 5.5</td></tr><tr><td><code>scripts/verify_dashboard.py --render</code></td><td>Headless Chrome at 1400 px: plot areas at least 200 px tall, no truncated value, a real row click</td></tr><tr><td><code>scripts/verify_training_attribution.py::add_eval_outcomes</code></td><td>Fixture helper that writes the same eval columns as the real eval (<code>T_s</code>, <code>event</code>, <code>tau_episode_steps</code>, <code>suite</code>, <code>libero_task_id</code>, <code>rollout_id</code>, <code>pairs</code>)</td></tr><tr><td><code>scripts/dashboard_screenshots.py</code></td><td>PAGES list gains the new page</td></tr><tr><td><code>scripts/verify_runbook.py check 8.5 + artifacts/claude_md_base_commit.txt</code></td><td>Re-anchored: no agent commit after the owner's <code>bad0241</code> touches CLAUDE.md (analyzer finding B2)</td></tr></tbody></table></div>
+
+<h2>Acceptance criteria</h2>
+<p class="small">Results as the analyzer reproduced them in round 2 (commands from the repo root; the full outputs are in <code>artifacts/</code>).</p>
+<div class="scroll"><table class=""><thead><tr><th>AC</th><th>Source</th><th>Result</th><th>Evidence</th></tr></thead><tbody><tr><td>5.1 the dry run's select, verify and step4-summary commands, through the stage CLI, render equal to recorded</td><td>§10 p.20</td><td>✅</td><td><code>7 selects (k 5/3), 69 verdicts, 23 summary rows (7 family O), headline ['not shown']; page rows equal recorded: True; porcelain before '' after ''</code></td></tr><tr><td>5.2 re-tagged to what the server writes: no SYNTHETIC or SMOKE banner, REAL caption; one synthetic tag brings it back</td><td>brief</td><td>✅</td><td><code>re-tagged: banners [], REAL captions 2; one synthetic tag added: banner back True</code></td></tr><tr><td>5.3 plot areas at least 200 px in real Chrome; no truncated metric; no exception</td><td>dashboard AC5.10</td><td>✅</td><td><code>'Curation results': [[592, 222], [720, 306]]; truncated []</code></td></tr><tr><td>5.4 regression across every earlier verifier and the runbook</td><td>brief</td><td>✅</td><td><code>--app 11/11, --results 12/12, --clusters 14/14, --planted 7/7, --discrepancy 10/10, --round-b 13/13, --planted-arms 8/8; verify_attribution 32/32; verify_runbook 10/10; mlflow.db sha256 306af412…bde79 unchanged</code></td></tr><tr><td>5.5 the drop-in runs family-O verdicts too and the page shows them in their own table</td><td>§3.4 p.7</td><td>✅</td><td><code>23 summary rows, O metric 'rmst60_op_cap', O table 7 rows, W table 16; forest rows [6, 9]; unreached []; snake []</code></td></tr></tbody></table></div>
+
+<h2>Example</h2>
+<p>The first Round 2 drop-in run raised <code>KeyError: 'nan'</code> on the page: the recorded JSON gives every row every column, with NaN where the other family has no metric. This is the kind of server-shaped surprise the proof exists to catch. The fix is <code>row_keys</code> in the page and a family filter in the checker.</p>
+<pre><code>verify_dashboard.py --dropin   -> pass=True (7/7, 265 s)
+  5.1  7 selects (k 5/3), 69 verdicts, 23 summary rows (7 family O), headline ['not shown']
+  5.5  23 summary rows, O metric 'rmst60_op_cap', O table 7 rows, W table 16
+verify_dashboard.py --render   -> pass=True (4/4, 90 s)   'Curation results': [[592, 222], [720, 306]]
+verify_runbook.py              -> [PASS] 8.5 ... base bad02413; commits touching CLAUDE.md after it: []; working-tree diff ''
+                                  runbook: pass=True (10/10)</code></pre>
+
+<h2>Visual</h2>
+<figure><svg viewBox="0 0 700 150" role="img" aria-label="Drop-in chain time with and without family O verdicts" style="width:100%;height:auto">
+<text x="12" y="20" class="f-t">Stage-CLI chain time of the drop-in check (measured, seconds)</text>
+<line x1="230" y1="34" x2="230" y2="116" class="f-axis"/>
+<text x="222" y="62" text-anchor="end" class="f-m">W only (48 verdicts)</text><rect x="230" y="48" width="416" height="20" class="f-bar2"/><text x="652" y="63" class="f-mt">208</text>
+<text x="222" y="98" text-anchor="end" class="f-m">W + O (69 verdicts)</text><rect x="230" y="84" width="472" height="20" class="f-bar"/><text x="640" y="99" class="f-mt" style="fill:var(--surface)">236</text>
+<text x="230" y="138" class="f-m">bar length = seconds x 2 px; the 21 added family-O verifies cost 28 s</text>
+</svg><figcaption><b>What this shows.</b> Adding the operation-level verdicts to the proof cost 28 seconds (208 s to 236 s, whole mode 241 s to 278 s). Numbers from the execution log, rounds 1 and 2.</figcaption></figure>
+
+<h2>Divergences and limitations</h2>
+<ul>
+<li>The fixture's own subset is the parent and the removal size is scaled (5 per task stays, 20 overall becomes 3, in the 20-task fixture). Commands are otherwise the dry run's. This proves the shape of server output, not its numbers.</li>
+<li><b>Recorded change to a checker:</b> <code>--demo</code> check 6.5 used to fail when the laptop had under 20 GiB free disk (it passed at 20.25 GiB and failed at 17 to 19 GiB; the demo store is 17 MiB). The refactor made store plus cache under 2 GiB the check and turned free disk into a printed <code>[WARN]</code>. <code>--demo</code> went from 5/6 to 6/6 with no change to the demo.</li>
+<li><b>Open (N8):</b> runbook check 8.5 will fail again if the owner commits a CLAUDE.md edit after <code>bad0241</code>, because agents commit under the same git user. Fix by advancing <code>claude_md_base_commit.txt</code> or by ignoring commits without the Claude co-author trailer.</li>
+<li>No streamlit or Chrome process was left running after the checks.</li>
+</ul>
+
+</div>
+</body>
+</html>
