@@ -64,12 +64,12 @@ rank in its task     : [1, 2, 3, 4, 5] for every task, equal to a recomputation 
 drop-random-20       : 20 recovered, the whole tag, equal</code></pre>
 
 <h2>Visual</h2>
-<figure><svg viewBox="0 0 700 150" role="img" aria-label="Recorded tag holds 78 of 100 removed episode ids; the loader recovers all 100" style="width:100%;height:auto">
+<figure><svg viewBox="0 0 700 160" role="img" aria-label="Recorded tag holds 78 of 100 removed episode ids; the loader recovers all 100" style="width:100%;height:auto">
 <text x="12" y="22" class="f-t">harm-f30-k5, demo store: removed episodes (100 = 5 per task x 20 tasks)</text>
 <rect x="12" y="38" width="676" height="26" rx="4" class="f-none"/><rect x="12" y="38" width="527" height="26" rx="4" class="f-bar2"/>
 <text x="20" y="56" class="f-mt" style="fill:var(--surface)">recorded tag: 78 ids (truncated)</text>
 <rect x="12" y="84" width="676" height="26" rx="4" class="f-bar"/><text x="20" y="102" class="f-mt" style="fill:var(--surface)">removed_episodes(): 100 ids = parent subset minus child subset</text>
-<text x="12" y="134" class="f-m">Bar lengths are proportional to 78 and 100. The recovered list begins with the recorded 78 (checked equal), so nothing the store says is contradicted.</text>
+<text x="12" y="134" class="f-m">Bar lengths are proportional to 78 and 100. The recovered list begins with</text><text x="12" y="148" class="f-m">the recorded 78 (checked equal), so nothing the store says is contradicted.</text>
 </svg><figcaption><b>Why a loader and not just the tag.</b> The recorded tag is cut at 7,900 characters, so on its own it would silently show 78 of 100 episodes. Recomputing from the two subsets gives the full list and the check proves the two agree on the part they share.</figcaption></figure>
 
 <h2>Divergences and limitations</h2>
